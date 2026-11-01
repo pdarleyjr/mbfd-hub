@@ -14,9 +14,18 @@ final class TrainingPlannerCandidateService
 {
     public function __construct(private readonly TrainingPlannerAttendanceLookup $attendance) {}
 
-    public function candidates(User $actor, TrainingCourse $course, ?int $moduleId, CarbonImmutable $asOf, array $effectiveStaffing, array $filters = [], ?string $personnelAsOf = null): array
+    /**
+     * Every row says `available` (usable on a simple list) and `eligible_slots` (usable for those sessions).
+     * With no roster ($verified false) nobody can be on duty, so anyone with no prior attendance is available
+     * provisionally. With a roster, members it does not list stay searchable as `off_roster`, never available.
+     *
+     * @param  list<string>  $slotIds
+     */
+    public function candidates(User $actor, ?TrainingCourse $course, ?int $moduleId, CarbonImmutable $asOf, array $effectiveStaffing, array $filters = [], ?string $personnelAsOf = null, bool $verified = true, array $slotIds = []): array
     {
-        $snapshot = $this->attendance->lookup($actor, $course, $moduleId, $asOf, $personnelAsOf);
+        $snapshot = $course === null
+            ? $this->attendance->population($actor, $personnelAsOf ?? $asOf->setTimezone(\App\Support\HubTimezone::NAME)->toDateString())
+            : $this->attendance->lookup($actor, $course, $moduleId, $asOf, $personnelAsOf);
         $filters = Validator::make($filters, [
             'rank' => ['nullable', 'string', 'max:100'], 'cohort' => ['nullable', Rule::in(['all', 'officers', 'captain', 'lieutenant', 'firefighters'])],
             'assignment' => ['nullable', Rule::in(['rescue', 'combat', 'day_other', 'unverified'])],
@@ -34,9 +43,10 @@ final class TrainingPlannerCandidateService
             // Prefix preserves exact string identity even for numeric-looking identifiers.
             $identities['id:'.$person['employee_id']][] = $person;
         }
-        $rows = $review = [];
+        $rows = $review = $seenIds = [];
         foreach ($effectiveStaffing as $rawId => $duty) {
             $rawId = (string) ($duty['raw_employee_id'] ?? $rawId);
+            $seenIds[$rawId] = true;
             $matches = $identities['id:'.$rawId] ?? [];
             if (count($matches) !== 1) {
                 $review[] = ['raw_employee_id' => $rawId, 'raw_name' => (string) ($duty['raw_name'] ?? ''),
@@ -55,6 +65,25 @@ final class TrainingPlannerCandidateService
             $row['eligible_slots'] = $person['attendance_status'] === 'NO_PRIOR_ATTENDANCE'
                 ? array_values($duty['eligible_slots'] ?? []) : [];
             $row['has_review'] = $person['has_review'] || $row['needs_review'] !== [];
+            $row['off_roster'] = false;
+            $row['provisional'] = false;
+            $row['available'] = $person['attendance_status'] === 'NO_PRIOR_ATTENDANCE' && ($duty['working_intervals'] ?? []) !== [] && ($duty['needs_review'] ?? []) === [];
+            if ($this->matches($row, $filters)) {
+                $rows[$person['employee_profile_id']] = $row;
+            }
+        }
+        foreach ($snapshot['rows'] as $person) {
+            if (isset($seenIds[$person['employee_id']])) {
+                continue;
+            }
+            $clear = $person['attendance_status'] === 'NO_PRIOR_ATTENDANCE';
+            $row = $person + ['working_intervals' => [], 'unavailable_slots' => [], 'partial_slots' => [], 'observed_unit_context' => [],
+                'review_intervals' => [], 'global_review_reasons' => [], 'slot_review_reasons' => [], 'needs_review' => [],
+                'off_roster' => $verified, 'provisional' => ! $verified, 'available' => ! $verified && $clear,
+                'eligible_slots' => ! $verified && $clear ? $slotIds : []];
+            if (in_array($person['attendance_status'], ['IDENTITY_OR_EVIDENCE_REVIEW', 'UNVERIFIED_OR_PROVISIONAL'], true)) {
+                $row['needs_review'][] = 'Prior attendance evidence requires verification.';
+            }
             if ($this->matches($row, $filters)) {
                 $rows[$person['employee_profile_id']] = $row;
             }

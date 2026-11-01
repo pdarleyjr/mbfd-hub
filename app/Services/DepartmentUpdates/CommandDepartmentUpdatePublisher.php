@@ -46,7 +46,10 @@ final class CommandDepartmentUpdatePublisher
 
     public const ORIGIN_CAPTAIN_5 = 'captain_5';
 
-    public const ORIGINS = [self::ORIGIN_COMMAND_300, self::ORIGIN_CAPTAIN_5];
+    /** Sent from the Training Crew Planner. Same posting rule as the two pages; Training access alone grants nothing. */
+    public const ORIGIN_TRAINING = 'training';
+
+    public const ORIGINS = [self::ORIGIN_COMMAND_300, self::ORIGIN_CAPTAIN_5, self::ORIGIN_TRAINING];
 
     private const CATEGORIES = ['general', 'operations', 'training'];
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// Isolated loopback browser fixture. Every created identity and PDF is fabricated.
+// Isolated loopback browser fixture. Every created identity and roster row is fabricated.
 $fixtureRoot = dirname(__DIR__, 3);
 $root = getenv('CREW_PLANNER_SOURCE_ROOT') ?: $fixtureRoot;
 $dependencies = getenv('CREW_PLANNER_DEPENDENCY_ROOT') ?: $root;
@@ -18,12 +18,6 @@ if (PHP_SAPI === 'cli-server') {
         throw new RuntimeException('Loopback test server only.');
     }
     $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-    if ($path === '/__synthetic_daily.pdf') {
-        header('Content-Type: application/pdf');
-        readfile($directory.'/synthetic-daily.pdf');
-
-        return;
-    }
     if ($path !== '/' && ! str_contains($path, '..')) {
         foreach ([$directory.'/public', $assets] as $assetRoot) {
             if (is_file($assetRoot.$path)) {
@@ -119,7 +113,14 @@ if (in_array('--seed', $argv ?? [], true)) {
         $employee = App\Models\Employee::create(['employee_id' => $number, 'name' => 'Synthetic actor '.$project, 'rank' => 'Captain', 'roster_status' => 'active', 'city_email' => 'synthetic-actor-'.$project.'@miamibeachfl.gov']);
         $actor = App\Models\User::factory()->create(['name' => 'Synthetic training admin '.$project, 'email' => 'training_admin-'.$project.'@example.test', 'password' => 'synthetic-crew-password', 'account_status' => 'active', 'must_change_password' => false, 'employee_profile_id' => $employee->id, 'employee_id' => $number]);
         $actor->assignRole('training_admin');
+        // Sending a plan is each destination's own rule, so the publisher also holds the super admin role.
+        $publisherEmployee = App\Models\Employee::create(['employee_id' => (string) (90021 + $index), 'name' => 'Synthetic publisher '.$project, 'rank' => 'Captain', 'roster_status' => 'active', 'city_email' => 'synthetic-publisher-'.$project.'@miamibeachfl.gov']);
+        $publisher = App\Models\User::factory()->create(['name' => 'Synthetic training publisher '.$project, 'email' => 'training_publisher-'.$project.'@example.test', 'password' => 'synthetic-crew-password', 'account_status' => 'active', 'must_change_password' => false, 'employee_profile_id' => $publisherEmployee->id, 'employee_id' => (string) (90021 + $index)]);
+        $publisher->assignRole('training_admin');
+        $publisher->assignRole(Spatie\Permission\Models\Role::findOrCreate('super_admin', 'web'));
     }
+    // Two places a session can be held: a Hub station from the list, or a typed venue.
+    App\Models\Station::create(['name' => 'Synthetic Station 99', 'station_number' => 99, 'address' => '1 Synthetic Way', 'city' => 'Synthetic City', 'state' => 'FL', 'zip_code' => '00000', 'is_active' => true]);
     $fresh = App\Models\Training\TrainingCourse::create(['name' => 'Synthetic new course', 'classifications' => ['STC'], 'track_attendance_matrix' => false, 'created_by' => $admin->id]);
     $modular = App\Models\Training\TrainingCourse::create(['name' => 'Synthetic modular course', 'classifications' => ['STC'], 'track_attendance_matrix' => false, 'created_by' => $admin->id]);
     foreach (['Synthetic Module 1', 'Synthetic Module 2'] as $index => $label) {
@@ -129,7 +130,15 @@ if (in_array('--seed', $argv ?? [], true)) {
             App\Models\Training\TrainingAttendance::create(['training_session_id' => $session->id, 'employee_profile_id' => $employees[0]->id, 'snapshot' => ['rank' => 'Captain'], 'signature' => ['disk' => 'local', 'path' => 'synthetic/not-read.png', 'mime' => 'image/png', 'sha256' => str_repeat('d', 64)], 'signed_at' => '2026-10-20T15:00:00Z', 'client_submission_id' => (string) Illuminate\Support\Str::uuid(), 'request_hash' => str_repeat('e', 64)]);
         }
     }
-    file_put_contents($directory.'/synthetic-daily.pdf', syntheticDailyPdf());
+    // The TeleStaff roster the Hub already accepted for today's duty date. 90004 has a code nobody can read
+    // (held for verification) and 90099 is on the roster but is no Hub employee.
+    $dutyDate = app(App\Support\Captain5\DutyCalendar::class)->dutyDate()->format('Y-m-d');
+    $onDuty = static fn (string $id, string $code = 'SP', string $availability = App\Models\DailyRoster\RosterAssignment::AVAILABILITY_WORKING): array => [
+        'employee_id' => $id, 'name' => 'SYNTHETIC, '.$id, 'code' => $code, 'availability' => $availability, 'from' => '08:00', 'through' => '20:00'];
+    Tests\Support\DailyRosterSnapshotFactory::publish($dutyDate, ['Station 9 / Engine 9' => [
+        $onDuty('90001'), $onDuty('90002'), $onDuty('90003'),
+        $onDuty('90004', 'ZZZ', App\Models\DailyRoster\RosterAssignment::AVAILABILITY_UNKNOWN), $onDuty('90099'),
+    ]]);
     echo 'SYNTHETIC_CREW_FIXTURE_READY '.$directory.PHP_EOL;
     exit;
 }
@@ -141,7 +150,8 @@ if ($path === '/__crew_domain_fingerprint') {
     $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
     $hashes = [];
     foreach (Illuminate\Support\Facades\Schema::getTableListing() as $table) {
-        if (preg_match('/^(?:training_|employees$|employee_bid_assignments$)|vacation/i', $table)) {
+        // The planner's own saved plans and send records are not training, attendance or personnel data.
+        if (preg_match('/^(?:training_|employees$|employee_bid_assignments$)|vacation/i', $table) && ! str_contains($table, 'crew_plan')) {
             $hashes[$table] = hash('sha256', json_encode(Illuminate\Support\Facades\DB::table($table)->orderBy('id')->get()->all(), JSON_THROW_ON_ERROR));
         }
     }
@@ -154,38 +164,3 @@ $_SERVER['SCRIPT_NAME'] = '/index.php';
 $_SERVER['SCRIPT_FILENAME'] = $root.'/public/index.php';
 $_SERVER['PHP_SELF'] = '/index.php';
 $app->handleRequest(Illuminate\Http\Request::capture());
-
-function syntheticDailyPdf(): string
-{
-    $items = [[48, 700, 'Wednesday, October 21, 2026'], [48, 680, 'B Shift'], [48, 660, 'Station 9'], [48, 640, 'Engine 9']];
-    foreach (['90001', '90002', '90003', '90004', '90099'] as $index => $id) {
-        $y = 620 - 20 * $index;
-        array_push($items, [51, $y, 'Firefighter'], [173, $y, 'SYNTHETIC, '.$id], [311, $y, $id], [351, $y, $id === '90004' ? 'ZZTEST' : 'SP'], [494.7, $y, '08:00'], [515.9, $y, '20:00'], [548, $y, '12']);
-    }
-    $content = '';
-    foreach ($items as [$x, $y, $text]) {
-        $content .= syntheticPdfText($x, $y, $text, 0.36040324);
-    }
-    $content .= syntheticPdfText(0, 20, '1 of 1', 0.5).syntheticPdfText(525, 20, '10/20/2026, 7:00 AM', 0.5);
-    $objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [4 0 R] /Count 1 >>', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>', '<< /Length '.strlen($content).">>\nstream\n".$content.'endstream'];
-    $pdf = "%PDF-1.4\n";
-    $offsets = [];
-    foreach ($objects as $index => $object) {
-        $offsets[] = strlen($pdf);
-        $pdf .= ($index + 1)." 0 obj\n".$object."\nendobj\n";
-    }
-    $xref = strlen($pdf);
-    $pdf .= "xref\n0 6\n0000000000 65535 f \n";
-    foreach ($offsets as $offset) {
-        $pdf .= sprintf("%010d 00000 n \n", $offset);
-    }
-
-    return $pdf."trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n".$xref."\n%%EOF";
-}
-
-function syntheticPdfText(float $x, float $y, string $text, float $scale): string
-{
-    $text = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $text);
-
-    return sprintf("q %.8F 0 0 %.8F 0 0 cm BT /F1 18 Tf 1 0 0 1 %.8F %.8F Tm (%s) Tj ET Q\n", $scale, $scale, $x / $scale, $y / $scale, $text);
-}

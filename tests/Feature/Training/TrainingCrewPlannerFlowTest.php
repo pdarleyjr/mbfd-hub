@@ -11,19 +11,20 @@ use App\Models\Training\TrainingCourse;
 use App\Models\Training\TrainingModule;
 use App\Models\Training\TrainingSession;
 use App\Models\User;
+use App\Services\Training\CrewPlanner\TrainingCrewPlanComposer;
 use App\Services\Training\CrewPlanner\TrainingCrewPlannerDraftStore;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Role;
+use Tests\Support\DailyRosterSnapshotFactory;
 use Tests\TestCase;
 
-/** The select-and-go planner flow. Every identity and PDF is synthetic. */
+/** The select-and-go planner flow. Every identity and roster is synthetic. */
 final class TrainingCrewPlannerFlowTest extends TestCase
 {
     use RefreshDatabase;
@@ -41,6 +42,7 @@ final class TrainingCrewPlannerFlowTest extends TestCase
         self::assertSame('sqlite', DB::connection()->getDriverName());
         self::assertSame(':memory:', DB::connection()->getDatabaseName());
         $this->withoutVite();
+        config(['captain5.shift_rotation' => ['enabled' => false]]);
         $this->admin = User::factory()->create(['account_status' => 'active', 'must_change_password' => false]);
         $this->admin->assignRole(Role::findOrCreate('training_admin', 'web'));
         $this->actingAs($this->admin);
@@ -205,8 +207,7 @@ final class TrainingCrewPlannerFlowTest extends TestCase
     public function test_attendance_is_judged_as_it_stood_when_todays_class_begins(): void
     {
         $today = CarbonImmutable::now('America/New_York')->toDateString();
-        $page = $this->readyComponent([], [], $today)->instance();
-        $cutoff = fn (array $draft): array => (fn (array $draft): array => $this->attendanceCutoff($draft))->call($page, $draft);
+        $cutoff = fn (array $draft): array => app(TrainingCrewPlanComposer::class)->attendanceCutoff($draft);
         $slot = fn (string $date, string $time): array => ['id' => (string) Str::uuid(), 'label' => 'Session 1',
             'start_at' => CarbonImmutable::parse($date.' '.$time, 'America/New_York')->toIso8601String(),
             'end_at' => CarbonImmutable::parse($date.' 23:59', 'America/New_York')->toIso8601String()];
@@ -222,15 +223,6 @@ final class TrainingCrewPlannerFlowTest extends TestCase
         $old = CarbonImmutable::now('America/New_York')->subDays(3)->toDateString();
         [, $classStart] = $cutoff(['slots' => [$slot($old, '13:00')], 'metadata' => ['schedule_date' => $old]]);
         self::assertFalse($classStart);
-    }
-
-    public function test_a_rejected_upload_message_survives_until_the_page_loads_and_shows_once(): void
-    {
-        // CI regression: a debounced search update consumed the flashed error before the redirect landed.
-        session()->put(TrainingCrewPlanner::UPLOAD_ERROR_KEY, 'Synthetic upload problem. Your saved proposal is safe.');
-        Livewire::test(TrainingCrewPlanner::class)->assertSee('Synthetic upload problem. Your saved proposal is safe.');
-        self::assertFalse(session()->has(TrainingCrewPlanner::UPLOAD_ERROR_KEY));
-        Livewire::test(TrainingCrewPlanner::class)->assertDontSee('Synthetic upload problem.');
     }
 
     public function test_an_older_roster_never_moves_the_attendance_cutoff_into_the_past(): void
@@ -253,8 +245,8 @@ final class TrainingCrewPlannerFlowTest extends TestCase
         // Extending the class past the end of duty is picked up by the export itself.
         $component->set('slotEdits.0.end', '21:00')->assertHasNoErrors();
         $component->assertSee('Needs verification')->call('download', 'pdf')->assertHasErrors('confirmReview')->assertNoFileDownloaded();
-        $component->set('confirmReview', true)->call('download', 'pdf')->assertFileDownloaded('MBFD-Training-Personnel-Request-2026-10-21.pdf');
-        $component->call('download', 'xlsx')->assertFileDownloaded('MBFD-Training-Personnel-Request-2026-10-21.xlsx');
+        $component->set('confirmReview', true)->call('download', 'pdf')->assertFileDownloaded('MBFD-Training-Class-Roster-2026-10-21.pdf');
+        $component->call('download', 'xlsx')->assertFileDownloaded('MBFD-Training-Class-Roster-2026-10-21.xlsx');
         self::assertCount(3, $this->draft($id)['selections']);
         $component->call('toggleMember', $this->employees['90001']->id);
         self::assertCount(2, $this->draft($id)['selections']);
@@ -263,7 +255,7 @@ final class TrainingCrewPlannerFlowTest extends TestCase
 
     public function test_every_mutation_is_denied_after_management_access_is_revoked(): void
     {
-        $calls = [['toggleMember', [1]], ['selectAllShown', []], ['clearSelection', []], ['setMemberSlot', [1, '']], ['addSlot', []], ['saveSlots', []]];
+        $calls = [['toggleMember', [1]], ['selectAllShown', []], ['clearSelection', []], ['setMemberSlot', [1, '']], ['addSlot', []], ['publish', []], ['download', ['pdf']]];
         $components = array_map(fn (): mixed => Livewire::test(TrainingCrewPlanner::class), $calls);
         $this->admin->removeRole('training_admin');
         foreach ($calls as $index => [$method, $arguments]) {
@@ -272,18 +264,20 @@ final class TrainingCrewPlannerFlowTest extends TestCase
     }
 
     /**
-     * A planner with a course applied, a roster uploaded for the date, and optional typed sessions.
+     * A planner on a date with an accepted roster, a course applied, and optional typed sessions.
      *
      * @param  list<array{string, string, string}>  $sessions
      * @param  array<string, array{string, string}>  $duty  employee id => [from, to] overriding the 08:00-20:00 default
      */
     private function readyComponent(array $sessions = [], array $duty = [], string $date = '2026-10-21'): mixed
     {
-        $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id)->assertHasNoErrors();
-        $id = $component->get('draftId');
-        $this->post(route('training.crew-planner.upload'), ['draft_id' => $id, 'version' => $component->get('version'),
-            'roster_pdf' => UploadedFile::fake()->createWithContent('synthetic-daily.pdf', $this->pdf($date, $duty))])->assertRedirect()->assertSessionHasNoErrors();
-        $component->call('reloadProposal')->assertHasNoErrors();
+        $rows = [];
+        foreach (array_map('strval', array_keys($this->employees)) as $number) {
+            [$from, $through] = $duty[$number] ?? ['08:00', '20:00'];
+            $rows[] = ['employee_id' => $number, 'name' => 'Synthetic '.$number, 'code' => 'SP', 'availability' => 'working', 'from' => $from, 'through' => $through];
+        }
+        DailyRosterSnapshotFactory::publish($date, ['Station 9 / Engine 9' => $rows], ['shift' => 'B']);
+        $component = Livewire::test(TrainingCrewPlanner::class)->set('scheduleDate', $date)->assertHasNoErrors()->set('courseId', $this->course->id)->assertHasNoErrors();
         foreach ($sessions as $index => [$label, $start, $end]) {
             if ($index > 0) {
                 $component->call('addSlot');
@@ -297,47 +291,5 @@ final class TrainingCrewPlannerFlowTest extends TestCase
     private function draft(string $id): array
     {
         return app(TrainingCrewPlannerDraftStore::class)->get($this->admin, $id);
-    }
-
-    /** Valid one-page template PDF with fabricated employees. */
-    private function pdf(string $date, array $duty): string
-    {
-        $items = [[48, 700, CarbonImmutable::parse($date)->format('l, F j, Y')], [48, 680, 'B Shift'], [48, 660, 'Station 9'], [48, 640, 'Engine 9']];
-        foreach (array_map('strval', array_keys($this->employees)) as $index => $number) {
-            $y = 620 - 20 * $index;
-            [$from, $to] = $duty[$number] ?? ['08:00', '20:00'];
-            $hours = (string) ((int) substr($to, 0, 2) - (int) substr($from, 0, 2));
-            array_push($items, [51, $y, 'Firefighter'], [173, $y, 'SYNTHETIC, '.$number], [311, $y, $number], [351, $y, 'SP'],
-                [494.7, $y, $from], [515.9, $y, $to], [548, $y, $hours]);
-        }
-        $content = '';
-        foreach ($items as [$x, $y, $text]) {
-            $content .= $this->pdfText($x, $y, $text, 0.36040324);
-        }
-        $content .= $this->pdfText(0, 20, '1 of 1', 0.5).$this->pdfText(525, 20, '10/21/2026, 7:00 AM', 0.5);
-        $objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [4 0 R] /Count 1 >>',
-            '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>',
-            '<< /Length '.strlen($content).">>\nstream\n".$content.'endstream'];
-        $pdf = "%PDF-1.4\n";
-        $offsets = [];
-        foreach ($objects as $index => $object) {
-            $offsets[] = strlen($pdf);
-            $pdf .= ($index + 1)." 0 obj\n".$object."\nendobj\n";
-        }
-        $xref = strlen($pdf);
-        $pdf .= "xref\n0 6\n0000000000 65535 f \n";
-        foreach ($offsets as $offset) {
-            $pdf .= sprintf("%010d 00000 n \n", $offset);
-        }
-
-        return $pdf."trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n".$xref."\n%%EOF";
-    }
-
-    private function pdfText(float $x, float $y, string $text, float $scale): string
-    {
-        $text = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $text);
-
-        return sprintf("q %.8F 0 0 %.8F 0 0 cm BT /F1 18 Tf 1 0 0 1 %.8F %.8F Tm (%s) Tj ET Q\n", $scale, $scale, $x / $scale, $y / $scale, $text);
     }
 }

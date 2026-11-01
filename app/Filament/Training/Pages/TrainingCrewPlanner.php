@@ -4,28 +4,37 @@ declare(strict_types=1);
 
 namespace App\Filament\Training\Pages;
 
+use App\Models\Station;
 use App\Models\Training\TrainingCourse;
+use App\Models\Training\TrainingCrewPlanPublication;
 use App\Models\User;
 use App\Policies\TrainingRosterPolicy;
-use App\Services\Training\CrewPlanner\TeleStaffDutyResolver;
+use App\Services\Training\CrewPlanner\TrainingCrewPlanComposer;
 use App\Services\Training\CrewPlanner\TrainingCrewPlanExporter;
 use App\Services\Training\CrewPlanner\TrainingCrewPlannerDraftStore;
-use App\Services\Training\CrewPlanner\TrainingCrewPlannerDutyContext;
-use App\Services\Training\CrewPlanner\TrainingPlannerCandidateService;
+use App\Services\Training\CrewPlanner\TrainingCrewPlanPublisher;
+use App\Services\Training\CrewPlanner\TrainingRosterDuty;
+use App\Services\Training\CrewPlanner\TrainingRosterDutySource;
 use Carbon\CarbonImmutable;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
+/**
+ * Class, personnel, optional sessions, review, publish. Staffing comes from the TeleStaff roster the Hub
+ * already holds. Saving or publishing a plan never creates a class or an attendance record.
+ */
 final class TrainingCrewPlanner extends Page
 {
     private const TZ = \App\Support\HubTimezone::NAME;
 
-    /** A rejected roster upload's message, held until the page itself loads and shows it. */
-    public const UPLOAD_ERROR_KEY = 'training_crew_planner_upload_error';
+    private const STATION_CHOICE = 'station:';
+
+    private const OTHER_LOCATION = 'other';
 
     protected static ?string $navigationGroup = 'Training';
 
@@ -51,9 +60,13 @@ final class TrainingCrewPlanner extends Page
 
     public ?int $courseId = null;
 
+    public string $classTitle = '';
+
     public string $courseSearch = '';
 
     public string $scope = 'course';
+
+    public string $scheduleDate = '';
 
     public array $slotEdits = [];
 
@@ -67,6 +80,8 @@ final class TrainingCrewPlanner extends Page
 
     public bool $confirmReview = false;
 
+    public array $publishTargets = [];
+
     public static function canAccess(): bool
     {
         $actor = auth()->user();
@@ -77,21 +92,8 @@ final class TrainingCrewPlanner extends Page
     public function mount(): void
     {
         $actor = $this->actor();
-        $id = session()->get($this->sessionKey());
-        try {
-            $draft = is_string($id) ? $this->store()->get($actor, $id) : $this->store()->create($actor);
-        } catch (HttpException $exception) {
-            if ($exception->getStatusCode() !== 410) {
-                throw $exception;
-            }
-            $draft = $this->store()->create($actor);
-        }
-        $this->loadDraft($draft);
-        session()->put($this->sessionKey(), $draft['id']);
-        $uploadError = session()->pull(self::UPLOAD_ERROR_KEY);
-        if (is_string($uploadError) && $uploadError !== '' && ! $this->getErrorBag()->has('roster_pdf')) {
-            $this->addError('roster_pdf', $uploadError);
-        }
+        $draft = $this->store()->latest($actor) ?? $this->newDraft($actor);
+        $this->loadDraft($this->syncRoster($draft));
     }
 
     public function reloadProposal(): void
@@ -100,12 +102,33 @@ final class TrainingCrewPlanner extends Page
         $this->resetErrorBag();
     }
 
+    /** Picks up a roster that arrived while the page was open. Polled while visible; an edit in progress is untouched. */
+    public function refreshRoster(): void
+    {
+        $draft = $this->draft();
+        if ($draft['version'] === $this->version) {
+            $this->syncRoster($draft);
+        }
+    }
+
+    public function acknowledgeRoster(): void
+    {
+        $snapshot = $this->composer()->duty($this->draft())->snapshotId;
+        $this->change(function (array $draft) use ($snapshot): array {
+            $draft['metadata']['acknowledged_snapshot_id'] = $snapshot;
+
+            return $draft;
+        });
+        $this->confirmReview = false;
+    }
+
     /** Choosing a course applies it immediately; the module choice starts at the entire course. */
     public function updatedCourseId(): void
     {
         $this->actor();
         $this->scope = 'course';
         if ($this->courseId !== null) {
+            $this->classTitle = '';
             $this->applyScope();
         }
     }
@@ -123,12 +146,13 @@ final class TrainingCrewPlanner extends Page
     {
         $this->actor();
         $this->validate(['courseId' => ['required', 'integer', 'min:1'], 'scope' => ['required', 'string', 'max:30']]);
-        $course = $this->course($this->courseId);
+        $course = $this->composer()->course($this->actor(), $this->courseId);
         $module = $this->scope === 'course' ? null : filter_var($this->scope, FILTER_VALIDATE_INT);
         abort_unless($module === null || ($module !== false && $course->modules()->whereKey($module)->exists()), 422);
         $updated = $this->change(function (array $draft) use ($course, $module): array {
             $draft['course_id'] = $course->id;
             $draft['module_id'] = $module;
+            $draft['class_title'] = '';
 
             return $draft;
         });
@@ -139,11 +163,62 @@ final class TrainingCrewPlanner extends Page
         }
     }
 
+    /** A class outside the course catalog. It stays a title on this plan and creates no course or training record. */
+    public function updatedClassTitle(): void
+    {
+        $this->actor();
+        $this->validate(['classTitle' => ['nullable', 'string', 'max:160']]);
+        $title = trim($this->classTitle);
+        if ($title !== '') {
+            $this->courseId = null;
+            $this->scope = 'course';
+        }
+        $this->change(function (array $draft) use ($title): array {
+            $draft['class_title'] = $title;
+            if ($title !== '') {
+                $draft['course_id'] = $draft['module_id'] = null;
+            }
+
+            return $draft;
+        });
+    }
+
+    /** Sessions keep their clock times on the new date, and selections stay put to be rechecked against that day's roster. */
+    public function updatedScheduleDate(): void
+    {
+        $this->actor();
+        $today = CarbonImmutable::now(self::TZ);
+        $valid = (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/D', $this->scheduleDate) && checkdate((int) substr($this->scheduleDate, 5, 2), (int) substr($this->scheduleDate, 8, 2), (int) substr($this->scheduleDate, 0, 4))
+            && $this->scheduleDate >= $today->subYear()->toDateString() && $this->scheduleDate <= $today->addYear()->toDateString();
+        if (! $valid) {
+            $this->addError('scheduleDate', 'Choose a date within a year of today.');
+            $this->scheduleDate = $this->composer()->date($this->draft());
+
+            return;
+        }
+        $date = $this->scheduleDate;
+        $snapshot = app(TrainingRosterDutySource::class)->forDate($date)->snapshotId;
+        $this->change(function (array $draft) use ($date, $snapshot): array {
+            $draft['metadata']['schedule_date'] = $date;
+            $draft['metadata']['acknowledged_snapshot_id'] = $snapshot;
+            $draft['slots'] = array_map(static fn (array $slot): array => [
+                ...$slot,
+                'start_at' => CarbonImmutable::parse($date.' '.CarbonImmutable::parse($slot['start_at'])->setTimezone(self::TZ)->format('H:i'), self::TZ)->toIso8601String(),
+                'end_at' => CarbonImmutable::parse($date.' '.CarbonImmutable::parse($slot['end_at'])->setTimezone(self::TZ)->format('H:i'), self::TZ)->toIso8601String(),
+            ], $draft['slots']);
+
+            return $draft;
+        });
+        $this->confirmReview = false;
+    }
+
     public function addSlot(): void
     {
         $this->actor();
         abort_if(count($this->slotEdits) >= 12, 422);
-        $this->slotEdits = [...$this->slotEdits, $this->blankRow()];
+        $last = end($this->slotEdits) ?: [];
+        // A new session starts at the location of the one before it; most classes stay in one place.
+        $this->slotEdits = [...$this->slotEdits, [...$this->blankRow(), 'location_choice' => $last['location_choice'] ?? '', 'venue' => $last['venue'] ?? '']];
     }
 
     public function removeSlot(int $index): void
@@ -156,22 +231,13 @@ final class TrainingCrewPlanner extends Page
         $this->persistSlots(true);
     }
 
-    public function reorderSlot(int $index, int $direction): void
+    public function applyLocationToAll(int $index): void
     {
         $this->actor();
-        abort_unless(in_array($direction, [-1, 1], true), 422);
-        $target = $index + $direction;
-        if (isset($this->slotEdits[$index], $this->slotEdits[$target])) {
-            [$this->slotEdits[$index], $this->slotEdits[$target]] = [$this->slotEdits[$target], $this->slotEdits[$index]];
-            $this->persistSlots();
-        }
-    }
-
-    public function useSessionSuggestions(): void
-    {
-        $draft = $this->draft();
-        $analysis = $this->analysis($draft);
-        $this->slotEdits = array_map(fn (array $slot): array => $this->slotEdit($slot, true), array_slice($analysis['session_suggestions'] ?? [], 0, 12));
+        abort_unless(isset($this->slotEdits[$index]), 422);
+        $source = $this->slotEdits[$index];
+        $this->slotEdits = array_map(static fn (array $row): array => [...$row, 'location_choice' => $source['location_choice'] ?? '', 'venue' => $source['venue'] ?? ''], $this->slotEdits);
+        $this->persistSlots();
     }
 
     /** Sessions save themselves once every row has a valid start before its end. */
@@ -182,27 +248,9 @@ final class TrainingCrewPlanner extends Page
         $this->persistSlots();
     }
 
-    public function saveSlots(): void
-    {
-        $draft = $this->draft();
-        $this->validate([
-            'slotEdits' => ['required', 'array', 'min:1', 'max:12'],
-            'slotEdits.*.id' => ['required', 'uuid', 'distinct'],
-            'slotEdits.*.label' => ['nullable', 'string', 'max:80'],
-            'slotEdits.*.start' => ['required', 'date_format:H:i'],
-            'slotEdits.*.end' => ['required', 'date_format:H:i'],
-        ]);
-        $date = $draft['metadata']['schedule_date'] ?? null;
-        if (! $date) {
-            throw ValidationException::withMessages(['slotEdits' => 'Read the daily report first so session times use the correct date.']);
-        }
-        $this->commitSlots($this->slotsFromEdits($date, array_column($draft['slots'], 'id'), true));
-    }
-
     public function addSelected(bool $allEligible = false): void
     {
         $draft = $this->draft();
-        $this->requireCurrentSlotDates($draft);
         $this->validate(['candidateSelection' => ['array', 'max:2000'], 'candidateSelection.*' => ['integer', 'min:1']]);
         $rows = $this->analysis($draft, $this->cleanFilters($draft))['rows'] ?? [];
         $ids = $allEligible ? array_keys($rows) : $this->candidateSelection;
@@ -219,7 +267,6 @@ final class TrainingCrewPlanner extends Page
     public function toggleMember(int $id): void
     {
         $draft = $this->draft();
-        $this->requireCurrentSlotDates($draft);
         abort_unless($id > 0, 422);
         if (isset($draft['selections'][$id])) {
             $this->removeMember($id);
@@ -232,9 +279,28 @@ final class TrainingCrewPlanner extends Page
     public function selectAllShown(): void
     {
         $draft = $this->draft();
-        $this->requireCurrentSlotDates($draft);
         $rows = $this->analysis($draft, $this->cleanFilters($draft))['rows'] ?? [];
         $this->addMembers($draft, $rows, array_keys($rows));
+    }
+
+    /** A deliberate addition of someone the roster or attendance check left out. It is labelled wherever the plan goes. */
+    public function addException(int $id): void
+    {
+        $draft = $this->draft();
+        abort_unless($id > 0, 422);
+        $rows = $this->analysis($draft)['rows'] ?? [];
+        if (! isset($rows[$id])) {
+            $this->addError('selection', 'That member is not an active member of the department.');
+
+            return;
+        }
+        $only = count($draft['slots']) === 1 ? $draft['slots'][0]['id'] : null;
+        $this->change(function (array $draft) use ($id, $only): array {
+            $draft['selections'][$id] = ['slot_id' => $only, 'exception' => true];
+
+            return $draft;
+        });
+        $this->confirmReview = false;
     }
 
     public function clearSelection(): void
@@ -244,15 +310,14 @@ final class TrainingCrewPlanner extends Page
         $this->confirmReview = false;
     }
 
-    /** A member has exactly one session; it must be one the member is on duty for in full. */
+    /** A member has exactly one session; it must be one the member is on duty for in full, unless added as an exception. */
     public function setMemberSlot(int $id, string $slotId): void
     {
         $draft = $this->draft();
-        $this->requireCurrentSlotDates($draft);
         abort_unless($id > 0 && isset($draft['selections'][$id]), 422);
         $slot = $slotId === '' ? null : $slotId;
         abort_unless($slot === null || in_array($slot, array_column($draft['slots'], 'id'), true), 422);
-        if ($slot !== null) {
+        if ($slot !== null && empty($draft['selections'][$id]['exception'])) {
             $row = ($this->analysis($draft)['rows'] ?? [])[$id] ?? null;
             if (! $row || ! in_array($slot, $row['eligible_slots'] ?? [], true)) {
                 throw ValidationException::withMessages(['selection' => 'This member is not on duty for the whole of that session. Choose another session.']);
@@ -301,14 +366,13 @@ final class TrainingCrewPlanner extends Page
     public function moveSelected(): void
     {
         $draft = $this->draft();
-        $this->requireCurrentSlotDates($draft);
         $this->validate(['planSelection' => ['array', 'max:2000'], 'planSelection.*' => ['integer', 'min:1']]);
         $rows = $this->analysis($draft)['rows'] ?? [];
         $slot = $this->targetSlot === '' ? null : $this->targetSlot;
         abort_unless($slot === null || in_array($slot, array_column($draft['slots'], 'id'), true), 422);
         foreach ($this->planSelection as $id) {
             abort_unless(isset($draft['selections'][$id]), 422);
-            if ($slot !== null && ! in_array($slot, $rows[$id]['eligible_slots'] ?? [], true)) {
+            if ($slot !== null && empty($draft['selections'][$id]['exception']) && ! in_array($slot, $rows[$id]['eligible_slots'] ?? [], true)) {
                 throw ValidationException::withMessages(['targetSlot' => 'A selected member does not fully qualify for that time. Choose another time or keep the member unassigned for review.']);
             }
         }
@@ -323,13 +387,30 @@ final class TrainingCrewPlanner extends Page
         $this->planSelection = [];
     }
 
+    /** Puts everyone still without a session into this one, where they fit. Anyone who does not fit stays unassigned. */
+    public function assignUnassignedTo(string $slotId): void
+    {
+        $draft = $this->draft();
+        abort_unless(in_array($slotId, array_column($draft['slots'], 'id'), true), 422);
+        $rows = $this->analysis($draft)['rows'] ?? [];
+        $this->change(function (array $draft) use ($rows, $slotId): array {
+            foreach ($draft['selections'] as $id => $selection) {
+                if (($selection['slot_id'] ?? null) === null && (! empty($selection['exception']) || in_array($slotId, $rows[$id]['eligible_slots'] ?? [], true))) {
+                    $draft['selections'][$id]['slot_id'] = $slotId;
+                }
+            }
+
+            return $draft;
+        });
+        $this->confirmReview = false;
+    }
+
     public function discardProposal(): void
     {
         $actor = $this->actor();
         $this->store()->discard($actor, $this->draftId, $this->version);
-        $this->loadDraft($this->store()->create($actor));
-        session()->put($this->sessionKey(), $this->draftId);
-        $this->candidateSelection = $this->planSelection = [];
+        $this->loadDraft($this->newDraft($actor));
+        $this->candidateSelection = $this->planSelection = $this->publishTargets = [];
         $this->confirmReview = false;
         $this->resetErrorBag();
     }
@@ -339,80 +420,116 @@ final class TrainingCrewPlanner extends Page
         abort_unless(in_array($format, ['pdf', 'xlsx'], true), 404);
         $draft = $this->draft();
         abort_if($draft['version'] !== $this->version, 409, 'Reload the proposal before exporting; another tab changed it.');
-        $this->requireCurrentSlotDates($draft);
-        $analysis = $this->analysis($draft);
-        $course = $this->course($draft['course_id']);
-        $rows = [];
-        foreach ($draft['selections'] as $id => $selection) {
-            $person = $analysis['rows'][$id] ?? null;
-            $review = $this->needsVerification($person, $selection);
-            if ($review && ! $this->confirmReview) {
-                throw ValidationException::withMessages(['confirmReview' => 'Some selected members need fresh verification. Review them under "Needs verification" and confirm before exporting.']);
-            }
-            $slot = collect($draft['slots'])->firstWhere('id', $selection['slot_id']);
-            $context = app(TrainingCrewPlannerDutyContext::class)->project($person['observed_unit_context'] ?? [], $slot);
-            $rows[$id] = [
-                'employee_id' => $person['employee_id'] ?? '', 'name' => $person['name'] ?? 'Previously selected member — identity requires review',
-                'rank' => $person['rank'] ?? '', 'bid_position' => ($person['assignment'] ?? '').(! empty($person['is_de_bid']) ? ' · Published Driver Engineer seat' : ''),
-                'station' => $context['station_plain'], 'apparatus' => $context['apparatus_plain'],
-                'slot_id' => $selection['slot_id'], 'verification_required' => $review,
-                'review_reasons' => $review ? ['Recheck identity, current attendance and full class-time availability before approval.'] : [],
-            ];
-        }
-        $projection = [
-            'course_name' => $course->name, 'module_name' => $analysis['module']['name'] ?? null,
-            'scope_label' => $draft['module_id'] ? 'Selected module — no verified prior attendance' : 'Entire course — no verified prior attendance',
-            ...$draft['metadata'], 'generated_at' => now()->toIso8601String(), 'author' => $this->actor()->name,
-            'slots' => $draft['slots'], 'rows' => $rows,
-        ];
+        $projection = $this->composer()->projection($this->actor(), $draft, $this->confirmReview);
         $bytes = app(TrainingCrewPlanExporter::class)->{$format}($projection);
         $this->resetErrorBag('confirmReview');
 
         return response()->streamDownload(static function () use ($bytes): void {
             echo $bytes;
-        }, 'MBFD-Training-Personnel-Request-'.($draft['metadata']['schedule_date'] ?? 'undated').'.'.$format, [
+        }, 'MBFD-Training-Class-Roster-'.$projection['schedule_date'].'.'.$format, [
             'Content-Type' => $format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Cache-Control' => 'private, no-store, max-age=0', 'Pragma' => 'no-cache',
         ]);
     }
 
+    public function publish(): void
+    {
+        $actor = $this->actor();
+        $draft = $this->draft();
+        if ($draft['version'] !== $this->version) {
+            $this->addError('proposal', 'This proposal changed in another tab. Reload it before sending.');
+
+            return;
+        }
+        $this->validate(['publishTargets' => ['required', 'array', 'min:1'], 'publishTargets.*' => ['string', 'in:'.implode(',', TrainingCrewPlanPublisher::DESTINATIONS)]],
+            ['publishTargets.required' => 'Choose where to send this plan.', 'publishTargets.min' => 'Choose where to send this plan.']);
+        $this->send($actor, $draft, $this->publishTargets);
+    }
+
+    /** Only what failed goes again; what already went out stays as it is. */
+    public function retryFailed(): void
+    {
+        $actor = $this->actor();
+        $draft = $this->draft();
+        $publisher = app(TrainingCrewPlanPublisher::class);
+        $latest = $publisher->history($actor, $draft['id'])->first()?->fingerprint;
+        $failed = $publisher->history($actor, $draft['id'])
+            ->filter(static fn (TrainingCrewPlanPublication $row): bool => $row->fingerprint === $latest && $row->status === TrainingCrewPlanPublication::STATUS_FAILED)
+            ->pluck('destination')->values()->all();
+        if ($failed !== []) {
+            $this->send($actor, $draft, $failed);
+        }
+    }
+
     protected function getViewData(): array
     {
+        $actor = $this->actor();
         $draft = $this->draft();
-        [$cutoff, $fromClassStart] = $this->attendanceCutoff($draft);
-        $all = $this->analysis($draft);
+        $composer = $this->composer();
+        $duty = $composer->duty($draft);
+        [$cutoff, $fromClassStart] = $composer->attendanceCutoff($draft);
+        $all = $this->analysis($draft, [], $duty);
         $filters = $this->cleanFilters($draft);
-        $filtered = $filters === [] ? $all : $this->analysis($draft, $filters);
-        $usable = $draft['slots'] !== [] && ! $this->hasStaleSlotDates($draft);
+        $filtered = $filters === [] ? $all : $this->analysis($draft, $filters, $duty);
         $labels = $this->slotLabels($draft['slots']);
+        $searching = trim((string) ($filters['search'] ?? '')) !== '';
 
         $candidates = $notListed = [];
         foreach ($filtered['rows'] ?? [] as $id => $row) {
-            if ($this->eligible($row)) {
+            if ($composer->eligible($row, $draft)) {
                 $candidates[$id] = $this->candidateCard($id, $row, $draft, $labels);
-            } elseif ($reason = $this->notListedReason($row, $usable, $draft['module_id'] !== null)) {
-                $notListed[] = ['name' => $row['name'], 'rank' => $row['rank'] ?? '', 'employee_id' => $row['employee_id'], 'reason' => $reason];
+            } elseif (! ($row['off_roster'] ?? false) || $searching) {
+                $notListed[] = ['id' => (int) $id, 'name' => $row['name'], 'rank' => $row['rank'] ?? '', 'employee_id' => $row['employee_id'],
+                    'reason' => $this->notListedReason($row, $draft), 'selected' => isset($draft['selections'][$id])];
             }
         }
-        $unmatched = $this->unmatchedIdentities($filtered['review'] ?? [], $filters);
 
-        $courses = TrainingCourse::query()->when($this->courseSearch !== '', fn ($query) => $query->where('name', 'like', '%'.mb_substr($this->courseSearch, 0, 200).'%'))->orderBy('name')->limit(500)->get()->filter(fn (TrainingCourse $course): bool => app(TrainingRosterPolicy::class)->view($this->actor(), $course));
-        $chosen = $this->courseId ? $this->course($this->courseId) : null;
+        $courses = TrainingCourse::query()->when($this->courseSearch !== '', fn ($query) => $query->where('name', 'like', '%'.mb_substr($this->courseSearch, 0, 200).'%'))->orderBy('name')->limit(500)->get()->filter(fn (TrainingCourse $course): bool => app(TrainingRosterPolicy::class)->view($actor, $course));
+        $chosen = $composer->course($actor, $draft['course_id'] ?? null);
+        $contexts = collect($all['rows'] ?? [])->pluck('observed_unit_context')->flatten(1);
+        $publisher = app(TrainingCrewPlanPublisher::class);
 
         return [
-            'draft' => $draft, 'all' => $all, 'candidates' => $candidates, 'notListed' => $notListed, 'unmatched' => $unmatched,
+            'draft' => $draft, 'duty' => $duty, 'all' => $all, 'candidates' => $candidates, 'notListed' => array_slice($notListed, 0, 100),
+            'unmatched' => $this->unmatchedIdentities($filtered['review'] ?? [], $filters),
             'courses' => $courses, 'chosen' => $chosen, 'showCourseSearch' => $this->courseSearch !== '' || $courses->count() >= 15,
-            'snapshotWarnings' => $this->snapshotWarnings($draft['metadata']),
-            'eligibleTotal' => count(array_filter($all['rows'] ?? [], fn (array $row): bool => $this->eligible($row))),
+            'hasClass' => $composer->hasClass($draft), 'dates' => $this->dateChoices($duty),
+            'rosterChange' => $composer->rosterChange($actor, $draft, $duty),
+            'eligibleTotal' => count(array_filter($all['rows'] ?? [], fn (array $row): bool => $composer->eligible($row, $draft))),
             'review' => $this->reviewModel($draft, $all, $labels), 'cutoff' => $cutoff, 'cutoffIsClassStart' => $fromClassStart,
-            'scopeName' => $all['module']['name'] ?? null, 'courseName' => $all['course']['name'] ?? null, 'sessionsReady' => $usable,
-            'rosterDay' => $this->rosterDay($draft['metadata']), 'slotLabels' => $labels,
+            'slotLabels' => $labels, 'stationsList' => Station::query()->orderBy('station_number')->get(['id', 'name', 'station_number']),
+            'locationConflicts' => $this->locationConflicts($draft['slots']),
             'ranks' => collect($all['rows'] ?? [])->pluck('rank')->filter()->unique()->sort()->values()->all(),
-            'stations' => collect($all['rows'] ?? [])->pluck('observed_unit_context')->flatten(1)->pluck('station')->filter()->unique()->sort()->values()->all(),
-            'units' => collect($all['rows'] ?? [])->pluck('observed_unit_context')->flatten(1)->pluck('apparatus')->filter()->unique()->sort()->values()->all(),
+            'stations' => $contexts->pluck('station')->filter()->unique()->sort()->values()->all(),
+            'units' => $contexts->pluck('apparatus')->filter()->unique()->sort()->values()->all(),
             'assignments' => collect($all['rows'] ?? [])->pluck('assignment')->filter()->unique()->sort()->values()->all(),
             'categories' => collect($all['rows'] ?? [])->pluck('assignment_category')->filter()->unique()->sort()->values()->all(),
+            'targets' => [
+                ['id' => TrainingCrewPlanPublisher::COMMAND_300, 'label' => '300 message card', 'allowed' => $publisher->allows($actor, TrainingCrewPlanPublisher::COMMAND_300)],
+                ['id' => TrainingCrewPlanPublisher::CAPTAIN_5, 'label' => 'Captain 5 message card', 'allowed' => $publisher->allows($actor, TrainingCrewPlanPublisher::CAPTAIN_5)],
+                ['id' => TrainingCrewPlanPublisher::DEPARTMENT, 'label' => 'Department Updates (visible department-wide)', 'allowed' => $publisher->allows($actor, TrainingCrewPlanPublisher::DEPARTMENT)],
+            ],
+            'publications' => $publisher->history($actor, $draft['id']),
         ];
+    }
+
+    private function send(User $actor, array $draft, array $destinations): void
+    {
+        $limit = 'training-crew-plan-publish:'.$actor->getKey();
+        if (RateLimiter::tooManyAttempts($limit, 12)) {
+            $this->addError('publishTargets', 'Too many sends in a short time. Wait a minute and try again.');
+
+            return;
+        }
+        RateLimiter::hit($limit, 60);
+        $results = app(TrainingCrewPlanPublisher::class)->publish($actor, $draft, $destinations, $this->confirmReview);
+        $failed = array_filter($results, static fn (TrainingCrewPlanPublication $row): bool => $row->status === TrainingCrewPlanPublication::STATUS_FAILED);
+        if ($failed === []) {
+            Notification::make()->success()->title('Plan sent to '.count($results).' '.Str::plural('destination', count($results)).'.')->send();
+        } else {
+            Notification::make()->warning()->title(count($failed).' of '.count($results).' did not go out. Your plan is safe. See the status below.')->send();
+        }
+        $this->publishTargets = [];
     }
 
     private function actor(): User
@@ -422,20 +539,11 @@ final class TrainingCrewPlanner extends Page
         return auth()->user();
     }
 
-    private function course(?int $id): TrainingCourse
-    {
-        $actor = $this->actor();
-        $course = TrainingCourse::query()->findOrFail($id);
-        abort_unless(app(TrainingRosterPolicy::class)->view($actor, $course), 403);
-
-        return $course;
-    }
-
     private function draft(): array
     {
         $draft = $this->store()->get($this->actor(), $this->draftId);
-        if ($draft['course_id']) {
-            $this->course($draft['course_id']);
+        if ($draft['course_id'] ?? null) {
+            $this->composer()->course($this->actor(), $draft['course_id']);
         }
 
         return $draft;
@@ -444,6 +552,36 @@ final class TrainingCrewPlanner extends Page
     private function store(): TrainingCrewPlannerDraftStore
     {
         return app(TrainingCrewPlannerDraftStore::class);
+    }
+
+    private function composer(): TrainingCrewPlanComposer
+    {
+        return app(TrainingCrewPlanComposer::class);
+    }
+
+    private function newDraft(User $actor): array
+    {
+        return $this->store()->create($actor, app(TrainingRosterDutySource::class)->today());
+    }
+
+    /** Adopts a newer roster silently unless it changes someone on this plan; then the planner has to look first. */
+    private function syncRoster(array $draft): array
+    {
+        $composer = $this->composer();
+        $duty = $composer->duty($draft);
+        if (($draft['metadata']['acknowledged_snapshot_id'] ?? null) === $duty->snapshotId || $composer->rosterChange($this->actor(), $draft, $duty)['material']) {
+            return $draft;
+        }
+        $updated = $this->store()->update($this->actor(), $draft['id'], $draft['version'], function (array $current) use ($duty): array {
+            $current['metadata']['acknowledged_snapshot_id'] = $duty->snapshotId;
+
+            return $current;
+        });
+        if (isset($this->version)) {
+            $this->version = $updated['version'];
+        }
+
+        return $updated;
     }
 
     private function change(callable $change): ?array
@@ -464,44 +602,9 @@ final class TrainingCrewPlanner extends Page
         }
     }
 
-    /**
-     * Attendance is judged as it stood when today's class begins: the earliest saved session
-     * start when that is already past, otherwise the present moment. An older roster never
-     * moves the cutoff back, so recent verified attendance always excludes a member.
-     *
-     * @return array{0: CarbonImmutable, 1: bool}
-     */
-    private function attendanceCutoff(array $draft): array
+    private function analysis(array $draft, array $filters = [], ?TrainingRosterDuty $duty = null): array
     {
-        $now = CarbonImmutable::now();
-        if ($draft['slots'] === [] || $this->hasStaleSlotDates($draft)
-            || ($draft['metadata']['schedule_date'] ?? null) !== $now->setTimezone(self::TZ)->toDateString()) {
-            return [$now, false];
-        }
-        $earliest = collect($draft['slots'])->map(fn (array $slot): CarbonImmutable => CarbonImmutable::parse($slot['start_at']))->sortBy(fn (CarbonImmutable $start): int => $start->getTimestamp())->first();
-
-        return $earliest !== null && $earliest->lt($now) ? [$earliest, true] : [$now, false];
-    }
-
-    private function analysis(array $draft, array $filters = []): array
-    {
-        if (! $draft['course_id']) {
-            return ['rows' => [], 'session_suggestions' => []];
-        }
-        $staff = app(TeleStaffDutyResolver::class)->resolveStaff($draft['staff'], $this->hasStaleSlotDates($draft) ? [] : $draft['slots']);
-
-        return app(TrainingPlannerCandidateService::class)->candidates($this->actor(), $this->course($draft['course_id']), $draft['module_id'], $this->attendanceCutoff($draft)[0], $staff, $filters, $draft['metadata']['schedule_date'] ?? null);
-    }
-
-    private function eligible(array $row): bool
-    {
-        return ! empty($row['eligible_slots']);
-    }
-
-    private function needsVerification(?array $person, array $selection): bool
-    {
-        return ! $person || ! $this->eligible($person)
-            || ($selection['slot_id'] !== null && ! in_array($selection['slot_id'], $person['eligible_slots'] ?? [], true));
+        return $this->composer()->analyze($this->actor(), $draft, $filters, $duty);
     }
 
     /** Re-reads current eligibility on the server; the browser never decides who qualifies. */
@@ -511,10 +614,10 @@ final class TrainingCrewPlanner extends Page
         $add = [];
         foreach ($ids as $id) {
             $row = $rows[$id] ?? null;
-            if (! $row || ! $this->eligible($row)) {
+            if (! $row || ! $this->composer()->eligible($row, $draft)) {
                 continue;
             }
-            $fits = array_values(array_intersect($row['eligible_slots'], $slotIds));
+            $fits = array_values(array_intersect($row['eligible_slots'] ?? [], $slotIds));
             $add[(int) $id] = ['slot_id' => count($fits) === 1 ? $fits[0] : null];
         }
         if ($add === [] && $ids !== []) {
@@ -530,25 +633,6 @@ final class TrainingCrewPlanner extends Page
         $this->confirmReview = false;
 
         return $updated;
-    }
-
-    private function hasStaleSlotDates(array $draft): bool
-    {
-        $date = $draft['metadata']['schedule_date'] ?? null;
-        foreach ($draft['slots'] as $slot) {
-            if (CarbonImmutable::parse($slot['start_at'])->setTimezone(self::TZ)->toDateString() !== $date) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function requireCurrentSlotDates(array $draft): void
-    {
-        if ($this->hasStaleSlotDates($draft)) {
-            throw ValidationException::withMessages(['slotEdits' => 'The session times belong to a different roster date. Apply them to the new date before selecting or exporting. Your selected members are safe.']);
-        }
     }
 
     private function cleanFilters(array $draft): array
@@ -575,8 +659,10 @@ final class TrainingCrewPlanner extends Page
     {
         $this->draftId = $draft['id'];
         $this->version = $draft['version'];
-        $this->courseId = $draft['course_id'];
-        $this->scope = $draft['module_id'] === null ? 'course' : (string) $draft['module_id'];
+        $this->courseId = $draft['course_id'] ?? null;
+        $this->classTitle = (string) ($draft['class_title'] ?? '');
+        $this->scope = ($draft['module_id'] ?? null) === null ? 'course' : (string) $draft['module_id'];
+        $this->scheduleDate = $this->composer()->date($draft);
         $this->slotEdits = array_map(fn (array $slot): array => $this->slotEdit($slot), $draft['slots']);
         $this->prefillSessionRows($draft);
     }
@@ -588,10 +674,8 @@ final class TrainingCrewPlanner extends Page
             return;
         }
         $rows = [];
-        if (! empty($draft['metadata']['schedule_date'])) {
-            foreach (array_slice($this->analysis($draft)['session_suggestions'] ?? [], 0, 12) as $suggestion) {
-                $rows[] = [...$this->slotEdit($suggestion, true), 'label' => ''];
-            }
+        foreach (array_slice($this->analysis($draft)['session_suggestions'] ?? [], 0, 12) as $suggestion) {
+            $rows[] = [...$this->slotEdit($suggestion, true), 'label' => ''];
         }
         $this->slotEdits = $rows ?: [$this->blankRow()];
     }
@@ -609,17 +693,13 @@ final class TrainingCrewPlanner extends Page
 
     private function blankRow(): array
     {
-        return ['id' => (string) Str::uuid(), 'label' => '', 'start' => '', 'end' => ''];
+        return ['id' => (string) Str::uuid(), 'label' => '', 'start' => '', 'end' => '', 'location_choice' => '', 'venue' => ''];
     }
 
     private function persistSlots(bool $allowClear = false): void
     {
         $draft = $this->draft();
-        $date = $draft['metadata']['schedule_date'] ?? null;
-        if (! is_string($date) || $date === '') {
-            return;
-        }
-        $slots = $this->slotsFromEdits($date, array_column($draft['slots'], 'id'), false);
+        $slots = $this->slotsFromEdits($this->composer()->date($draft), array_column($draft['slots'], 'id'));
         if ($slots === null || ($slots === [] && ! $allowClear) || $slots === $draft['slots']) {
             return;
         }
@@ -628,9 +708,9 @@ final class TrainingCrewPlanner extends Page
 
     /**
      * @param  list<string>  $savedIds
-     * @return ?list<array{id: string, label: string, start_at: string, end_at: string}> null while a row is unfinished or invalid
+     * @return ?list<array<string, mixed>> null while a row is unfinished or invalid
      */
-    private function slotsFromEdits(string $date, array $savedIds, bool $strict): ?array
+    private function slotsFromEdits(string $date, array $savedIds): ?array
     {
         abort_if(count($this->slotEdits) > 12, 422);
         abort_unless(array_is_list($this->slotEdits), 422);
@@ -647,28 +727,42 @@ final class TrainingCrewPlanner extends Page
                 return null;
             }
             if (! $this->validTime($start) || ! $this->validTime($end)) {
-                return $this->slotProblem($strict, $index, 'Enter the time as hours and minutes.');
+                $this->addError("slotEdits.$index.end", 'Enter the time as hours and minutes.');
+
+                return null;
             }
             if ($end <= $start) {
-                return $this->slotProblem($strict, $index, 'End time must be after start time on the training day.');
+                $this->addError("slotEdits.$index.end", 'End time must be after start time on the training day.');
+
+                return null;
             }
             $label = mb_substr(trim(is_string($edit['label'] ?? null) ? $edit['label'] : ''), 0, 80);
             $slots[] = ['id' => $edit['id'], 'label' => $label !== '' ? $label : 'Session '.(count($slots) + 1),
                 'start_at' => CarbonImmutable::parse($date.' '.$start, self::TZ)->toIso8601String(),
-                'end_at' => CarbonImmutable::parse($date.' '.$end, self::TZ)->toIso8601String()];
+                'end_at' => CarbonImmutable::parse($date.' '.$end, self::TZ)->toIso8601String(),
+                ...$this->location($edit)];
         }
 
         return $slots;
     }
 
-    private function slotProblem(bool $strict, int|string $index, string $message): null
+    /** A station from the Hub's own list, or a typed venue. The stored words are what people read. */
+    private function location(array $edit): array
     {
-        if ($strict) {
-            throw ValidationException::withMessages(["slotEdits.$index.end" => $message]);
-        }
-        $this->addError("slotEdits.$index.end", $message);
+        $choice = is_string($edit['location_choice'] ?? null) ? $edit['location_choice'] : '';
+        if (str_starts_with($choice, self::STATION_CHOICE)) {
+            $station = Station::query()->find((int) substr($choice, strlen(self::STATION_CHOICE)));
 
-        return null;
+            return $station === null ? ['station_id' => null, 'venue' => '', 'location' => '']
+                : ['station_id' => (int) $station->getKey(), 'venue' => '', 'location' => (string) $station->name];
+        }
+        if ($choice === self::OTHER_LOCATION) {
+            $venue = mb_substr(trim(is_string($edit['venue'] ?? null) ? $edit['venue'] : ''), 0, 160);
+
+            return ['station_id' => null, 'venue' => $venue, 'location' => $venue];
+        }
+
+        return ['station_id' => null, 'venue' => '', 'location' => ''];
     }
 
     private function validTime(string $time): bool
@@ -680,15 +774,10 @@ final class TrainingCrewPlanner extends Page
     {
         $ids = array_column($slots, 'id');
         $keepOnlyKnown = static fn (array $rows): array => array_map(
-            static fn (array $row): array => in_array($row['slot_id'], $ids, true) ? $row : ['slot_id' => null], $rows);
+            static fn (array $row): array => [...$row, 'slot_id' => in_array($row['slot_id'] ?? null, $ids, true) ? $row['slot_id'] : null], $rows);
         $this->change(static fn (array $draft): array => [...$draft, 'slots' => $slots,
             'selections' => $keepOnlyKnown($draft['selections']), 'removed' => $keepOnlyKnown($draft['removed'])]);
         $this->confirmReview = false;
-    }
-
-    private function sessionKey(): string
-    {
-        return 'training_crew_planner_draft.'.auth()->id();
     }
 
     private function slotEdit(array $slot, bool $newId = false): array
@@ -697,32 +786,66 @@ final class TrainingCrewPlanner extends Page
             'id' => $newId ? (string) Str::uuid() : $slot['id'], 'label' => $slot['label'],
             'start' => CarbonImmutable::parse($slot['start_at'])->setTimezone(self::TZ)->format('H:i'),
             'end' => empty($slot['end_at']) ? '' : CarbonImmutable::parse($slot['end_at'])->setTimezone(self::TZ)->format('H:i'),
+            'location_choice' => ! empty($slot['station_id']) ? self::STATION_CHOICE.$slot['station_id'] : (($slot['venue'] ?? '') !== '' ? self::OTHER_LOCATION : ''),
+            'venue' => $slot['venue'] ?? '',
         ];
     }
 
-    /** @return array<string, array{label: string, time: string}> */
+    /** @return array<string, array{label: string, time: string, location: string}> */
     private function slotLabels(array $slots): array
     {
         $labels = [];
         foreach ($slots as $slot) {
-            $labels[$slot['id']] = ['label' => $slot['label'],
+            $labels[$slot['id']] = ['label' => $slot['label'], 'location' => (string) ($slot['location'] ?? ''),
                 'time' => CarbonImmutable::parse($slot['start_at'])->setTimezone(self::TZ)->format('H:i').'–'.CarbonImmutable::parse($slot['end_at'])->setTimezone(self::TZ)->format('H:i')];
         }
 
         return $labels;
     }
 
+    /** @return list<string> sessions booked into the same place at overlapping times; a nudge, not a stop */
+    private function locationConflicts(array $slots): array
+    {
+        $conflicts = [];
+        foreach ($slots as $index => $slot) {
+            foreach (array_slice($slots, $index + 1) as $other) {
+                if (($slot['location'] ?? '') !== '' && ($slot['location'] ?? '') === ($other['location'] ?? '')
+                    && CarbonImmutable::parse($slot['start_at'])->lt(CarbonImmutable::parse($other['end_at']))
+                    && CarbonImmutable::parse($other['start_at'])->lt(CarbonImmutable::parse($slot['end_at']))) {
+                    $conflicts[] = $slot['label'].' and '.$other['label'].' overlap at '.$slot['location'].'.';
+                }
+            }
+        }
+
+        return $conflicts;
+    }
+
+    /** @return list<array{date: string, label: string, verified: bool}> */
+    private function dateChoices(TrainingRosterDuty $duty): array
+    {
+        $source = app(TrainingRosterDutySource::class);
+        $today = $source->today();
+        $verified = array_slice($source->availableDates(5), 0, 5);
+        $dates = array_values(array_unique([$today, ...$verified]));
+        rsort($dates);
+
+        return array_map(static fn (string $date): array => [
+            'date' => $date, 'verified' => in_array($date, $verified, true),
+            'label' => ($date === $today ? 'Today · ' : '').CarbonImmutable::parse($date, self::TZ)->format('D M j'),
+        ], $dates);
+    }
+
     private function candidateCard(int|string $id, array $row, array $draft, array $labels): array
     {
         $place = $this->dutyPlace($row['observed_unit_context'] ?? [], $draft['slots']);
-        $eligibleSlots = array_values(array_intersect($row['eligible_slots'], array_keys($labels)));
+        $eligibleSlots = array_values(array_intersect($row['eligible_slots'] ?? [], array_keys($labels)));
 
         return [
             'id' => (int) $id, 'name' => $row['name'], 'rank' => $row['rank'] ?? '', 'employee_id' => $row['employee_id'],
             'station' => $place['station'], 'unit' => $place['unit'], 'duty' => $this->dutyWindow($row['working_intervals'] ?? []),
             'selected' => isset($draft['selections'][$id]), 'slot_id' => $draft['selections'][$id]['slot_id'] ?? null,
             'slot_options' => array_map(fn (string $slotId): array => ['id' => $slotId] + $labels[$slotId], $eligibleSlots),
-            'partial' => count($eligibleSlots) < count($labels),
+            'partial' => count($eligibleSlots) < count($labels), 'provisional' => $row['provisional'] ?? false,
         ];
     }
 
@@ -759,11 +882,11 @@ final class TrainingCrewPlanner extends Page
         return implode(', ', $parts) ?: 'Not reported';
     }
 
-    private function notListedReason(array $row, bool $sessionsReady, bool $moduleScope): ?string
+    private function notListedReason(array $row, array $draft): string
     {
         $status = $row['attendance_status'] ?? '';
         if ($status === 'VERIFIED_ATTENDED') {
-            return $moduleScope ? 'Already attended this module (verified record)' : 'Already attended this course (verified record)';
+            return $draft['module_id'] ? 'Already attended this module (verified record)' : 'Already attended this course (verified record)';
         }
         if ($status === 'NOT_APPLICABLE') {
             return "Outside this module's audience";
@@ -771,8 +894,8 @@ final class TrainingCrewPlanner extends Page
         if (in_array($status, ['UNVERIFIED_OR_PROVISIONAL', 'IDENTITY_OR_EVIDENCE_REVIEW'], true)) {
             return 'Attendance record needs verification';
         }
-        if (! $sessionsReady) {
-            return null;
+        if ($row['off_roster'] ?? false) {
+            return 'Not on this roster';
         }
         foreach ($row['slot_review_reasons'] ?? [] as $reasons) {
             foreach ($reasons as $reason) {
@@ -781,11 +904,14 @@ final class TrainingCrewPlanner extends Page
                 }
             }
         }
+        if ($draft['slots'] === []) {
+            return ($row['needs_review'] ?? []) !== [] ? 'Duty needs verification' : 'Not working on this date';
+        }
 
         return 'Not on duty for the whole session';
     }
 
-    /** Schedule identities with no unique active Hub employee; searchable so absence is explained. */
+    /** Roster identities with no unique active Hub employee; searchable so absence is explained. */
     private function unmatchedIdentities(array $review, array $filters): array
     {
         if (array_intersect_key($filters, array_flip(['rank', 'day_station', 'day_apparatus', 'assignment_category', 'published_assignment', 'de_bid'])) !== []) {
@@ -814,12 +940,12 @@ final class TrainingCrewPlanner extends Page
         $unassigned = $verify = [];
         foreach ($draft['selections'] as $id => $selection) {
             $person = $all['rows'][$id] ?? null;
-            $slot = collect($draft['slots'])->firstWhere('id', $selection['slot_id']);
+            $slot = collect($draft['slots'])->firstWhere('id', $selection['slot_id'] ?? null);
             $place = $this->dutyPlace($person['observed_unit_context'] ?? [], $slot ? [$slot] : []);
             $member = ['id' => (int) $id, 'name' => $person['name'] ?? 'Previously selected member', 'rank' => $person['rank'] ?? '',
-                'employee_id' => $person['employee_id'] ?? '', 'place' => $place['station'].' · '.$place['unit']];
-            if ($this->needsVerification($person, $selection)) {
-                $verify[] = $member + ['reason' => $person ? 'No longer qualifies for the whole session. Check attendance and duty time.' : 'Not found on the current report. Check identity.'];
+                'employee_id' => $person['employee_id'] ?? '', 'place' => $place['station'].' · '.$place['unit'], 'exception' => ! empty($selection['exception'])];
+            if ($this->composer()->needsVerification($person, $selection, $draft)) {
+                $verify[] = $member + ['reason' => $person ? 'No longer qualifies for this class. Check attendance and duty time.' : 'Not found on the current report. Check identity.'];
             } elseif ($slot) {
                 $groups[$slot['id']]['members'][] = $member;
             } else {
@@ -828,27 +954,5 @@ final class TrainingCrewPlanner extends Page
         }
 
         return ['groups' => $groups, 'unassigned' => $unassigned, 'verify' => $verify, 'count' => count($draft['selections'])];
-    }
-
-    private function rosterDay(array $metadata): ?string
-    {
-        return empty($metadata['schedule_date']) ? null : CarbonImmutable::parse($metadata['schedule_date'], self::TZ)->format('l');
-    }
-
-    private function snapshotWarnings(array $metadata): array
-    {
-        if (empty($metadata['printed_at'])) {
-            return [];
-        }
-        $printed = CarbonImmutable::parse($metadata['printed_at']);
-        $warnings = [];
-        if (! empty($metadata['schedule_date']) && $printed->lt(CarbonImmutable::parse($metadata['schedule_date'], self::TZ)->startOfDay())) {
-            $warnings[] = 'This snapshot was generated before its roster date. Verify any staffing changes made after it was printed.';
-        }
-        if ($printed->lt(CarbonImmutable::now()->subDay())) {
-            $warnings[] = 'This snapshot was generated more than 24 hours ago. Use it as dated planning evidence and verify later staffing changes.';
-        }
-
-        return $warnings;
     }
 }

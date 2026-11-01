@@ -185,6 +185,10 @@ Code colors match the TeleStaff online roster, read on 2026-10-30. They are defi
 
 **Export PDF** on the roster page downloads the entire roster for the date on screen as landscape Letter, ignoring any search or collapsed sections, with its date, shift, times and any warning. It holds what the Hub publishes, the Suppression/Rescue block, not TeleStaff's other divisions. Access is the same as the page, it is never cached, and each member is limited to 10 exports a minute.
 
+### Training Crew Planner
+
+The Crew Planner reads this roster and nothing else, through `TrainingRosterDutySource` and `CurrentRosterReader::forDutyDate()`. It has no upload and no parser of its own. A date with no accepted export has no staff: the planner says why and offers a provisional list, labelled wherever the plan goes, and never borrows another day's roster. Working intervals, the A-Day and overtime rule, and identity by exact employee ID behave as they do for the 300 card. Codes and leave reasons are never copied into a plan. When a newer export changes the duty of someone on a plan, the plan keeps its list and waits for the planner to acknowledge the change before it can be exported or sent.
+
 ### Sending more often
 
 The pipeline is built for exports every few minutes. When TeleStaff's schedule changes, add this to `/opt/mbfd/mbfd-hub/.env`, then rebuild the config cache and restart the workers:

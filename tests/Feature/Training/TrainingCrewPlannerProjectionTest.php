@@ -14,6 +14,7 @@ use App\Models\Training\TrainingPaperRosterImport;
 use App\Models\Training\TrainingRosterVersion;
 use App\Models\Training\TrainingSession;
 use App\Models\User;
+use App\Services\Training\CrewPlanner\TrainingCrewPlanExporter;
 use App\Services\Training\CrewPlanner\TrainingPlannerAttendanceLookup;
 use App\Services\Training\CrewPlanner\TrainingPlannerCandidateService;
 use App\Services\Training\TrainingAttendanceMatrixService;
@@ -23,6 +24,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Smalot\PdfParser\Parser;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -265,6 +268,175 @@ final class TrainingCrewPlannerProjectionTest extends TestCase
         $foreign = $this->module('Foreign', ['training_course_id' => $other->id]);
         $this->expectException(ValidationException::class);
         $this->lookup($foreign->id);
+    }
+
+    public function test_a_plan_without_sessions_is_one_list_group_with_the_rows_on_duty_that_date(): void
+    {
+        $exporter = app(TrainingCrewPlanExporter::class);
+        $report = $exporter->report($this->proposal([]));
+        self::assertSame(['list', 'review'], array_column($report['groups'], 'kind'));
+        self::assertSame('Class list', $report['groups'][0]['label']);
+        self::assertSame(['Synthetic Alpha', 'Synthetic Bravo'], array_column($report['groups'][0]['rows'], 'name'));
+        self::assertSame(['On duty this date'], array_values(array_unique(array_column($report['groups'][0]['rows'], 'status'))));
+        self::assertSame(2, $report['total']);
+        self::assertSame(0, $report['eligible_total'], 'With no sessions nobody is assigned to one.');
+        self::assertSame('', $report['groups'][0]['location']);
+
+        $text = (new Parser)->parseContent($exporter->pdf($this->proposal([])))->getText();
+        self::assertStringContainsString('CLASS LIST', $text);
+        self::assertStringContainsString('Synthetic Alpha', $text);
+        self::assertStringNotContainsString('UNASSIGNED', $text);
+        self::assertSame(['Summary', 'Class list', 'Needs verification'], $this->sheetNames($exporter->xlsx($this->proposal([]))));
+    }
+
+    public function test_session_location_shows_in_report_groups_the_pdf_view_data_the_pdf_and_the_workbook(): void
+    {
+        $exporter = app(TrainingCrewPlanExporter::class);
+        $proposal = $this->proposal([$this->slot('s1', 'Morning block', '09:00', '11:00', 'Synthetic Training Tower'), $this->slot('s2', 'Second block', '13:00', '15:00', '')]);
+        $proposal['rows'][1]['slot_id'] = 's1';
+        $proposal['rows'][2]['slot_id'] = 's2';
+        $report = $exporter->report($proposal);
+        self::assertSame('Synthetic Training Tower', $report['groups'][0]['location']);
+        self::assertSame('', $report['groups'][1]['location']);
+        self::assertSame('09:00–11:00', $report['groups'][0]['time']);
+
+        $html = view('training.crew-planner-proposal', ['report' => $report, 'logo' => $exporter->logo()])->render();
+        self::assertStringContainsString('Morning block: 09:00–11:00 · Synthetic Training Tower', preg_replace('/\s+/', ' ', strip_tags($html)));
+        self::assertStringContainsString('MORNING BLOCK — 09:00–11:00 — Synthetic Training Tower', html_entity_decode(strip_tags($html)));
+        self::assertStringNotContainsString('Second block: 13:00–15:00 ·', preg_replace('/\s+/', ' ', strip_tags($html)));
+
+        self::assertStringContainsString('Synthetic Training Tower', (new Parser)->parseContent($exporter->pdf($proposal))->getText());
+        $book = $this->workbook($exporter->xlsx($proposal));
+        try {
+            self::assertSame('09:00–11:00 · Synthetic Training Tower', $book->getSheetByName('Morning block')->getCell('B3')->getValue());
+            self::assertSame('13:00–15:00', $book->getSheetByName('Second block')->getCell('B3')->getValue());
+        } finally {
+            $book->disconnectWorksheets();
+        }
+    }
+
+    public function test_a_member_added_as_an_exception_is_labelled_added_by_planner_and_never_sent_for_review(): void
+    {
+        $exporter = app(TrainingCrewPlanExporter::class);
+        foreach ([[], [$this->slot('s1', 'Morning', '09:00', '11:00', '')]] as $slots) {
+            $proposal = $this->proposal($slots);
+            $proposal['rows'][2]['exception'] = true;
+            if ($slots !== []) {
+                $proposal['rows'][1]['slot_id'] = $proposal['rows'][2]['slot_id'] = 's1';
+            }
+            $report = $exporter->report($proposal);
+            $body = $report['groups'][0]['rows'];
+            self::assertSame(['On duty '.($slots === [] ? 'this date' : 'during session'), 'Added by planner'], array_column($body, 'status'));
+            self::assertSame(0, $report['review_total']);
+            $html = view('training.crew-planner-proposal', ['report' => $report, 'logo' => $exporter->logo()])->render();
+            self::assertStringContainsString('(added by planner)', $html);
+            self::assertSame(1, substr_count($html, '(added by planner)'));
+        }
+        // An exception is not exempt from a recheck that fails: it simply was never counted as qualifying.
+        $proposal = $this->proposal([]);
+        $proposal['rows'][2]['exception'] = true;
+        $proposal['rows'][2]['verification_required'] = true;
+        self::assertSame(['Synthetic Bravo'], array_column($exporter->report($proposal)['groups'][1]['rows'], 'name'));
+    }
+
+    public function test_without_a_verified_roster_every_status_and_the_legend_say_provisional(): void
+    {
+        $exporter = app(TrainingCrewPlanExporter::class);
+        foreach ([[], [$this->slot('s1', 'Morning', '09:00', '11:00', '')]] as $slots) {
+            $proposal = $this->proposal($slots, false);
+            if ($slots !== []) {
+                $proposal['rows'][1]['slot_id'] = $proposal['rows'][2]['slot_id'] = 's1';
+            }
+            $report = $exporter->report($proposal);
+            self::assertFalse($report['roster_verified']);
+            self::assertSame(['Provisional'], array_values(array_unique(array_column($report['groups'][0]['rows'], 'status'))));
+            self::assertSame(TrainingCrewPlanExporter::LEGEND_PROVISIONAL, $report['legend']);
+            self::assertStringStartsWith('Provisional', $report['source_label']);
+            self::assertStringContainsString('no TeleStaff roster was available', (new Parser)->parseContent($exporter->pdf($proposal))->getText());
+            $book = $this->workbook($exporter->xlsx($proposal));
+            try {
+                self::assertSame($report['source_label'], $book->getSheetByName('Summary')->getCell('B7')->getValue());
+                $summary = array_column($book->getSheetByName('Summary')->toArray(), 1, 0);
+                self::assertSame(TrainingCrewPlanExporter::LEGEND_PROVISIONAL, $summary['Eligibility']);
+                self::assertSame(TrainingCrewPlanExporter::QUALIFIER, $summary['Status']);
+            } finally {
+                $book->disconnectWorksheets();
+            }
+        }
+        $verified = $exporter->report($this->proposal([$this->slot('s1', 'Morning', '09:00', '11:00', '')]));
+        self::assertTrue($verified['roster_verified']);
+        self::assertSame(TrainingCrewPlanExporter::LEGEND, $verified['legend']);
+        self::assertStringStartsWith('TeleStaff roster', $verified['source_label']);
+    }
+
+    public function test_nothing_a_member_can_read_says_the_roster_was_uploaded(): void
+    {
+        $exporter = app(TrainingCrewPlanExporter::class);
+        $texts = [implode(' ', [TrainingCrewPlanExporter::TITLE, TrainingCrewPlanExporter::INTRO, TrainingCrewPlanExporter::INTRO_ADHOC, TrainingCrewPlanExporter::QUALIFIER,
+            TrainingCrewPlanExporter::LEGEND, TrainingCrewPlanExporter::LEGEND_PROVISIONAL, TrainingCrewPlanExporter::VERIFY_NOTE])];
+        $slot = $this->slot('s1', 'Morning', '09:00', '11:00', 'Synthetic Training Tower');
+        foreach ([[[], true], [[$slot], true], [[], false], [[$slot], false]] as [$slots, $verified]) {
+            $proposal = $this->proposal($slots, $verified);
+            $proposal['rows'][2]['exception'] = true;
+            $report = $exporter->report($proposal);
+            $texts[] = json_encode($report, JSON_THROW_ON_ERROR);
+            $texts[] = view('training.crew-planner-proposal', ['report' => $report, 'logo' => $exporter->logo()])->render();
+            $texts[] = (new Parser)->parseContent($exporter->pdf($proposal))->getText();
+            $book = $this->workbook($exporter->xlsx($proposal));
+            try {
+                foreach ($book->getAllSheets() as $sheet) {
+                    $texts[] = json_encode($sheet->toArray(), JSON_THROW_ON_ERROR);
+                }
+            } finally {
+                $book->disconnectWorksheets();
+            }
+        }
+        foreach ($texts as $text) {
+            self::assertStringNotContainsStringIgnoringCase('uploaded', $text);
+            self::assertStringNotContainsStringIgnoringCase('upload', $text);
+        }
+    }
+
+    /** @return array<string, mixed> the allowlisted projection the composer hands the exporter */
+    private function proposal(array $slots, bool $verified = true): array
+    {
+        $row = static fn (string $id, string $name, string $rank): array => ['employee_id' => $id, 'name' => $name, 'rank' => $rank, 'bid_position' => '',
+            'station' => 'Station 9', 'apparatus' => 'Engine 9', 'slot_id' => null, 'verification_required' => false, 'exception' => false, 'review_reasons' => []];
+
+        return ['course_name' => 'Synthetic crew planning course', 'module_name' => null, 'scope_label' => 'Entire course — no verified prior attendance',
+            'schedule_date' => '2026-10-21', 'shift' => 'B', 'shift_label' => 'B Shift', 'roster_verified' => $verified,
+            'roster_as_of' => $verified ? '2026-10-21T07:14:00-04:00' : null, 'roster_version' => $verified ? 1 : null,
+            'generated_at' => '2026-10-21T10:00:00-04:00', 'author' => 'Synthetic Planner', 'slots' => $slots,
+            'rows' => [1 => $row('90001', 'Synthetic Alpha', 'Captain'), 2 => $row('90002', 'Synthetic Bravo', 'Firefighter')]];
+    }
+
+    private function slot(string $id, string $label, string $start, string $end, string $location): array
+    {
+        return ['id' => $id, 'label' => $label, 'location' => $location, 'station_id' => null, 'venue' => $location,
+            'start_at' => '2026-10-21T'.$start.':00-04:00', 'end_at' => '2026-10-21T'.$end.':00-04:00'];
+    }
+
+    private function workbook(string $bytes): \PhpOffice\PhpSpreadsheet\Spreadsheet
+    {
+        $path = tempnam(sys_get_temp_dir(), 'crew-projection-');
+        try {
+            file_put_contents($path, $bytes);
+
+            return IOFactory::load($path);
+        } finally {
+            unlink($path);
+        }
+    }
+
+    /** @return list<string> */
+    private function sheetNames(string $bytes): array
+    {
+        $book = $this->workbook($bytes);
+        try {
+            return $book->getSheetNames();
+        } finally {
+            $book->disconnectWorksheets();
+        }
     }
 
     private function lookup(?int $moduleId = null, ?string $personnelAsOf = null): array
