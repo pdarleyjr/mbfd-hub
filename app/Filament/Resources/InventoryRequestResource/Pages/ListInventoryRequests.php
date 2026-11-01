@@ -20,12 +20,12 @@ class ListInventoryRequests extends ListRecords
 
     public function getTitle(): string
     {
-        return 'Rescue Inventory';
+        return 'Submitted Inventory Forms';
     }
 
     public function getSubheading(): ?string
     {
-        return 'Medical Inventory Requests from members. These are the same records Captain 5 works from. Quantities are what was requested and issued, not what crews used.';
+        return 'Medical Inventory Requests from members. These are the same records Captain 5 works from, and Captain 5 reconciles them on the Captain 5 page. Quantities are what was requested, not what crews used.';
     }
 
     protected function getHeaderActions(): array

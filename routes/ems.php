@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Ems\MasterInventoryController;
 use App\Http\Controllers\Ems\MemberRequestController;
 use App\Http\Controllers\Ems\StaffRequestController;
 use App\Http\Controllers\Ems\StatisticsController;
@@ -56,9 +57,23 @@ Route::prefix('ems/api')
             Route::get('/supply/snapshots/{uuid}/export/pdf', [SupplyRoomController::class, 'exportSnapshotPdf'])->whereUuid('uuid')->name('supply.snapshots.export.pdf');
 
             Route::get('/statistics', StatisticsController::class)->name('statistics');
+
+            Route::get('/forms/reconcile/preview', [MasterInventoryController::class, 'reconcilePreview'])->name('forms.reconcile.preview');
+            Route::get('/supply/master', [MasterInventoryController::class, 'index'])->name('supply.master.index');
+            Route::get('/supply/count-form/{uuid}/review', [MasterInventoryController::class, 'reviewCount'])->whereUuid('uuid')->name('supply.count-form.review');
         });
 
         Route::middleware([EnsureEmsAccess::class.':act', 'throttle:60,1,ems-staff-write'])->group(function (): void {
+            Route::post('/requests/{uuid}/acknowledge', [StaffRequestController::class, 'acknowledge'])->whereUuid('uuid')->name('requests.acknowledge');
+            Route::post('/requests/{uuid}/reject', [StaffRequestController::class, 'reject'])->whereUuid('uuid')->name('requests.reject');
+            Route::post('/forms/reconcile', [MasterInventoryController::class, 'reconcile'])->name('forms.reconcile');
+            Route::post('/supply/master/items', [MasterInventoryController::class, 'store'])->name('supply.master.items.store');
+            Route::patch('/supply/master/items/{item}', [MasterInventoryController::class, 'update'])->whereNumber('item')->name('supply.master.items.update');
+            Route::post('/supply/master/items/{item}/count', [MasterInventoryController::class, 'count'])->whereNumber('item')->name('supply.master.items.count');
+            Route::post('/supply/count-form/start', [MasterInventoryController::class, 'startCount'])->name('supply.count-form.start');
+            Route::put('/supply/count-form/{uuid}/entries', [MasterInventoryController::class, 'saveCount'])->whereUuid('uuid')->name('supply.count-form.entries');
+            Route::post('/supply/count-form/{uuid}/submit', [MasterInventoryController::class, 'submitCount'])->whereUuid('uuid')->name('supply.count-form.submit');
+
             Route::post('/requests/{uuid}/review', [StaffRequestController::class, 'review'])->whereUuid('uuid')->name('requests.review');
             Route::post('/requests/{uuid}/prepare', [StaffRequestController::class, 'prepare'])->whereUuid('uuid')->name('requests.prepare');
             Route::post('/requests/{uuid}/issue', [StaffRequestController::class, 'issue'])->whereUuid('uuid')->name('requests.issue');

@@ -330,6 +330,8 @@ page; everyone else goes through `EmsAccess` unchanged.
 
 ## 11. Captain 5 tabs (as built, branch feat/ems-captain5-tabs)
 
+The tabs described in this section were replaced in November 2026; see `docs/ems/captain5-medical-inventory-workflow.md` for how they work now.
+
 The Daily Checkout app's Captain 5 page (`/daily/captain-5`) gains two tabs built only on the staff API above. No second ticket engine and no new tables.
 
 - **Rescue Inventory** (`?tab=rescue`; `&request=<uuid>` opens that request; `&view=stats` opens Unit statistics). Open = submitted, reviewed, prepared or partly issued; chips Issued, Closed (includes cancelled) and All. The tab badge is `meta.total` of a one-row list with the four open statuses, refreshed on focus and once a minute while the page is visible. `EmsLinks::staff()` produces exactly this URL.

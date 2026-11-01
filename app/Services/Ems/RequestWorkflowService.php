@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Ems;
 
+use App\Models\Ems\CatalogSupplyLink;
 use App\Models\Ems\InventoryRequest;
 use App\Models\Ems\InventoryRequestEvent;
 use App\Models\Ems\InventoryRequestLine;
@@ -11,6 +12,7 @@ use App\Models\Ems\StockMovement;
 use App\Models\Ems\SupplyItem;
 use App\Models\User;
 use Closure;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The request lifecycle (docs/ems/ems-inventory-contract.md section 5):
@@ -33,6 +35,9 @@ final class RequestWorkflowService
 
     public const EFFECT_NONE = 'none';
 
+    /** A person or the reviewed mapping decided this form item does not come out of the supply room. */
+    public const EFFECT_NOT_STOCKED = 'not_stocked';
+
     private const MAX_QTY = RequestFormDefinition::MAX_QUANTITY;
 
     public function __construct(
@@ -49,6 +54,65 @@ final class RequestWorkflowService
     public function review(int $requestId, User $user, string $key): array
     {
         return $this->mutate($requestId, $user, 'review', $key, [], fn (): array => []);
+    }
+
+    /**
+     * Captain 5 has seen this form. Stock does not move and the form stays in the active list.
+     *
+     * @return array{result: array<string, mixed>, replayed: bool}
+     */
+    public function acknowledge(int $requestId, User $user, string $key): array
+    {
+        if (! $this->access->canAct($user)) {
+            throw EmsException::forbidden();
+        }
+
+        return $this->idempotency->run($user, "ems.request.acknowledge.{$requestId}", $key, function () use ($requestId, $user): array {
+            $request = $this->lock($requestId);
+            $this->assertWorkable($request, 'acknowledged');
+            if (! $request->isAcknowledged()) {
+                $actor = EmsActor::staff($user, $this->access);
+                $this->markAcknowledged($request, $actor);
+                $request->update(['last_activity_at' => now()]);
+            }
+
+            return $this->presenter->detail($request->fresh(), RequestPresenter::AUDIENCE_STAFF);
+        });
+    }
+
+    /**
+     * Send the form back to the member who submitted it. Nothing leaves stock, and the acknowledgment
+     * is cleared so the corrected form has to be looked at again.
+     *
+     * @param  array<string, mixed>  $input  {reason}
+     * @return array{result: array<string, mixed>, replayed: bool}
+     */
+    public function reject(int $requestId, User $user, string $key, array $input): array
+    {
+        if (! $this->access->canAct($user)) {
+            throw EmsException::forbidden();
+        }
+        $data = EmsValidator::validate($input, ['reason' => ['required', 'string', 'min:3', 'max:500']], [
+            'reason.required' => 'Tell the member what to correct.', 'reason.min' => 'Tell the member what to correct.',
+            'reason.max' => 'Keep the reason to 500 characters or fewer.',
+        ]);
+
+        return $this->idempotency->run($user, "ems.request.reject.{$requestId}", $key, function () use ($requestId, $user, $data): array {
+            $request = $this->lock($requestId);
+            $this->assertWorkable($request, 'sent back');
+            $actor = EmsActor::staff($user, $this->access);
+            $reason = trim($data['reason']);
+            $from = $request->status;
+            $request->update([
+                'status' => InventoryRequest::RETURNED,
+                'returned_at' => now(), 'returned_by_user_id' => $actor->userId, 'returned_by_name' => $actor->name, 'return_reason' => $reason,
+                'reviewed_at' => null, 'reviewed_by_user_id' => null, 'reviewed_by_name' => null,
+                'last_activity_at' => now(),
+            ]);
+            $this->writeEvent($request, $actor, 'rejected', null, ['reason' => $reason], $from, InventoryRequest::RETURNED);
+
+            return $this->presenter->detail($request->fresh(), RequestPresenter::AUDIENCE_STAFF);
+        });
     }
 
     /**
@@ -184,7 +248,7 @@ final class RequestWorkflowService
             'reason' => ['required', 'string', 'min:3', 'max:500'],
         ], ['reason.required' => 'Give a reason for the correction.', 'reason.min' => 'Give a reason for the correction.', 'new_quantity.required' => 'Enter the correct quantity.']);
 
-        return $this->mutate($requestId, $user, 'correct', $key, ['open', 'closed'], function (InventoryRequest $request, EmsActor $actor) use ($data, $key): array {
+        return $this->mutate($requestId, $user, 'correct', $key, ['open', 'closed', 'reconciled'], function (InventoryRequest $request, EmsActor $actor) use ($data, $key): array {
             return [$this->correctOne($request, $actor, $data, $key)];
         });
     }
@@ -244,17 +308,16 @@ final class RequestWorkflowService
 
             $from = $request->status;
             if ($request->status === InventoryRequest::SUBMITTED) {
-                $request->update(['status' => InventoryRequest::REVIEWED, 'reviewed_at' => now(), 'reviewed_by_user_id' => $actor->userId]);
-                $this->writeEvent($request, $actor, 'reviewed', null, [], InventoryRequest::SUBMITTED, InventoryRequest::REVIEWED);
+                $this->markAcknowledged($request, $actor);
                 $from = InventoryRequest::REVIEWED;
             }
 
             $specs = $work($request, $actor);
             $request->load('lines');
 
-            // Close and reopen name their own target status; everything else follows the lines.
+            // Close and reopen name their own target status; a correction leaves a finished record finished; everything else follows the lines.
             $lastSpec = $specs === [] ? null : $specs[array_key_last($specs)];
-            $to = $lastSpec['to_status'] ?? ($request->status === InventoryRequest::CLOSED ? InventoryRequest::CLOSED : $this->derivedStatus($request));
+            $to = $lastSpec['to_status'] ?? (in_array($request->status, [InventoryRequest::CLOSED, InventoryRequest::RECONCILED], true) ? $request->status : $this->derivedStatus($request));
             if ($to !== $request->status) {
                 $request->update(['status' => $to]);
             }
@@ -298,12 +361,142 @@ final class RequestWorkflowService
         if ($request->status === InventoryRequest::CANCELLED) {
             throw EmsException::conflict('The member cancelled this request, so it cannot be changed.', 'request_cancelled');
         }
+        if ($request->status === InventoryRequest::RETURNED) {
+            throw EmsException::conflict('This form was sent back to the member to correct.', 'request_returned');
+        }
+        if ($request->status === InventoryRequest::SUPERSEDED) {
+            throw EmsException::conflict('The member sent a corrected version of this form. Open that one instead.', 'request_superseded');
+        }
+        if ($request->status === InventoryRequest::RECONCILED && ! in_array('reconciled', $allowed, true)) {
+            throw EmsException::conflict('This form was already reconciled with the supply room.', 'already_reconciled');
+        }
         if (in_array('open', $allowed, true) && ! in_array('closed', $allowed, true) && $request->status === InventoryRequest::CLOSED) {
             throw EmsException::conflict('This request is closed. Reopen it first.', 'request_closed');
         }
         if ($allowed === ['closed'] && $request->status !== InventoryRequest::CLOSED) {
             throw EmsException::conflict('Only a closed request can be reopened.', 'request_not_closed');
         }
+    }
+
+    /**
+     * Put a form handled by the older Issue workflow back in front of Captain 5, so reconciling it is its one
+     * deduction. Each issuance is corrected to zero with ordinary compensating rows, so the history shows what
+     * happened and why. It is refused once a count covers any of those movements: that count already reflects the
+     * shelf, and a compensating row after it would add stock that was never returned.
+     */
+    public function returnToForms(int $requestId, string $reason): void
+    {
+        DB::transaction(function () use ($requestId, $reason): void {
+            $request = $this->lock($requestId);
+            if (! in_array($request->status, [InventoryRequest::ISSUED, InventoryRequest::PARTIALLY_ISSUED], true)) {
+                throw EmsException::conflict("{$request->number} is not an issued form.", 'not_issued');
+            }
+            $issuances = InventoryRequestEvent::query()->where('request_id', $request->getKey())->where('action', 'issued')->orderBy('id')->get();
+            $this->assertNoCountCovers($request, $issuances);
+
+            $actor = EmsActor::system();
+            $from = $request->status;
+            foreach ($issuances as $issuance) {
+                if ($this->issuanceState($issuance)['quantity'] === 0) {
+                    continue;
+                }
+                $correction = $this->correctOne($request, $actor, ['event_id' => $issuance->getKey(), 'new_quantity' => 0, 'reason' => $reason], 'return-to-forms');
+                $this->writeEvent($request, $actor, $correction['action'], $correction['line'], $correction['payload'], null, null);
+            }
+
+            $request->load('lines');
+            $to = $this->derivedStatus($request);
+            $request->update([
+                'status' => $to, 'last_activity_at' => now(),
+                'reviewed_by_name' => $request->reviewed_by_name ?? InventoryRequestEvent::query()->where('request_id', $request->getKey())->where('action', 'reviewed')->orderByDesc('id')->value('actor_name'),
+            ]);
+            $this->writeEvent($request, $actor, 'returned_to_forms', null, ['reason' => $reason], $from, $to);
+        });
+    }
+
+    /** @param \Illuminate\Support\Collection<int, InventoryRequestEvent> $issuances */
+    private function assertNoCountCovers(InventoryRequest $request, \Illuminate\Support\Collection $issuances): void
+    {
+        $this->ledger->lock();
+        $movements = $issuances->map(fn (InventoryRequestEvent $issuance): array => $this->issuanceState($issuance))->filter(fn (array $state): bool => $state['movement_id'] !== null);
+        $counts = $this->ledger->lastCounts($movements->pluck('supply_item_id')->map(fn ($id): int => (int) $id)->all());
+        foreach ($movements as $state) {
+            if (isset($counts[$state['supply_item_id']]) && $counts[$state['supply_item_id']]['through'] >= $state['movement_id']) {
+                throw EmsException::conflict("{$request->number} cannot go back: a count already covers what it took. Reconcile the difference with a count instead.", 'count_covers_issuance');
+            }
+        }
+    }
+
+    /** The forms Captain 5 can still act on: nothing issued yet and not finished. */
+    private function assertWorkable(InventoryRequest $request, string $doing): void
+    {
+        if ($request->canBeWorked()) {
+            return;
+        }
+        $this->assertState($request, ['open']);
+
+        throw EmsException::conflict("This form cannot be {$doing} because the older workflow already issued supplies against it.", 'already_issued');
+    }
+
+    private function markAcknowledged(InventoryRequest $request, EmsActor $actor): void
+    {
+        $from = $request->status;
+        $to = $from === InventoryRequest::SUBMITTED ? InventoryRequest::REVIEWED : $from;
+        $request->update(['status' => $to, 'reviewed_at' => now(), 'reviewed_by_user_id' => $actor->userId, 'reviewed_by_name' => $actor->name]);
+        $this->writeEvent($request, $actor, 'reviewed', null, [], $from, $to === $from ? null : $to);
+    }
+
+    /**
+     * Apply one planned line of a reconciliation. The movement key names only the request and the line,
+     * so no retry, second person or second key can ever take this line off the shelf twice.
+     *
+     * @param  array{quantity: int, effect: string, item: SupplyItem|null, quantity_base: int|null, note: string|null}  $plan
+     */
+    public function applyReconciledLine(InventoryRequest $request, EmsActor $actor, InventoryRequestLine $line, array $plan, string $batch): ?int
+    {
+        if ($plan['quantity'] === 0) {
+            if ($line->line_status !== InventoryRequestLine::NOT_ISSUED) {
+                $reason = 'Not taken, recorded when the form was reconciled.';
+                $line->not_issued_reason = $reason;
+                $this->saveLine($line);
+                $this->writeEvent($request, $actor, 'not_issued', $line, ['label' => $line->label, 'reason' => $reason, 'reconciliation_batch' => $batch], null, null);
+            }
+
+            return null;
+        }
+
+        $movementId = null;
+        if ($plan['effect'] === self::EFFECT_APPLIED) {
+            $movementId = $this->ledger->record(
+                $plan['item'], StockMovement::ISSUED, -$plan['quantity_base'], $actor,
+                "reconcile:r{$request->getKey()}:l{$line->getKey()}",
+                "Reconciled {$request->number}", ['request_id' => $request->getKey(), 'request_line_id' => $line->getKey()],
+            )->getKey();
+        }
+
+        $line->not_issued_reason = null;
+        $line->issued_qty = (int) $line->issued_qty + $plan['quantity'];
+        $this->saveLine($line);
+        $this->writeEvent($request, $actor, 'issued', $line, [
+            'label' => $line->label, 'quantity' => $plan['quantity'], 'quantity_delta' => $plan['quantity'],
+            'supply_item_id' => $plan['item']?->getKey(), 'supply_item_name' => $plan['item']?->name,
+            'stock_effect' => $plan['effect'], 'stock_note' => $plan['note'],
+            'quantity_base' => $plan['effect'] === self::EFFECT_APPLIED ? $plan['quantity_base'] : null,
+            'movement_id' => $movementId, 'over_issue' => $plan['quantity'] > $line->wantedQty(), 'reason' => null, 'reconciliation_batch' => $batch,
+        ], null, null);
+
+        return $movementId;
+    }
+
+    /** Finish one form of a reconciliation: it is deducted and archived in the same transaction. */
+    public function markReconciled(InventoryRequest $request, EmsActor $actor, string $batch, int $formCount): void
+    {
+        $from = $request->status;
+        $request->update([
+            'status' => InventoryRequest::RECONCILED, 'reconciled_at' => now(), 'reconciled_by_user_id' => $actor->userId,
+            'reconciled_by_name' => $actor->name, 'reconciliation_batch' => $batch, 'last_activity_at' => now(),
+        ]);
+        $this->writeEvent($request, $actor, 'reconciled', null, ['reconciliation_batch' => $batch, 'forms_in_batch' => $formCount], $from, InventoryRequest::RECONCILED);
     }
 
     private function line(InventoryRequest $request, int $lineId): InventoryRequestLine
@@ -443,8 +636,13 @@ final class RequestWorkflowService
                 throw new EmsException('Controlled substances are not tracked in the supply room.', 'controlled_not_tracked', 422);
             }
         } else {
-            $candidates = $line->catalog_item_id === null ? collect() : SupplyItem::query()
-                ->where('catalog_item_id', $line->catalog_item_id)->where('active', true)->where('controlled_substance', false)->get();
+            $link = $line->catalog_item_id === null ? null : CatalogSupplyLink::query()->with('supplyItem')->where('catalog_item_id', $line->catalog_item_id)->first();
+            if ($link?->not_stocked) {
+                return ['item' => null, 'base' => null, 'effect' => self::EFFECT_NOT_STOCKED, 'note' => 'Not a supply room item, so stock was not changed.'];
+            }
+            $linked = $link?->supplyItem;
+            $candidates = $linked !== null && $linked->tracksStock() ? collect([$linked]) : ($line->catalog_item_id === null ? collect() : SupplyItem::query()
+                ->where('catalog_item_id', $line->catalog_item_id)->where('active', true)->where('controlled_substance', false)->get());
             if ($candidates->count() !== 1) {
                 return ['item' => null, 'base' => null, 'effect' => self::EFFECT_UNMATCHED, 'note' => $candidates->isEmpty()
                     ? 'No supply room item is linked to this line, so stock was not changed.'

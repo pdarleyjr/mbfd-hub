@@ -28,6 +28,10 @@ use LogicException;
  * @property int|null $previous_snapshot_id
  * @property string|null $idempotency_key
  * @property string|null $notes
+ * @property string|null $origin
+ * @property int|null $counted_items
+ * @property int|null $uncounted_items
+ * @property int|null $order_items
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */
@@ -43,11 +47,21 @@ class InventorySnapshot extends Model
 
     public const FINAL = 'final';
 
+    /** The Monday count form. */
+    public const ORIGIN_COUNT_FORM = 'count_form';
+
+    /** One item's on-hand number typed directly on the master inventory. */
+    public const ORIGIN_DIRECT_EDIT = 'direct_edit';
+
+    /** The starting counts from the supply room workbook. */
+    public const ORIGIN_WORKBOOK = 'workbook';
+
     protected $table = 'ems_inventory_snapshots';
 
     protected $fillable = [
-        'uuid', 'version', 'kind', 'status', 'scope_location_code', 'started_by_user_id', 'started_at', 'finalized_by_user_id', 'finalized_at',
+        'uuid', 'version', 'kind', 'origin', 'status', 'scope_location_code', 'started_by_user_id', 'started_at', 'finalized_by_user_id', 'finalized_at',
         'finalized_name', 'cutoff_at', 'through_movement_id', 'previous_snapshot_id', 'idempotency_key', 'notes',
+        'counted_items', 'uncounted_items', 'order_items',
     ];
 
     protected static function booted(): void
@@ -72,6 +86,9 @@ class InventorySnapshot extends Model
             'finalized_at' => 'datetime',
             'cutoff_at' => 'datetime',
             'through_movement_id' => 'integer',
+            'counted_items' => 'integer',
+            'uncounted_items' => 'integer',
+            'order_items' => 'integer',
         ];
     }
 

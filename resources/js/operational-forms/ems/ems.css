@@ -246,6 +246,34 @@
 .ems-status.is-progress { color: rgb(var(--hub-warning-strong)); background: rgb(var(--hub-warning-bg)); border-color: rgb(var(--hub-warning-border)); }
 .ems-status.is-done { color: rgb(var(--hub-success)); background: rgb(var(--hub-success-bg)); border-color: rgb(var(--hub-success-border)); }
 .ems-status.is-muted { color: var(--ems-muted); background: rgb(var(--hub-n-50)); border-color: var(--ems-line); }
+.ems-status.is-attention { color: var(--ems-danger); background: rgb(var(--hub-danger-bg, var(--hub-warning-bg))); border-color: var(--ems-danger); }
+
+/* A request Captain 5 sent back: it asks the member for something, so it stands out from the rest of the list. */
+.ems-request-item { display: grid; gap: 0; }
+.ems-request-item.is-attention .ems-request-row { border-color: var(--ems-danger); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.ems-attention-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    padding: 10px 14px;
+    background: rgb(var(--hub-warning-bg));
+    border: 1px solid var(--ems-danger);
+    border-top: 0;
+    border-radius: 0 0 var(--hub-radius-card) var(--hub-radius-card);
+}
+.ems-attention-text { flex: 1 1 220px; min-width: 0; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.ems-attention { border-color: var(--ems-danger); border-left-width: 4px; }
+.ems-attention h2 { display: flex; align-items: center; gap: 8px; color: var(--ems-danger); }
+.ems-attention-by { font-size: 13.5px; color: var(--ems-muted); }
+.ems-return-reason { font-size: 16px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ems-return-reason span { font-weight: 650; }
+.ems-request-link { margin: 0; }
+.ems-link { padding: 0; font: inherit; font-weight: 650; color: var(--ems-accent); text-decoration: underline; background: none; border: 0; cursor: pointer; overflow-wrap: anywhere; }
+.ems-link:focus-visible { outline: 3px solid rgb(var(--hub-focus, 29 78 216)); outline-offset: 2px; }
+.ems-review-replaces { padding: 8px 10px; font-size: 14px; background: rgb(var(--hub-warning-bg)); border: 1px solid rgb(var(--hub-warning-border)); border-radius: var(--hub-radius-control); }
+.ems-revision-banner, .ems-revision-stale { overflow-wrap: anywhere; }
 
 .ems-copy-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .ems-lines { display: grid; }

@@ -42,7 +42,7 @@ class InventoryRequestEvent extends Model
     /** Events a member may see in their own request history. */
     public const MEMBER_VISIBLE = [
         'submitted', 'reviewed', 'prepared', 'issued', 'issue_corrected', 'not_issued',
-        'closed', 'reopened', 'cancelled', 'status_changed',
+        'closed', 'reopened', 'cancelled', 'status_changed', 'rejected', 'reconciled', 'revised',
     ];
 
     protected $table = 'ems_inventory_request_events';

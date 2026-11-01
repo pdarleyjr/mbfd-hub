@@ -21,9 +21,10 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 /**
- * Admin -> EMS -> Rescue Inventory. The same request records Captain 5 works from, read here and
+ * Admin -> EMS -> Submitted Inventory Forms. The same request records Captain 5 works from, read here and
  * acted on through the EMS services. Members submit requests and history is never edited, so this
  * resource has no create, edit or delete.
  */
@@ -38,11 +39,11 @@ class InventoryRequestResource extends Resource
 
     protected static ?string $navigationGroup = 'EMS';
 
-    protected static ?string $navigationLabel = 'Rescue Inventory';
+    protected static ?string $navigationLabel = 'Submitted Inventory Forms';
 
     protected static ?string $modelLabel = 'request';
 
-    protected static ?string $pluralModelLabel = 'Rescue Inventory';
+    protected static ?string $pluralModelLabel = 'Submitted Inventory Forms';
 
     protected static ?string $slug = 'rescue-inventory';
 
@@ -160,7 +161,12 @@ class InventoryRequestResource extends Resource
                     ->state(fn (InventoryRequest $record): int => (int) $record->qty_issued),
                 Tables\Columns\TextColumn::make('status')->label('Status')->badge()->sortable()
                     ->formatStateUsing(fn (string $state): string => EmsLabels::status($state))
-                    ->color(fn (string $state): string => EmsLabels::STATUS_COLOR[$state] ?? 'gray'),
+                    ->color(fn (string $state): string => EmsLabels::STATUS_COLOR[$state] ?? 'gray')
+                    ->description(fn (InventoryRequest $record): ?string => match ($record->status) {
+                        InventoryRequest::RETURNED => filled($record->return_reason) ? 'Sent back: '.Str::limit((string) $record->return_reason, 60) : null,
+                        InventoryRequest::RECONCILED => filled($record->reconciled_by_name) ? 'By '.$record->reconciled_by_name : null,
+                        default => null,
+                    }),
                 Tables\Columns\TextColumn::make('last_message_context')->label('Messages')
                     ->state(fn (InventoryRequest $record): ?string => $record->last_message_context === 'member' ? 'Waiting for a reply' : null)
                     ->badge()->color('warning'),
@@ -170,7 +176,7 @@ class InventoryRequestResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('status')->label('Status')->multiple()
-                    ->options(EmsLabels::STATUS)->default(InventoryRequest::OPEN_STATUSES),
+                    ->options(EmsLabels::STATUS)->default(InventoryRequest::ACTIVE_STATUSES),
                 SelectFilter::make('apparatus_id')->label('Unit')
                     ->options(fn (): array => static::unitOptions()),
                 SelectFilter::make('target_kind')->label('Kind of request')->options(EmsLabels::TARGET_KIND),

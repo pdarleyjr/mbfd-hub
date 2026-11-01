@@ -58,7 +58,7 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
     public const TABS = [
         'stock' => 'Stock',
         'counts' => 'Counts',
-        'reconcile' => 'Reconcile',
+        'reconcile' => 'Calculated snapshot',
         'reorder' => 'Reorder',
         'movements' => 'Movements',
         'snapshots' => 'Snapshots',
@@ -307,12 +307,12 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
 
     public function confirmReconciliationAction(): Action
     {
-        return Action::make('confirmReconciliation')->label('Confirm reconciliation')->icon('heroicon-o-check-badge')->color('success')
+        return Action::make('confirmReconciliation')->label('Confirm calculated snapshot')->icon('heroicon-o-check-badge')->color('success')
             ->visible(fn (): bool => $this->emsCan('act'))
             ->requiresConfirmation()
-            ->modalHeading('Confirm this reconciliation?')
+            ->modalHeading('Save this calculated snapshot?')
             ->modalDescription('This saves the calculated levels shown below as a new snapshot. It is not a physical count, and items without an earlier count stay "not counted". Confirming twice does not count anything twice.')
-            ->modalSubmitActionLabel('Confirm reconciliation')
+            ->modalSubmitActionLabel('Save calculated snapshot')
             ->action(function (Action $action): void {
                 $previewed = $this->previewLastMovementId;
                 $key = 'recon-ui-'.substr(hash('sha256', (string) auth()->id().'|'.($previewed ?? 'none')), 0, 32);
@@ -327,7 +327,7 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
                         }
                         throw $exception;
                     }
-                }, 'Reconciliation saved');
+                }, 'Calculated snapshot saved');
                 $this->forgetCurrentStock();
                 if (is_array($result) && ($result['result']['unchanged'] ?? false)) {
                     \Filament\Notifications\Notification::make()->info()->title('Nothing new to reconcile')->body('The latest snapshot already includes every stock movement.')->send();

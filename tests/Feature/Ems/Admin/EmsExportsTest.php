@@ -166,6 +166,29 @@ final class EmsExportsTest extends TestCase
             ->callAction('exportPdf')->assertFileDownloaded();
     }
 
+    public function test_the_list_exports_still_work_for_returned_reconciled_and_superseded_forms(): void
+    {
+        $member = $this->emsMember('Paramedic', 'Pat Medic');
+        $uuids = [];
+        foreach (['returned', 'reconciled', 'superseded'] as $status) {
+            $uuids[$status] = $this->submitRequest($member, [['form' => 'als-med-bag', 'item_key' => 'als.trauma.tape', 'quantity' => 1]])['uuid'];
+            InventoryRequest::query()->where('uuid', $uuids[$status])->update(['status' => $status]);
+        }
+        $this->actingAs($this->manager);
+
+        $rows = InventoryRequestResource::getEloquentQuery()->orderBy('id')->get();
+        $exporter = app(RequestListExporter::class);
+        $at = CarbonImmutable::parse('2026-11-02 09:00:00', 'America/New_York');
+        $sheet = $this->read($exporter->xlsx($rows, 'None (all requests)', $at))->getSheetByName('Requests');
+        $statuses = collect(range(2, $sheet->getHighestRow()))->map(fn (int $r): string => (string) $sheet->getCell('J'.$r)->getValue())->all();
+        $this->assertSame(['Needs correction', 'Reconciled', 'Replaced by a correction'], $statuses);
+        $this->assertStringStartsWith('%PDF', $exporter->pdf($rows, 'None (all requests)', $at));
+
+        $page = Livewire::test(ListInventoryRequests::class)->call('loadTable')
+            ->filterTable('status', ['returned', 'reconciled', 'superseded']);
+        $page->callAction('exportExcel')->assertFileDownloaded()->callAction('exportPdf')->assertFileDownloaded();
+    }
+
     // ----------------------------------------------------------------- snapshot
 
     public function test_a_snapshot_exports_to_excel_and_pdf_with_its_basis_and_numbers(): void

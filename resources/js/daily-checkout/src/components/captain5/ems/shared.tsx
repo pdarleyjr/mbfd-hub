@@ -51,7 +51,7 @@ export function useEmsLoad<T>(load: () => Promise<T>, key: string, options: { ti
   return { data, error, loading, reload, setData };
 }
 
-export interface WriteState {
+interface WriteState {
   busy: boolean;
   error: string | null;
   fields: Record<string, string>;

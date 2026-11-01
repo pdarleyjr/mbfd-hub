@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $name
  * @property string|null $bag_alias_text
  * @property string $base_unit
+ * @property string $count_unit
  * @property string|null $package_unit
  * @property int|null $units_per_package
  * @property int|null $packages_per_case
@@ -42,6 +43,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class SupplyItem extends Model
 {
+    public const COUNT_UNITS = ['each', 'box', 'case', 'pack', 'bag'];
+
     protected $table = 'ems_supply_items';
 
     protected $guarded = [];
