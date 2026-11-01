@@ -24,6 +24,7 @@ final class RosterAlerts
         'needs_review' => 'A TeleStaff roster was held for review. Members still see the last good roster.',
         'failed' => 'A TeleStaff roster email could not be processed. Members still see the last good roster.',
         'rejected' => 'An email that looks like the TeleStaff roster failed the mail check and was not used. Members still see the last good roster.',
+        'move_alerts_held' => 'An unusually large number of on-duty members changed in one TeleStaff roster, so no roster move alerts went out for it. Check the roster is right.',
     ];
 
     public function __construct(private readonly NotificationRecipientEvaluator $recipients) {}

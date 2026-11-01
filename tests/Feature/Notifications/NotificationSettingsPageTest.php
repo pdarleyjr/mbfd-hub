@@ -22,7 +22,7 @@ final class NotificationSettingsPageTest extends TestCase
     use BuildsNotificationPersonas;
     use RefreshDatabase;
 
-    private const EVERYONE = ['member_request_updates', 'department_updates', 'fleet_operational_alerts'];
+    private const EVERYONE = ['member_request_updates', 'department_updates', 'fleet_operational_alerts', 'roster_moves'];
 
     protected function setUp(): void
     {

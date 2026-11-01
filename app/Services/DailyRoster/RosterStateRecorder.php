@@ -31,6 +31,10 @@ final class RosterStateRecorder
 
     public const ACTION_ATTESTED_IMPORT = 'operator_attested_import';
 
+    public const ACTION_MOVE_ALERTS_SENT = 'move_alerts_sent';
+
+    public const ACTION_MOVE_ALERTS_HELD = 'move_alerts_held';
+
     /**
      * The frozen contract's state machine plus the recovery edges it needs: validated can fail
      * (publish hits a database fault, or a crash expires the lease), held imports can be superseded

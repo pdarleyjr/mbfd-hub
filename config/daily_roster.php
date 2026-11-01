@@ -74,6 +74,13 @@ return [
         'stale_after_missed' => (int) env('DAILY_ROSTER_STALE_AFTER_MISSED', 3),
     ],
 
+    'move_alerts' => [
+        // Push and in-app alerts to on-duty members whose rest of the shift changed. Off keeps the baseline moving and sends nothing.
+        'enabled' => (bool) env('DAILY_ROSTER_MOVE_ALERTS_ENABLED', true),
+        // More changed members than this in one comparison looks like a bad export: administrators are told instead.
+        'max_members' => (int) env('DAILY_ROSTER_MOVE_ALERTS_MAX_MEMBERS', 20),
+    ],
+
     'live_updates' => [
         // Above this share of seats changed, an open page takes the whole roster instead of spot updates.
         'max_changed_seat_percent' => 50,

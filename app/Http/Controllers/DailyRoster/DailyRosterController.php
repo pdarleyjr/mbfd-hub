@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Services\DailyRoster\DailyRosterPagePresenter;
 use App\Services\DailyRoster\RosterChangeBuilder;
 use App\Services\DailyRoster\RosterFreshnessResolver;
+use App\Services\DailyRoster\RosterMemberCard;
 use App\Services\Security\DailyRosterAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,7 @@ final class DailyRosterController extends Controller
         private readonly DailyRosterPagePresenter $page,
         private readonly RosterFreshnessResolver $freshness,
         private readonly RosterChangeBuilder $changeBuilder,
+        private readonly RosterMemberCard $memberCard,
     ) {}
 
     public function show(Request $request): Response
@@ -64,6 +66,17 @@ final class DailyRosterController extends Controller
             : null;
 
         return response()->json($changes ?? ['mode' => 'full'], 200, self::NO_STORE);
+    }
+
+    /** The card behind a name on the roster on screen. */
+    public function member(Request $request, string $employeeId): Response
+    {
+        $this->authorizeViewer($request);
+
+        $card = $this->memberCard->build($employeeId, $this->requestedDate($request));
+        abort_if($card === null, 404, 'This member is not on this roster.', self::NO_STORE);
+
+        return response()->view('daily-roster._member_card', ['card' => $card], 200, self::NO_STORE);
     }
 
     /** The entire roster for the date on screen, whatever the member has filtered or collapsed there. */

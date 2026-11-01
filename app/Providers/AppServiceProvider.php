@@ -106,6 +106,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Its own counter: a plain throttle:10,1 shares one per user with every other plain throttle in the Hub.
         RateLimiter::for('daily-roster-pdf', static fn (Request $request) => Limit::perMinute(10)->by('daily-roster-pdf:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+        // Plenty for a member opening cards, and it cannot use up the counter the page's own refresh runs on.
+        RateLimiter::for('daily-roster-member', static fn (Request $request) => Limit::perMinute(30)->by('daily-roster-member:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
 
         // Pulse defaults to Gravatar URLs built from hashed member emails; keep
         // dashboard user cards local instead of disclosing them to a third party.

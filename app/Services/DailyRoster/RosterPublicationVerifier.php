@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\DailyRoster;
 
 use App\Jobs\DailyRoster\CleanupRosterImport;
+use App\Jobs\DailyRoster\DetectRosterMoves;
 use App\Models\DailyRoster\RosterActiveVersion;
 use App\Models\DailyRoster\RosterAssignment;
 use App\Models\DailyRoster\RosterEvent;
@@ -13,6 +14,7 @@ use App\Models\DailyRoster\RosterSection;
 use App\Models\DailyRoster\RosterSnapshot;
 use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonImmutable;
+use Throwable;
 
 /**
  * Proves a publish by reading it back the way members do. Only a roster that reads back whole lets its
@@ -70,8 +72,19 @@ final class RosterPublicationVerifier
         }
 
         CleanupRosterImport::dispatchIfEnabled((int) $current->getKey());
+        $this->queueMoveCheck();
 
         return true;
+    }
+
+    /** A failure here must not undo a good publish: the reconciler runs the same check within a minute. */
+    private function queueMoveCheck(): void
+    {
+        try {
+            DetectRosterMoves::dispatch()->afterCommit();
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function firstProblem(RosterImport $import): ?string

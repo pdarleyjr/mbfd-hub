@@ -103,7 +103,6 @@ final class RosterChangeBuilder
             'counts' => $counts,
             'summary' => view('daily-roster._summary', ['summary' => $after['summary']])->render(),
             'legend' => view('daily-roster._legend_items', ['legend' => $after['legend']])->render(),
-            'filters' => $after['filters'],
             'facts' => $this->presenter->liveFacts($status),
         ];
     }
@@ -111,7 +110,7 @@ final class RosterChangeBuilder
     /** @param array<string, mixed> $section Everything about a section except its seats and how many entries it has. */
     private static function frame(array $section): string
     {
-        return self::fingerprint([$section['title'], $section['search'], $section['image']]);
+        return self::fingerprint([$section['title'], $section['image']]);
     }
 
     private static function fingerprint(mixed $value): string
