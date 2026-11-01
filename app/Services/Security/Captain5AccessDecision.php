@@ -8,8 +8,7 @@ use App\Services\Captain5\OnDutyCaptain5;
 
 /**
  * Immutable result of Captain5Access::decide(). Everyone eligible may use the whole Captain 5 page
- * (view, act, close); configuration (overrides, medical classification, approving acting Captain 5
- * requests) is separate. Being the shift's Captain 5 is display information only.
+ * (view, act, close); configuration (overrides, medical classification) is separate.
  */
 final readonly class Captain5AccessDecision
 {
@@ -22,6 +21,8 @@ final readonly class Captain5AccessDecision
     public const SOURCE_CAPTAIN5_SEAT = 'captain5_seat';
 
     public const SOURCE_EMS_CAPTAIN_SEAT = 'ems_captain_seat';
+
+    public const SOURCE_ROSTER_SEAT = 'roster_seat';
 
     public const SOURCE_EXPLICIT_ALLOW = 'explicit_allow';
 
@@ -68,7 +69,6 @@ final readonly class Captain5AccessDecision
     public function authority(): string
     {
         return match (true) {
-            $this->isShownCaptain5 && $this->onDuty->source === OnDutyCaptain5::SOURCE_ACTING => 'shift_captain5_acting',
             $this->isShownCaptain5 => 'shift_captain5',
             $this->has(self::SOURCE_EMS_CAPTAIN_SEAT) => 'ems_captain',
             $this->has(self::SOURCE_CAPTAIN5_SEAT) => 'captain5_seat',
@@ -81,7 +81,6 @@ final readonly class Captain5AccessDecision
     public function authorityLabel(): string
     {
         return match ($this->authority()) {
-            'shift_captain5_acting' => 'Captain 5 (acting)',
             'shift_captain5' => 'Captain 5 (on shift)',
             'ems_captain' => 'EMS Captain',
             'captain5_seat' => 'Captain 5',

@@ -78,7 +78,7 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
       return route.fulfill({
         json: {
           access: { view: true, act: true, configure: false, acts_as: 'captain5', authority: 'on_duty_captain5', authority_label: 'Captain 5 (on duty)' },
-          on_duty: { duty_date: '2026-10-23', shift: 'B', source: 'bid_holder', resolved: true, name: 'Responsive Tester', rank: 'Captain', acting_until: null, acting_request_id: null },
+          on_duty: { duty_date: '2026-10-23', shift: 'B', source: 'bid_holder', resolved: true, name: 'Responsive Tester', rank: 'Captain' },
           open_issues: 3,
         },
       });
@@ -244,7 +244,6 @@ test('Command 300 tabs open on Communications, show one station at a time and pr
   await page.goto('/daily/command-300');
   await expect(page.getByRole('heading', { name: '300', exact: true })).toBeVisible();
   await expect(page.getByTestId('command-duty-line')).toHaveText('A Shift 300: Division Chief Jane Smith');
-  await expect(page.getByTestId('command-acting-open')).toHaveText('Acting as 300 today? Click here.');
   const commandBoard = page.getByRole('link', { name: /^Open Command Board/ });
   await expect(commandBoard).toHaveCount(1);
   await expect(commandBoard).toHaveAttribute('href', 'https://cmd.mbfdhub.com');

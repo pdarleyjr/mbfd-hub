@@ -83,6 +83,27 @@ final class CurrentRosterReader
             ->all();
     }
 
+    /**
+     * Employee IDs on working rows in this seat on one stored roster. Absences, annotations and codes the
+     * Hub does not know never count.
+     *
+     * @return list<string>
+     */
+    public function workingEmployeeIds(int $snapshotId, string $role): array
+    {
+        return RosterAssignment::query()
+            ->where('roster_snapshot_id', $snapshotId)
+            ->where('kind', RosterAssignment::KIND_EMPLOYEE)
+            ->where('availability', RosterAssignment::AVAILABILITY_WORKING)
+            ->whereNotNull('employee_id')
+            ->whereIn('roster_section_id', RosterSection::query()->select('id')->where('roster_snapshot_id', $snapshotId)->where('section_role', $role))
+            ->pluck('employee_id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     /** @return list<string> Duty dates with a published roster, newest first */
     public function availableDutyDates(int $limit = 14): array
     {

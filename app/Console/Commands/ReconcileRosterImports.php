@@ -15,6 +15,7 @@ use App\Services\DailyRoster\RosterFreshnessResolver;
 use App\Services\DailyRoster\RosterImportCleanup;
 use App\Services\DailyRoster\RosterImportOperations;
 use App\Services\DailyRoster\RosterPipelineException;
+use App\Services\DailyRoster\RosterSeatWatch;
 use App\Services\DailyRoster\RosterStateRecorder;
 use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonImmutable;
@@ -39,7 +40,7 @@ final class ReconcileRosterImports extends Command
 
     private const PENDING_CLEANUP = [RosterImport::CLEANUP_NONE, RosterImport::CLEANUP_PENDING, RosterImport::CLEANUP_ROW_DELETED];
 
-    public function handle(RosterStateRecorder $recorder, RosterImportOperations $operations, DutyCalendar $calendar, RosterAlerts $alerts, RosterFreshnessResolver $freshness): int
+    public function handle(RosterStateRecorder $recorder, RosterImportOperations $operations, DutyCalendar $calendar, RosterAlerts $alerts, RosterFreshnessResolver $freshness, RosterSeatWatch $seatWatch): int
     {
         if (config('daily_roster.mode') === 'off') {
             return self::SUCCESS;
@@ -57,6 +58,7 @@ final class ReconcileRosterImports extends Command
             'late_rosters' => $this->flagLateRoster($recorder, $alerts, $calendar, $freshness, $now),
             'stale_rosters' => $this->flagStaleRoster($recorder, $alerts, $calendar, $freshness, $now),
             'held_alerts' => $this->alertHeldImports($alerts, $calendar, $now),
+            'seat_changes' => $this->watchSeats($seatWatch, $now),
         ];
 
         if (array_sum($counts) > 0) {
@@ -64,6 +66,19 @@ final class ReconcileRosterImports extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /** The record of who holds a seat must never stop the repairs above from running next minute. */
+    private function watchSeats(RosterSeatWatch $seatWatch, CarbonImmutable $now): int
+    {
+        try {
+            return $seatWatch->check($now);
+        } catch (Throwable $failure) {
+            // Code only: the original can be a query error, whose bindings carry employee IDs.
+            report(new RosterPipelineException('seat_watch_failed_'.class_basename($failure)));
+
+            return 0;
+        }
     }
 
     private function redispatchStuck(RosterImportOperations $operations, CarbonImmutable $now, CarbonImmutable $cutoff): int

@@ -43,7 +43,6 @@ final readonly class Captain5ActorContext
             'authority' => $this->decision->authority(),
             'label' => $this->decision->authorityLabel(),
             'shown_captain5' => $this->decision->isShownCaptain5,
-            'acting_request_id' => $this->decision->isShownCaptain5 ? $onDuty->actingRequest?->getKey() : null,
             'duty_date' => $onDuty->dutyDate->format('Y-m-d'),
             'shift' => $onDuty->shiftLetter,
             'bid_shift' => $this->decision->bidShiftLetter,
