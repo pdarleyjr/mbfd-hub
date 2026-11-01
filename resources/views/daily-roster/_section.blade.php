@@ -1,4 +1,4 @@
-<details class="hub-panel roster-section" open data-roster-section data-section-key="{{ $section['key'] }}" data-search="{{ $section['search'] }}">
+<details class="hub-panel roster-section" open data-roster-section data-section-key="{{ $section['key'] }}">
     <summary class="roster-section__summary">
         @if($section['image']->kind === \App\Services\DailyRoster\RosterUnitImage::PICTOGRAM)
             <span class="roster-unit roster-unit--pictogram" data-unit-kind="pictogram"><x-heroicon-o-user-group aria-hidden="true" /></span>

@@ -38,8 +38,8 @@ import {
 const CHECK_INTERVAL_MS = 5 * 60_000;
 const CHECKED_KEY = 'mbfd.push.checked-at';
 
-/** "Not now" is respected for this long. */
-const SNOOZE_MS = 14 * 24 * 60 * 60_000;
+/** "Not now" is respected for this long. The owner wants members on alerts, so the card comes back the next day. */
+const SNOOZE_MS = 24 * 60 * 60_000;
 const SNOOZED_KEY = 'mbfd.push.snoozed-at';
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'> | null;

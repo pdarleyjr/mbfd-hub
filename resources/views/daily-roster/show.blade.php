@@ -17,15 +17,27 @@
         data-sections-url="{{ route('daily-roster.sections', array_filter(['date' => $roster['requestedDate']])) }}"
         data-changes-url="{{ route('daily-roster.changes') }}"
         data-login-url="{{ url('/login') }}"
+        data-member-url="{{ url('/daily-roster/members') }}"
+        data-member-date="{{ $roster['requestedDate'] }}"
     >
         {{-- Stays in place across a swap so "Roster updated" is announced. --}}
         <p class="sr-only" role="status" data-roster-announce></p>
         @include('daily-roster._body', ['roster' => $roster])
+        {{-- Outside the swapped body, so a roster update leaves an open card alone. Emptied when it closes. --}}
+        <dialog class="roster-card-dialog" data-roster-card-dialog aria-label="Member details">
+            {{-- Fills the dialog, so only a click outside the card lands on the dialog itself and closes it. --}}
+            <div class="roster-card-dialog__inner">
+                <div class="roster-card-dialog__bar">
+                    <button type="button" class="hub-btn hub-btn--secondary" data-roster-card-close>Close</button>
+                </div>
+                <div data-roster-card-content></div>
+            </div>
+        </dialog>
         {{-- Replaces the roster when the session ends or access is withdrawn, so no personnel data stays on screen. --}}
         <template data-roster-ended-template>
             <div data-roster-ended>
-                <header class="hub-page-header roster-header">
-                    <div class="roster-header__text"><h1 class="hub-h1" tabindex="-1">Daily Roster</h1></div>
+                <header class="hub-page-header">
+                    <h1 class="hub-h1" tabindex="-1">Daily Roster</h1>
                 </header>
                 <section class="hub-panel hub-empty">
                     <x-heroicon-o-lock-closed class="hub-empty__icon" aria-hidden="true" />
