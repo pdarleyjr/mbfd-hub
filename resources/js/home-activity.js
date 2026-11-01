@@ -1,50 +1,50 @@
-// Live numbers on the Home visit card, and the list of members who signed in. Loaded only on pages that have the
-// card (see hub-shell.js). Every failure is silent: the numbers already on screen stay.
+// Home page visit counts and who signed in, collapsed on the Admin Overview (see hub-shell.js). Reads nothing until it
+// is opened, and refreshes only while it is open and on screen.
 
 const POLL_MS = 60_000;
 const MAX_BACKOFF_MS = 600_000;
-// A page that comes back into view only refreshes if the last fetch is older than this.
-const MIN_GAP_MS = 10_000;
 const numbers = new Intl.NumberFormat('en-US');
 
 const card = document.querySelector('[data-home-activity]');
 if (card) {
     startCounters(card);
-    if (card.dataset.membersUrl) startSignInList(card);
+    startSignInList(card);
+    startDismissal(card);
+}
+
+function memberLabel(count) {
+    return `${numbers.format(count)} ${count === 1 ? 'member' : 'members'} signed in`;
 }
 
 function startCounters(root) {
     const past = root.querySelector('[data-activity-past]');
     const total = root.querySelector('[data-activity-total]');
     const caption = root.querySelector('[data-activity-caption]');
+    const label = root.querySelector('[data-activity-link-label]');
     let delay = POLL_MS;
     let timer = 0;
     let busy = false;
-    let lastAttempt = Date.now();
+    let loaded = false;
 
     function show(data) {
         if (!Number.isFinite(data.past_24_hours) || !Number.isFinite(data.total)) throw new Error('unexpected payload');
         past.textContent = numbers.format(data.past_24_hours);
         total.textContent = numbers.format(data.total);
-        caption.textContent = typeof data.since === 'string' && data.since ? `Home page visits since ${data.since}` : 'Home page visits';
+        caption.textContent = typeof data.since === 'string' && data.since ? `Since ${data.since}` : 'No visits recorded yet';
+        if (Number.isFinite(data.signed_in)) label.textContent = memberLabel(data.signed_in);
+        loaded = true;
     }
 
     function schedule() {
         clearTimeout(timer);
-        timer = setTimeout(tick, delay);
-    }
-
-    // A hidden page pauses the chain; becoming visible again restarts it.
-    function tick() {
-        if (document.visibilityState === 'visible') refresh();
+        if (root.open && document.visibilityState === 'visible') timer = setTimeout(refresh, delay);
     }
 
     async function refresh() {
-        if (busy) return;
+        if (busy || !root.open) return;
         busy = true;
-        lastAttempt = Date.now();
         try {
-            // Marked as a background refresh so an unattended Home page cannot keep the member's session alive.
+            // Marked as a background refresh so a card left open cannot keep the session alive on an unattended screen.
             const response = await fetch(root.dataset.summaryUrl, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-Hub-Background-Refresh': '1' },
                 credentials: 'same-origin',
@@ -55,21 +55,25 @@ function startCounters(root) {
             delay = POLL_MS;
         } catch {
             delay = Math.min(delay * 2, MAX_BACKOFF_MS);
+            // Numbers already on screen stay; only a card that never loaded says so.
+            if (!loaded) caption.textContent = 'Could not load the counts. Close this and open it again to retry.';
         } finally {
             busy = false;
             schedule();
         }
     }
 
-    function resume() {
-        if (document.visibilityState !== 'visible') return;
-        if (Date.now() - lastAttempt >= MIN_GAP_MS) refresh();
-        else schedule();
-    }
-
-    document.addEventListener('visibilitychange', resume);
-    window.addEventListener('online', resume);
-    schedule();
+    root.addEventListener('toggle', () => {
+        delay = POLL_MS;
+        if (root.open) refresh();
+        else clearTimeout(timer);
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (root.open && document.visibilityState === 'visible') refresh();
+    });
+    window.addEventListener('online', () => refresh());
+    // This module loads lazily, so on a slow connection the member may have opened the card before it got here.
+    if (root.open) refresh();
 }
 
 function startSignInList(root) {
@@ -93,12 +97,12 @@ function startSignInList(root) {
 
     function row(member) {
         const item = document.createElement('li');
-        item.className = 'home-activity-dialog__row hub-well';
+        item.className = 'mbfd-visits-dialog__row';
         const name = document.createElement('span');
-        name.className = 'home-activity-dialog__name';
+        name.className = 'mbfd-visits-dialog__name';
         name.textContent = String(member.name ?? '');
         const when = document.createElement('span');
-        when.className = 'home-activity-dialog__when';
+        when.className = 'mbfd-visits-dialog__when';
         when.textContent = String(member.at ?? '');
         item.append(name, when);
         return item;
@@ -119,9 +123,7 @@ function startSignInList(root) {
             if (mine !== latest) return;
             list.replaceChildren(...data.members.map(row));
             show(data.members.length > 0 ? 'list' : 'empty');
-            if (label && Number.isFinite(data.count)) {
-                label.textContent = `${numbers.format(data.count)} ${data.count === 1 ? 'member' : 'members'} signed in`;
-            }
+            if (Number.isFinite(data.count)) label.textContent = memberLabel(data.count);
         } catch {
             if (mine === latest) show('error');
         }
@@ -143,5 +145,20 @@ function startSignInList(root) {
     dialog.addEventListener('close', () => {
         latest += 1;
         open.focus();
+    });
+}
+
+// A tap elsewhere or Escape folds the card back up, unless the sign-in list is open on top of it.
+function startDismissal(root) {
+    const dialog = root.querySelector('[data-activity-dialog]');
+    const summary = root.querySelector('summary');
+
+    document.addEventListener('click', event => {
+        if (root.open && !dialog?.open && !root.contains(event.target)) root.open = false;
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || !root.open || dialog?.open) return;
+        root.open = false;
+        summary?.focus();
     });
 }

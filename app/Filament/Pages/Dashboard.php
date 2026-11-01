@@ -4,6 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Filament\Pages\Concerns\RendersOperationsDashboard;
 use App\Filament\Widgets\StationOperationsHubWidget;
+use App\Models\User;
+use App\Services\Home\HomeActivity;
 use App\Support\Dashboards\DashboardView;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Support\Enums\MaxWidth;
@@ -63,6 +65,14 @@ class Dashboard extends BaseDashboard
     public function getHeader(): ?View
     {
         return $this->isDisplayMode() ? null : $this->dashboardHeader();
+    }
+
+    protected function showsHomeVisits(): bool
+    {
+        // getHeader() draws no header in display mode, so member names never reach a wall screen.
+        $user = auth('web')->user();
+
+        return $user instanceof User && app(HomeActivity::class)->canSeeActivity($user);
     }
 
     /**

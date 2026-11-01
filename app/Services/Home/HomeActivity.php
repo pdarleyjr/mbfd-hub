@@ -16,11 +16,11 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * The Home page visit counter and the list of members who signed in recently.
+ * The Home page visit counter and the list of members who signed in recently, read on the Admin Overview.
  *
  * A visit is one successful render of Home by a signed-in member (see HomeController). Visits are counted in one
  * row per UTC hour, after the response has been sent, and nothing here may slow or break Home: every read and
- * write is guarded, and a table that cannot be read (an old image, a database blip) just hides the card.
+ * write is guarded, and a table that cannot be read (an old image, a database blip) only leaves the counts unavailable.
  *
  * "Past 24 hours" is a rolling window over those hourly rows, so old hours fall away on their own and nothing
  * has to run at midnight. History counted before this feature existed lives in `imported_views`.
@@ -55,14 +55,11 @@ final class HomeActivity
         return true;
     }
 
-    /**
-     * Count this request as a visit once the response has gone out. Returns whether it will be counted, so the
-     * page can show a total that already includes the member's own visit.
-     */
-    public function recordVisit(Request $request): bool
+    /** Count this request as a visit once the response has gone out. */
+    public function recordVisit(Request $request): void
     {
         if (! $this->countsAsVisit($request)) {
-            return false;
+            return;
         }
 
         $hour = $this->hourKey($this->now());
@@ -86,14 +83,12 @@ final class HomeActivity
                 Cache::forget(self::SUMMARY_CACHE_KEY);
             });
         });
-
-        return true;
     }
 
     /**
-     * @return array{past_24_hours: int, total: int, since: ?string}|null null when the counts cannot be read
+     * @return array{past_24_hours: int, total: int, since: ?string, signed_in: int}|null null when the counts cannot be read
      */
-    public function summary(bool $includingThisVisit = false): ?array
+    public function summary(): ?array
     {
         $totals = $this->guarded(fn (): array => Cache::remember(
             self::SUMMARY_CACHE_KEY,
@@ -104,30 +99,20 @@ final class HomeActivity
             return null;
         }
 
-        // The visit being rendered is only written after the response, so it is added here instead.
-        $own = $includingThisVisit ? 1 : 0;
-        $first = $totals['first'] ?? ($own === 1 ? $this->hourKey($this->now()) : null);
-
         return [
-            'past_24_hours' => $totals['recent'] + $own,
-            'total' => $totals['total'] + $own,
-            'since' => $first === null
+            'past_24_hours' => $totals['recent'],
+            'total' => $totals['total'],
+            'since' => $totals['first'] === null
                 ? null
-                : CarbonImmutable::parse($first, 'UTC')->setTimezone(HubTimezone::NAME)->format('M j, Y'),
+                : CarbonImmutable::parse($totals['first'], 'UTC')->setTimezone(HubTimezone::NAME)->format('M j, Y'),
+            'signed_in' => $totals['signed_in'],
         ];
     }
 
-    /** One place to widen or narrow who sees which members signed in. */
-    public function canSeeSignIns(User $user): bool
+    /** One place to widen or narrow who sees the visit counts and which members signed in. */
+    public function canSeeActivity(User $user): bool
     {
         return $user->canAccessPanel(Filament::getPanel('admin'));
-    }
-
-    public function signedInCount(): ?int
-    {
-        $count = $this->guarded(fn (): int => User::query()->where('last_login_at', '>=', $this->signedInSince())->count());
-
-        return is_int($count) ? $count : null;
     }
 
     /**
@@ -155,7 +140,7 @@ final class HomeActivity
         return ['count' => count($members), 'members' => $members];
     }
 
-    /** @return array{total: int, recent: int, first: ?string} */
+    /** @return array{total: int, recent: int, first: ?string, signed_in: int} */
     private function readTotals(): array
     {
         $windowStart = $this->hourKey($this->now()->subHours(self::WINDOW_HOURS));
@@ -172,6 +157,7 @@ final class HomeActivity
             'total' => (int) ($row->total ?? 0),
             'recent' => (int) ($row->recent ?? 0),
             'first' => isset($row->first_hour) ? (string) $row->first_hour : null,
+            'signed_in' => User::query()->where('last_login_at', '>=', $this->signedInSince())->count(),
         ];
     }
 

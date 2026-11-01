@@ -54,6 +54,13 @@
 
 .mbfd-dash-header__text { min-width: 0; flex: 1 1 22rem; }
 
+.mbfd-dash-header__title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .25rem .75rem;
+}
+
 .mbfd-dash-header__title {
     margin: 0;
     font-size: 1.5rem;
@@ -73,6 +80,133 @@
 .mbfd-dash-header__date { margin: 0; font-size: .875rem; color: rgb(var(--hub-ink-secondary)); }
 .mbfd-dash-header__greeting { margin: 0; font-size: 1rem; font-weight: 700; color: rgb(var(--hub-header)); }
 .mbfd-dash-header__actions { flex-basis: 100%; display: flex; justify-content: flex-end; }
+
+/* ---------- Home page visits, collapsed beside the Admin Overview title ---------- */
+
+.mbfd-visits { position: relative; flex: none; }
+
+.mbfd-visits__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    min-height: 2rem;
+    padding: .125rem .625rem;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-well));
+    color: rgb(var(--hub-ink-secondary));
+    font-size: .8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    list-style: none;
+}
+.mbfd-visits__toggle::-webkit-details-marker { display: none; }
+.mbfd-visits__toggle:hover,
+.mbfd-visits[open] > .mbfd-visits__toggle { color: rgb(var(--hub-header)); }
+.mbfd-visits__toggle:focus-visible,
+.mbfd-visits__link:focus-visible { outline: 2px solid rgb(var(--hub2-focus)); outline-offset: 2px; }
+.mbfd-visits__icon { width: 1rem; height: 1rem; flex: none; }
+.mbfd-visits__chevron { width: 1rem; height: 1rem; flex: none; }
+.mbfd-visits[open] .mbfd-visits__chevron { transform: rotate(180deg); }
+
+/* Overlay glass over the page: opening it never moves the fit-to-window layout. */
+.mbfd-visits__panel {
+    position: absolute;
+    top: calc(100% + .375rem);
+    left: 0;
+    z-index: 30;
+    width: min(20rem, calc(100vw - 2rem));
+    padding: .75rem 1rem;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-well) / var(--hub-overlay-alpha));
+    -webkit-backdrop-filter: var(--hub-overlay-blur);
+    backdrop-filter: var(--hub-overlay-blur);
+    box-shadow: var(--hub-shadow-elevated);
+}
+
+.mbfd-visits__stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; }
+.mbfd-visits__stats dt { color: rgb(var(--hub-ink-secondary)); font-size: .75rem; line-height: 1rem; font-weight: 600; }
+.mbfd-visits__stats dd { margin: .125rem 0 0; color: rgb(var(--hub-ink)); font-size: 1.25rem; line-height: 1.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mbfd-visits__caption { margin: .25rem 0 0; color: rgb(var(--hub-ink-secondary)); font-size: .75rem; line-height: 1rem; }
+
+.mbfd-visits__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    margin-top: .25rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: rgb(var(--hub2-action));
+    font-size: .875rem;
+    font-weight: 600;
+    text-align: start;
+    cursor: pointer;
+}
+.mbfd-visits__link:hover { text-decoration: underline; }
+
+/* Who signed in: a native dialog over everything, a bottom sheet on phones. */
+.mbfd-visits-dialog {
+    width: min(27.5rem, calc(100vw - 1.5rem));
+    max-width: none;
+    max-height: 80dvh;
+    margin: auto;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-sheet);
+    background: rgb(var(--hub-well) / var(--hub-overlay-alpha));
+    -webkit-backdrop-filter: var(--hub-overlay-blur);
+    backdrop-filter: var(--hub-overlay-blur);
+    box-shadow: var(--hub-shadow-elevated);
+    color: rgb(var(--hub-ink));
+}
+.mbfd-visits-dialog[open] { display: flex; flex-direction: column; }
+.mbfd-visits-dialog::backdrop { background: rgb(var(--hub-header-deep) / .45); }
+.mbfd-visits-dialog [hidden] { display: none; }
+body:has(.mbfd-visits-dialog[open]) { overflow: hidden; }
+
+.mbfd-visits-dialog__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .25rem 1rem;
+    border-bottom: 1px solid rgb(var(--hub-glass-border));
+}
+.mbfd-visits-dialog__header .mbfd-visits__link { margin-top: 0; }
+.mbfd-visits-dialog__title { margin: 0; font-size: 1rem; line-height: 1.5rem; font-weight: 700; }
+.mbfd-visits-dialog__body { flex: 1 1 auto; min-height: 0; padding: .75rem; overflow-y: auto; overscroll-behavior: contain; }
+.mbfd-visits-dialog__list { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.mbfd-visits-dialog__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    min-height: 2.75rem;
+    padding: .5rem .75rem;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-well));
+}
+.mbfd-visits-dialog__name { min-width: 0; overflow-wrap: anywhere; font-size: .875rem; line-height: 1.25rem; font-weight: 500; }
+.mbfd-visits-dialog__when { flex: none; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; line-height: 1.25rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (pointer: coarse) {
+    .mbfd-visits__toggle { min-height: 2.75rem; }
+}
+
+@media (max-width: 639.98px) {
+    .mbfd-visits-dialog {
+        width: 100%;
+        margin: auto 0 0;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        border-width: 1px 0 0;
+        border-radius: var(--hub-radius-sheet) var(--hub-radius-sheet) 0 0;
+    }
+}
 
 /* ---------- Board ---------- */
 
