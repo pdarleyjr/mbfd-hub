@@ -90,7 +90,7 @@ class ApparatusServiceTicketResource extends Resource
                 Tables\Filters\SelectFilter::make('apparatus_id')
                     ->relationship('apparatus', 'designation')
                     // Designation is optional on a unit, and a null option label would take the whole page down.
-                    ->getOptionLabelFromRecordUsing(fn (Apparatus $unit): string => $unit->designation ?: $unit->unit_id ?: $unit->name ?: 'Unit '.$unit->getKey())
+                    ->getOptionLabelFromRecordUsing(fn (Apparatus $unit): string => $unit->designation ?: $unit->name ?: 'Unit '.$unit->getKey())
                     ->label('Unit')
                     ->searchable()
                     ->preload(),

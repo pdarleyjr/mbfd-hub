@@ -106,7 +106,7 @@ class ApparatusServiceTicketAdminTest extends TestCase
             'status' => 'In Service',
         ]);
 
-        $this->get(ApparatusServiceTicketResource::getUrl('index'))->assertOk()->assertSee('R44');
+        Livewire::test(ListApparatusServiceTickets::class)->assertSuccessful()->call('loadTable')->assertSee('Rescue 44');
     }
 
     public function test_fleet_table_filters_search_and_view_transition_are_operational(): void

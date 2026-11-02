@@ -7,7 +7,8 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="shortcut icon" href="/favicon.ico">
     <title>Home · MBFD Hub</title>
-    @vite(['resources/css/app.css', 'resources/js/home-duty.js'])
+    @vite('resources/css/app.css')
+    @vite('resources/js/home-duty.js')
 </head>
 <body>
     @php
