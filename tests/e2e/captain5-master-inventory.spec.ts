@@ -60,6 +60,7 @@ interface Server {
   conflictOnce: boolean;
   writes: Recorded[];
   submitted: boolean;
+  meta?: EmsMeta;
 }
 
 function newServer(overrides: Partial<Server> = {}): Server {
@@ -92,7 +93,7 @@ async function handleEms(route: Route, server: Server, url: URL): Promise<void> 
   const recorded: Recorded = { method, path, key: route.request().headers()['idempotency-key'] ?? null, body: text ? JSON.parse(text) as Record<string, unknown> : {} };
   if (method !== 'GET') server.writes.push(recorded);
 
-  if (path === '/meta') return ok(route, META);
+  if (path === '/meta') return ok(route, server.meta ?? META);
   if (path === '/supply/master') {
     return ok(route, {
       sections: sectionsOf(server), items: withLabels(server), inactive: server.inactive,
@@ -581,6 +582,31 @@ for (const width of [320, 360, 390, 768, 1280]) {
     await noHorizontalOverflow(page);
   });
 }
+
+test('a best guess says Estimate until a real number replaces it', async ({ page }) => {
+  const server = newServer({ items: [item(1, 'Oral Airway Size 3', 'A1', { on_hand: 6, on_hand_base: 6, estimated: true }), item(2, 'Nasal Airway 28 Fr', 'A1', { on_hand: 2, on_hand_base: 2, estimated: false })] });
+  await open(page, server, SUPPLY);
+  const guess = page.locator('[data-testid="master-row"][data-item-id="1"]');
+  await expect(guess.getByTestId('on-hand-estimate')).toHaveText('Estimate');
+  await expect(page.locator('[data-testid="master-row"][data-item-id="2"]').getByTestId('on-hand-estimate')).toHaveCount(0);
+
+  await guess.getByTestId('edit-item').click();
+  await expect(page.getByText('This number is an estimate, not a count.')).toBeVisible();
+  server.items[0].estimated = false;
+  await page.getByLabel('On hand').fill('11');
+  await page.getByTestId('edit-item-save').click();
+  await expect(guess.getByTestId('on-hand-number')).toHaveText('11');
+  await expect(guess.getByTestId('on-hand-estimate')).toHaveCount(0);
+});
+
+test('an administrator with no other EMS access gets the master inventory and can edit it, but not the forms tab', async ({ page }) => {
+  const server = newServer({ meta: { ...META, permissions: { view: false, act: false, configure: false }, inventory: { read: true, edit: true } } });
+  await open(page, server, SUPPLY);
+  await expect(page.getByRole('tab', { name: 'Master Supply Room Inventory' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /Submitted Inventory Forms/ })).toHaveCount(0);
+  await expect(page.locator('[data-testid="master-row"][data-item-id="1"]').getByTestId('edit-item')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Count Supply Room/ }).first()).toBeVisible();
+});
 
 test('every control is at least 44px on a phone', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

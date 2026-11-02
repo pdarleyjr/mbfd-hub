@@ -259,7 +259,9 @@ final class InventoryCountService
     /** Throw away a draft nobody wants (a final snapshot can never be deleted). */
     public function discard(int $snapshotId, User $user, string $key): array
     {
-        $this->authorize($user);
+        if (! $this->access->canEditInventory($user)) {
+            throw EmsException::forbidden();
+        }
 
         return $this->idempotency->run($user, "ems.count.discard.{$snapshotId}", $key, function () use ($snapshotId): array {
             $snapshot = $this->draft($snapshotId);

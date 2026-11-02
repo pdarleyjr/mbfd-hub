@@ -37,6 +37,7 @@ final class StaffRequestController extends Controller
     {
         return $this->guarded(fn (): JsonResponse => $this->ok([
             'permissions' => $this->access->summary($this->user($request)),
+            'inventory' => ['read' => $this->access->canReadInventory($this->user($request)), 'edit' => $this->access->canEditInventory($this->user($request))],
             'statuses' => InventoryRequest::STATUSES,
             'target_kinds' => InventoryRequest::TARGET_KINDS,
             'units' => $this->units->options(),

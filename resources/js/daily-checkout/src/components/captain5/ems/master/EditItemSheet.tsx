@@ -58,7 +58,9 @@ function EditForm({ item, sections, onClose, onSaved, onRemoved }: Props & { ite
       )}
       <NameAndShelf form={form} onChange={setForm} errors={errors} disabled={busy} sections={sections} />
       <OnHandField form={form} onChange={setForm} errors={errors} disabled={busy} label="On hand" unit={word}
-        hint="Saving a new number counts as a physical count and clears the red number." />
+        hint={item.estimated === true
+          ? 'This number is an estimate, not a count. Saving the real number here or entering it on the Monday count replaces it.'
+          : 'Saving a new number counts as a physical count and clears the red number.'} />
 
       <details className="rounded-hub-control border border-hub-border bg-hub-n-25 px-3" data-testid="edit-more">
         <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-hub-ink">More</summary>

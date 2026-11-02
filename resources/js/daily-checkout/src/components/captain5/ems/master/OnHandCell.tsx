@@ -10,6 +10,7 @@ export default function OnHandCell({ item }: { item: MasterItem }) {
     <span className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0" data-testid="on-hand">
       <span className="font-heading text-xl font-bold tabular-nums leading-7 text-hub-ink" data-testid="on-hand-number">{formatQty(item.on_hand)}</span>
       {unit !== '' && <span className="text-[13px] leading-5 text-hub-n-600">{unit}</span>}
+      {item.estimated === true && <span className="rounded-hub-control border border-hub-border px-1.5 text-[12px] font-semibold leading-5 text-hub-n-600" data-testid="on-hand-estimate">Estimate</span>}
       {deducted && (
         <span className="text-base font-bold tabular-nums text-hub-danger" data-testid="on-hand-deducted">
           <span aria-hidden="true">{deducted.text}</span>

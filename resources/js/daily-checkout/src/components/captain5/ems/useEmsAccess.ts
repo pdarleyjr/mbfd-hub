@@ -10,9 +10,9 @@ export type EmsAccessState =
   | { status: 'error'; meta: null; error: string };
 
 /**
- * Whether this person may use the EMS tabs. The Captain 5 page admits some people the EMS API does not (an Admin Panel
- * user with no EMS grant), so the tabs appear only when GET /ems/api/meta says `permissions.view`. A 403 means "no EMS
- * tabs for you" and is not an error to show.
+ * Whether this person may use the EMS tabs. The Captain 5 page admits some people the EMS API does not, so the tabs
+ * appear only when GET /ems/api/meta says so: `permissions.view` for the forms, `inventory.read` for the master inventory
+ * (an Admin Panel user with no EMS grant gets only that one). A 403 means "no EMS tabs for you" and is not an error to show.
  */
 export function useEmsAccess(): EmsAccessState & { reload: () => void; deny: () => void } {
   const [state, setState] = useState<EmsAccessState>({ status: 'loading', meta: null, error: null });
@@ -21,7 +21,7 @@ export function useEmsAccess(): EmsAccessState & { reload: () => void; deny: () 
   useEffect(() => {
     let active = true;
     fetchEmsMeta()
-      .then((meta) => { if (active) setState(meta.permissions?.view === true ? { status: 'ready', meta, error: null } : { status: 'denied', meta: null, error: null }); })
+      .then((meta) => { if (active) setState(meta.permissions?.view === true || meta.inventory?.read === true ? { status: 'ready', meta, error: null } : { status: 'denied', meta: null, error: null }); })
       .catch((failure) => {
         if (!active) return;
         if (isApiAuthenticationError(failure)) { redirectToLoginAfterSessionExpiry(); return; }

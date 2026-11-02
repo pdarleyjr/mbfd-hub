@@ -12,7 +12,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Staff EMS routes: `EnsureEmsAccess::class.':view'` (Captain 5 view OR Admin EMS view),
- * `:act` (Captain 5 act OR Admin EMS manage) or `:configure`. The decision lives in EmsAccess.
+ * `:act` (Captain 5 act OR Admin EMS manage), `:configure`, or `:inventory_read` / `:inventory_edit`
+ * (those, plus any administrator, for the master inventory). The decision lives in EmsAccess.
  */
 final readonly class EnsureEmsAccess
 {
