@@ -16,6 +16,7 @@ use App\Services\Ems\EmsException;
 use App\Services\Ems\RequestWorkflowService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -138,7 +139,7 @@ final class RescueInventoryResourceTest extends TestCase
 
     // ------------------------------------------------------------- view + actions
 
-    public function test_the_view_page_shows_the_request_and_review_prepare_issue_use_the_services(): void
+    public function test_the_view_page_shows_the_request_and_acknowledge_prepare_issue_use_the_services(): void
     {
         $this->finalizeCount($this->manager, ['sr.t.02' => 30]);
         $request = $this->tapeRequest(4);
@@ -148,7 +149,7 @@ final class RescueInventoryResourceTest extends TestCase
         $page = $this->viewPage($request['uuid'])->assertOk()
             ->assertSee($request['number'])->assertSee('Pat Medic')->assertSee('Rescue 2')->assertSee('Tape 1')->assertSee('Submitted');
 
-        $page->callAction('review');
+        $page->callAction('acknowledge');
         $this->assertSame('reviewed', $this->requestModel($request['uuid'])->status);
         $this->assertSame(1, InventoryRequestEvent::query()->where('action', 'reviewed')->count());
 
@@ -280,6 +281,142 @@ final class RescueInventoryResourceTest extends TestCase
         $this->assertSame(0, $this->requestModel($request['uuid'])->lines()->first()->issued_qty);
     }
 
+    // ------------------------------------------------- Friday forms: new statuses and actions
+
+    public function test_the_screen_is_called_submitted_inventory_forms_and_keeps_its_address(): void
+    {
+        $this->actAs($this->manager);
+        $this->assertSame('Submitted Inventory Forms', InventoryRequestResource::getNavigationLabel());
+        $this->assertSame('Submitted Inventory Forms', InventoryRequestResource::getPluralModelLabel());
+        $this->assertSame('rescue-inventory', InventoryRequestResource::getSlug());
+        $this->assertStringEndsWith('/admin/rescue-inventory', InventoryRequestResource::getUrl('index'));
+        Livewire::test(ListInventoryRequests::class)->assertSee('Submitted Inventory Forms');
+    }
+
+    public function test_the_list_defaults_to_the_active_forms_and_filters_returned_reconciled_and_superseded(): void
+    {
+        $active = $this->tapeRequest();
+        $returned = $this->tapeRequest(2);
+        $reconciled = $this->tapeRequest(3);
+        $superseded = $this->tapeRequest(1);
+        InventoryRequest::query()->where('uuid', $returned['uuid'])->update(['status' => 'returned', 'return_reason' => 'Tape count looks wrong', 'returned_by_name' => 'Manny Manager']);
+        InventoryRequest::query()->where('uuid', $reconciled['uuid'])->update(['status' => 'reconciled', 'reconciled_by_name' => 'Cap Tain', 'reconciled_at' => now()]);
+        InventoryRequest::query()->where('uuid', $superseded['uuid'])->update(['status' => 'superseded']);
+        $this->actAs($this->manager);
+
+        $page = Livewire::test(ListInventoryRequests::class)->call('loadTable');
+        $page->assertCanSeeTableRecords([$this->requestModel($active['uuid']), $this->requestModel($returned['uuid'])])
+            ->assertCanNotSeeTableRecords([$this->requestModel($reconciled['uuid']), $this->requestModel($superseded['uuid'])])
+            ->assertSee('Needs correction')->assertSee('Tape count looks wrong');
+        $this->assertSame(['submitted', 'reviewed', 'prepared', 'returned'], InventoryRequest::ACTIVE_STATUSES);
+
+        foreach (['returned', 'reconciled', 'superseded'] as $status) {
+            $this->assertArrayHasKey($status, \App\Filament\Support\EmsLabels::STATUS, "{$status} is a status filter option");
+        }
+        $page->filterTable('status', ['reconciled'])->assertCanSeeTableRecords([$this->requestModel($reconciled['uuid'])])
+            ->assertCanNotSeeTableRecords([$this->requestModel($active['uuid'])])->assertSee('Reconciled')->assertSee('By Cap Tain');
+        $page->filterTable('status', ['superseded'])->assertCanSeeTableRecords([$this->requestModel($superseded['uuid'])])->assertSee('Replaced by a correction');
+    }
+
+    public function test_acknowledge_marks_the_form_without_moving_stock_and_only_once(): void
+    {
+        $this->finalizeCount($this->manager, ['sr.t.02' => 30]);
+        $request = $this->tapeRequest(4);
+        $this->actAs($this->manager);
+
+        $page = $this->viewPage($request['uuid'])->assertActionVisible('acknowledge')->assertActionVisible('reject');
+        $page->callAction('acknowledge')->assertHasNoActionErrors();
+        $model = $this->requestModel($request['uuid']);
+        $this->assertNotNull($model->reviewed_at);
+        $this->assertSame('Manny Manager', $model->reviewed_by_name);
+        $this->assertSame(0, StockMovement::query()->count(), 'Acknowledging never moves stock.');
+
+        $this->viewPage($request['uuid'])->assertActionHidden('acknowledge')->assertActionVisible('reject')
+            ->assertSee('Acknowledged')->assertSee('Manny Manager');
+    }
+
+    public function test_reject_needs_a_reason_sends_the_form_back_and_hides_the_older_workflow_buttons(): void
+    {
+        $this->finalizeCount($this->manager, ['sr.t.02' => 30]);
+        $request = $this->tapeRequest(4);
+        $this->actAs($this->manager);
+
+        $this->viewPage($request['uuid'])->callAction('reject', ['reason' => ''])->assertHasActionErrors(['reason' => 'required']);
+        $this->assertSame('submitted', $this->requestModel($request['uuid'])->status);
+        $this->viewPage($request['uuid'])->callAction('reject', ['reason' => 'ab'])->assertHasActionErrors(['reason']);
+
+        $this->viewPage($request['uuid'])->callAction('reject', ['reason' => 'Please recount the tape'])->assertHasNoActionErrors();
+        $model = $this->requestModel($request['uuid']);
+        $this->assertSame('returned', $model->status);
+        $this->assertSame('Please recount the tape', $model->return_reason);
+        $this->assertNull($model->reviewed_at, 'Rejecting clears the acknowledgment.');
+        $this->assertSame(0, StockMovement::query()->count());
+
+        $page = $this->viewPage($request['uuid'])->assertSee('Needs correction')->assertSee('Please recount the tape')->assertSee('Manny Manager');
+        foreach (['acknowledge', 'reject', 'prepare', 'issue', 'close', 'reopen', 'correct'] as $name) {
+            $page->assertActionHidden($name);
+        }
+        $page->assertActionVisible('message');
+        $page->assertSee('Sent the form back to the member to correct. Reason: Please recount the tape');
+    }
+
+    public function test_a_reconciled_form_hides_prepare_issue_and_close_but_still_allows_a_correction(): void
+    {
+        $this->finalizeCount($this->manager, ['sr.t.02' => 30]);
+        $request = $this->tapeRequest(4);
+        $lineId = $this->lineId($request['uuid'], 'als.trauma.tape');
+        $this->actAs($this->manager);
+        $this->submitRepeater($this->viewPage($request['uuid']), 'issue', 'quantity', [$lineId => 4]);
+        $this->assertSame('issued', $this->requestModel($request['uuid'])->status);
+
+        InventoryRequest::query()->where('uuid', $request['uuid'])->update(['status' => 'reconciled', 'reconciled_by_name' => 'Cap Tain', 'reconciled_at' => now()]);
+        $page = $this->viewPage($request['uuid'])->assertSee('Reconciled')->assertSee('Cap Tain');
+        foreach (['acknowledge', 'reject', 'prepare', 'issue', 'close', 'reopen'] as $name) {
+            $page->assertActionHidden($name);
+        }
+        $page->assertActionVisible('correct')->assertDontSee('Mark not issued');
+
+        $issued = InventoryRequestEvent::query()->where('action', 'issued')->sole();
+        $page->callAction('correct', ['event_id' => $issued->id, 'new_quantity' => 3, 'reason' => 'Miscounted at the shelf'])->assertHasNoActionErrors();
+        $this->assertSame(3, $this->requestModel($request['uuid'])->lines()->first()->issued_qty);
+        $this->assertSame('reconciled', $this->requestModel($request['uuid'])->status, 'A correction does not reopen a reconciled form.');
+    }
+
+    public function test_a_superseded_form_points_to_the_corrected_version_and_closed_records_keep_correct(): void
+    {
+        $old = $this->tapeRequest(2);
+        $new = $this->tapeRequest(3);
+        InventoryRequest::query()->where('uuid', $old['uuid'])->update(['status' => 'superseded']);
+        DB::table('ems_inventory_requests')->where('uuid', $new['uuid'])->update(['revision_of_request_id' => $this->requestModel($old['uuid'])->id, 'revision_number' => 2]);
+        $this->actAs($this->manager);
+
+        $page = $this->viewPage($old['uuid'])->assertSee('The member sent a corrected version of this form')->assertSee('Open the corrected version');
+        foreach (['acknowledge', 'reject', 'prepare', 'issue', 'close', 'reopen'] as $name) {
+            $page->assertActionHidden($name);
+        }
+        $this->viewPage($new['uuid'])->assertSee('Versions of this form')->assertSee($old['number']);
+
+        // A closed record that was issued keeps the Correct action; Prepare, Issue and Close stay away from it.
+        $closed = $this->tapeRequest(1);
+        $lineId = $this->lineId($closed['uuid'], 'als.trauma.tape');
+        $this->actAs($this->manager);
+        $this->submitRepeater($this->viewPage($closed['uuid']), 'issue', 'quantity', [$lineId => 1]);
+        $this->viewPage($closed['uuid'])->callAction('close', ['reason_choice' => 'Issued in full']);
+        $this->viewPage($closed['uuid'])->assertActionVisible('correct')->assertActionVisible('reopen')->assertActionHidden('issue')->assertActionHidden('close');
+    }
+
+    public function test_acknowledge_and_reject_are_refused_for_a_viewer_even_when_forced(): void
+    {
+        $request = $this->tapeRequest(2);
+        $this->actAs($this->viewer);
+        $page = $this->viewPage($request['uuid'])->assertActionHidden('acknowledge')->assertActionHidden('reject');
+        $page->call('mountAction', 'reject', [], [])->call('callMountedAction');
+
+        $this->assertSame('submitted', $this->requestModel($request['uuid'])->status);
+        $this->assertNull($this->requestModel($request['uuid'])->reviewed_at);
+        $this->assertNull($this->requestModel($request['uuid'])->return_reason);
+    }
+
     // ------------------------------------------------------------------ access
 
     public function test_a_read_only_viewer_sees_everything_but_no_actions_and_the_server_refuses_them(): void
@@ -290,12 +427,13 @@ final class RescueInventoryResourceTest extends TestCase
 
         Livewire::test(ListInventoryRequests::class)->call('loadTable')->assertCanSeeTableRecords([$this->requestModel($request['uuid'])]);
         $page = $this->viewPage($request['uuid'])->assertOk()->assertSee($request['number']);
-        foreach (['review', 'prepare', 'issue', 'close', 'message'] as $name) {
+        foreach (['acknowledge', 'reject', 'prepare', 'issue', 'close', 'message'] as $name) {
             $page->assertActionHidden($name);
         }
 
         // Forcing the calls anyway changes nothing.
-        $page->call('mountAction', 'review')->call('callMountedAction');
+        $page->call('mountAction', 'acknowledge')->call('callMountedAction');
+        $page->call('mountAction', 'reject')->call('callMountedAction');
         $page->call('mountAction', 'issue')->call('callMountedAction');
         $this->assertSame('submitted', $this->requestModel($request['uuid'])->status);
         $this->assertSame(0, InventoryRequestEvent::query()->where('action', 'reviewed')->count());

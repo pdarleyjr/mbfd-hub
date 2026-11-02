@@ -1,6 +1,6 @@
 import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, MessageBar, MessageBarBody } from '@fluentui/react-components';
 import { LoaderCircle, Send } from 'lucide-react';
-import { countRequested, itemsLabel, retiredEntries, reviewGroups } from './emsLogic.js';
+import { countRequested, itemsLabel, retiredEntries, revisionBanner, reviewGroups } from './emsLogic.js';
 import type { EmsDraft, EmsFormDefinition } from './emsTypes';
 
 /** Everything that will be sent, listed once more before the final Send. Opens as a bottom sheet on phones. */
@@ -21,6 +21,7 @@ export function ReviewSheet({ open, definition, draft, onDiscardRetired, unitLab
     const requested = countRequested(draft);
     const note = draft.note.trim();
     const event = draft.targetChoice === 'detail' ? draft.eventAssignment.trim() : '';
+    const correcting = revisionBanner(draft);
 
     return <Dialog open={open} modalType="modal" onOpenChange={(_, data) => { if (!data.open && !sending) onBack(); }}>
         <DialogSurface className="ems-sheet" aria-describedby="ems-review-summary">
@@ -28,6 +29,9 @@ export function ReviewSheet({ open, definition, draft, onDiscardRetired, unitLab
                 <DialogTitle>Review your request</DialogTitle>
                 <DialogContent>
                     <div className="ems-review" id="ems-review-summary">
+                        {correcting && <p className="ems-review-replaces" id="ems-review-replaces">
+                            This corrected form replaces {draft.revisesNumber ? <strong>{draft.revisesNumber}</strong> : 'the earlier form'}. Captain 5 will review this one instead.
+                        </p>}
                         <p className="ems-unit-banner">For <strong>{unitLabel || 'no unit chosen'}</strong></p>
                         <dl className="ems-review-facts">
                             <div><dt>For</dt><dd>{unitLabel}</dd></div>
@@ -55,7 +59,7 @@ export function ReviewSheet({ open, definition, draft, onDiscardRetired, unitLab
                 </DialogContent>
                 <DialogActions className="ems-sheet-actions">
                     <Button onClick={onBack} disabled={sending}>Back to edit</Button>
-                    <Button appearance="primary" icon={sending ? <LoaderCircle className="spin" size={17} /> : <Send size={17} />} disabled={sending} onClick={onSend}>{sending ? 'Sending' : 'Send request'}</Button>
+                    <Button appearance="primary" icon={sending ? <LoaderCircle className="spin" size={17} /> : <Send size={17} />} disabled={sending} onClick={onSend}>{sending ? 'Sending' : correcting ? 'Send corrected form' : 'Send request'}</Button>
                 </DialogActions>
             </DialogBody>
         </DialogSurface>

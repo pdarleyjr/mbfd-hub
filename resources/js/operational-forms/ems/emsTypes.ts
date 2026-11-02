@@ -71,6 +71,12 @@ export interface EmsDraft {
     retired?: EmsRetired;
     /** Item names for the retired entries, so they can be listed by name. */
     labels?: Record<string, string>;
+    /** Set while the member is fixing a request Captain 5 sent back: the uuid of the request this one replaces. */
+    revises?: string;
+    /** The returned request's number, so the banner can name it. Display only. */
+    revisesNumber?: string;
+    /** Why Captain 5 sent it back, for the banner. Display only. */
+    returnReason?: string;
 }
 
 export interface EmsRetired {
@@ -88,6 +94,10 @@ export interface StoredDraft {
     retired?: EmsRetired;
     /** Item name per key that has an entry (optional, additive). */
     labels?: Record<string, string>;
+    /** Optional and additive (the stored version stays 1): present only on a correction in progress. */
+    revises?: string;
+    revisesNumber?: string;
+    returnReason?: string;
     savedAt: string;
 }
 
@@ -100,6 +110,8 @@ export interface EmsSubmitLine {
 
 export interface EmsSubmitPayload {
     client_submission_id: string;
+    /** The returned request this one corrects (the member's own, status returned). The server supersedes it. */
+    revises?: string;
     target: { kind: EmsTargetKind; apparatus_id?: number; event_assignment?: string; label_seen?: string };
     member_note?: string;
     lines: EmsSubmitLine[];
@@ -114,9 +126,13 @@ export interface EmsOutboxEntry {
     /** The unit and item count to show while the request waits to be sent. */
     unitLabel: string;
     itemCount: number;
+    /** Present when this is a correction: which returned request it replaces, for the waiting notice and for editing it again. */
+    revision?: { number: string; reason: string };
 }
 
-export type EmsStatus = 'submitted' | 'reviewed' | 'prepared' | 'partially_issued' | 'issued' | 'closed' | 'cancelled';
+export type EmsStatus =
+    | 'submitted' | 'reviewed' | 'prepared' | 'partially_issued' | 'issued' | 'closed' | 'cancelled'
+    | 'returned' | 'reconciled' | 'superseded';
 
 export interface EmsRequestSummary {
     id: string;
@@ -133,6 +149,11 @@ export interface EmsRequestSummary {
     has_note: boolean;
     last_activity_at: string | null;
     closed_at: string | null;
+    /** True when Captain 5 sent it back and the member can fix and resend it. */
+    can_revise?: boolean;
+    /** Why Captain 5 sent it back (3 to 500 characters). */
+    return_reason?: string | null;
+    returned_at?: string | null;
 }
 
 export interface EmsRequestLine {
@@ -198,6 +219,16 @@ export interface EmsRequestDetail extends EmsRequestSummary {
     cancel_reason: string | null;
     files_copy: EmsFilesCopy;
     can_cancel: boolean;
+    /** The unit the request was for. Lets "Fix and resend" pick the same unit; without it the unit name is matched. */
+    apparatus_id?: number | null;
+    returned_by?: string | null;
+    revision_number?: number | null;
+    /** The returned request this one corrects, and the request that replaced this one (uuids). */
+    revision_of?: string | null;
+    replaced_by?: string | null;
+    /** Optional: the numbers of those two, so a link does not need another call. */
+    revision_of_number?: string | null;
+    replaced_by_number?: string | null;
 }
 
 export interface EmsEndpoints {
@@ -210,7 +241,8 @@ export interface EmsEndpoints {
 }
 
 export type EmsView =
-    | { name: 'form' }
+    /** `revises`: the returned request being fixed, so a refresh or a shared link comes back to the correction. */
+    | { name: 'form'; revises?: string }
     | { name: 'mine' }
     | { name: 'detail'; id: string };
 

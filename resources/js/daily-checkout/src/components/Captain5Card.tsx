@@ -60,7 +60,7 @@ export default function Captain5Card({ summary }: { summary: Captain5Summary }) 
           <Tag tone={dutyTone(summary.on_duty)} className="!whitespace-normal !py-1 max-w-full break-words">{dutyLine(summary.on_duty)}</Tag>
         </p>
         <DutyNote onDuty={summary.on_duty} testId="daily-captain5-duty-note" className="mb-2" />
-        <p className="text-sm text-hub-n-600">EMS Operations: Rescue and medical equipment issues, replacements, shift handoff and messages.</p>
+        <p className="text-sm text-hub-n-600">EMS Operations: Rescue and medical equipment issues, medical inventory, shift handoff and messages.</p>
         <p className="mt-3" data-testid="daily-captain5-open">
           <Tag tone={open > 0 ? 'warning' : 'success'}>{open > 0 ? `${open} open ${open === 1 ? 'issue' : 'issues'}` : 'No open issues'}</Tag>
         </p>

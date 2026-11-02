@@ -49,6 +49,7 @@ final class StaffRequestController extends Controller
         return $this->guarded(function () use ($request): JsonResponse {
             $f = EmsValidator::validate($request->query(), [
                 'status' => ['nullable', 'string', 'max:120'],
+                'state' => ['nullable', 'in:active,archived'],
                 'unit' => ['nullable', 'regex:/^(detail|\d{1,9})$/'],
                 'target_kind' => ['nullable', 'in:'.implode(',', InventoryRequest::TARGET_KINDS)],
                 'date_from' => ['nullable', 'date_format:Y-m-d'],
@@ -62,10 +63,13 @@ final class StaffRequestController extends Controller
                 'q.max' => 'Search text can be at most 100 characters.', 'q.string' => 'Search text must be plain text.',
             ]);
 
-            $query = InventoryRequest::query()->withCount('lines');
+            $query = InventoryRequest::query()->with('lines')->withCount('lines');
             $status = array_values(array_intersect(array_filter(explode(',', (string) ($f['status'] ?? ''))), InventoryRequest::STATUSES));
             if ($status !== []) {
                 $query->whereIn('status', $status);
+            }
+            if (! empty($f['state'])) {
+                $query->whereIn('status', $f['state'] === 'active' ? InventoryRequest::ACTIVE_STATUSES : InventoryRequest::ARCHIVED_STATUSES);
             }
             if (! empty($f['unit'])) {
                 $f['unit'] === 'detail'
@@ -94,7 +98,7 @@ final class StaffRequestController extends Controller
                 ->paginate((int) ($f['per_page'] ?? 25), ['*'], 'page', (int) ($f['page'] ?? 1));
 
             return $this->ok(
-                $page->getCollection()->map(fn (InventoryRequest $r): array => $this->presenter->summary($r))->values()->all(),
+                $page->getCollection()->map(fn (InventoryRequest $r): array => $this->presenter->staffSummary($r))->values()->all(),
                 $this->pageMeta($page->currentPage(), $page->perPage(), $page->total()),
             );
         });
@@ -108,6 +112,16 @@ final class StaffRequestController extends Controller
     public function review(Request $request, string $uuid): JsonResponse
     {
         return $this->guarded(fn (): JsonResponse => $this->written($this->workflow->review($this->id($uuid), $this->user($request), $this->idempotencyKey($request))));
+    }
+
+    public function acknowledge(Request $request, string $uuid): JsonResponse
+    {
+        return $this->guarded(fn (): JsonResponse => $this->written($this->workflow->acknowledge($this->id($uuid), $this->user($request), $this->idempotencyKey($request))));
+    }
+
+    public function reject(Request $request, string $uuid): JsonResponse
+    {
+        return $this->guarded(fn (): JsonResponse => $this->written($this->workflow->reject($this->id($uuid), $this->user($request), $this->idempotencyKey($request), $request->all())));
     }
 
     public function prepare(Request $request, string $uuid): JsonResponse

@@ -36,7 +36,7 @@ final class EmsNotifier
     private const EXCERPT_LENGTH = 240;
 
     /** Request statuses the requester hears about (everything else stays in history). */
-    private const MEMBER_NOTIFIED = [InventoryRequest::ISSUED, InventoryRequest::CLOSED];
+    private const MEMBER_NOTIFIED = [InventoryRequest::ISSUED, InventoryRequest::CLOSED, InventoryRequest::RETURNED];
 
     /** @var array{user: int, key: string, sent: bool}|null */
     private ?array $replay = null;
@@ -69,7 +69,7 @@ final class EmsNotifier
                 self::KIND_SUBMITTED,
                 $this->recipients->staff(),
                 fn (User $recipient): array => [
-                    'title' => "{$request->number}: new medical inventory request",
+                    'title' => $request->revision_of_request_id !== null ? "{$request->number}: corrected medical inventory form" : "{$request->number}: new medical inventory request",
                     'body' => $body,
                     'url' => $this->staffUrl($recipient, $request),
                 ],
@@ -118,16 +118,24 @@ final class EmsNotifier
         }
         $this->guard('statusChanged', function () use ($request, $event): void {
             $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
-            $body = $event->to_status === InventoryRequest::ISSUED
-                ? "{$request->number} for {$request->target_label} was issued."
-                : "{$request->number} for {$request->target_label} was closed.".($request->close_reason ? ' '.$this->excerpt((string) $request->close_reason) : '');
+            $reason = (string) (($event->payload ?? [])['reason'] ?? $request->return_reason ?? '');
+            $body = match ($event->to_status) {
+                InventoryRequest::ISSUED => "{$request->number} for {$request->target_label} was issued.",
+                InventoryRequest::RETURNED => "Captain 5 sent back {$request->number} for {$request->target_label}. ".$this->excerpt($reason),
+                default => "{$request->number} for {$request->target_label} was closed.".($request->close_reason ? ' '.$this->excerpt((string) $request->close_reason) : ''),
+            };
+            $title = match ($event->to_status) {
+                InventoryRequest::ISSUED => "{$request->number}: supplies issued",
+                InventoryRequest::RETURNED => "{$request->number}: please correct and resend",
+                default => "{$request->number}: request closed",
+            };
 
             $this->queue(
                 'ems:request:'.$request->getKey().':status:'.$event->getKey(),
                 self::KIND_STATUS,
                 $this->requester($request),
                 fn (User $recipient): array => [
-                    'title' => $event->to_status === InventoryRequest::ISSUED ? "{$request->number}: supplies issued" : "{$request->number}: request closed",
+                    'title' => $title,
                     'body' => $body,
                     'url' => EmsLinks::member($request->uuid),
                 ],
