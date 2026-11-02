@@ -191,7 +191,7 @@ final class DailyCheckoutInspectionSessionService
                 priorInspectionSessionId: (int) $prior->getKey(),
             );
             $prior->update([
-                'abandoned_at' => $issuedAt,
+                'abandoned_at' => $issuedAt->utc(),
                 'abandoned_by_user_id' => $actorUserId,
                 'abandoned_by_session_hash' => $actorSessionHash,
                 'abandonment_reason' => 'operator_requested_start_today',
@@ -304,7 +304,9 @@ final class DailyCheckoutInspectionSessionService
             'actor_user_id' => $actorUserId,
             'actor_session_hash' => $actorSessionHash,
             'issuance_key' => $issuanceKey,
-            'issued_at' => $issuedAt,
+            // The duty date is Eastern; the instants are stored in UTC. Eloquent keeps a date's clock time and drops its
+            // zone, so an Eastern date saved as it is reads back 4 or 5 hours early.
+            'issued_at' => $issuedAt->utc(),
             'duty_date' => $issuedAt->toDateString(),
             'checklist_template_id' => $preparedContract['template_id'],
             'checklist_template_version' => $preparedContract['template_version'],
@@ -314,7 +316,7 @@ final class DailyCheckoutInspectionSessionService
             'due_tasks_hash' => $preparedContract['due_tasks_hash'],
             'replay_key' => $replayKey,
             'token_hash' => hash('sha256', $token),
-            'expires_at' => $issuedAt->addHours($this->expiryHours()),
+            'expires_at' => $issuedAt->addHours($this->expiryHours())->utc(),
             'prior_inspection_session_id' => $priorInspectionSessionId,
         ]);
 
@@ -380,7 +382,7 @@ final class DailyCheckoutInspectionSessionService
             ->where('apparatus_id', $apparatusId)
             ->whereNull('submitted_inspection_id')
             ->whereNull('abandoned_at')
-            ->where('expires_at', '>', $issuedAt);
+            ->where('expires_at', '>', $issuedAt->utc());
     }
 
     private function inspectionSessionDateAttribute(DailyCheckoutInspectionSession $session, string $attribute): ?CarbonImmutable
