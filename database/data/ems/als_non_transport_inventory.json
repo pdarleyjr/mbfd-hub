@@ -41,7 +41,7 @@
       "items": [
         {
           "item_ref": "nt.handtevy.handtevy",
-          "catalog_ref": null,
+          "catalog_ref": "handtevy-kit",
           "label": "Handtevy",
           "source_label": "HANDTEVY",
           "min_text": "1",

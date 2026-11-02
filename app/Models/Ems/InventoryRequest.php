@@ -7,6 +7,7 @@ namespace App\Models\Ems;
 use App\Models\Apparatus;
 use App\Models\User;
 use App\Services\Ems\FormFamilies;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -172,6 +173,24 @@ class InventoryRequest extends Model
     public function family(): array
     {
         return FormFamilies::resolve($this->form_family);
+    }
+
+    /**
+     * Requests of one family, read the same way as family(): ALS Transport also takes rows with no family or an unknown one.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeInFamily(Builder $query, string $family): Builder
+    {
+        $column = $query->qualifyColumn('form_family');
+
+        return $query->where(function (Builder $inner) use ($column, $family): void {
+            $inner->where($column, $family);
+            if ($family === FormFamilies::DEFAULT) {
+                $inner->orWhereNull($column)->orWhereNotIn($column, FormFamilies::keys());
+            }
+        });
     }
 
     public function isOpen(): bool

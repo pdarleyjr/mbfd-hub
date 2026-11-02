@@ -9,9 +9,10 @@ use App\Filament\Resources\InventoryRequestResource\Pages\ListInventoryRequests;
 use App\Filament\Resources\InventoryRequestResource\Pages\ViewInventoryRequest;
 use App\Models\Ems\InventoryRequest;
 use App\Models\User;
+use App\Services\Ems\EmsStatistics;
+use App\Services\Ems\Exports\StatisticsView;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\Feature\Ems\Concerns\BuildsEmsWorld;
@@ -163,9 +164,10 @@ final class FormFamilyAdminTest extends TestCase
         $this->actAsManager();
 
         $page = Livewire::test(MedicalDataStatistics::class)->assertOk();
-        $html = $page->html();
+        // Livewire wraps each loop pass in marker comments; the rows are read without them.
+        $html = (string) preg_replace('~<!--.*?-->~s', '', $page->html());
 
-        $this->assertStringContainsString('data-testid="stats-by-form"', $html);
+        $this->assertStringContainsString('By form', $html);
         $this->assertStringContainsString('These are requests, not supplies used on calls.', $html);
         foreach (['ALS Transport Inventory Form', 'ALS Non Transport Inventory Form', self::FIRE_BOAT_TITLE, 'BLS Detail Medical Inventory Form'] as $title) {
             $this->assertStringContainsString($title, $html);
@@ -176,17 +178,16 @@ final class FormFamilyAdminTest extends TestCase
         $this->assertMatchesRegularExpression('~BLS Detail Medical Inventory Form</th>\s*<td[^>]*>\s*0\s*</td>~', $html, 'A form nobody used shows zero, not a missing row.');
     }
 
-    public function test_the_by_form_table_is_left_out_when_the_report_has_no_family_figures(): void
+    public function test_the_statistics_export_carries_the_same_by_form_section(): void
     {
-        $partial = 'filament.admin.partials.ems-stats-by-form';
+        $this->requestOn('fire-boat-6', 4);
+        $this->requestOn(null, 2);
 
-        $this->assertSame('', trim(Blade::render("@include('{$partial}', ['rows' => [], 'sections' => []])")));
+        $sections = collect(StatisticsView::build(app(EmsStatistics::class)->report([]))['sections'])->keyBy('heading');
 
-        $rows = [['family' => 'fire-boat-6', 'title' => self::FIRE_BOAT_TITLE, 'requests' => 2, 'qty_requested' => 7, 'qty_issued' => 1]];
-        $this->assertStringContainsString('stats-by-form', Blade::render("@include('{$partial}', ['rows' => \$rows, 'sections' => []])", ['rows' => $rows]));
-
-        // A "By form" section from the shared statistics view takes its place, so the page never shows two.
-        $built = [(object) ['heading' => 'By form']];
-        $this->assertSame('', trim(Blade::render("@include('{$partial}', ['rows' => \$rows, 'sections' => \$built])", ['rows' => $rows, 'built' => $built])));
+        $this->assertTrue($sections->has('By form'));
+        $rows = collect($sections['By form']->rows)->keyBy(0);
+        $this->assertSame([self::FIRE_BOAT_TITLE, 1, 4, 0], $rows[self::FIRE_BOAT_TITLE]);
+        $this->assertSame(['ALS Transport Inventory Form', 1, 2, 0], $rows['ALS Transport Inventory Form'], 'A request with no family counts as ALS Transport.');
     }
 }

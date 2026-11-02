@@ -126,7 +126,7 @@ export default function FormDetailSheet({ uuid, canAct, tick, onOpenForm, onClos
         onClose={onClose}
         testId="ems-form-sheet"
         title={form ? `${form.number}: ${targetText(form)}` : 'Submitted inventory form'}
-        description={form ? `${familyTitle(form)} · ${memberText(form)} ·${etDateTime(form.submitted_at)}` : undefined}
+        description={form ? `${familyTitle(form)} · ${memberText(form)} · ${etDateTime(form.submitted_at)}` : undefined}
       >
         {loading && !form && <div role="status" aria-label="Loading form" className="space-y-3"><span className="hub-skeleton block !h-8 w-2/3" /><span className="hub-skeleton block !h-32 w-full" /></div>}
         {unavailable && (

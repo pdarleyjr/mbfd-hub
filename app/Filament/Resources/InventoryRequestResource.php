@@ -235,13 +235,7 @@ class InventoryRequestResource extends Resource
             return $query;
         }
 
-        return $query->where(function (Builder $inner) use ($family): void {
-            $inner->where('ems_inventory_requests.form_family', $family);
-            if ($family === FormFamilies::DEFAULT) {
-                $inner->orWhereNull('ems_inventory_requests.form_family')
-                    ->orWhereNotIn('ems_inventory_requests.form_family', FormFamilies::keys());
-            }
-        });
+        return $query->inFamily((string) $family);
     }
 
     /**

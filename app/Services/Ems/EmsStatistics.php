@@ -53,9 +53,7 @@ final class EmsStatistics
             ->when($to !== null, fn ($q) => $q->where('submitted_at', '<=', $to->utc()))
             ->when(! empty($filters['apparatus_id']), fn ($q) => $q->where('apparatus_id', (int) $filters['apparatus_id']))
             ->when(! empty($filters['target_kind']) && in_array($filters['target_kind'], InventoryRequest::TARGET_KINDS, true), fn ($q) => $q->where('target_kind', (string) $filters['target_kind']))
-            ->when($family !== null, fn ($q) => $family === FormFamilies::DEFAULT
-                ? $q->where(fn ($w) => $w->where('form_family', FormFamilies::DEFAULT)->orWhereNull('form_family'))
-                : $q->where('form_family', $family));
+            ->when($family !== null, fn ($q) => $q->inFamily((string) $family));
 
         $requests = $base()->get(['id', 'status', 'submitted_at', 'target_kind', 'apparatus_id', 'target_label', 'event_assignment', 'form_family']);
         // A form sent back or replaced by its correction would count the same supplies twice.

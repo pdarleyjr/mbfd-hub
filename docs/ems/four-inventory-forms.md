@@ -95,3 +95,10 @@ snapshot's family title (old snapshots keep "Medical Inventory Request"). Existi
 Deploy the image, run the migration (additive), then `php artisan ems:import-sources --dry-run` (the three existing lists must report
 `unchanged`; the four new lists report `new_version`), then run it for real. Until the import runs, the three new families answer
 "not available yet" and ALS Transport works as before. Rollback is the previous image; never reverse the migration or delete imported rows.
+
+What a rollback to the image before this release looks like (data stays safe; the column is nullable and the old code ignores it):
+- Requests sent on the three new forms stay in the database, but the old screens show them without a form name: Captain 5 shows the raw list
+  key (for example `fire-boat-6-als`) as the group heading, and a regenerated Files copy is titled "Medical Inventory Request".
+- A queued request from a new form that carries lines is refused by the old server (it does not know the new list keys) and stays in the
+  member's outbox until the release is restored; one with only a note would be accepted as an ALS Transport request.
+- Re-deploying this release afterwards needs nothing else: the lists, requests and column are already there.

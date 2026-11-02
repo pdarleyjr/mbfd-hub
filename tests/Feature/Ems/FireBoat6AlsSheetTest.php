@@ -6,9 +6,9 @@ namespace Tests\Feature\Ems;
 
 use App\Models\Ems\SourceForm;
 use App\Models\Ems\SourceFormItem;
-use App\Services\Ems\Import\SourceImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Feature\Ems\Concerns\BuildsEmsWorld;
+use Tests\Feature\Ems\Concerns\ImportsTrackedList;
 use Tests\TestCase;
 
 /**
@@ -21,6 +21,7 @@ use Tests\TestCase;
 final class FireBoat6AlsSheetTest extends TestCase
 {
     use BuildsEmsWorld;
+    use ImportsTrackedList;
     use RefreshDatabase;
 
     private const KEY = 'fire-boat-6-als';
@@ -272,7 +273,7 @@ SHEET;
         parent::setUp();
         $this->buildEmsWorld();
         // The tracked extractions as released: the fixture world only carries tiny bag forms.
-        app(SourceImporter::class)->import(base_path('database/data/ems'));
+        $this->importTrackedList(self::FILE);
     }
 
     protected function tearDown(): void
@@ -446,7 +447,7 @@ SHEET;
     public function test_reimporting_the_list_changes_nothing(): void
     {
         $before = SourceFormItem::query()->count();
-        $result = app(SourceImporter::class)->import(base_path('database/data/ems'));
+        $result = $this->importTrackedList(self::FILE);
 
         $this->assertSame($before, SourceFormItem::query()->count());
         $this->assertSame(1, $result['counts']['forms.'.self::KEY.'.unchanged'] ?? null);
@@ -576,5 +577,4 @@ SHEET;
         $this->assertCount(0, $labels->filter(static fn (string $l): bool => stripos($l, 'sleeves') !== false), 'No sleeves on the boat ALS sheet.');
         $this->assertCount(0, $labels->filter(static fn (string $l): bool => stripos($l, 'LSU') !== false || stripos($l, 'boo boo') !== false));
     }
-
 }

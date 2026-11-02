@@ -88,9 +88,7 @@ final class StaffRequestController extends Controller
             }
             if (! empty($f['family'])) {
                 // A request with no family (written before the four forms) is ALS Transport.
-                $f['family'] === FormFamilies::DEFAULT
-                    ? $query->where(fn ($w) => $w->where('form_family', FormFamilies::DEFAULT)->orWhereNull('form_family'))
-                    : $query->where('form_family', $f['family']);
+                $query->inFamily((string) $f['family']);
             }
             if (! empty($f['date_from'])) {
                 $query->where('submitted_at', '>=', CarbonImmutable::parse($f['date_from'], \App\Support\HubTimezone::NAME)->startOfDay()->utc());

@@ -6,9 +6,9 @@ namespace Tests\Feature\Ems;
 
 use App\Models\Ems\SourceForm;
 use App\Models\Ems\SourceFormItem;
-use App\Services\Ems\Import\SourceImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Feature\Ems\Concerns\BuildsEmsWorld;
+use Tests\Feature\Ems\Concerns\ImportsTrackedList;
 use Tests\TestCase;
 
 /**
@@ -20,6 +20,7 @@ use Tests\TestCase;
 final class NonTransportSheetTest extends TestCase
 {
     use BuildsEmsWorld;
+    use ImportsTrackedList;
     use RefreshDatabase;
 
     private const KEY = 'als-non-transport';
@@ -48,10 +49,10 @@ final class NonTransportSheetTest extends TestCase
     /** Catalog keys this list shares with the three older lists / keys only this and the other new lists use. */
     private const CATALOG_REUSED = 193;
 
-    private const CATALOG_NEW = 43;
+    private const CATALOG_NEW = 44;
 
     private const SHEET = <<<'SHEET'
-nt-handtevy|HANDTEVY|Handtevy|1|1|~|1|1|quantity|~|~
+nt-handtevy|HANDTEVY|Handtevy|1|1|~|1|1|quantity|~|handtevy-kit
 nt-handtevy|HANDTEVY 1st Tuesday-Monthly Inventory-Inspection completed|Handtevy monthly inventory-inspection completed|~|~|~|~|~|yes_no|cad=monthly_first_tuesday|~
 nt-medications|Adenocard 12mg|Adenocard 12 mg|2|2|~|2|2|quantity|~|adenocard-12mg
 nt-medications|Amiodarone|Amiodarone|4|4|~|4|4|quantity|~|amiodarone
@@ -304,7 +305,7 @@ SHEET;
         parent::setUp();
         $this->buildEmsWorld();
         // The tracked extractions as released: the fixture world only carries tiny bag forms.
-        app(SourceImporter::class)->import(base_path('database/data/ems'));
+        $this->importTrackedList(self::FILE);
     }
 
     protected function tearDown(): void
@@ -478,7 +479,7 @@ SHEET;
     public function test_reimporting_the_list_changes_nothing(): void
     {
         $before = SourceFormItem::query()->count();
-        $result = app(SourceImporter::class)->import(base_path('database/data/ems'));
+        $result = $this->importTrackedList(self::FILE);
 
         $this->assertSame($before, SourceFormItem::query()->count());
         $this->assertSame(1, $result['counts']['forms.'.self::KEY.'.unchanged'] ?? null);
@@ -545,7 +546,7 @@ SHEET;
     public function test_handtevy_rows_are_a_quantity_item_a_monthly_yes_no_check_and_in_handtevy_locations(): void
     {
         $kit = $this->item('HANDTEVY');
-        $this->assertSame(['1', 1, '1', 1, 'quantity', null], [$kit->min_text, $kit->min_qty, $kit->flags['fill_if_text'], $kit->flags['fill_if_qty'], $kit->response_type, $kit->catalogItem?->key]);
+        $this->assertSame(['1', 1, '1', 1, 'quantity', 'handtevy-kit'], [$kit->min_text, $kit->min_qty, $kit->flags['fill_if_text'], $kit->flags['fill_if_qty'], $kit->response_type, $kit->catalogItem?->key]);
 
         $check = $this->item('HANDTEVY 1st Tuesday-Monthly Inventory-Inspection completed');
         $this->assertSame('yes_no', $check->response_type);
@@ -625,5 +626,4 @@ SHEET;
         $this->assertSame('500 ml irrigation water', $trauma->first()->source_label);
         $this->assertSame('Ocular Eye Patch', $trauma->last()->source_label);
     }
-
 }

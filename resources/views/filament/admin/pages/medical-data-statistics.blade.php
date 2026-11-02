@@ -113,8 +113,6 @@
                     @endif
                 </x-filament::section>
             @endforeach
-
-            @include('filament.admin.partials.ems-stats-by-form', ['rows' => $byFamily, 'sections' => $view['sections']])
         @endif
     </div>
 </x-filament-panels::page>

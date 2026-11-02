@@ -230,7 +230,7 @@ final class EmsExportsTest extends TestCase
         $exporter = app(StatisticsExporter::class);
 
         $book = $this->read($exporter->xlsx($report, $filters, $at));
-        $this->assertSame(['Totals', 'Top requested items', 'Monthly trend', 'Requests by unit', 'Detail and special events', 'About this export'], $book->getSheetNames());
+        $this->assertSame(['Totals', 'Top requested items', 'Monthly trend', 'Requests by unit', 'By form', 'Detail and special events', 'About this export'], $book->getSheetNames());
         $totals = $book->getSheetByName('Totals');
         foreach ($view['metrics'] as $index => $metric) {
             $this->assertSame($metric['label'], $totals->getCell('A'.($index + 2))->getValue());

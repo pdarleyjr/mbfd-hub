@@ -29,7 +29,7 @@ export function ItemSearch({ inputRef, query, onQuery, searching, shownQuery, ma
                 <Search size={18} aria-hidden="true" />
                 <input
                     id="ems-search" ref={inputRef} type="search" className="ems-search-input" autoComplete="off" autoCapitalize="off" spellCheck={false}
-                    enterKeyHint="search" placeholder="Search supplies" value={query} onChange={(event) => onQuery(event.target.value)}
+                    enterKeyHint="search" placeholder={enteredCount > 0 || enteredOnly ? 'Search' : 'Search supplies'} value={query} onChange={(event) => onQuery(event.target.value)}
                 />
                 {query && <button type="button" className="ems-search-clear" aria-label="Clear search" onClick={() => { onQuery(''); inputRef.current?.focus(); }}><X size={17} aria-hidden="true" /></button>}
             </div>

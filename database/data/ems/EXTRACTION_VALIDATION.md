@@ -521,7 +521,7 @@ How the tricky cells were read:
 
 Flagged `needs_review` (5): `nt.bvm-bag.et-tube-extension`, `nt.bvm-bag.bvm-co-capnoline`, `nt.bvm-bag.i-gel-5`, `nt.bvm-bag.i-gel-4`, `nt.bvm-bag.i-gel-3`. Reason for all five: AMOUNT is blank and "1 in bag" is printed under Fill if <.
 
-Catalog: 193 keys reused from the older lists, 43 new. Reused (this sheet's printed row <- key):
+Catalog: 193 keys reused from the older lists, 44 new (including `handtevy-kit` for the Handtevy kit row, so a reconcile choice for it is remembered). Reused (this sheet's printed row <- key):
 
 ```
 adenocard-12mg <- Adenocard 12mg   [older list: Adenocard 12mg]

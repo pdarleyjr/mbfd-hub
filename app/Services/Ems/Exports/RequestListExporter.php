@@ -6,6 +6,7 @@ namespace App\Services\Ems\Exports;
 
 use App\Filament\Support\EmsLabels;
 use App\Models\Ems\InventoryRequest;
+use App\Services\Ems\FormFamilies;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
@@ -23,12 +24,12 @@ final class RequestListExporter
 
     private const HEADERS = [
         'Number', 'Submitted (ET)', 'Member', 'Rank', 'Unit or Detail / Special Event', 'Event or assignment',
-        'Items', 'Quantity requested', 'Quantity issued', 'Status', 'Close reason', 'Last activity (ET)',
+        'Items', 'Quantity requested', 'Quantity issued', 'Status', 'Close reason', 'Last activity (ET)', 'Form',
     ];
 
     private const NUMERIC = [6, 7, 8];
 
-    private const WIDTHS = [14, 20, 24, 14, 26, 28, 8, 12, 12, 14, 28, 20];
+    private const WIDTHS = [14, 20, 24, 14, 26, 28, 8, 12, 12, 14, 28, 20, 34];
 
     public function __construct(private readonly ReportWriter $writer) {}
 
@@ -87,6 +88,7 @@ final class RequestListExporter
             EmsLabels::status($request->status),
             (string) $request->close_reason,
             EmsLabels::et($request->last_activity_at ?? $request->submitted_at),
+            FormFamilies::resolve($request->form_family)['title'],
         ];
     }
 }
