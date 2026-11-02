@@ -56,6 +56,9 @@ class InventorySnapshot extends Model
     /** The starting counts from the supply room workbook. */
     public const ORIGIN_WORKBOOK = 'workbook';
 
+    /** Best guesses for items nobody has counted. The next real count of an item replaces its guess. */
+    public const ORIGIN_ESTIMATE = 'estimate';
+
     protected $table = 'ems_inventory_snapshots';
 
     protected $fillable = [

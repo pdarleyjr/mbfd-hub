@@ -1,0 +1,443 @@
+{
+  "note": "Best guesses loaded 2026-11-01 at the owner's request. Items 1-11 of the question list were answered by the supply room as cases or boxes, and items 35-44 as stored in the Captain 5 office. The rest are guesses. The next real count of an item replaces its guess.",
+  "locations": [
+    {
+      "code": "CAPT 5 OFFICE",
+      "label": "Capt 5 Office",
+      "sort": 455
+    }
+  ],
+  "estimates": [
+    {
+      "name": "Ammonia Wipes",
+      "typed": 36,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said",
+      "set": {
+        "count_unit": "case",
+        "package_unit": "case",
+        "units_per_package": 30,
+        "threshold_qty_base": 30,
+        "threshold_source_text": "< 1 case",
+        "review_reasons": [
+          "arithmetic: 5 x 30 = 150 but order amount states 1500U"
+        ]
+      }
+    },
+    {
+      "name": "Lancettes",
+      "typed": 43,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said",
+      "set": {
+        "count_unit": "box",
+        "package_unit": "box",
+        "units_per_package": 100,
+        "threshold_qty_base": 200,
+        "threshold_source_text": "< 2 boxes",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "4 X 4 Gauze Sponges (Curaplex)",
+      "typed": 10,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said",
+      "set": {
+        "count_unit": "box",
+        "package_unit": "box",
+        "units_per_package": 100,
+        "threshold_qty_base": 1000,
+        "threshold_source_text": "< 10 boxes",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "5 X 9 Abdominal Pads",
+      "typed": 16,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said; box size taken from the 20 per pack on the sheet",
+      "set": {
+        "count_unit": "box",
+        "package_unit": "box",
+        "units_per_package": 20,
+        "threshold_qty_base": 200,
+        "threshold_source_text": "< 10 boxes",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Cold Packs",
+      "typed": 97,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said; box size taken from the 24 per case on the sheet",
+      "set": {
+        "count_unit": "box",
+        "package_unit": "box",
+        "units_per_package": 24,
+        "threshold_qty_base": 48,
+        "threshold_source_text": "< 2 boxes",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Disposable Razors",
+      "typed": 341,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said; the sheet's order level of 10 packs has no pack size, so 1 case is used",
+      "set": {
+        "count_unit": "case",
+        "package_unit": "case",
+        "units_per_package": 720,
+        "threshold_qty_base": 720,
+        "threshold_source_text": "< 1 case",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "AMBU EKG Electrodes",
+      "typed": 70,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said; 40 packs per case, and the sheet's 20 packs rounds up to 1 case",
+      "set": {
+        "count_unit": "case",
+        "package_unit": "case",
+        "units_per_package": 40,
+        "threshold_qty_base": 40,
+        "threshold_source_text": "< 1 case",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Autopulse Lifeband",
+      "typed": 5,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said; the sheet's order level says 3 is 1 box",
+      "set": {
+        "count_unit": "box",
+        "package_unit": "box",
+        "units_per_package": 3,
+        "threshold_qty_base": 3,
+        "threshold_source_text": "< 1 box",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Tyvek Sleeves",
+      "typed": 700,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said; box size taken from the 100 per case on the sheet",
+      "set": {
+        "count_unit": "box",
+        "package_unit": "box",
+        "units_per_package": 100,
+        "threshold_qty_base": 1000,
+        "threshold_source_text": "< 10 boxes",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "AAA Batteries",
+      "typed": 28,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said; the order level says 2 boxes is 48",
+      "set": {
+        "count_unit": "box",
+        "package_unit": "box",
+        "units_per_package": 24,
+        "threshold_qty_base": 48,
+        "threshold_source_text": "< 2 boxes",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "AA Batteries",
+      "typed": 84,
+      "basis": "Count sheet number, read in cases or boxes as the supply room said; the order level says 3 boxes is 72, so the sheet's 4 per package was not used",
+      "set": {
+        "count_unit": "box",
+        "package_unit": "box",
+        "units_per_package": 24,
+        "threshold_qty_base": 72,
+        "threshold_source_text": "< 3 boxes",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Chewable Aspirin 81 mg",
+      "typed": 30,
+      "basis": "Sheet says 30 bx and gives no box size; one box treated as one unit",
+      "set": {
+        "count_unit": "box",
+        "package_unit": "box",
+        "units_per_package": 1,
+        "threshold_qty_base": 5,
+        "threshold_source_text": "< 5 boxes",
+        "review_reasons": [
+          "secondary price-date text reads '7/222' (extra digit); likely '7/22'; raw text kept"
+        ]
+      }
+    },
+    {
+      "name": "Tyvek Suit XL",
+      "typed": 14,
+      "basis": "Sheet says 14 bx; box size taken from the 25 per case on the sheet",
+      "set": {
+        "count_unit": "box",
+        "package_unit": "box",
+        "units_per_package": 25,
+        "threshold_qty_base": 25,
+        "threshold_source_text": "< 1 box",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Syringe Needle 19 ga.",
+      "typed": 97,
+      "basis": "Count sheet shows 97 at this spot on B4 but calls it 18 ga.",
+      "set": {
+        "review_reasons": [
+          "The Count sheet calls this 18 ga. and the Inventory sheet calls it 19 ga. Confirm the gauge"
+        ]
+      }
+    },
+    {
+      "name": "Glucometer Batteries",
+      "typed": 5,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Nasal Drug Delivery Device",
+      "typed": 10,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "LUCAS 3 CUPS",
+      "typed": 3,
+      "basis": "No count on the sheet; assumed stocked at its order level",
+      "set": {
+        "review_reasons": [
+          "arithmetic: 1 x 3 = 3 but order amount states 12U"
+        ]
+      }
+    },
+    {
+      "name": "CURAPLEX Canister for Manual Suction 500mmHG",
+      "typed": 2,
+      "basis": "No count on the sheet; assumed stocked at its order level",
+      "set": {
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Sterile Lubricating Jelly",
+      "typed": 100,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Vinegar 64 oz or 1 Gallon",
+      "typed": 3,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "N95 Respirator Masks",
+      "typed": 50,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Auto BP Cuff (Large adult) (GREEN)",
+      "typed": 10,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "No-neck C-collar (adult)",
+      "typed": 10,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "LATEX GLOVES XXL BOXES",
+      "typed": 20,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Electric Suction Cannisters/ Lids",
+      "typed": 10,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Forceps Magill Pedi",
+      "typed": 3,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Bougie Introducer 10Fr",
+      "typed": 3,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Face Shields w/ masks",
+      "typed": 25,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Tyvek Boot Covers",
+      "typed": 150,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Autopulse Straps",
+      "typed": 3,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "AED COMBI PADS (PEDI) AED ONLY",
+      "typed": 2,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "CO Indicators",
+      "typed": 2,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Kendrick Extract Device K.E.D.",
+      "typed": 1,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "ADULT Traction Splint",
+      "typed": 1,
+      "basis": "No count on the sheet; assumed stocked at its order level"
+    },
+    {
+      "name": "Masimo Patient Cable Extention Cable",
+      "typed": 2,
+      "basis": "No count on the sheet; assumed stocked at its order level",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "section_key": "stored-with-captain-5"
+      }
+    },
+    {
+      "name": "Masimo DCI Adult Reusable Sensor SpO2",
+      "typed": 2,
+      "basis": "No count on the sheet; assumed stocked at its order level",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "section_key": "stored-with-captain-5"
+      }
+    },
+    {
+      "name": "Masimo Rainbow DCI Sensor SpO2/ CO",
+      "typed": 2,
+      "basis": "No count on the sheet; assumed stocked at its order level",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "section_key": "stored-with-captain-5"
+      }
+    },
+    {
+      "name": "Masimo Spo2 sensor single use Pedi",
+      "typed": 18,
+      "basis": "Unnamed Count sheet row with 18 at this spot on shelf O",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "section_key": "stored-with-captain-5"
+      }
+    },
+    {
+      "name": "(AED) 3-Wire ECG Cable (Lead II) (AED 1000 3 LIMB)",
+      "typed": 1,
+      "basis": "No count and no order level on the sheet; assumed 1",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "section_key": "stored-with-captain-5",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "MCI Bag (cat. Nbr. OAME609)",
+      "typed": 1,
+      "basis": "No count and no order level on the sheet; assumed 1",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "section_key": "stored-with-captain-5",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Masimo Rainbow Sensor (Rad 57) 8 ft",
+      "typed": 1,
+      "basis": "No count and no order level on the sheet; assumed 1",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "section_key": "stored-with-captain-5",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Masimo Rainbow Sensor- Adult (Rad 57) 3 ft",
+      "typed": 1,
+      "basis": "No count and no order level on the sheet; assumed 1",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "section_key": "stored-with-captain-5",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Masimo Rainbow Sensor- Pedi (Rad 57)",
+      "typed": 1,
+      "basis": "No count and no order level on the sheet; assumed 1",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "section_key": "stored-with-captain-5",
+        "review_reasons": []
+      }
+    },
+    {
+      "name": "Lock, Drug Cynch",
+      "typed": 100,
+      "basis": "No count on the sheet; assumed stocked at its order level",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "section_key": "stored-with-captain-5",
+        "review_reasons": [
+          "order amount '400' has no unit"
+        ]
+      }
+    }
+  ],
+  "moves": [
+    {
+      "name": "IV Catheters 14 ga. (3.25\")",
+      "location_code": "CAPT 5 OFFICE"
+    },
+    {
+      "name": "Adult Quick Trach",
+      "location_code": "CAPT 5 OFFICE"
+    },
+    {
+      "name": "Pedi Quick Trach",
+      "location_code": "CAPT 5 OFFICE"
+    },
+    {
+      "name": "TPOD ORANGE TRAUMA PELVIC ORTHOTIC DEVICE",
+      "location_code": "CAPT 5 OFFICE"
+    },
+    {
+      "name": "Combat Application Tourniquet (CAT)",
+      "location_code": "CAPT 5 OFFICE"
+    },
+    {
+      "name": "Ondansetron (CAPT 5 Refrigerator)",
+      "location_code": "CAPT 5 OFFICE",
+      "set": {
+        "review_reasons": [
+          "Added from the supply room workbook; it is not on the printed 2021 list."
+        ]
+      }
+    },
+    {
+      "name": "ALS Orang Box",
+      "set": {
+        "name": "ALS Orange Box",
+        "review_reasons": [
+          "Added from the supply room workbook; it is not on the printed 2021 list.",
+          "No shelf is given on the workbook.",
+          "No order level is given on the workbook."
+        ]
+      }
+    }
+  ]
+}

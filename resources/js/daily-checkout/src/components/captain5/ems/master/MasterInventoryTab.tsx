@@ -16,5 +16,5 @@ export interface MasterInventoryTabProps {
  */
 export default function MasterInventoryTab({ meta, counting, onCounting, onForbidden }: MasterInventoryTabProps) {
   if (counting) return <CountSupplyRoom onExit={() => onCounting(false)} onForbidden={onForbidden} />;
-  return <MasterInventoryView canStart={meta.permissions.act} onCounting={onCounting} onForbidden={onForbidden} />;
+  return <MasterInventoryView canStart={meta.inventory?.edit ?? meta.permissions.act} onCounting={onCounting} onForbidden={onForbidden} />;
 }

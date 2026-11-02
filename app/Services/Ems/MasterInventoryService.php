@@ -64,7 +64,7 @@ final class MasterInventoryService
                 'counted' => $draft->lines()->whereNotNull('quantity_base')->count(),
             ],
             'last_count' => $lastCount === null ? null : ['id' => $lastCount->uuid, 'finalized_at' => $lastCount->finalized_at?->toIso8601String(), 'finalized_name' => $lastCount->finalized_name],
-            'can_edit' => $this->access->canAct($user),
+            'can_edit' => $this->access->canEditInventory($user),
         ];
     }
 
@@ -209,6 +209,7 @@ final class MasterInventoryService
                 'deducted' => CountMath::display($taken, $per),
                 'counted_at' => ($count['counted_at'] ?? null)?->toIso8601String(),
                 'counted_by' => $count['counted_by'] ?? null,
+                'estimated' => $count['estimated'] ?? false,
                 'required_base' => $item->threshold_qty_base,
                 'order_rule_text' => CountMath::orderRuleText($item),
                 'refrigerated' => $item->refrigerated,
@@ -392,7 +393,7 @@ final class MasterInventoryService
 
     private function authorize(User $user): void
     {
-        if (! $this->access->canAct($user)) {
+        if (! $this->access->canEditInventory($user)) {
             throw EmsException::forbidden();
         }
     }

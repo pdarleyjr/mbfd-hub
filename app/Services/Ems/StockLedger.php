@@ -201,7 +201,7 @@ final class StockLedger
             ->join('ems_inventory_snapshots as s', 's.id', '=', 'l.snapshot_id')
             ->joinSub($latest, 'm', fn ($join) => $join->on('m.supply_item_id', '=', 'l.supply_item_id')->on('m.v', '=', 's.version'))
             ->where('l.value_source', InventorySnapshotLine::COUNTED)
-            ->get(['l.supply_item_id', 'l.through_movement_id as line_through', 's.through_movement_id', 's.finalized_at', 's.finalized_name']);
+            ->get(['l.supply_item_id', 'l.through_movement_id as line_through', 's.through_movement_id', 's.finalized_at', 's.finalized_name', 's.origin']);
 
         $map = [];
         foreach ($rows as $row) {
@@ -209,6 +209,7 @@ final class StockLedger
                 'through' => (int) ($row->line_through ?? $row->through_movement_id),
                 'counted_at' => $row->finalized_at !== null ? CarbonImmutable::parse($row->finalized_at) : null,
                 'counted_by' => $row->finalized_name,
+                'estimated' => $row->origin === InventorySnapshot::ORIGIN_ESTIMATE,
             ];
         }
 

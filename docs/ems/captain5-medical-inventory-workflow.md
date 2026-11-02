@@ -107,6 +107,8 @@ Base `/ems/api`. `view` for reads, `act` for writes.
 
 The master item endpoints need `act`, not `configure` as the older item settings endpoint does. Captain 5 runs the room, and the brief calls for authorized Captain 5 personnel to rename, move, recount and reconfigure items. Every change is audited in `ems_supply_item_events`.
 
+Any administrator can also read and edit the master inventory and run the count (`inventory_read`, `inventory_edit`), without the rest of EMS: the Submitted Inventory Forms tab still needs EMS view. The owner asked for this on 2026-11-01. The one exception is someone deliberately given the read-only `admin.ems.view`, who stays read-only. A Captain 5 deny override ends this access too.
+
 ### Rollback
 
 Rolling back to an image from before this release reopens a second deduction path, because older code does not know `returned`, `reconciled` or `superseded` and its Issue action would accept those forms. After a rollback, do not issue against a form shown with one of those statuses.
@@ -137,3 +139,7 @@ The first use was Friday, October 30, 2026, on the owner's instruction: MIR-0000
 ## 9. Workbook cutover
 
 `php artisan ems:apply-supply-workbook` is a dry run. `--apply` writes one final `baseline` snapshot (`origin = workbook`, `idempotency_key = workbook:<sha256>`) under the stock lock. Movements recorded before it stay in history and are not subtracted from the supplied count. Re-running is a no-op. An item that already has a counted line is never overwritten. See `docs/ems/supply-room-workbook-exceptions.md`.
+
+### Estimates
+
+`php artisan ems:apply-supply-estimates` is a dry run. `--apply` loads `database/data/ems/supply_room_estimates_20261101.json` as one final `baseline` snapshot (`origin = estimate`, `idempotency_key = estimate:<sha256>`), for the items the workbook left without a usable number. Its `basis` field says where each guess came from. These lines are `counted`, so live quantity and the red number work as usual, and the screen shows an Estimate tag while the newest counted line for an item comes from this snapshot. The next real count of that item, on the Monday form or typed under Edit, is newer, so it replaces the number and the tag goes away by itself. An item left blank on a count keeps its estimate. An item that already has a number is left alone. Estimates never appear on the Submitted Medical Supply Room Inventory reports.
