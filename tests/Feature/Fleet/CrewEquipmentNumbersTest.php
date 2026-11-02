@@ -71,6 +71,44 @@ class CrewEquipmentNumbersTest extends TestCase
         $this->assertCount(3, array_filter($rescue, static fn (array $slot): bool => $slot['kind'] === 'radio'));
     }
 
+    /** @return array<string, array{0: string, 1: int, 2: int}> */
+    public static function standardCounts(): array
+    {
+        return [
+            'engine' => ['engine', 4, 4],
+            'engine 2' => ['engine2', 4, 4],
+            'ladder 1' => ['ladder1', 4, 4],
+            'ladder 3' => ['ladder3', 4, 4],
+            'rescue' => ['rescue', 3, 3],
+            'fire boat' => ['fireboat6', 4, 4],
+        ];
+    }
+
+    #[DataProvider('standardCounts')]
+    public function test_every_unit_shows_four_packs_and_at_least_four_radios_and_a_rescue_three(string $template, int $packs, int $radios): void
+    {
+        $unit = $this->unit($template);
+        $slots = collect(app(CrewEquipmentNumbers::class)->block($unit, $this->checklist($unit))['slots']);
+        $standardPacks = $slots->where('kind', 'scba')->where('spare', false)->reject(fn (array $slot): bool => (bool) preg_match('/scuba/i', $slot['label']));
+
+        $this->assertSame($packs, $standardPacks->sum('boxes'), 'packs shown');
+        $this->assertGreaterThanOrEqual($radios, $slots->where('kind', 'radio')->reject(fn (array $slot): bool => (bool) preg_match('/serial/i', $slot['label']))->count(), 'radios shown');
+        $this->assertTrue($slots->where('kind', 'radio')->every(fn (array $slot): bool => $slot['spare'] === false), 'radios are named seats and always shown');
+    }
+
+    public function test_a_fifth_pack_box_waits_until_it_holds_a_number(): void
+    {
+        $unit = $this->unit('engine');
+        $spare = collect(app(CrewEquipmentNumbers::class)->block($unit, $this->checklist($unit))['slots'])->firstWhere('slot', 'field:scba_5');
+        $this->assertTrue($spare['spare']);
+
+        $this->submit($unit, ['field:scba_5' => '2199']);
+
+        $slot = collect($this->getJson("/api/public/apparatuses/{$unit->id}/checklist")->json('equipment_numbers.slots'))->firstWhere('slot', 'field:scba_5');
+        $this->assertSame('2199', $slot['number']);
+        $this->assertTrue($slot['spare'], 'still a spare box, shown because it now holds a number');
+    }
+
     public function test_a_number_entered_on_one_checkout_is_there_for_the_next_member_on_every_type(): void
     {
         foreach (['engine' => 'field:scba_1', 'ladder1' => 'item:scba_radio/scba_radio-item-1', 'rescue' => 'item:radio_numbers/radio_numbers-item-1', 'fireboat6' => 'field:fb6-scba-id-1'] as $template => $slot) {

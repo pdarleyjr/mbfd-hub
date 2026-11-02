@@ -34,6 +34,7 @@ export function parseEquipmentNumbers(raw: unknown): EquipmentNumbers | undefine
       item_id: itemId === '' ? null : itemId,
       boxes: typeof row.boxes === 'number' && Number.isInteger(row.boxes) && row.boxes > 0 ? row.boxes : 1,
       number: text(row.number),
+      ...(row.spare === true ? { spare: true } : {}),
     }];
   });
   const extras = (Array.isArray(block.extras) ? block.extras : []).flatMap((entry): EquipmentExtra[] => {
@@ -132,6 +133,43 @@ export function slotsOnChecklist(block: EquipmentNumbers | undefined, fields: Ar
   return (block?.slots ?? []).filter(slot => (slot.field_id !== null
     ? fieldIds.has(slot.field_id)
     : compartments.some(compartment => compartment.id === slot.compartment_id && compartment.items.some(item => item.id === slot.item_id))));
+}
+
+/** What a slot holds right now in this checkout's answers. */
+export function slotValue(slot: EquipmentSlot, fieldValues: Array<{ id: string; value: ChecklistFieldValue }>, compartments: Compartment[]): string {
+  const value = slot.field_id !== null
+    ? fieldValues.find(field => field.id === slot.field_id)?.value
+    : compartments.find(compartment => compartment.id === slot.compartment_id)?.items.find(item => item.id === slot.item_id)?.value;
+
+  return typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '';
+}
+
+/** A spare pack box shows once it holds a number or the member adds it; every other box always shows. */
+export const slotIsShown = (slot: EquipmentSlot, value: string, revealed: ReadonlySet<string>): boolean => (
+  slot.spare !== true || value.trim() !== '' || revealed.has(slot.slot)
+);
+
+/** How many boxes on the screen hold a number, for the first screen's prompt. */
+export function numbersProgress(
+  block: EquipmentNumbers,
+  fields: Array<{ id: string }>,
+  compartments: Compartment[],
+  fieldValues: Array<{ id: string; value: ChecklistFieldValue }>,
+  extras: EquipmentExtra[],
+): { entered: number; total: number } {
+  let entered = 0;
+  let total = 0;
+  for (const slot of slotsOnChecklist(block, fields, compartments)) {
+    const value = slotValue(slot, fieldValues, compartments);
+    if (!slotIsShown(slot, value, new Set())) continue;
+    const boxes = boxesFor(slot, value);
+    total += boxes.length;
+    entered += boxes.filter(part => part.trim() !== '').length;
+  }
+  total += extras.length;
+  entered += extras.filter(extra => extra.number.trim() !== '').length;
+
+  return { entered, total };
 }
 
 /** The added numbers as they are sent. One left blank is not sent, which removes it. */
