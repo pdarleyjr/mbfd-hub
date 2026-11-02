@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { planColumns, priorityOf } from '../../resources/js/hub-tables/plan.js';
+import { canReusePlan, planColumns, priorityOf } from '../../resources/js/hub-tables/plan.js';
 
 const cols = count => Array.from({ length: count }, (_, i) => ({ index: i + 1, priority: i, essential: i === 0 }));
 
@@ -74,4 +74,13 @@ test('priorityOf prefers the explicit attribute', () => {
   assert.equal(priorityOf(null, 7), 7);
   assert.equal(priorityOf('', 2), 2);
   assert.equal(priorityOf('x', 4), 4);
+});
+
+test('a plan is reused only while width, screen and columns are unchanged', () => {
+  const state = { available: 800, viewport: 1280, signature: 'a|b|c' };
+  assert.equal(canReusePlan(state, { ...state }), true);
+  assert.equal(canReusePlan(undefined, state), false);
+  assert.equal(canReusePlan(state, { ...state, available: 799 }), false);
+  assert.equal(canReusePlan(state, { ...state, viewport: 1024 }), false);
+  assert.equal(canReusePlan(state, { ...state, signature: 'a|b' }), false);
 });

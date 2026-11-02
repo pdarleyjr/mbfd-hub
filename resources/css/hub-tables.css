@@ -173,6 +173,10 @@ table[data-hub-mode] .fi-ta-select { width: 100%; min-width: 0; padding: 0.25rem
 @media (pointer: coarse) {
   table[data-hub-mode] .fi-btn,
   table[data-hub-mode] .fi-icon-btn { min-width: 2.75rem; min-height: 2.75rem; }
+  /* Row checkboxes keep their visible box; the area around it (the whole selection cell) is the 44px target.
+     hub-tables.js turns a tap anywhere in that area into a tap on the checkbox. */
+  .fi-ta-table :is(td, th).fi-ta-selection-cell { min-width: 2.75rem; min-height: 2.75rem; cursor: pointer; }
+  .fi-ta-table :is(td, th).fi-ta-selection-cell > div { display: flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2.75rem; }
 }
 
 /* ---- Print and PDF keep the real table: every column, no cards, no controls ---- */
