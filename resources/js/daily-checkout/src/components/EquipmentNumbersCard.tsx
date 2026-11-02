@@ -1,7 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import { Plus } from 'lucide-react';
 import type { ChecklistFieldValue, Compartment, EquipmentExtra, EquipmentKind, EquipmentNumbers, EquipmentSlot } from '../types';
-import { MAX_EXTRA_NUMBERS, MAX_NUMBER_LENGTH, boxesFor, joinNumbers, slotsOnChecklist } from '../utils/equipmentNumbers.ts';
+import { MAX_EXTRA_NUMBERS, MAX_NUMBER_LENGTH, boxesFor, joinNumbers, slotIsShown, slotValue, slotsOnChecklist } from '../utils/equipmentNumbers.ts';
 import { createClientSubmissionId } from '../utils/storage';
 
 interface Props {
@@ -32,27 +32,32 @@ export default function EquipmentNumbersCard({ block, fields, fieldValues, compa
   // A box holding several numbers is edited one number at a time. The parts live here so typing cannot reshuffle them.
   const [parts, setParts] = useState<Record<string, string[]>>({});
   const [focusId, setFocusId] = useState<string | null>(null);
+  // Spare pack boxes the member opened with "Add another" before typing in them.
+  const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set());
 
-  const valueOf = (slot: EquipmentSlot): string => {
-    if (slot.field_id !== null) {
-      const value = fieldValues.find(field => field.id === slot.field_id)?.value;
-
-      return typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '';
-    }
-    const value = compartments.find(compartment => compartment.id === slot.compartment_id)?.items.find(item => item.id === slot.item_id)?.value;
-
-    return typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '';
-  };
+  const valueOf = (slot: EquipmentSlot): string => slotValue(slot, fieldValues, compartments);
 
   const write = (slot: EquipmentSlot, value: string) => {
     if (slot.field_id !== null) onFieldChange(slot.field_id, value);
     else if (slot.compartment_id !== null && slot.item_id !== null) onItemChange(slot.compartment_id, slot.item_id, value);
   };
 
+  // The unit's own spare box comes first; past that, a new box is added.
   const add = (kind: EquipmentKind) => {
+    const spare = slots.find(slot => slot.kind === kind && !slotIsShown(slot, valueOf(slot), revealed));
+    if (spare) {
+      setRevealed(previous => new Set([...previous, spare.slot]));
+      setFocusId(spare.slot);
+      return;
+    }
     const client_id = createClientSubmissionId();
     setFocusId(client_id);
     onExtrasChange(previous => previous.length >= MAX_EXTRA_NUMBERS ? previous : [...previous, { client_id, kind, label: null, number: '' }]);
+  };
+
+  const removeSpare = (slot: EquipmentSlot) => {
+    write(slot, '');
+    setRevealed(previous => new Set([...previous].filter(entry => entry !== slot.slot)));
   };
 
   if (slots.length === 0 && extras.length === 0) return null;
@@ -62,7 +67,7 @@ export default function EquipmentNumbersCard({ block, fields, fieldValues, compa
       <h3 id="equipment-numbers-heading" className="mb-1 font-semibold">SCBA &amp; Radio Numbers</h3>
       <p className="inspection-muted mb-3">Filled in from the last inspection of this apparatus. Change only what is different today.</p>
       {GROUPS.map((group) => {
-        const groupSlots = slots.filter(slot => slot.kind === group.kind);
+        const groupSlots = slots.filter(slot => slot.kind === group.kind && slotIsShown(slot, valueOf(slot), revealed));
         const groupExtras = extras.filter(extra => extra.kind === group.kind);
 
         return (
@@ -72,9 +77,12 @@ export default function EquipmentNumbersCard({ block, fields, fieldValues, compa
               {groupSlots.flatMap((slot) => {
                 const value = valueOf(slot);
                 if (slot.boxes <= 1) {
-                  return [<label key={slot.slot} className={LABEL}>{slot.label}
-                    <input type="text" autoComplete="off" autoCorrect="off" spellCheck={false} maxLength={MAX_NUMBER_LENGTH} className={INPUT} value={value} onChange={event => write(slot, event.target.value)} />
-                  </label>];
+                  return [<div key={slot.slot}>
+                    <label className={LABEL}>{slot.label}
+                      <input type="text" autoComplete="off" autoCorrect="off" spellCheck={false} autoFocus={focusId === slot.slot} maxLength={MAX_NUMBER_LENGTH} className={INPUT} value={value} onChange={event => write(slot, event.target.value)} />
+                    </label>
+                    {slot.spare && <button type="button" className="hub-btn hub-btn--tertiary mt-1" onClick={() => removeSpare(slot)}>Remove {slot.label}</button>}
+                  </div>];
                 }
                 const shown = parts[slot.slot] ?? boxesFor(slot, value);
 
