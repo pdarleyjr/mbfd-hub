@@ -79,7 +79,7 @@ final class RosterMemberCard
     {
         $now = CarbonImmutable::now();
         $shown = $this->freshness->pageStatus($now)->dutyDate;
-        if ($requestedDate !== null && $requestedDate !== $shown && in_array($requestedDate, $this->reader->availableDutyDates(), true)) {
+        if ($requestedDate !== null && $requestedDate !== $shown && in_array($requestedDate, $this->reader->pageDutyDates(), true)) {
             return $this->reader->forDutyDate($requestedDate);
         }
 

@@ -53,6 +53,28 @@ final class TeleStaffMailClassifier
     }
 
     /**
+     * TeleStaff's outlook mail, checked by its own rules before the 5-minute export's and only while the outlook
+     * is on. Null when the message does not claim to be an outlook day; then classify() decides as before.
+     */
+    public function classifyOutlook(InboundEmail $email): ?TeleStaffMailClassification
+    {
+        /** @var array{sender: string, subject: string, filename_pattern: string} $rules */
+        $rules = config('daily_roster.outlook.classifier');
+        $attachments = is_array($email->attachment_metadata) ? $email->attachment_metadata : [];
+        $named = array_filter($attachments, static fn (array $attachment): bool => preg_match($rules['filename_pattern'], $attachment['filename']) === 1);
+
+        if (strtolower(trim((string) $email->from_address)) !== strtolower(trim($rules['sender']))
+            || self::fold((string) $email->subject) !== self::fold($rules['subject'])
+            || $named === []) {
+            return null;
+        }
+
+        $classification = $this->classifyCandidate($email, $attachments, self::domainOf($rules['sender']), (string) config('daily_roster.classifier.authserv_id'));
+
+        return new TeleStaffMailClassification($classification->verdict, $classification->reasons, self::evidenceSummary($email));
+    }
+
+    /**
      * The transport facts the ledger keeps once the email is gone.
      *
      * @return array<string, mixed>

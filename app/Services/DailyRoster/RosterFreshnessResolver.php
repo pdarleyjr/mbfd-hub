@@ -42,7 +42,8 @@ final class RosterFreshnessResolver
         $moment = CarbonImmutable::instance($at ?? now());
         $today = $this->calendar->dutyDate($moment);
         $next = $today->addDay()->format('Y-m-d');
-        if (! RosterActiveVersion::query()->whereDate('duty_date', $next)->whereNotNull('roster_snapshot_id')->exists()) {
+        // Posted by the 5-minute export. The outlook always has the next days, so it never moves the page.
+        if (! RosterActiveVersion::query()->whereDate('duty_date', $next)->whereNotNull('roster_snapshot_id')->whereNull('source')->exists()) {
             return $this->status($moment);
         }
 
@@ -130,14 +131,17 @@ final class RosterFreshnessResolver
         }
 
         $limit = CarbonImmutable::instance($at)->subMinutes($staleAfter);
-        $lastHeard = $pointer->last_confirmed_at ?? $pointer->updated_at;
+        // An outlook covering the day is not the 5-minute export being heard from.
+        $lastHeard = $pointer->source === RosterOutlook::SOURCE ? null : ($pointer->last_confirmed_at ?? $pointer->updated_at);
         if ($lastHeard !== null && $lastHeard->greaterThanOrEqualTo($limit)) {
             return false;
         }
 
+        // Outlook mail arriving says nothing about whether the 5-minute export is still coming.
         return ! RosterImport::query()
             ->where('received_at', '>=', $limit)
             ->where('state', '!=', RosterImport::STATE_REJECTED)
+            ->whereNull('source')
             ->exists();
     }
 
@@ -155,6 +159,7 @@ final class RosterFreshnessResolver
 
         return RosterImport::query()
             ->whereIn('state', self::HELD_STATES)
+            ->whereNull('source')
             ->where(static fn ($code) => $code->whereNull('error_code')->orWhere('error_code', '!=', RosterPublisher::HOLD_PINNED))
             ->when($showing !== null, static fn ($query) => self::onlyNewerThan($query, $showing))
             ->where(static function ($query) use ($dutyDate, $start, $end): void {

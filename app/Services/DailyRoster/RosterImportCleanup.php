@@ -116,6 +116,8 @@ final class RosterImportCleanup
                 ->from('roster_imports as accepted')
                 ->whereIn('accepted.outcome', [RosterImport::OUTCOME_PUBLISHED, RosterImport::OUTCOME_CONFIRMED])
                 ->whereIn('accepted.state', [RosterImport::STATE_VERIFIED, RosterImport::STATE_DUPLICATE, RosterImport::STATE_CLEANED])
+                // Only the same feed overtakes: an accepted outlook says nothing about a held 5-minute export.
+                ->whereRaw("coalesce(accepted.source, '') = coalesce(roster_imports.source, '')")
                 ->where(static fn ($later) => $later
                     ->where(static fn ($read) => $read
                         ->whereColumn('accepted.duty_date', 'roster_imports.duty_date')

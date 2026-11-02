@@ -25,6 +25,22 @@ return [
         'authserv_id' => 'mx.cloudflare.net',
     ],
 
+    // TeleStaff's 7-day outlook: seven one-day emails four times a day (docs/operations/telestaff-roster-outlook.md).
+    // off: that mail is classified exactly as before. shadow: parse and check, never publish. publish: fill the
+    // next days; needs mode publish too. A 5-minute export always wins over the outlook for its date.
+    'outlook' => [
+        'mode' => env('DAILY_ROSTER_OUTLOOK_MODE', 'off'),
+        'classifier' => [
+            'sender' => env('DAILY_ROSTER_OUTLOOK_SENDER', 'donotreply@miamibeachfl.gov'),
+            'subject' => env('DAILY_ROSTER_OUTLOOK_SUBJECT', 'Roster Report'),
+            'filename_pattern' => '/\ARoster_Day_[1-7]\.xlsx\z/i',
+        ],
+        // How many days after its export time an outlook day may fall. Day_7 is six days after Day_1.
+        'max_days_ahead' => 7,
+        // TeleStaff sends every six hours or so, so an outlook older than this says so on the page.
+        'stale_after_hours' => 7,
+    ],
+
     'workbook' => [
         'sheet' => 'Roster Report',
         'division' => 'Suppression/Rescue',
