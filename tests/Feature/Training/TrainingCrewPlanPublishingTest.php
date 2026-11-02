@@ -353,7 +353,10 @@ final class TrainingCrewPlanPublishingTest extends TestCase
         $this->send($component, [TrainingCrewPlanPublisher::DEPARTMENT])->assertHasNoErrors();
         self::assertTrue(DepartmentUpdate::query()->sole()->expires_at->between(now(), now()->addDays(2)));
 
-        $component->set('scheduleDate', '2027-09-01')->set('confirmReview', true);
+        DailyRosterSnapshotFactory::publish('2027-09-01', ['Station 9 / Engine 9' => [
+            ['employee_id' => '90001', 'name' => 'Synthetic 90001', 'code' => 'SP', 'availability' => RosterAssignment::AVAILABILITY_WORKING],
+        ]], ['shift' => 'B']);
+        $component->set('scheduleDate', '2027-09-01')->assertHasNoErrors()->set('confirmReview', true);
         $this->send($component, [TrainingCrewPlanPublisher::DEPARTMENT])->assertHasNoErrors();
         self::assertTrue(DepartmentUpdate::query()->latest('id')->first()->expires_at->lt(now()->addDays(120)));
     }
@@ -399,7 +402,7 @@ final class TrainingCrewPlanPublishingTest extends TestCase
         $admin = $this->superAdmin();
         $this->actingAs($admin);
         $component = Livewire::test(TrainingCrewPlanner::class)->set('classTitle', 'Synthetic ladder drill')->assertHasNoErrors();
-        $component->assertSee('3 eligible')->call('toggleMember', $this->employees['90001']->id)->assertHasNoErrors();
+        $component->assertSee('3 on duty')->call('toggleMember', $this->employees['90001']->id)->assertHasNoErrors();
         $this->send($component, [TrainingCrewPlanPublisher::COMMAND_300])->assertHasNoErrors();
         self::assertSame(0, TrainingCourse::query()->count());
         self::assertStringContainsString('Synthetic ladder drill', CommandCommunicationPost::query()->sole()->body);
