@@ -1178,7 +1178,7 @@ export default function InspectionWizard() {
         <button type="button" className="px-3" aria-label={memberStepLabel} aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => changeStep('officer')}><Users size={20} aria-hidden="true" />Member</button>
         <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Readings · Optional'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => changeStep(isV2Checklist ? 'details' : 'meter')}><Gauge size={20} aria-hidden="true" /><span>{isV2Checklist ? 'Details' : <>Readings <small>Optional</small></>}</span></button>
         {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-label="Checklist details" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => changeStep('details')}><ClipboardList size={20} aria-hidden="true" />Details</button>}
-        <button type="button" className="px-3" aria-label="SCBA, radio numbers and notes" aria-current={currentStep === 'notes' ? 'page' : undefined} onClick={() => changeStep('notes')}><StickyNote size={20} aria-hidden="true" />SCBA &amp; Notes{concerns.length > 0 ? ` (${concerns.length})` : ''}</button>
+        <button type="button" className="px-3" aria-label="SCBA, radio numbers and notes" aria-current={currentStep === 'notes' ? 'page' : undefined} onClick={() => changeStep('notes')}><StickyNote size={20} aria-hidden="true" /><span>SCBA <small>&amp; Notes{concerns.length > 0 ? ` (${concerns.length})` : ''}</small></span></button>
       </nav>
 
       {currentStep === 'officer' && (
