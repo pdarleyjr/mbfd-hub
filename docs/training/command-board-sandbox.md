@@ -81,7 +81,7 @@ Optional `--built-at <ISO date>` records the build time (default: now). The comm
    nested folders, any other root file (so build with `manifest: false` and no copied `public/` files), an `index.html`
    with an inline script, a `<base>`, frames or forms, or asset URLs that are not plain paths under
    `/training-tools/command-board/assets/`, any asset the page refers to that is missing, and any file containing a
-   forbidden marker: `/api/`, `new WebSocket(`, `sendBeacon`, `maps.googleapis.com`, `cmd.mbfdhub.com`,
+   forbidden marker: `/api/`, `new WebSocket(`, `.sendBeacon(` (a call; the runtime guard that replaces it is allowed), `maps.googleapis.com`, `cmd.mbfdhub.com`,
    `navigator.serviceWorker`.
 2. Copies `index.html` to `resources/training-tools/command-board/` and the assets to
    `public/training-tools/command-board/assets/`, removing earlier assets that are not in the new build (only inside that
@@ -118,7 +118,7 @@ loaded chunk of the old build would 404. The page needs a reload after an update
 
 | Guarantee | Layers that enforce it | Evidence |
 | --- | --- | --- |
-| The sandbox cannot send data anywhere | Build rules: no `/api/`, `WebSocket`, `sendBeacon`, map host or `cmd.mbfdhub.com` in any file. Browser: `connect-src 'none'` (no fetch, XHR, WebSocket, EventSource, beacon), `form-action 'none'`, `default-src 'none'`. | `tests/Node/command-board-sandbox-vendoring.test.mjs` (every marker in every file type is refused; the committed bundle is re-hashed and scanned), `CommandBoardSandboxRouteTest::test_an_ordinary_firefighter_gets_the_page...` (exact header) |
+| The sandbox cannot send data anywhere | Build rules: no `/api/`, `WebSocket`, `.sendBeacon(` calls, map host or `cmd.mbfdhub.com` in any file. Browser: `connect-src 'none'` (no fetch, XHR, WebSocket, EventSource, beacon), `form-action 'none'`, `default-src 'none'`. | `tests/Node/command-board-sandbox-vendoring.test.mjs` (every marker in every file type is refused; the committed bundle is re-hashed and scanned), `CommandBoardSandboxRouteTest::test_an_ordinary_firefighter_gets_the_page...` (exact header) |
 | It cannot run code that was not vendored | `script-src 'self'` (no inline script, no `eval`), `worker-src 'none'`, `base-uri 'none'`, no frames or objects (`default-src 'none'`), inline scripts refused at vendoring | vendoring test (inline script, outside script, `<base>`, form, handler cases), route test |
 | It cannot be framed or embedded | `frame-ancestors 'none'` | exact-header assertion |
 | It cannot register a service worker or install | `worker-src 'none'`, `manifest-src 'none'`, no worker files accepted, `navigator.serviceWorker` is a forbidden marker. The Hub's root `/sw.js` has no `fetch` handler, so it intercepts and caches nothing here. | vendoring test; `docs/pwa-service-worker-architecture.md` section 1.1 (R1, "No `fetch` handler") |

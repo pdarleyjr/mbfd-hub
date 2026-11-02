@@ -153,7 +153,7 @@ test('a build with anything unexpected is refused and nothing is written', () =>
 
 test('every forbidden marker in any file refuses the build', () => {
   assert.deepEqual([...FORBIDDEN_MARKERS].sort(), [
-    '/api/', 'cmd.mbfdhub.com', 'maps.googleapis.com', 'navigator.serviceWorker', 'new WebSocket(', 'sendBeacon',
+    '/api/', 'cmd.mbfdhub.com', 'maps.googleapis.com', 'navigator.serviceWorker', 'new WebSocket(', '.sendBeacon(',
   ].sort());
 
   for (const marker of FORBIDDEN_MARKERS) {
@@ -234,7 +234,7 @@ test('verification catches a changed file, an unlisted file, a missing file and 
     assert.match(verifyVendored(dirs.repo).problems.join('\n'), /source maps are not allowed/);
     rmSync(join(dirs.repo, ASSET_DIRECTORY, 'index-DqK3p9Lx.js.map'));
 
-    writeFileSync(js, `${original.toString('utf8')}// sendBeacon\n`);
+    writeFileSync(js, `${original.toString('utf8')}navigator.sendBeacon(1)\n`);
     const manifestPath = join(dirs.repo, HTML_DIRECTORY, MANIFEST_NAME);
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const entry = manifest.files.find((file) => file.path.endsWith('.js'));

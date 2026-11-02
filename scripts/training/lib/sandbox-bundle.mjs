@@ -27,7 +27,7 @@ const TEXT_EXTENSIONS = new Set(['js', 'css', 'svg', 'html']);
 export const FORBIDDEN_MARKERS = [
   '/api/',
   'new WebSocket(',
-  'sendBeacon',
+  '.sendBeacon(',
   'maps.googleapis.com',
   'cmd.mbfdhub.com',
   'navigator.serviceWorker',
