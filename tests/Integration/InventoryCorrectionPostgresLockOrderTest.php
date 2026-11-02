@@ -85,6 +85,7 @@ final class InventoryCorrectionPostgresLockOrderTest extends TestCase
                 DB::table('inspection_notification_deliveries')->where('event_key', 'like', 'correction:'.$id.':%')->delete();
             }
             DB::table('apparatus_inventory_correction_events')->whereIn('apparatus_inventory_correction_id', $correctionIds)->delete();
+            DB::table('apparatus_inventory_correction_participants')->whereIn('apparatus_inventory_correction_id', $correctionIds)->delete();
             DB::table('apparatus_inventory_corrections')->whereIn('id', $correctionIds)->delete();
             if ($inspection !== null) {
                 DB::table('apparatus_inspections')->where('id', $inspection->id)->delete();
