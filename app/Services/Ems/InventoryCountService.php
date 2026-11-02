@@ -88,46 +88,56 @@ final class InventoryCountService
             $this->ledger->lock();
             $through = $this->ledger->maxMovementId();
             $snapshot = $this->draft($snapshotId);
-            $items = SupplyItem::query()->with('location:id,code')->whereIn('id', collect($data['lines'])->pluck('supply_item_id')->all())->get()->keyBy('id');
-
-            foreach ($data['lines'] as $row) {
-                $item = $items->get((int) $row['supply_item_id']);
-                if ($item === null || ! $item->tracksStock()) {
-                    throw new EmsException('One of those items is not counted in the supply room (controlled substances and inactive items are not tracked).', 'item_not_counted', 422);
-                }
-                if ($snapshot->scope_location_code !== null && $item->location?->code !== $snapshot->scope_location_code) {
-                    throw new EmsException("\"{$item->name}\" is not in location {$snapshot->scope_location_code}.", 'wrong_location', 422);
-                }
-                $entry = array_filter(
-                    ['cases' => $row['cases'] ?? null, 'boxes' => $row['boxes'] ?? null, 'each' => $row['each'] ?? null],
-                    fn ($value): bool => $value !== null,
-                );
-                $existing = InventorySnapshotLine::query()->where('snapshot_id', $snapshot->getKey())->where('supply_item_id', $item->getKey())->first();
-                if ($entry === []) { // nothing typed: the line is cleared; a typed 0 is a real count of zero
-                    $existing?->delete();
-
-                    continue;
-                }
-                $converted = self::convertEntry($item, $entry);
-                if ($converted['quantity'] !== null) {
-                    StockLedger::assertWithinLimit($converted['quantity']);
-                }
-                // Re-sending an unchanged entry (a draft autosave) must not move its baseline forward.
-                $unchanged = $existing !== null && ($existing->entry ?? []) == $entry && $existing->through_movement_id !== null;
-                InventorySnapshotLine::query()->updateOrCreate(
-                    ['snapshot_id' => $snapshot->getKey(), 'supply_item_id' => $item->getKey()],
-                    [
-                        'location_code' => $item->location?->code, 'item_name' => $item->name,
-                        'quantity_base' => $converted['quantity'], 'entry' => $entry,
-                        'value_source' => $converted['quantity'] === null ? InventorySnapshotLine::NOT_COUNTED : InventorySnapshotLine::COUNTED,
-                        'warnings' => $converted['warnings'] === [] ? null : $converted['warnings'],
-                        'through_movement_id' => $unchanged ? $existing->through_movement_id : $through,
-                    ],
-                );
-            }
+            $this->writeLines($snapshot, array_values($data['lines']), $through);
 
             return $this->presenter->detail($snapshot->fresh(), withItems: true);
         });
+    }
+
+    /**
+     * Save typed lines into a draft. The caller holds the stock lock and says which movements already existed.
+     *
+     * @param  list<array<string, mixed>>  $lines  {supply_item_id, cases?, boxes?, each?}
+     */
+    public function writeLines(InventorySnapshot $snapshot, array $lines, int $through): void
+    {
+        $items = SupplyItem::query()->with('location:id,code')->whereIn('id', collect($lines)->pluck('supply_item_id')->all())->get()->keyBy('id');
+
+        foreach ($lines as $row) {
+            $item = $items->get((int) $row['supply_item_id']);
+            if ($item === null || ! $item->tracksStock()) {
+                throw new EmsException('One of those items is not counted in the supply room (controlled substances and inactive items are not tracked).', 'item_not_counted', 422);
+            }
+            if ($snapshot->scope_location_code !== null && $item->location?->code !== $snapshot->scope_location_code) {
+                throw new EmsException("\"{$item->name}\" is not in location {$snapshot->scope_location_code}.", 'wrong_location', 422);
+            }
+            $entry = array_filter(
+                ['cases' => $row['cases'] ?? null, 'boxes' => $row['boxes'] ?? null, 'each' => $row['each'] ?? null],
+                fn ($value): bool => $value !== null,
+            );
+            $existing = InventorySnapshotLine::query()->where('snapshot_id', $snapshot->getKey())->where('supply_item_id', $item->getKey())->first();
+            if ($entry === []) { // nothing typed: the line is cleared; a typed 0 is a real count of zero
+                $existing?->delete();
+
+                continue;
+            }
+            $converted = self::convertEntry($item, $entry);
+            if ($converted['quantity'] !== null) {
+                StockLedger::assertWithinLimit($converted['quantity']);
+            }
+            // Re-sending an unchanged entry (a draft autosave) must not move its baseline forward.
+            $unchanged = $existing !== null && ($existing->entry ?? []) == $entry && $existing->through_movement_id !== null;
+            InventorySnapshotLine::query()->updateOrCreate(
+                ['snapshot_id' => $snapshot->getKey(), 'supply_item_id' => $item->getKey()],
+                [
+                    'location_code' => $item->location?->code, 'item_name' => $item->name,
+                    'quantity_base' => $converted['quantity'], 'entry' => $entry,
+                    'value_source' => $converted['quantity'] === null ? InventorySnapshotLine::NOT_COUNTED : InventorySnapshotLine::COUNTED,
+                    'warnings' => $converted['warnings'] === [] ? null : $converted['warnings'],
+                    'through_movement_id' => $unchanged ? $existing->through_movement_id : $through,
+                ],
+            );
+        }
     }
 
     /** @return array{result: array<string, mixed>, replayed: bool} */
@@ -138,23 +148,112 @@ final class InventoryCountService
         return $this->idempotency->run($user, "ems.count.finalize.{$snapshotId}", $key, function () use ($snapshotId, $user): array {
             $this->ledger->lock();
             $snapshot = $this->draft($snapshotId);
-            if (! $snapshot->lines()->whereNotNull('quantity_base')->exists()) {
-                throw new EmsException('Nothing has been counted yet. Enter at least one count before you finalize.', 'empty_count', 422);
-            }
-            $previous = InventorySnapshot::query()->where('status', InventorySnapshot::FINAL)->orderByDesc('version')->first();
-            $actor = EmsActor::forUser($user, 'captain5');
-
-            $snapshot->update([
-                'status' => InventorySnapshot::FINAL,
-                'version' => (int) InventorySnapshot::query()->max('version') + 1,
-                'finalized_by_user_id' => $user->getKey(), 'finalized_name' => $actor->name,
-                'finalized_at' => now(), 'cutoff_at' => now(),
-                'through_movement_id' => $this->ledger->maxMovementId(),
-                'previous_snapshot_id' => $previous?->getKey(),
-            ]);
+            $this->close($snapshot, $user);
 
             return $this->presenter->detail($snapshot->fresh(), withItems: false);
         });
+    }
+
+    /**
+     * Make a draft final. Every item in scope gets a line: counted items carry the numbers and the order worked
+     * out from them, uncounted items are recorded as not counted and keep their stock. Everything a report
+     * shows is stamped here, so it never changes when an item is renamed, moved or reconfigured later.
+     * The caller holds the stock lock.
+     */
+    public function close(InventorySnapshot $snapshot, User $user): void
+    {
+        if (! $snapshot->lines()->whereNotNull('quantity_base')->exists()) {
+            throw new EmsException('Nothing has been counted yet. Enter at least one count before you finalize.', 'empty_count', 422);
+        }
+        $items = SupplyItem::query()->with('location:id,code')->where('active', true)->where('controlled_substance', false)
+            ->when($snapshot->scope_location_code !== null, fn ($query) => $query->whereHas('location', fn ($l) => $l->where('code', $snapshot->scope_location_code)))
+            ->get()->keyBy('id');
+        $lines = $snapshot->lines()->get()->keyBy('supply_item_id');
+        $items = $items->union(SupplyItem::query()->with('location:id,code')->whereIn('id', $lines->keys()->diff($items->keys())->all())->get()->keyBy('id'));
+        $current = $this->ledger->current($items->values());
+        $later = $this->ledger->movementSums($lines->filter(fn (InventorySnapshotLine $line): bool => $line->quantity_base !== null)
+            ->map(fn (InventorySnapshotLine $line): int => (int) $line->through_movement_id)->all());
+
+        $counted = 0;
+        $orders = 0;
+        foreach ($items as $id => $item) {
+            $line = $lines->get($id);
+            $number = $line?->quantity_base;
+            // What the books said when the shelf was counted, not counting anything that moved after it was typed.
+            $since = $later[$id] ?? ['issued' => 0, 'received' => 0, 'adjusted' => 0];
+            $book = $current[$id]['quantity'] ?? null;
+            $stamp = CountMath::stamp($item, $number, $book === null ? null : $book - $since['issued'] - $since['received'] - $since['adjusted']);
+            if ($line !== null) {
+                $line->update($stamp + ['item_name' => $item->name, 'location_code' => $item->location?->code]);
+            } else {
+                InventorySnapshotLine::query()->create($stamp + [
+                    'snapshot_id' => $snapshot->getKey(), 'supply_item_id' => $id, 'location_code' => $item->location?->code,
+                    'item_name' => $item->name, 'quantity_base' => null, 'value_source' => InventorySnapshotLine::NOT_COUNTED,
+                ]);
+            }
+            $counted += $number !== null ? 1 : 0;
+            $orders += (int) ($stamp['order_qty_base'] ?? 0) > 0 ? 1 : 0;
+        }
+
+        $this->seal($snapshot, $user, $counted, $items->count() - $counted, $orders);
+    }
+
+    /**
+     * One on-hand number typed directly on the master inventory: a newly verified physical count of one item,
+     * so it replaces that item's baseline and clears its deductions without touching any other item.
+     * The caller holds the stock lock.
+     */
+    public function recordDirectCount(SupplyItem $item, int $typed, User $user): InventorySnapshot
+    {
+        if (! $item->tracksStock()) {
+            throw new EmsException('This item is not counted in the supply room.', 'item_not_counted', 422);
+        }
+        CountMath::assertConvertible($item);
+        $base = CountMath::toBase($item, $typed);
+        StockLedger::assertWithinLimit($base);
+        $item->loadMissing('location:id,code');
+        $book = $this->ledger->current(collect([$item]))[$item->getKey()]['quantity'] ?? null;
+
+        // This number is newer than anything typed into a count still open, so that line must not outrank it at submit.
+        InventorySnapshotLine::query()->where('supply_item_id', $item->getKey())
+            ->whereIn('snapshot_id', InventorySnapshot::query()->where('status', InventorySnapshot::DRAFT)->select('id'))
+            ->get()->each(fn (InventorySnapshotLine $line) => $line->delete());
+
+        $snapshot = InventorySnapshot::query()->create([
+            'uuid' => (string) Str::uuid(), 'kind' => InventorySnapshot::KIND_COUNT, 'origin' => InventorySnapshot::ORIGIN_DIRECT_EDIT, 'status' => InventorySnapshot::DRAFT,
+            'started_by_user_id' => $user->getKey(), 'started_at' => now(),
+        ]);
+        $stamp = CountMath::stamp($item, $base, $book);
+        InventorySnapshotLine::query()->create($stamp + [
+            'snapshot_id' => $snapshot->getKey(), 'supply_item_id' => $item->getKey(), 'location_code' => $item->location?->code,
+            'item_name' => $item->name, 'quantity_base' => $base, 'entry' => CountMath::entryFor($item, $typed),
+            'value_source' => InventorySnapshotLine::COUNTED, 'through_movement_id' => $this->ledger->maxMovementId(),
+        ]);
+        $this->seal($snapshot, $user, 1, 0, (int) ($stamp['order_qty_base'] ?? 0) > 0 ? 1 : 0);
+
+        return $snapshot;
+    }
+
+    private function seal(InventorySnapshot $snapshot, User $user, int $counted, int $uncounted, int $orders): void
+    {
+        $previous = InventorySnapshot::query()->where('status', InventorySnapshot::FINAL)->orderByDesc('version')->first();
+        $actor = EmsActor::forUser($user, 'captain5');
+
+        $snapshot->update([
+            'status' => InventorySnapshot::FINAL,
+            'version' => (int) InventorySnapshot::query()->max('version') + 1,
+            'finalized_by_user_id' => $user->getKey(), 'finalized_name' => $actor->name,
+            'finalized_at' => now(), 'cutoff_at' => now(),
+            'through_movement_id' => $this->ledger->maxMovementId(),
+            'previous_snapshot_id' => $previous?->getKey(),
+            'counted_items' => $counted, 'uncounted_items' => $uncounted, 'order_items' => $orders,
+        ]);
+    }
+
+    /** A draft count, locked for the rest of the transaction. */
+    public function lockDraft(int $snapshotId): InventorySnapshot
+    {
+        return $this->draft($snapshotId);
     }
 
     /** Throw away a draft nobody wants (a final snapshot can never be deleted). */

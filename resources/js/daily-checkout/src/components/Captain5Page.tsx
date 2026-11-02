@@ -11,18 +11,17 @@ import HistoryTab from './captain5/HistoryTab';
 import InspectionSheet from './captain5/InspectionSheet';
 import IssueSheet from './captain5/IssueSheet';
 import IssuesTab from './captain5/IssuesTab';
-import ReplacementsTab from './captain5/ReplacementsTab';
 import TodayTab from './captain5/TodayTab';
 import TruckChangesTab from './captain5/TruckChangesTab';
 import VehicleIdentificationPanel from './VehicleIdentificationPanel';
 import VehicleIdentificationCard from './VehicleIdentificationCard';
-import RescueInventoryTab, { type RescueView } from './captain5/ems/RescueInventoryTab';
-import SupplyRoomTab, { isSupplyView, type SupplyView } from './captain5/ems/SupplyRoomTab';
+import SubmittedFormsTab from './captain5/ems/forms/SubmittedFormsTab';
+import MasterInventoryTab from './captain5/ems/master/MasterInventoryTab';
 import { useEmsAccess, useOpenRequestCount } from './captain5/ems/useEmsAccess';
 import NarcoticsTab from './captain5/narcotics/NarcoticsTab';
 import { useNarcoticsInbox } from './captain5/narcotics/useNarcoticsInbox';
 import { isKindFilter, isQueueFilter, type KindFilter, type QueueFilter } from './captain5/filters';
-import { dutyLine, dutyTone, isReplacementTracked } from './captain5/format';
+import { dutyLine, dutyTone } from './captain5/format';
 import type { Workspace } from './captain5/types';
 import { useWorkspace } from './captain5/useWorkspace';
 import DepartmentUpdatesPanel from './department-updates/DepartmentUpdatesPanel';
@@ -30,9 +29,9 @@ import Tabs, { type TabItem } from './ui/Tabs';
 import Tag from './ui/Tag';
 import { LoadError, SkeletonRows } from './ui/StateViews';
 
-type TabId = 'today' | 'issues' | 'replacements' | 'trucks' | 'rescue' | 'supply' | 'narcotics' | 'messages' | 'updates' | 'history';
+type TabId = 'today' | 'issues' | 'trucks' | 'rescue' | 'supply' | 'narcotics' | 'messages' | 'updates' | 'history';
 
-const TAB_IDS: TabId[] = ['today', 'issues', 'replacements', 'trucks', 'rescue', 'supply', 'narcotics', 'messages', 'updates', 'history'];
+const TAB_IDS: TabId[] = ['today', 'issues', 'trucks', 'rescue', 'supply', 'narcotics', 'messages', 'updates', 'history'];
 const isTab = (value: string | null): value is TabId => TAB_IDS.includes(value as TabId);
 const isEmsTab = (value: string | null): boolean => value === 'rescue' || value === 'supply';
 const positiveInt = (value: string | null): number | null => (value !== null && /^\d{1,12}$/.test(value) && Number(value) > 0 ? Number(value) : null);
@@ -42,15 +41,13 @@ interface EmsTabs { show: boolean; openRequests: number }
 interface NarcoticsTabState { show: boolean; pending: number }
 
 function tabsFor(workspace: Workspace, unread: number, ems: EmsTabs, narcotics: NarcoticsTabState): Array<TabItem<TabId>> {
-  const tracked = workspace.issues.filter(isReplacementTracked).length;
   return [
     { id: 'today', label: 'Today' },
     { id: 'issues', label: 'Issues', badge: workspace.counts.open, badgeLabel: 'open issues' },
-    { id: 'replacements', label: 'Replacements', badge: tracked, badgeLabel: 'in progress' },
     { id: 'trucks', label: 'Truck Changes', badge: workspace.rescue_truck_changes.filter((change) => change.recent).length, badgeLabel: 'Rescue truck changes in the last 24 hours' },
     ...(ems.show ? [
-      { id: 'rescue' as const, label: 'Rescue Inventory', badge: ems.openRequests, badgeLabel: 'open requests' },
-      { id: 'supply' as const, label: 'Supply Room' },
+      { id: 'rescue' as const, label: 'Submitted Inventory Forms', badge: ems.openRequests, badgeLabel: 'forms waiting' },
+      { id: 'supply' as const, label: 'Master Supply Room Inventory' },
     ] : []),
     ...(narcotics.show ? [{ id: 'narcotics' as const, label: 'Narcotics Checks', badge: narcotics.pending, badgeLabel: 'checks to review' }] : []),
     { id: 'messages', label: 'Messages', badge: unread, badgeLabel: 'unread messages' },
@@ -95,9 +92,7 @@ export default function Captain5Page() {
   const checkId = checkParam !== null && UUID.test(checkParam) ? checkParam.toLowerCase() : null;
   const requestParam = searchParams.get('request');
   const requestId = requestParam !== null && UUID.test(requestParam) ? requestParam.toLowerCase() : null;
-  const rescueView: RescueView = searchParams.get('view') === 'stats' ? 'stats' : 'requests';
-  const sectionParam = searchParams.get('section');
-  const supplyView: SupplyView = isSupplyView(sectionParam) ? sectionParam : 'stock';
+  const counting = searchParams.get('count') === '1';
   const queue: QueueFilter = isQueueFilter(searchParams.get('filter')) ? searchParams.get('filter') as QueueFilter : 'all';
   const kind: KindFilter = isKindFilter(searchParams.get('kind')) ? searchParams.get('kind') as KindFilter : 'all';
 
@@ -151,15 +146,13 @@ export default function Captain5Page() {
 
   const renderEms = (id: 'rescue' | 'supply') => {
     if (ems.status === 'loading') return <SkeletonRows rows={4} />;
-    if (ems.status === 'error') return <LoadError title={id === 'rescue' ? 'Rescue Inventory could not be loaded' : 'The Supply Room could not be loaded'} message={ems.error} onRetry={ems.reload} />;
+    if (ems.status === 'error') return <LoadError title={id === 'rescue' ? 'Submitted Inventory Forms could not be loaded' : 'The Master Supply Room Inventory could not be loaded'} message={ems.error} onRetry={ems.reload} />;
     if (ems.status !== 'ready') return null;
     return id === 'rescue'
       ? (
-        <RescueInventoryTab
+        <SubmittedFormsTab
           meta={ems.meta}
           requestId={requestId}
-          view={rescueView}
-          onView={(next) => update({ view: next === 'stats' ? 'stats' : null, request: null })}
           onOpenRequest={openRequest}
           onCloseRequest={closeRequest}
           tick={openRequests.tick}
@@ -167,7 +160,7 @@ export default function Captain5Page() {
           onForbidden={ems.deny}
         />
       )
-      : <SupplyRoomTab meta={ems.meta} view={supplyView} onView={(next) => update({ section: next === 'stock' ? null : next })} onForbidden={ems.deny} />;
+      : <MasterInventoryTab meta={ems.meta} counting={counting} onCounting={(open) => update({ count: open ? '1' : null }, open)} onForbidden={ems.deny} />;
   };
 
   const renderPanel = (id: TabId) => {
@@ -176,8 +169,6 @@ export default function Captain5Page() {
         return <TodayTab workspace={data} onFilter={(next) => update({ tab: 'issues', filter: next, kind: null })} onOpenInspection={setInspectionId} onHandoff={(handoff) => ws.patch({ handoff })} />;
       case 'issues':
         return <IssuesTab workspace={data} queue={queue} kind={kind} targetIssueId={issueId} onFilter={(nextQueue, nextKind) => update({ filter: nextQueue, kind: nextKind })} onOpen={openIssue} onChanged={changed} />;
-      case 'replacements':
-        return <ReplacementsTab issues={data.issues} onOpen={openIssue} />;
       case 'trucks':
         return <TruckChangesTab trucks={data.rescue_trucks} changes={data.rescue_truck_changes} />;
       case 'rescue':

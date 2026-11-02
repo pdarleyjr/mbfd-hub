@@ -26,6 +26,9 @@ final class EmsLabels
         InventoryRequest::ISSUED => 'Issued',
         InventoryRequest::CLOSED => 'Closed',
         InventoryRequest::CANCELLED => 'Cancelled',
+        InventoryRequest::RETURNED => 'Needs correction',
+        InventoryRequest::RECONCILED => 'Reconciled',
+        InventoryRequest::SUPERSEDED => 'Replaced by a correction',
     ];
 
     public const STATUS_COLOR = [
@@ -36,6 +39,9 @@ final class EmsLabels
         InventoryRequest::ISSUED => 'success',
         InventoryRequest::CLOSED => 'gray',
         InventoryRequest::CANCELLED => 'gray',
+        InventoryRequest::RETURNED => 'warning',
+        InventoryRequest::RECONCILED => 'success',
+        InventoryRequest::SUPERSEDED => 'gray',
     ];
 
     public const LINE_STATUS = [

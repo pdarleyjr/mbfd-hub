@@ -107,6 +107,7 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Pages\LogisticsBoard::class,
                 Captain5Operations::class,
                 \App\Filament\Admin\Pages\MedicalSupplyRoom::class,
+                \App\Filament\Admin\Pages\SubmittedMedicalSupplyRoomInventory::class,
                 \App\Filament\Admin\Pages\MedicalDataStatistics::class,
                 CommandCommunications::class,
                 EmailCenter::class,

@@ -28,7 +28,12 @@ final class RequestPresenter
         InventoryRequest::ISSUED => 'Issued',
         InventoryRequest::CLOSED => 'Closed',
         InventoryRequest::CANCELLED => 'Cancelled',
+        InventoryRequest::RETURNED => 'Needs correction',
+        InventoryRequest::RECONCILED => 'Reconciled',
+        InventoryRequest::SUPERSEDED => 'Replaced by a correction',
     ];
+
+    private const ITEM_PREVIEW_COUNT = 3;
 
     private const LINE_LABELS = [
         InventoryRequestLine::OPEN => 'Waiting',
@@ -65,6 +70,39 @@ final class RequestPresenter
             'has_note' => trim((string) $request->member_note) !== '',
             'last_activity_at' => $request->last_activity_at?->toIso8601String(),
             'closed_at' => $request->closed_at?->toIso8601String(),
+            'return_reason' => $request->return_reason,
+            'returned_at' => $request->returned_at?->toIso8601String(),
+            'returned_by' => $request->returned_by_name,
+            'revision_number' => $request->revision_number,
+            'can_revise' => $this->canRevise($request),
+        ];
+    }
+
+    /**
+     * A row on Submitted Inventory Forms. Load the `lines` relation first: the list has at most a page of rows.
+     *
+     * @return array<string, mixed>
+     */
+    public function staffSummary(InventoryRequest $request): array
+    {
+        $lines = $request->relationLoaded('lines') ? $request->lines : $request->lines()->get();
+        $wanted = $lines->filter(fn (InventoryRequestLine $line): bool => $line->wantedQty() > 0)->values();
+        $issued = $lines->sum('issued_qty') > 0;
+        $workable = in_array($request->status, InventoryRequest::WORKABLE_STATUSES, true) && ! $issued;
+
+        return $this->summary($request) + [
+            'acknowledged' => $request->isAcknowledged(),
+            'acknowledged_at' => $request->reviewed_at?->toIso8601String(),
+            'acknowledged_by' => $request->reviewed_by_name,
+            'can_acknowledge' => $workable && ! $request->isAcknowledged(),
+            'can_reject' => $workable,
+            'can_reconcile' => $workable && $request->isAcknowledged(),
+            'reconciled_at' => $request->reconciled_at?->toIso8601String(),
+            'reconciled_by' => $request->reconciled_by_name,
+            'items_preview' => $wanted->take(self::ITEM_PREVIEW_COUNT)->map(fn (InventoryRequestLine $line): array => [
+                'label' => $line->label, 'quantity' => $line->isYesNo() ? null : $line->requested_qty, 'unit' => $line->unit,
+            ])->all(),
+            'quantity_total' => (int) $wanted->sum(fn (InventoryRequestLine $line): int => (int) $line->requested_qty),
         ];
     }
 
@@ -74,7 +112,7 @@ final class RequestPresenter
         $request->loadMissing(['lines', 'events', 'messages']);
         $staff = $audience === self::AUDIENCE_STAFF;
 
-        $data = $this->summary($request) + [
+        $data = ($staff ? $this->staffSummary($request) : $this->summary($request)) + [
             'member_note' => $request->member_note,
             'lines' => $this->lines($request->lines, $staff),
             'history' => $this->history($request->events, $staff),
@@ -82,6 +120,8 @@ final class RequestPresenter
             'close_reason' => $request->close_reason,
             'cancel_reason' => $request->cancel_reason,
             'files_copy' => $this->filesCopy($request, $withUrls && ! $staff),
+            'revision_of' => $request->revision_of_request_id !== null ? InventoryRequest::query()->whereKey($request->revision_of_request_id)->value('uuid') : null,
+            'replaced_by' => InventoryRequest::query()->where('revision_of_request_id', $request->getKey())->value('uuid'),
         ];
 
         if ($staff) {
@@ -91,6 +131,7 @@ final class RequestPresenter
                 'source_form_versions' => $request->source_form_versions,
                 'snapshot_sha256' => $request->snapshot_sha256,
                 'reviewed_at' => $request->reviewed_at?->toIso8601String(),
+                'revisions' => $this->revisions($request),
             ];
         } else {
             $data['can_cancel'] = $this->memberCanCancel($request);
@@ -103,8 +144,35 @@ final class RequestPresenter
     {
         $request->loadMissing('lines');
 
-        return in_array($request->status, [InventoryRequest::SUBMITTED, InventoryRequest::REVIEWED, InventoryRequest::PREPARED], true)
+        return in_array($request->status, [InventoryRequest::SUBMITTED, InventoryRequest::REVIEWED, InventoryRequest::PREPARED, InventoryRequest::RETURNED], true)
             && $request->lines->sum('issued_qty') === 0;
+    }
+
+    private function canRevise(InventoryRequest $request): bool
+    {
+        return $request->status === InventoryRequest::RETURNED;
+    }
+
+    /**
+     * Every version of this form, oldest first. Chains are short: one row per correction.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function revisions(InventoryRequest $request): array
+    {
+        $chain = collect([$request]);
+        for ($older = $request->revisionOf; $older !== null; $older = $older->revisionOf) {
+            $chain->prepend($older);
+        }
+        for ($newer = $request->replacedBy; $newer !== null; $newer = $newer->replacedBy) {
+            $chain->push($newer);
+        }
+
+        return $chain->map(fn (InventoryRequest $version): array => [
+            'id' => $version->uuid, 'number' => $version->number, 'status' => $version->status,
+            'status_label' => self::STATUS_LABELS[$version->status] ?? $version->status,
+            'submitted_at' => $version->submitted_at->toIso8601String(), 'is_current' => (int) $version->getKey() === (int) $request->getKey(),
+        ])->values()->all();
     }
 
     /**
@@ -199,7 +267,7 @@ final class RequestPresenter
         return array_filter([
             'quantity' => $payload['quantity'] ?? $payload['new_quantity'] ?? null,
             // Over-issue reasons and correction notes are staff-internal; members see why something was not issued, closed or cancelled.
-            'reason' => in_array($event->action, ['not_issued', 'closed', 'cancelled'], true) ? ($payload['reason'] ?? null) : null,
+            'reason' => in_array($event->action, ['not_issued', 'closed', 'cancelled', 'rejected'], true) ? ($payload['reason'] ?? null) : null,
             'label' => $payload['label'] ?? null,
         ], fn ($value): bool => $value !== null);
     }

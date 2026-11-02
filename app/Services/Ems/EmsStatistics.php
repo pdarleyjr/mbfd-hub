@@ -22,7 +22,7 @@ final class EmsStatistics
     public const DEFINITIONS = [
         'requests_submitted' => 'Requests submitted in the date range, in any status (cancelled ones included).',
         'requests_cancelled' => 'Requests the member cancelled before anything was issued.',
-        'requests_counted' => 'Requests submitted in the range that were not cancelled. Every other figure below uses only these requests.',
+        'requests_counted' => 'Requests submitted in the range that were not cancelled, sent back or replaced by a correction. Every other figure below uses only these requests.',
         'lines_requested' => 'Items asked for on counted requests: a quantity of 1 or more, or a Yes answer. A "No" answer is not counted.',
         'qty_requested' => 'The sum of the quantities members asked for (Yes/No answers are not quantities).',
         'yes_answers' => 'Items answered Yes (for example the narcotics box). They are recorded only; narcotics are restocked by the controlled-substance procedure.',
@@ -52,9 +52,11 @@ final class EmsStatistics
             ->when(! empty($filters['target_kind']) && in_array($filters['target_kind'], InventoryRequest::TARGET_KINDS, true), fn ($q) => $q->where('target_kind', (string) $filters['target_kind']));
 
         $requests = $base()->get(['id', 'status', 'submitted_at', 'target_kind', 'apparatus_id', 'target_label', 'event_assignment']);
-        $counted = $requests->where('status', '!=', InventoryRequest::CANCELLED)->values();
+        // A form sent back or replaced by its correction would count the same supplies twice.
+        $notCounted = [InventoryRequest::CANCELLED, InventoryRequest::RETURNED, InventoryRequest::SUPERSEDED];
+        $counted = $requests->whereNotIn('status', $notCounted)->values();
         $lines = $counted->isEmpty() ? collect() : InventoryRequestLine::query()
-            ->whereIn('request_id', $base()->where('status', '!=', InventoryRequest::CANCELLED)->select('id'))
+            ->whereIn('request_id', $base()->whereNotIn('status', $notCounted)->select('id'))
             ->get(['id', 'request_id', 'bag_key', 'item_key', 'label', 'response_type', 'requested_qty', 'requested_flag', 'issued_qty', 'line_status']);
         $requestById = $counted->keyBy('id');
         $quantityLines = $lines->where('response_type', 'quantity')->values();

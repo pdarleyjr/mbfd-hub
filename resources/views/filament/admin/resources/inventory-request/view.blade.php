@@ -41,6 +41,40 @@
             @if ($request->status === 'closed' && filled($request->close_reason))
                 <p class="mt-3 text-sm text-gray-700 dark:text-gray-300"><span class="font-medium">Closed:</span> {{ $request->close_reason }}</p>
             @endif
+            @if ($request->reviewed_at && ! in_array($request->status, ['returned', 'superseded'], true))
+                <p class="mt-3 text-sm text-gray-700 dark:text-gray-300" data-testid="acknowledged-note"><span class="font-medium">Acknowledged</span>@if (filled($request->reviewed_by_name)) by {{ $request->reviewed_by_name }}@endif on {{ $acknowledgedAt }}.</p>
+            @endif
+            @if ($request->status === 'returned')
+                <div class="mt-3 rounded-lg bg-gray-50 p-3 text-sm dark:bg-white/5" data-testid="returned-note">
+                    <p class="font-medium text-gray-950 dark:text-white">Sent back to the member @if (filled($request->returned_by_name)) by {{ $request->returned_by_name }}@endif @if ($returnedAt)on {{ $returnedAt }}@endif</p>
+                    <p class="mt-1 whitespace-pre-line text-gray-700 dark:text-gray-300"><span class="font-medium">Reason:</span> {{ $request->return_reason }}</p>
+                    <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">It waits for the member to correct and resend it. Nothing changed in stock.</p>
+                </div>
+            @endif
+            @if ($request->status === 'reconciled')
+                <p class="mt-3 text-sm text-gray-700 dark:text-gray-300" data-testid="reconciled-note"><span class="font-medium">Reconciled</span>@if (filled($request->reconciled_by_name)) by {{ $request->reconciled_by_name }}@endif @if ($reconciledAt)on {{ $reconciledAt }}@endif. The supplies were taken out of the supply room and this form is archived.</p>
+            @endif
+            @if ($request->status === 'superseded')
+                <p class="mt-3 text-sm text-gray-700 dark:text-gray-300" data-testid="superseded-note">The member sent a corrected version of this form.
+                    @if ($replacedByUrl)<a href="{{ $replacedByUrl }}" class="font-medium text-primary-600 underline dark:text-primary-400">Open the corrected version</a>.@endif
+                </p>
+            @endif
+            @if (count($revisions) > 1)
+                <div class="mt-3 text-sm text-gray-700 dark:text-gray-300" data-testid="revisions">
+                    <p class="font-medium">Versions of this form</p>
+                    <ul class="mt-1 space-y-1">
+                        @foreach ($revisions as $version)
+                            <li>
+                                @if ($version['is_current'])
+                                    {{ $version['number'] }} (this one), {{ $version['status_label'] }}
+                                @else
+                                    <a href="{{ $version['url'] }}" class="text-primary-600 underline dark:text-primary-400">{{ $version['number'] }}</a>, {{ $version['status_label'] }}
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
             @if ($request->status === 'cancelled')
                 <p class="mt-3 text-sm text-gray-700 dark:text-gray-300"><span class="font-medium">The member cancelled this request.</span> @if (filled($request->cancel_reason)) {{ $request->cancel_reason }} @endif Nothing can be changed on it.</p>
             @endif

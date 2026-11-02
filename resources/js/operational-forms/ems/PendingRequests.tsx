@@ -29,7 +29,10 @@ export function PendingRequests({ outbox, openRequest, editEntry }: {
                 </MessageBarActions>
             </MessageBar>
             : <MessageBar key={entry.clientSubmissionId} intent="warning">
-                <MessageBarBody><MessageBarTitle>Waiting to send: {entry.unitLabel}, {itemsLabel(entry.itemCount)}</MessageBarTitle>Saved on this device. We&apos;ll send it when you&apos;re back online.</MessageBarBody>
+                <MessageBarBody>
+                    <MessageBarTitle>{entry.revision ? `Waiting to send the corrected form: ${entry.unitLabel}, ${itemsLabel(entry.itemCount)}` : `Waiting to send: ${entry.unitLabel}, ${itemsLabel(entry.itemCount)}`}</MessageBarTitle>
+                    Saved on this device. We&apos;ll send it when you&apos;re back online.{entry.revision?.number ? ` It will replace ${entry.revision.number}.` : ''}
+                </MessageBarBody>
                 <MessageBarActions>
                     <Button size="small" icon={outbox.flushing ? <LoaderCircle className="spin" size={14} /> : undefined} disabled={outbox.flushing} onClick={() => void outbox.flush()}>{outbox.flushing ? 'Sending' : 'Send now'}</Button>
                     <Button size="small" appearance="subtle" disabled={outbox.flushing} onClick={() => void outbox.discard(entry.clientSubmissionId)}>Discard</Button>
