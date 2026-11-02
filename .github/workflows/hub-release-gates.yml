@@ -329,6 +329,10 @@ jobs:
       - name: Daily TypeScript typecheck
         working-directory: resources/js/daily-checkout
         run: npm run typecheck
+      - name: Daily component tests
+        # Vitest and Testing Library on jsdom: no browser, no server, no network. About 15 seconds.
+        working-directory: resources/js/daily-checkout
+        run: npm test
       - name: Daily production build
         working-directory: resources/js/daily-checkout
         env:

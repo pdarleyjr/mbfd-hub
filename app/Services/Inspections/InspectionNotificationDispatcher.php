@@ -968,6 +968,7 @@ final class InspectionNotificationDispatcher
     {
         return match ($reason) {
             'rollback' => 'the meter reading is lower than the last recorded reading',
+            'implausible_increase' => 'the meter reading rose more than is possible since the last recorded reading',
             'member_flagged' => 'the member flagged it for further review',
             'new_significant_damage' => 'new significant damage was reported',
             default => 'it needs a reviewer decision',

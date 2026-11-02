@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Admin\Pages\Concerns\ShowsSupplyData;
 use App\Filament\Concerns\RunsEmsActions;
 use App\Filament\Resources\InventoryRequestResource;
 use App\Filament\Support\EmsLabels;
@@ -17,13 +18,21 @@ use Filament\Pages\Page;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Admin -> EMS -> Medical Data / Statistics. Every number comes from EmsStatistics, read from the
- * request tables, and is labelled as requests and issuances, not supplies used on calls. The Excel
- * and PDF files are built from the same data, so they hold exactly what is on screen.
+ * Admin -> EMS -> Medical Supply Data (route /admin/medical-statistics, kept so bookmarks and links work).
+ *
+ * Two sections on one page:
+ *  - Supply data: every figure comes from SupplyDataReport (see ShowsSupplyData); the Excel file is the
+ *    report's own export, opened with the same filters.
+ *  - Requests: the former Medical Data / Statistics page. Every number comes from EmsStatistics, read from
+ *    the request tables, and is labelled as requests and issuances, not supplies used on calls. The Excel
+ *    and PDF files are built from the same data, so they hold exactly what is on screen.
+ *
+ * Read access (admin.ems.view) is enough for all of it; nothing here changes a record.
  */
 final class MedicalDataStatistics extends Page
 {
     use RunsEmsActions;
+    use ShowsSupplyData;
 
     public const DEFAULT_DAYS = 90;
 
@@ -31,9 +40,9 @@ final class MedicalDataStatistics extends Page
 
     protected static ?string $navigationGroup = 'EMS';
 
-    protected static ?string $navigationLabel = 'Medical Data / Statistics';
+    protected static ?string $navigationLabel = 'Medical Supply Data';
 
-    protected static ?string $title = 'Medical Data / Statistics';
+    protected static ?string $title = 'Medical Supply Data';
 
     protected static ?string $slug = 'medical-statistics';
 
@@ -140,6 +149,14 @@ final class MedicalDataStatistics extends Page
     protected function getViewData(): array
     {
         $this->emsActor('view');
+
+        return ['activeTab' => $this->activeTab(), 'tabs' => self::TABS]
+            + ($this->activeTab() === 'supply' ? $this->supplyViewData() : $this->requestsViewData());
+    }
+
+    /** @return array<string, mixed> */
+    private function requestsViewData(): array
+    {
         $report = app(EmsStatistics::class)->report($this->filters());
         $view = StatisticsView::build($report);
         $monthly = collect($view['sections'])->firstWhere('heading', 'Monthly trend');
@@ -158,9 +175,17 @@ final class MedicalDataStatistics extends Page
 
     // -------------------------------------------------------------------- exports
 
+    /**
+     * The Supply data tab offers the supply file; the Requests tab keeps its Excel and PDF files. All three
+     * actions always exist (Filament caches header actions before the tab is read from the request) and
+     * visibility follows the tab at render time.
+     */
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('exportSupply')->label('Export supply data (Excel)')->icon('heroicon-o-table-cells')->color('gray')
+                ->visible(fn (): bool => $this->activeTab() === 'supply' && $this->supplyFilterState()['filters'] !== null)
+                ->url(fn (): string => $this->supplyExportUrl()),
             $this->exportAction('exportExcel', 'Export Excel', 'heroicon-o-table-cells', 'xlsx'),
             $this->exportAction('exportPdf', 'Export PDF', 'heroicon-o-document-arrow-down', 'pdf'),
         ];
@@ -169,6 +194,7 @@ final class MedicalDataStatistics extends Page
     private function exportAction(string $name, string $label, string $icon, string $format): Action
     {
         return Action::make($name)->label($label)->icon($icon)->color('gray')
+            ->visible(fn (): bool => $this->activeTab() === 'requests')
             ->action(fn (): StreamedResponse => $this->streamExport($format));
     }
 

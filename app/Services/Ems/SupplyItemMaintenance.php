@@ -15,7 +15,7 @@ use App\Models\User;
  */
 final class SupplyItemMaintenance
 {
-    private const PACKAGE_UNITS = ['each', 'box', 'case', 'pack', 'bag'];
+    private const PACKAGE_UNITS = SupplyItem::COUNT_UNITS;
 
     public function __construct(
         private readonly Idempotency $idempotency,

@@ -210,7 +210,8 @@ final class MedicalSupplyRoomPageTest extends TestCase
         $this->assertSame(2, $order->packages);
         $this->assertSame(48, $order->quantity_base);
         $this->assertSame(0, StockMovement::query()->count(), 'Placing an order does not change stock.');
-        $page->assertSee('Order placed');
+        $page->assertSee('Ordered');
+        $this->assertSame(1, \App\Models\Ems\SupplyOrderEvent::query()->where('supply_order_id', $order->id)->count(), 'Placing is kept in the order history.');
 
         $page->callAction('receiveOrder', [], ['order' => $order->id])->assertHasNoActionErrors();
         $this->assertSame('received', $order->fresh()->status);

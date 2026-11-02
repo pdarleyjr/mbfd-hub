@@ -451,7 +451,7 @@ async function mockFireBoatInspectionApi(
         ...fireBoatChecklist,
         checklist: {
           ...fireBoatChecklist.checklist,
-          fields: [...fireBoatChecklist.checklist.fields, { id: 'radio_de', name: 'Radio # - DE', inputType: 'text', required: false }],
+          fields: [...fireBoatChecklist.checklist.fields, { id: 'radio_de', name: 'Radio # - DE', inputType: 'text', required: false }, { id: 'scba_5', name: 'SCBA #5', inputType: 'text', required: false }],
           compartments: fireBoatChecklist.checklist.compartments.map((compartment) => ({
             ...compartment,
             items: [...compartment.items, { id: 'fb6-cubby-scbas', name: 'SCBAs', inputType: 'text', expectedQuantity: 3 }],
@@ -461,6 +461,7 @@ async function mockFireBoatInspectionApi(
           slots: [
             { slot: 'item:fb6-cubby/fb6-cubby-scbas', kind: 'scba', label: 'SCBAs', field_id: null, compartment_id: 'fb6-cubby', item_id: 'fb6-cubby-scbas', boxes: 3, number: '2103 - 2161 - 2189' },
             { slot: 'field:radio_de', kind: 'radio', label: 'Radio # - DE', field_id: 'radio_de', compartment_id: null, item_id: null, boxes: 1, number: '1741' },
+            { slot: 'field:scba_5', kind: 'scba', label: 'SCBA #5', field_id: 'scba_5', compartment_id: null, item_id: null, boxes: 1, number: '', spare: true },
           ],
           extras: [{ client_id: '77777777-7777-4777-8777-777777777777', kind: 'radio', label: null, number: '1800' }],
         },
@@ -1107,16 +1108,21 @@ test('SCBA and radio numbers come filled in, one box each, and only a change or 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
   await page.getByLabel('SCBAs 2').fill('2999');
+  // The unit's fifth pack box waits until someone needs it; the next one after that is a new box.
+  await expect(page.getByLabel('SCBA #5')).toHaveCount(0);
   await page.getByRole('button', { name: 'Add another SCBA' }).click();
-  await page.getByLabel('Additional SCBA').fill('2200');
+  await page.getByLabel('SCBA #5').fill('2200');
+  await page.getByRole('button', { name: 'Add another SCBA' }).click();
+  await page.getByLabel('Additional SCBA').fill('2300');
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
   await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
 
   const submitted = api.submissions[0] as { field_values: Array<{ id: string; value: unknown }>; compartments: Array<{ items: Array<{ id: string; value?: unknown }> }>; extra_equipment_numbers: Array<Record<string, unknown>> };
   expect(submitted.field_values.find((field) => field.id === 'radio_de')?.value).toBe('1741');
+  expect(submitted.field_values.find((field) => field.id === 'scba_5')?.value).toBe('2200');
   expect(submitted.compartments[0].items.find((item) => item.id === 'fb6-cubby-scbas')?.value).toBe('2103, 2999, 2189');
-  expect(submitted.extra_equipment_numbers.map((extra) => [extra.kind, extra.number])).toEqual([['radio', '1800'], ['scba', '2200']]);
+  expect(submitted.extra_equipment_numbers.map((extra) => [extra.kind, extra.number])).toEqual([['radio', '1800'], ['scba', '2300']]);
   // What the member was shown, in the form the answers are sent, so the server applies only their changes.
   expect((api.submissions[0] as { equipment_numbers_seen: unknown }).equipment_numbers_seen).toEqual([
     { slot: 'item:fb6-cubby/fb6-cubby-scbas', number: '2103, 2161, 2189' },
@@ -1130,7 +1136,11 @@ test('notes and numbers are one tap away from the first screen, before anything 
 
   await page.goto('/daily/apparatus/fire-boat-6');
   await expect(page.locator('.inspection-readiness')).not.toContainText('unavailable');
-  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Notes and numbers' }).click();
+  // The first screen says how many numbers are in and opens them in one tap.
+  const prompt = page.getByRole('region', { name: 'SCBA & Radio Numbers' });
+  await expect(prompt).toContainText('5 of 5 entered');
+  await expect(page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'SCBA, radio numbers and notes' })).toBeVisible();
+  await prompt.getByRole('button', { name: 'Enter SCBA & radio numbers' }).click();
 
   await expect(page.getByRole('heading', { name: 'Concerns, Damage & Additional Notes' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'SCBA & Radio Numbers' })).toBeVisible();
@@ -1467,7 +1477,11 @@ test('upgrades a pre-E01 queue without assigning it to the current user', async 
     lastErrorCode: 'OFFLINE_QUEUE_OWNER_LEGACY',
     data: { checklist_version: legacyVersion },
   });
-  await expect(page.getByText('A saved Daily Checkout using this checklist version needs officer review.')).toBeVisible();
+  // Unowned legacy work never blocks the signed-in member; it is kept and named for an officer.
+  await expect(page.getByRole('heading', { name: 'Engine 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Saved inspection/ })).toHaveCount(0);
+  await expect(page.getByTestId('other-member-saved-checkout')).toContainText('saved on this device by Captain Previous');
+  await expect(page.getByTestId('other-member-saved-checkout')).toContainText('needs review by an officer');
 });
 
 test('a changed checklist preserves the older autosave while a current-version draft is created separately', async ({ page }) => {
@@ -1546,7 +1560,7 @@ test('queued inspection syncs after reconnect while the queued success page rema
   ]);
 });
 
-test('a different canonical user cannot replay the prior user offline queue', async ({ page, context }) => {
+test('a different member never sends or changes the prior member offline queue, and it sends when its owner signs in', async ({ page, context }) => {
   const api = await mockInspectionApi(page);
 
   await page.goto('/daily/apparatus/engine-1');
@@ -1556,22 +1570,56 @@ test('a different canonical user cannot replay the prior user offline queue', as
 
   await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   await expect.poll(async () => (await queuedInspections(page))[0]?.ownerUserId).toBe(101);
+  const [before] = await queuedInspections(page);
 
   api.setIdentity(202, 1);
+  const contextRequests = api.contextRequests();
   await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect.poll(() => api.contextRequests()).toBeGreaterThan(contextRequests);
+  await page.waitForTimeout(500);
 
-  await expect.poll(async () => (await queuedInspections(page))[0]?.status).toBe('requires_attention');
-  const quarantined = (await queuedInspections(page))[0];
-  expect(quarantined).toMatchObject({
+  // Not sent under the other account, and left exactly as it was.
+  expect(api.submissions).toHaveLength(0);
+  expect(await queuedInspections(page)).toEqual([before]);
+
+  // The owner signs in again on this device: the saved checkout is sent once.
+  api.setIdentity(101, 1);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect.poll(() => api.submissions.length).toBe(1);
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
+  expect(api.submissions[0]).toMatchObject({ client_submission_id: before.data.client_submission_id });
+});
+
+test('a checkout an earlier release held for a different member goes back to the queue when its owner signs in', async ({ page }) => {
+  const api = await mockInspectionApi(page);
+  let releaseIdentity!: () => void;
+  const identityBarrier = new Promise<void>((resolve) => { releaseIdentity = resolve; });
+  await page.route('**/api/me/context', async (route) => {
+    await identityBarrier;
+    await route.fallback();
+  });
+  await page.goto('/daily/stations');
+  await addQueuedInspection(page, {
+    id: 'daily_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    apparatusId: apparatus.id,
+    checklistVersion: 'e'.repeat(64),
+    status: 'requires_attention',
+    retryCount: 0,
+    lastError: 'This saved Daily Checkout belongs to a different signed-in member and was not submitted.',
+    lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
     ownerUserId: 101,
     ownerSecurityVersion: 1,
     ownershipState: 'identity_mismatch',
-    lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
+    data: { client_submission_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', checklist_version: 'e'.repeat(64), operator_name: 'Captain Browser', compartments: [] },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   });
-  expect(api.submissions).toHaveLength(0);
-  await expect(page.getByRole('alert')).toContainText('belongs to a different signed-in member');
-  await expect(page.getByRole('alert')).not.toContainText('101');
-  await expect(page.getByRole('alert')).not.toContainText('202');
+  releaseIdentity();
+
+  await expect.poll(() => api.submissions.length).toBe(1);
+  expect(api.submissions[0]).toMatchObject({ client_submission_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' });
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
 });
 
 test('the same canonical user may safely replay after logging in again', async ({ page, context }) => {
@@ -1654,16 +1702,14 @@ test('generic offline records enforce ownership per record on a shared device', 
   await expect.poll(() => api.genericSubmissions.length).toBe(1);
   await expect.poll(async () => (await genericQueuedSubmissions(page)).length).toBe(1);
   expect(api.genericSubmissions[0]).toMatchObject({ title: 'User B record' });
+  // User A's record is not sent under B's account and is left untouched for A.
   expect((await genericQueuedSubmissions(page))[0]).toMatchObject({
     ownerUserId: 101,
-    ownershipState: 'identity_mismatch',
-    status: 'requires_attention',
-    lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
+    ownershipState: 'owned',
+    status: 'pending',
+    retryCount: 0,
   });
-  const ownershipAlert = page.getByRole('alert').filter({ hasText: 'belongs to a different signed-in member' });
-  await expect(ownershipAlert).toBeVisible();
-  await expect(ownershipAlert).not.toContainText('101');
-  await expect(ownershipAlert).not.toContainText('202');
+  expect((await genericQueuedSubmissions(page))[0].lastErrorCode).toBeUndefined();
 });
 
 test('queued inspection reports pending review after reconnect without retaining a duplicate queue item', async ({ page, context }) => {
@@ -1830,6 +1876,95 @@ test('another member’s rejected inspection cannot be discarded from this devic
   const saved = page.getByRole('list', { name: 'Saved inspections that need review' });
   await expect(saved).toContainText('Rejected for another member.');
   await expect(saved.getByRole('button', { name: /Discard/ })).toHaveCount(0);
+});
+
+test('on a shared device another member’s unsent checkout for the truck never blocks this member, and still sends for its owner', async ({ page }) => {
+  // Hold the replay until both records are in place, as on a Toughbook that just woke up.
+  const api = await mockInspectionApi(page);
+  api.setIdentity(202, 1);
+  await page.goto('/daily/stations');
+  const othersRecord: SeededQueuedInspection = {
+    id: 'daily_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+    apparatusId: apparatus.id,
+    checklistVersion: checklist.checklist_version,
+    status: 'pending',
+    retryCount: 2,
+    lastError: 'This device is offline. The inspection stays saved on this device and will be sent when the connection returns.',
+    ownerUserId: 101,
+    ownerSecurityVersion: 1,
+    ownershipState: 'owned',
+    data: { client_submission_id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', checklist_version: checklist.checklist_version, operator_name: 'Aurelio Mederos', compartments: [] },
+    createdAt: '2026-11-02T11:42:00.000Z',
+    updatedAt: '2026-11-02T11:42:00.000Z',
+  };
+  await addQueuedInspection(page, othersRecord);
+  const [seeded] = await queuedInspections(page);
+
+  await page.goto('/daily/apparatus/engine-1');
+  await expect(page.getByRole('heading', { name: 'Engine 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Saved inspection/ })).toHaveCount(0);
+  await expect(page.getByTestId('other-member-saved-checkout')).toHaveText(
+    'A checkout for Engine 1 saved on this device by Aurelio Mederos at Nov 2, 6:42 AM has not been sent yet. It will send when Aurelio Mederos signs in on this device.',
+  );
+
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+
+  // Only this member's checkout was sent; the other member's record is exactly as it was.
+  expect(api.submissions).toHaveLength(1);
+  expect(api.submissions[0].client_submission_id).not.toBe(othersRecord.data.client_submission_id);
+  expect(await queuedInspections(page)).toEqual([seeded]);
+
+  // Its owner signs in on this device: their checkout is sent, once.
+  api.setIdentity(101, 1);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect.poll(() => api.submissions.length).toBe(2);
+  expect(api.submissions[1]).toMatchObject({ client_submission_id: othersRecord.data.client_submission_id });
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
+});
+
+test('the same member still cannot start a second checkout while their own is unsent', async ({ page }) => {
+  const api = await mockInspectionApi(page, { abortFirstSubmit: true });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Saved inspection not sent yet' })).toBeVisible();
+
+  // Leaving and coming back (the replay still cannot reach the server) shows the same block, never a fresh form.
+  await page.route('**/api/public/apparatuses/*/inspections', (route) => {
+    api.submissions.push(route.request().postDataJSON() as Record<string, unknown>);
+    return route.abort('connectionreset');
+  });
+  await page.goto('/daily/stations');
+  await page.goto('/daily/apparatus/engine-1');
+  await expect(page.getByRole('heading', { name: 'Saved inspection not sent yet' })).toBeVisible();
+  await expect(page.getByTestId('other-member-saved-checkout')).toHaveCount(0);
+  expect(await queuedInspections(page)).toHaveLength(1);
+  expect(new Set(api.submissions.map((submission) => submission.client_submission_id)).size).toBe(1);
+});
+
+test('the owner can discard their own rejected inspection from the blocking screen', async ({ page }) => {
+  await mockInspectionApi(page, { submitSequence: [{ status: 422, json: { message: 'The meter reading is not valid.' } }] });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  const blocking = page.getByRole('region', { name: 'Saved inspection needs review' });
+  await expect(blocking).toBeVisible();
+
+  await blocking.getByRole('button', { name: 'Discard this saved inspection…' }).click();
+  await blocking.getByRole('button', { name: 'Keep it' }).click();
+  expect(await queuedInspections(page)).toHaveLength(1);
+
+  await blocking.getByRole('button', { name: 'Discard this saved inspection…' }).click();
+  await expect(blocking.getByRole('group', { name: 'Confirm discard' })).toContainText('cannot be recovered');
+  await blocking.getByRole('button', { name: 'Discard permanently' }).click();
+
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Engine 1', exact: true })).toBeVisible();
 });
 
 test('the receipt returns the member to the station they came from', async ({ page }) => {

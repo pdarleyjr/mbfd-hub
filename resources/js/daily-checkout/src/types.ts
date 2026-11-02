@@ -208,6 +208,8 @@ export interface EquipmentSlot {
   /** How many numbers one checklist entry holds (a rescue's "SCBAs"). */
   boxes: number;
   number: string;
+  /** A pack box past the unit's standard four (three on a rescue), shown once it holds a number or a member adds it. */
+  spare?: boolean;
 }
 
 /** A number the checklist has no entry for, added by a member. */

@@ -23,6 +23,7 @@ use App\Models\ApparatusServiceTicket;
 use App\Models\Station;
 use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
+use App\Services\Inspections\InspectionHold;
 use App\Services\Inspections\IssueMessageService;
 use App\Services\Inventory\InventoryCorrectionReason;
 use App\Support\Captain5\EventActorLabel;
@@ -284,7 +285,8 @@ final class InspectionWorkspace
             'id' => (int) $exception->getKey(),
             'anchor' => 'hold-'.$exception->getKey(),
             'field_label' => $isMiles ? 'Odometer miles' : 'Engine hours',
-            'reason_label' => str((string) $exception->reason)->replace('_', ' ')->headline()->toString(),
+            'reason_label' => InspectionHold::meterReasonLabel((string) $exception->field, (string) $exception->reason)
+                ?? str((string) $exception->reason)->replace('_', ' ')->headline()->toString(),
             'blocking' => $this->isOpenHold($exception),
             'is_hold' => (bool) $exception->blocks_acceptance,
             'status_label' => $this->exceptionStatusLabel($exception),

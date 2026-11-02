@@ -28,4 +28,17 @@ final class EmsPanelAccess
 
         return app(EmsAccess::class)->canView($user);
     }
+
+    /** The Master Supply Room Inventory link: same shortcut, then EmsAccess::canReadInventory. */
+    public static function canReadInventory(?User $user): bool
+    {
+        if (! $user instanceof User) {
+            return false;
+        }
+        if ($user->isAuthenticationAllowed() && ! $user->must_change_password && $user->hasRole('super_admin')) {
+            return true;
+        }
+
+        return app(EmsAccess::class)->canReadInventory($user);
+    }
 }
