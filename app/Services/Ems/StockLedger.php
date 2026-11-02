@@ -184,7 +184,7 @@ final class StockLedger
      * The newest real count per item. A calculated reconciliation snapshot is not a count, so it never appears here.
      *
      * @param  list<int>  $itemIds
-     * @return array<int, array{through: int, counted_at: CarbonImmutable|null, counted_by: string|null}>
+     * @return array<int, array{through: int, counted_at: CarbonImmutable|null, counted_by: string|null, estimated: bool}>
      */
     public function lastCounts(array $itemIds): array
     {
