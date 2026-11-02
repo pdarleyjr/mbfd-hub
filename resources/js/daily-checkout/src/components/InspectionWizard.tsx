@@ -41,12 +41,14 @@ import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProg
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
 import { EMPTY_REVIEW_FLAG, buildReviewFlag, normalizeReviewFlagDraft, reviewFlagExplanationMissing } from '../utils/reviewFlag';
 import { normalizeTaskStatus } from '../utils/checklistFields.ts';
+import ConcernsSection from './findings/ConcernsSection';
+import EquipmentNumbersCard from './EquipmentNumbersCard';
 import { prefillBlankCompartments, prefillBlankFieldValues, prefillCompartments, prefillFieldValues, seenNumbers, toExtraSubmissions } from '../utils/equipmentNumbers.ts';
 import { checklistUsesVehicleId, defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
 import { activeVehicleIdentification, optionalIdentification, toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
-import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
+import { ClipboardList, Gauge, StickyNote, Truck, Users } from 'lucide-react';
 
-type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
+type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'notes' | 'submit';
 
 const inspectionSessionIsExpired = (session: InspectionData['inspectionSession']): boolean => {
   const expiresAt = typeof session?.expires_at === 'string' ? Date.parse(session.expires_at) : Number.NaN;
@@ -941,6 +943,9 @@ export default function InspectionWizard() {
     setCurrentStep(step);
   };
 
+  const changeEquipmentField = (id: string, value: string) => setFieldValues(previous => previous.map(field => field.id === id ? { ...field, value } : field));
+  const changeEquipmentItem = (compartmentId: string, itemId: string, value: string) => setCompartments(previous => previous.map(compartment => compartment.id === compartmentId ? { ...compartment, items: compartment.items.map(item => item.id === itemId ? { ...item, value } : item) } : compartment));
+
   const goBack = () => {
     if (currentStep === 'meter') {
       changeStep('officer');
@@ -1080,7 +1085,8 @@ export default function InspectionWizard() {
         <div className="inspection-save" data-save-state={autosaveState === 'idle' ? 'saving' : autosaveState}><div><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong>{/* Announced politely and only when a write finishes or fails, not on every edit. */}<small role="status" aria-live="polite">{saveStatusText}</small></div><div className="inspection-progress"><small>{progress.completed} / {progress.total} inspected</small><progress value={progress.completed} max={progress.total || 1} aria-label="Inspection progress" /></div></div>
       </header>
       <div className="inspection-readiness">
-        <span>{apparatus.pm_health ? apparatus.pm_health.status === 'red' ? 'PM due' : apparatus.pm_health.status === 'yellow' ? 'PM due soon' : 'PM current' : 'PM baseline unavailable'}</span>
+        {/* The PM cycle follows a truck's one engine-hour meter. A boat has none, so it says nothing rather than "unavailable". */}
+        {(apparatus.pm_health || usesVehicleId) && <span>{apparatus.pm_health ? apparatus.pm_health.status === 'red' ? 'PM due' : apparatus.pm_health.status === 'yellow' ? 'PM due soon' : 'PM current' : 'PM baseline unavailable'}</span>}
         <span>{progress.issues} reported {progress.issues === 1 ? 'issue' : 'issues'}</span>
       </div>
       {autosaveState === 'failed' && <p role="alert" className="inspection-alert">Changes could not be saved on this device. Keep this page open until the inspection is submitted successfully.</p>}
@@ -1171,6 +1177,7 @@ export default function InspectionWizard() {
         <button type="button" className="px-3" aria-label={memberStepLabel} aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => changeStep('officer')}><Users size={20} aria-hidden="true" />Member</button>
         <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Readings · Optional'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => changeStep(isV2Checklist ? 'details' : 'meter')}><Gauge size={20} aria-hidden="true" /><span>{isV2Checklist ? 'Details' : <>Readings <small>Optional</small></>}</span></button>
         {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-label="Checklist details" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => changeStep('details')}><ClipboardList size={20} aria-hidden="true" />Details</button>}
+        <button type="button" className="px-3" aria-label="Notes and numbers" aria-current={currentStep === 'notes' ? 'page' : undefined} onClick={() => changeStep('notes')}><StickyNote size={20} aria-hidden="true" />Notes{concerns.length > 0 ? ` (${concerns.length})` : ''}</button>
       </nav>
 
       {currentStep === 'officer' && (
@@ -1236,6 +1243,26 @@ export default function InspectionWizard() {
         />
       )}
 
+      {/* Open from the first screen: nobody should have to finish every area before they can write down what they saw. */}
+      {currentStep === 'notes' && (
+        <section className="inspection-review" aria-labelledby="inspection-notes-heading">
+          <h2 id="inspection-notes-heading">Notes &amp; Numbers</h2>
+          <p className="inspection-muted mb-4">Add these at any point. They are saved with this inspection and sent when you submit it.</p>
+          <ConcernsSection concerns={concerns} onChange={setConcerns} openIssues={concernIssues} />
+          {checklist.equipment_numbers && <EquipmentNumbersCard
+            block={checklist.equipment_numbers}
+            fields={checklist.fields}
+            fieldValues={fieldValues}
+            compartments={compartments}
+            onFieldChange={changeEquipmentField}
+            onItemChange={changeEquipmentItem}
+            extras={equipmentExtras}
+            onExtrasChange={setEquipmentExtras}
+          />}
+          <button type="button" className="hub-btn hub-btn--primary" onClick={() => changeStep(readiness.nextStep)}>{readiness.label}</button>
+        </section>
+      )}
+
       {currentStep === 'submit' && !readiness.ready && !showNotReady && (
         <div role="alert" className="mb-4 rounded-lg border border-hub-warning/40 bg-hub-warning/5 p-3 text-sm text-hub-ink">
           <p><span className="font-semibold">Not ready to submit.</span> {readinessExplanation(readiness)}</p>
@@ -1266,8 +1293,8 @@ export default function InspectionWizard() {
           openIssues={concernIssues}
           equipmentExtras={equipmentExtras}
           onEquipmentExtrasChange={setEquipmentExtras}
-          onEquipmentFieldChange={(id, value) => setFieldValues(previous => previous.map(field => field.id === id ? { ...field, value } : field))}
-          onEquipmentItemChange={(compartmentId, itemId, value) => setCompartments(previous => previous.map(compartment => compartment.id === compartmentId ? { ...compartment, items: compartment.items.map(item => item.id === itemId ? { ...item, value } : item) } : compartment))}
+          onEquipmentFieldChange={changeEquipmentField}
+          onEquipmentItemChange={changeEquipmentItem}
           scheduledTasks={scheduledTasks}
           onSubmit={handleSubmit}
           onBack={goBack}

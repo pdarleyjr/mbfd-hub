@@ -138,7 +138,7 @@ SCUBA is diving equipment and airpacks (SCBA) are breathing apparatus, so they a
 
 ## 7. SCBA and radio numbers
 
-Every member sees and can change the SCBA and radio numbers on the review step of every apparatus, filled in from the last inspection of that apparatus, so they only touch what changed.
+Every member sees and can change the SCBA and radio numbers on every apparatus, filled in from the last inspection of that apparatus, so they only touch what changed. They and Concerns, Damage & Additional Notes are on the Notes tab, open from the first screen, and again on the review step. Review & Sign opens only after every area is done, so neither can live there alone.
 
 - **Which entries:** `CrewEquipmentNumbers::slots` reads them from the checklist: any write-in field or item named for an SCBA, airpack, SCUBA or radio. Checklists are not edited, so their hashes and open drafts are untouched. A card edit writes to the checklist's own answer, so nothing is entered twice.
 - **Boxes:** at least what the checklist has. FB6 has 4 airpacks, 4 radio numbers and the Motorola serial digits. Rescues have 3 radios and one "SCBAs" item shown as 3 boxes (`expectedQuantity`) and stored comma separated. Engines and ladders have more than 3 radios on their checklists already.
