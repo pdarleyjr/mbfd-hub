@@ -98,8 +98,8 @@ test.describe('Supply Data tab', () => {
     expect(names[names.indexOf('Master Supply Room Inventory') + 1]).toBe('Supply Data');
     await expect(page.getByRole('tab', { name: 'Supply Data' })).toHaveAttribute('aria-selected', 'true');
 
-    await expect(page.getByTestId('attention-below_minimum')).toContainText('3');
-    await expect(page.getByTestId('attention-estimated')).toContainText('44');
+    await expect(page.getByTestId('attention-below_minimum')).toContainText('1');
+    await expect(page.getByTestId('attention-estimated')).toContainText('1');
     await expect(page.getByRole('img', { name: 'Distribution events by week' })).toBeVisible();
     await expect(page.getByTestId('supply-data-label')).toContainText('Distributed from the supply room');
     await expect(page.getByTestId('by-supply-list')).toBeVisible();
@@ -137,24 +137,24 @@ test.describe('Supply Data tab', () => {
     const server = newServer();
     await open(page, server, '/daily/captain-5?tab=supply-data&period=90d&explore=unit');
     await expect(page.getByRole('button', { name: 'Last 90 days' })).toHaveAttribute('aria-pressed', 'true');
-    expect(server.requests).toContain('/supply-data?period=90d');
-    await page.getByRole('button', { name: /RESCUE R2/ }).click();
-    await expect(page.getByRole('heading', { name: 'RESCUE R2', level: 2 })).toBeVisible();
+    expect(server.requests).toContain('/supply-data?period=90d&limit=50');
+    await page.getByRole('button', { name: /Rescue 2/ }).click();
+    await expect(page.getByRole('heading', { name: 'Rescue 2', level: 2 })).toBeVisible();
     await expect(page).toHaveURL(/period=90d/);
     await expect(page).toHaveURL(/unit=unit%3A45/);
-    expect(server.requests).toContain('/supply-data/units/unit%3A45?period=90d');
+    expect(server.requests).toContain('/supply-data/units/unit%3A45?period=90d&limit=50');
     await page.getByRole('button', { name: 'Back to Supply Data' }).click();
     await expect(page.getByRole('heading', { name: 'Supply Data', level: 2 })).toBeVisible();
     await expect(page).toHaveURL(/period=90d/);
     await expect(page).not.toHaveURL(/unit=/);
 
-    await page.getByRole('button', { name: /RESCUE R2/ }).click();
+    await page.getByRole('button', { name: /Rescue 2/ }).click();
     await page.getByRole('button', { name: /MIR-000004/ }).click();
     // The request opens over the Submitted Inventory Forms tab, as a sheet.
     await expect(page.getByRole('dialog', { name: 'Submitted inventory form' })).toBeVisible();
     await expect(page).toHaveURL(/tab=rescue&request=6f1f2c1e-1111-4222-8333-444455556666/);
     await page.goBack();
-    await expect(page.getByRole('heading', { name: 'RESCUE R2', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Rescue 2', level: 2 })).toBeVisible();
   });
 
   test('looks intentional with almost no history: an honest empty trend, no chart, no invented numbers', async ({ page }) => {

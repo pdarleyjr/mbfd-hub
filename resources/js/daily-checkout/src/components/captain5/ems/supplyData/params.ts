@@ -24,9 +24,12 @@ export const EXPLORE_OPTIONS: Array<{ id: ExploreView; label: string }> = [
   { id: 'stock', label: 'Stock' },
 ];
 
-const STOCK_FILTERS: StockFilter[] = ['all', 'zero', 'below_minimum', 'near_minimum', 'ok', 'estimated', 'reorder', 'oldest_count'];
+const STOCK_FILTERS: StockFilter[] = ['all', 'zero', 'below_minimum', 'ok', 'estimated', 'reorder', 'not_counted'];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const UNIT_KEY = /^(unit:\d{1,18}|detail|unassigned)$/;
+
+/** How many rows the ranked lists ask for. The API's default is 10 and its ceiling 50, which the admin page and the export use. */
+export const LIST_LIMIT = 50;
 
 /** The API refuses ranges longer than 400 days; stay one day inside the limit so a range is never refused. */
 export const MAX_RANGE_DAYS = 399;

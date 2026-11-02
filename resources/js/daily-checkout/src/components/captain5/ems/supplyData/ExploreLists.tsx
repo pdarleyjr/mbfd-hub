@@ -3,6 +3,7 @@ import { EmptyState } from '../../../ui/StateViews';
 import { etDate } from '../logic';
 import { HINT } from '../shared';
 import { formatNumber, plural, quantityText } from './format.ts';
+import { LIST_LIMIT } from './params.ts';
 import type { Direction, TopItem, UnitRow } from './types.ts';
 
 const rowClass = 'flex min-h-14 w-full min-w-0 items-center gap-3 rounded-hub-control px-3.5 py-3 text-left hover:bg-hub-blue-tint';
@@ -36,7 +37,7 @@ export function BySupplyList({ items, onOpen, onBrowseStock }: SupplyProps) {
   }
   return (
     <div className="space-y-2">
-      <p className={HINT}>Ranked by how many times each supply was distributed, most first.{items.length >= 10 ? ` Showing the top ${items.length}.` : ''}</p>
+      <p className={HINT}>Ranked by how many times each supply was distributed, most first.{items.length >= LIST_LIMIT ? ` Showing the top ${items.length}.` : ''}</p>
       <ol className="divide-y divide-hub-border-soft rounded-hub-control border border-hub-border bg-hub-well" aria-label="Supplies by distribution events" data-testid="by-supply-list">
         {items.map((item, index) => (
           <li key={item.item_id}>
@@ -65,7 +66,7 @@ interface UnitProps {
 
 export function ByUnitList({ units, onOpen }: UnitProps) {
   if (units.length === 0) {
-    return <EmptyState title="No units to show" body="Units appear here once the apparatus list is set up for medical inventory requests." />;
+    return <EmptyState title="No unit had requests in this period" body="A unit is listed once it has a request that counted, or something distributed to it, in the period." />;
   }
   return (
     <ul className="divide-y divide-hub-border-soft rounded-hub-control border border-hub-border bg-hub-well" aria-label="Units" data-testid="by-unit-list">

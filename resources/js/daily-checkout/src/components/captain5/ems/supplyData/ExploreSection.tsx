@@ -30,7 +30,7 @@ const ExploreSection = forwardRef<HTMLDivElement, Props>(function ExploreSection
         <ChoiceChips<ExploreView> label="Explore by" testId="supply-data-explore-view" options={EXPLORE_OPTIONS} value={explore} onChange={onExplore} />
         {explore === 'supply' && <BySupplyList items={data.top_items} onOpen={onOpenItem} onBrowseStock={() => onExplore('stock')} />}
         {explore === 'unit' && <ByUnitList units={data.units} onOpen={onOpenUnit} />}
-        {explore === 'stock' && <StockList stock={data.stock} filter={stockFilter} onFilter={onStockFilter} onOpen={onOpenItem} />}
+        {explore === 'stock' && <StockList stock={data.stock} generatedAt={data.generated_at} filter={stockFilter} onFilter={onStockFilter} onOpen={onOpenItem} />}
       </Section>
     </div>
   );

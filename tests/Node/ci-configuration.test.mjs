@@ -738,6 +738,13 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
 
   const daily = workflowJob(gates, "daily-contract-integrity");
   assert.match(workflowStep(daily, "Daily TypeScript typecheck"), /npm run typecheck/);
+  // The Daily component tests (Vitest on jsdom) run in the job that already installs Daily's dependencies, before its build.
+  const componentTests = workflowStep(daily, "Daily component tests");
+  assert.match(componentTests, /working-directory:\s*resources\/js\/daily-checkout/);
+  assert.match(componentTests, /run:\s*npm test\s*$/m);
+  assert.equal(JSON.parse(readFileSync(resolve(root, "resources/js/daily-checkout/package.json"), "utf8")).scripts.test, "vitest run");
+  assert.ok(daily.indexOf("Daily component tests") > daily.indexOf("Daily TypeScript typecheck"));
+  assert.ok(daily.indexOf("Daily component tests") < daily.indexOf("Daily production build"));
   assert.match(workflowStep(daily, "Daily production build"), /npm run build/);
   assert.match(
     workflowStep(daily, "Run Daily Checkout contract and integrity tests"),

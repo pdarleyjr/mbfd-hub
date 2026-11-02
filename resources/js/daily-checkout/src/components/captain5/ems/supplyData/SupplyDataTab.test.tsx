@@ -48,16 +48,16 @@ describe('Supply Data tab: what matters now', () => {
     expect(overviewMock).toHaveBeenCalledWith(THIRTY_DAYS);
 
     const section = screen.getByTestId('supply-data-attention');
-    expect(within(section).getByRole('button', { name: 'Below minimum: 3 supplies. Show these supplies.' })).toHaveTextContent('3');
+    expect(within(section).getByRole('button', { name: 'Below minimum: 1 supply. Show these supplies.' })).toHaveTextContent('1');
     expect(within(section).getByRole('button', { name: 'Zero on hand: 1 supply. Show these supplies.' })).toHaveTextContent('1');
-    expect(within(section).getByRole('button', { name: 'Estimated — not yet counted: 44 supplies. Show these supplies.' })).toHaveTextContent('44');
-    expect(within(section).getByRole('button', { name: 'Needs reorder: 4 supplies. Show these supplies.' })).toHaveTextContent('4');
-    expect(screen.getByTestId('attention-stale')).toHaveTextContent('50 supplies have not been counted recently.');
+    expect(within(section).getByRole('button', { name: 'Estimated — not yet counted: 1 supply. Show these supplies.' })).toHaveTextContent('1');
+    expect(within(section).getByRole('button', { name: 'Needs reorder: 1 supply. Show these supplies.' })).toHaveTextContent('1');
+    expect(screen.getByTestId('attention-stale')).toHaveTextContent('3 supplies have not been counted recently.');
   });
 
   it('opens the Stock list already filtered when an indicator is tapped', async () => {
     const { user } = renderTab();
-    await user.click(await screen.findByRole('button', { name: /^Below minimum: 3 supplies/ }));
+    await user.click(await screen.findByRole('button', { name: /^Below minimum: 1 supply/ }));
 
     expect(search()).toContain('explore=stock');
     expect(search()).toContain('stock=below_minimum');
@@ -223,9 +223,9 @@ describe('Supply Data tab: drill-downs', () => {
     // What the drill-down shows: balance with basis, distribution, receiving units with share numbers, restocks, counts, movements.
     const balance = screen.getByTestId('item-balance');
     expect(within(balance).getByTestId('item-on-hand')).toHaveTextContent('14 boxes');
-    expect(within(balance).getByText('Minimum').parentElement).toHaveTextContent('No minimum set');
+    expect(within(balance).getByText('Minimum / order level').parentElement).toHaveTextContent('No minimum set');
     expect(within(balance).getByText('Taken out since the count').parentElement).toHaveTextContent('Taken out since the count0');
-    expect(screen.getByTestId('item-distribution')).toHaveTextContent('2 in the previous period');
+    expect(screen.getByTestId('item-distribution')).toHaveTextContent('Up 150% from 2 in the previous period');
     expect(within(screen.getByTestId('item-units')).getByText('55.6%')).toBeInTheDocument();
     expect(screen.getByTestId('item-replenishment')).toHaveTextContent('Order received');
     expect(screen.getByTestId('item-counts')).toHaveTextContent('Compared with an estimate');
@@ -243,10 +243,10 @@ describe('Supply Data tab: drill-downs', () => {
     const { user } = renderTab('/daily/captain-5?tab=supply-data&explore=unit');
     const list = await screen.findByRole('list', { name: 'Units' });
     expect(within(list).getByText('No requests in this period')).toBeInTheDocument();
-    await user.click(within(list).getByText('RESCUE R2'));
+    await user.click(within(list).getByText('Rescue 2'));
 
     expect(unitMock).toHaveBeenCalledWith('unit:45', THIRTY_DAYS);
-    expect(await screen.findByRole('heading', { name: 'RESCUE R2', level: 2 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Rescue 2', level: 2 })).toBeInTheDocument();
     expect(search()).toContain('unit=unit%3A45');
     expect(screen.getByTestId('unit-top-requested')).toHaveTextContent('Gauze 4x4');
     expect(screen.getByTestId('unit-top-distributed')).toHaveTextContent('Gloves, nitrile (L)');
@@ -271,7 +271,7 @@ describe('Supply Data tab: drill-downs', () => {
     await user.click(await screen.findByRole('button', { name: /Gloves, nitrile \(L\)/ }));
     expect(await screen.findByRole('heading', { name: 'Gloves, nitrile (L)', level: 2 })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Back to unit' }));
-    expect(await screen.findByRole('heading', { name: 'RESCUE R2', level: 2 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Rescue 2', level: 2 })).toBeInTheDocument();
     expect(search()).toContain('unit=');
     expect(search()).not.toContain('item=');
   });
@@ -322,8 +322,8 @@ describe('Supply Data tab: failures', () => {
 describe('Supply Data tab: fields the API sends beyond the contract', () => {
   it('reads the counted number as counted and lists extra data-quality counts only when above zero', async () => {
     overviewMock.mockResolvedValue(overview({
-      count_accuracy: { comparable_counts: 1, coverage_pct: 2.5, note: null, items: [{ item_id: 12, name: 'Gloves, nitrile (L)', counted: 14, expected: 15, variance: -1, variance_pct: -6.7, counted_at: '2026-10-27T09:00:00-04:00' }] },
-      data_quality: { unattributed_movements: 0, estimated_items: 44, unresolved_conversions: 0, notes: [], negative_balances: 2, items_without_minimum: 0 },
+      count_accuracy: { counted_lines: 1, comparable_counts: 1, exact_matches: 0, items_compared: 1, coverage_pct: 2.5, note: null, items: [{ item_id: 12, name: 'Gloves, nitrile (L)', counted: 14, expected: 15, variance: -1, variance_pct: -6.7, counted_at: '2026-10-27T09:00:00-04:00' }] },
+      data_quality: { ...overview().data_quality, notes: [], negative_balances: 2, items_without_minimum: 0 },
       scope_notes: ['The unit filter narrows requests and distribution.'],
     }));
     const { user } = renderTab();
@@ -331,13 +331,13 @@ describe('Supply Data tab: fields the API sends beyond the contract', () => {
     await user.click(screen.getByRole('button', { name: /^Count accuracy/ }));
     expect(screen.getByRole('list', { name: 'Counted against expected' })).toHaveTextContent('Counted 14 of an expected 15, off by 1 short');
     await user.click(screen.getByRole('button', { name: /^Data quality/ }));
-    const extras = screen.getByTestId('quality-extras');
+    const extras = screen.getByTestId('quality-counts');
     expect(extras).toHaveTextContent('Balances below zero2');
     expect(extras).not.toHaveTextContent('no minimum');
   });
 
   it('opens the unit that holds requests whose truck is no longer on file', async () => {
-    unitMock.mockResolvedValue(unitReport({ unit: { unit_key: 'unassigned', apparatus_id: null, label: 'Unit no longer on file', kind: 'unassigned' } }));
+    unitMock.mockResolvedValue(unitReport({ unit: { unit_key: 'unassigned', apparatus_id: null, label: 'Unit no longer on file', labels: [], kind: 'unassigned' } }));
     renderTab('/daily/captain-5?tab=supply-data&unit=unassigned');
     expect(await screen.findByRole('heading', { name: 'Unit no longer on file', level: 2 })).toBeInTheDocument();
     expect(unitMock).toHaveBeenCalledWith('unassigned', THIRTY_DAYS);
@@ -360,10 +360,10 @@ describe('Supply Data tab: disclosure and stock', () => {
 
   it('sorts the oldest counts first, never-counted supplies at the top', async () => {
     const { user } = renderTab();
-    await user.click(await screen.findByRole('button', { name: 'Show oldest counts first' }));
+    await user.click(await screen.findByRole('button', { name: 'Show these supplies, oldest count first' }));
     const rows = within(screen.getByRole('list', { name: 'Stock' })).getAllByRole('listitem');
     expect(rows[0]).toHaveTextContent('Bandage rolls');
-    expect(rows[0]).toHaveTextContent('Never counted');
+    expect(rows[0]).toHaveTextContent('No physical count yet');
   });
 
   it('filters and searches the stock list', async () => {

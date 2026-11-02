@@ -104,7 +104,6 @@ export const BASIS_EXPLANATION: Record<Basis, string> = {
 export const STATUS_LABEL: Record<StockStatus, string> = {
   zero: 'Zero on hand',
   below_minimum: 'Below minimum',
-  near_minimum: 'Near minimum',
   ok: 'OK',
   unknown: 'Unknown',
 };
@@ -112,10 +111,12 @@ export const STATUS_LABEL: Record<StockStatus, string> = {
 export const STATUS_TONE: Record<StockStatus, 'danger' | 'warning' | 'info' | 'success' | 'neutral'> = {
   zero: 'danger',
   below_minimum: 'warning',
-  near_minimum: 'info',
   ok: 'success',
   unknown: 'neutral',
 };
+
+/** Stock counts as not counted recently when it has no physical count in this many days (the backend's STALE_COUNT_DAYS), or never. */
+export const STALE_COUNT_DAYS = 10;
 
 export const DIRECTION_LABEL: Record<Direction, string> = {
   up: 'More than the period before',
@@ -126,7 +127,11 @@ export const DIRECTION_LABEL: Record<Direction, string> = {
 
 /** The headline comparison in words. A zero previous period gives no percentage, only an honest note. */
 export function changeText(headline: Headline): { text: string; tone: 'up' | 'down' | 'flat' | 'none' } {
-  const { change_pct: pct, previous_distribution_events: before } = headline;
+  return changeSentence(headline.change_pct, headline.previous_distribution_events);
+}
+
+/** The same comparison for any figure: a null percentage or a zero before gives no percentage. */
+export function changeSentence(pct: number | null, before: number): { text: string; tone: 'up' | 'down' | 'flat' | 'none' } {
   if (pct === null || before === 0) return { text: 'No earlier activity to compare', tone: 'none' };
   const rounded = Math.round(pct * 10) / 10;
   if (rounded === 0) return { text: `No change from ${before} in the previous period`, tone: 'flat' };

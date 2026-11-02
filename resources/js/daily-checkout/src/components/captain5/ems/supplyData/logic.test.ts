@@ -12,25 +12,25 @@ vi.mock('../../../../utils/emsApi', async (importOriginal) => ({
 const callMock = vi.mocked(call);
 
 describe('supply data client', () => {
-  beforeEach(() => callMock.mockReset().mockResolvedValue({ data: {}, meta: {} }));
+  beforeEach(() => { callMock.mockReset().mockResolvedValue({ data: {}, meta: {} }); });
 
   it('asks the overview endpoint for the period, with dates only for a custom range', async () => {
     await fetchOverview({ period: '90d', from: null, to: null });
-    expect(callMock).toHaveBeenLastCalledWith('/supply-data?period=90d');
+    expect(callMock).toHaveBeenLastCalledWith('/supply-data?period=90d&limit=50');
     await fetchOverview({ period: 'custom', from: '2026-09-01', to: '2026-09-30' });
-    expect(callMock).toHaveBeenLastCalledWith('/supply-data?period=custom&from=2026-09-01&to=2026-09-30');
+    expect(callMock).toHaveBeenLastCalledWith('/supply-data?period=custom&from=2026-09-01&to=2026-09-30&limit=50');
     // dates from an earlier custom choice never leak into a preset period
     await fetchOverview({ period: '12m', from: '2026-09-01', to: '2026-09-30' });
-    expect(callMock).toHaveBeenLastCalledWith('/supply-data?period=12m');
+    expect(callMock).toHaveBeenLastCalledWith('/supply-data?period=12m&limit=50');
   });
 
   it('encodes the unit key and uses the item and unit routes', async () => {
     await fetchItem(12, { period: '30d', from: null, to: null });
     expect(callMock).toHaveBeenLastCalledWith('/supply-data/items/12?period=30d');
     await fetchUnit('unit:45', { period: '30d', from: null, to: null });
-    expect(callMock).toHaveBeenLastCalledWith('/supply-data/units/unit%3A45?period=30d');
+    expect(callMock).toHaveBeenLastCalledWith('/supply-data/units/unit%3A45?period=30d&limit=50');
     await fetchUnit('detail', { period: '30d', from: null, to: null });
-    expect(callMock).toHaveBeenLastCalledWith('/supply-data/units/detail?period=30d');
+    expect(callMock).toHaveBeenLastCalledWith('/supply-data/units/detail?period=30d&limit=50');
   });
 
   it('only ever reads: every call is a GET with no init', async () => {

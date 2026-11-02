@@ -4,11 +4,11 @@ import { etDate, etDateTime } from '../logic';
 import { HINT } from '../shared';
 import DetailShell from './DetailShell.tsx';
 import { fetchItem } from './api.ts';
-import { DISTRIBUTED_LABEL, daysOfSupplyText, formatNumber, periodText, plural, quantityText, unitWord } from './format.ts';
+import { changeSentence, DISTRIBUTED_LABEL, daysOfSupplyText, formatNumber, periodText, plural, quantityText, unitWord } from './format.ts';
 import { exportHref, selectionKey } from './params.ts';
 import TrendChart from './TrendChart.tsx';
 import type { ItemReport, PeriodSelection } from './types.ts';
-import { BasisNote, Disclosure, ExportLink, Figure, MeaningNote, Section, ShareBar, Stat, StockStatusTag } from './ui.tsx';
+import { BasisNote, Disclosure, EstimatedTag, ExportLink, Figure, MeaningNote, Section, ShareBar, Stat, StockStatusTag } from './ui.tsx';
 
 interface Props {
   itemId: number;
@@ -35,15 +35,17 @@ function Balance({ report }: { report: ItemReport }) {
           {balance.needs_reorder && <Tag tone="warning">Needs reorder</Tag>}
         </div>
         {balance.basis === 'estimate' && <p className={`${HINT} mt-1`} data-testid="item-estimate-note">This is a best-guess starting number that has not been counted yet. It is not a verified count.</p>}
+        {!item.units_resolved && <p className={`${HINT} mt-1`} data-testid="item-units-note">The count per {item.package_unit ?? 'package'} is not on file, so quantities here are in single units.</p>}
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-hub-border-soft pt-3 sm:grid-cols-3">
-          <Stat label="Last counted">{balance.last_counted_at ? etDate(balance.last_counted_at) : 'Never counted'}</Stat>
+          <Stat label="Last counted">{balance.last_counted_at ? etDate(balance.last_counted_at) : 'No physical count yet'}</Stat>
           <Stat label="Taken out since the count"><Figure value={balance.deductions_since_count}>{balance.deductions_since_count === null ? null : formatNumber(balance.deductions_since_count)}</Figure></Stat>
-          <Stat label="Minimum"><Figure value={balance.minimum} why="No minimum set">{balance.minimum === null ? null : formatNumber(balance.minimum)}</Figure></Stat>
-          <Stat label="Order level"><Figure value={balance.order_level} why="No order level set">{balance.order_level === null ? null : formatNumber(balance.order_level)}</Figure></Stat>
+          <Stat label="Minimum / order level" hint="One level: below it, an order is suggested.">
+            <Figure value={balance.minimum} why="No minimum set">{balance.minimum === null ? null : quantityText(balance.minimum, item.count_unit)}</Figure>
+          </Stat>
           <Stat label="Days of supply" hint={balance.days_of_supply === null ? 'Needs a counted balance and at least 3 distributions.' : 'At the recent distribution pace.'}>
             <Figure value={balance.days_of_supply}>{balance.days_of_supply === null ? null : daysOfSupplyText(balance.days_of_supply)}</Figure>
           </Stat>
-          <Stat label="Suggested order"><Figure value={balance.recommended_order} why="No order suggested">{balance.recommended_order === null ? null : quantityText(balance.recommended_order, item.count_unit)}</Figure></Stat>
+          <Stat label="Suggested order"><Figure value={balance.recommended_order} why="No order suggested">{balance.recommended_order === null ? null : quantityText(balance.recommended_order, balance.recommended_order_unit ?? item.count_unit)}</Figure></Stat>
         </dl>
       </div>
     </Section>
@@ -56,10 +58,10 @@ function Distribution({ report }: { report: ItemReport }) {
     <Section title="Distributed in this period" testId="item-distribution">
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-hub-control border border-hub-border bg-hub-well p-3 sm:grid-cols-3 sm:p-4">
         <Stat label="Quantity distributed">{quantityText(d.distributed, item.count_unit)}</Stat>
-        <Stat label="Distribution events" hint={`${d.previous_distribution_events} in the previous period`}>{formatNumber(d.distribution_events)}</Stat>
+        <Stat label="Distribution events" hint={changeSentence(d.change_pct, d.previous_distribution_events).text}>{formatNumber(d.distribution_events)}</Stat>
         <Stat label="Last distributed">{d.last_distributed_at ? etDate(d.last_distributed_at) : 'None yet'}</Stat>
         <Stat label="Average per week"><Figure value={d.avg_weekly}>{d.avg_weekly === null ? null : formatNumber(d.avg_weekly)}</Figure></Stat>
-        <Stat label="Typical week"><Figure value={d.median_weekly}>{d.median_weekly === null ? null : formatNumber(d.median_weekly)}</Figure></Stat>
+        <Stat label="Typical week"><Figure value={d.median_weekly} why="Not worked out for monthly periods">{d.median_weekly === null ? null : formatNumber(d.median_weekly)}</Figure></Stat>
       </dl>
       {report.trend.some((bucket) => bucket.distribution_events > 0) ? (
         <TrendChart
@@ -128,7 +130,9 @@ function CountHistory({ report }: { report: ItemReport }) {
             <li key={entry.counted_at} className="space-y-0.5 px-3.5 py-2.5 text-sm">
               <p className="font-semibold text-hub-ink">{etDate(entry.counted_at)}</p>
               <p className="text-hub-ink">
-                Counted <Figure value={entry.verified}>{entry.verified === null ? null : quantityText(entry.verified, report.item.count_unit)}</Figure>
+                {entry.verified === null && entry.estimated !== null
+                  ? <>Estimate <span className="tabular-nums">{quantityText(entry.estimated, report.item.count_unit)}</span> <EstimatedTag /></>
+                  : <>Counted <Figure value={entry.verified}>{entry.verified === null ? null : quantityText(entry.verified, report.item.count_unit)}</Figure></>}
                 {' · '}Expected <Figure value={entry.expected} why="Not enough data to say what was expected">{entry.expected === null ? null : formatNumber(entry.expected)}</Figure>
                 {' · '}Difference <Figure value={entry.variance} why="Not compared">{entry.variance === null ? null : signed(entry.variance)}</Figure>
               </p>
@@ -155,7 +159,7 @@ function Movements({ report }: { report: ItemReport }) {
                   <span className="font-semibold text-hub-ink">{humanize(movement.type)} · <span className="tabular-nums">{signed(movement.quantity)}</span></span>
                   <span className={HINT}>{etDateTime(movement.occurred_at)}</span>
                 </p>
-                <p className={HINT}>{[movement.unit_label, movement.request_number, movement.reason].filter(Boolean).join(' · ') || 'No unit or reason recorded'}{movement.reversed ? ' · Reversed later' : ''}</p>
+                <p className={HINT}>{[movement.unit_label, movement.request_number, movement.reason].filter(Boolean).join(' · ') || 'No unit or reason recorded'}{movement.corrects_movement_id !== null ? ' · Correction' : ''}{movement.reversed ? ' · Reversed later' : ''}</p>
               </li>
             ))}
           </ul>
@@ -187,7 +191,7 @@ export default function ItemDetail({ itemId, selection, backLabel, onBack, onFor
               <span>{periodText(report.period)}</span>
               {!report.item.active && <Tag>Not in use</Tag>}
             </p>
-            <MeaningNote label={DISTRIBUTED_LABEL} />
+            <MeaningNote label={report.label || DISTRIBUTED_LABEL} />
           </div>
           <Balance report={report} />
           <Distribution report={report} />

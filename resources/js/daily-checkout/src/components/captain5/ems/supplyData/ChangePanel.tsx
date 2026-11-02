@@ -41,7 +41,7 @@ function Headline({ data }: { data: Overview }) {
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-hub-border-soft pt-3 sm:grid-cols-4">
         <Stat label="Supplies distributed">{formatNumber(headline.items_distributed)}</Stat>
         <Stat label="Units supplied">{formatNumber(headline.units_supplied)}</Stat>
-        <Stat label="Requests submitted">{formatNumber(headline.requests_submitted)}</Stat>
+        <Stat label="Requests that counted">{formatNumber(headline.requests_submitted)}</Stat>
         <Stat label="Requests reconciled">{formatNumber(headline.requests_reconciled)}</Stat>
       </dl>
     </div>

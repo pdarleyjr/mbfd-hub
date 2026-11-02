@@ -58,8 +58,9 @@ export default function AttentionPanel({ attention, onShow }: Props) {
           {stale === 0
             ? 'Every supply has been counted recently.'
             : <><strong className="tabular-nums">{stale}</strong> {plural(stale, 'supply has', 'supplies have')} not been counted recently.</>}
+          <span className="block text-[12px] leading-4 text-hub-n-600">No physical count in 10 days, or ever. An estimate is not a count.</span>
         </p>
-        {stale > 0 && <button type="button" className={`${BTN_SECONDARY} !px-3`} onClick={() => onShow('oldest_count')}>Show oldest counts first</button>}
+        {stale > 0 && <button type="button" className={`${BTN_SECONDARY} !px-3`} onClick={() => onShow('not_counted')}>Show these supplies, oldest count first</button>}
       </div>
     </Section>
   );
