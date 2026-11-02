@@ -12,7 +12,8 @@ table, how it is tested, and an evidence-based inventory of every table surface 
 - Wide: the table is unchanged. Tablet and laptop with the sidebar open: the lowest priority columns move into
   the row's details panel. Phone: each row is a card with a short summary and the same details panel.
 - Long URLs, emails and IDs wrap (`overflow-wrap: anywhere`) instead of widening the table.
-- Controls the module adds (details button, sort menu) are at least 44px (2.75rem) on touch devices.
+- Controls the module adds (details button, sort menu) are at least 44px (2.75rem) on touch devices. Row checkboxes keep
+  their 24px box, but on a coarse pointer the 44px square around the box selects the row too.
 - Print, PDF and Excel keep their own page layout and are out of scope.
 
 ## How it works
@@ -20,7 +21,7 @@ table, how it is tested, and an evidence-based inventory of every table surface 
 | Part | File | Role |
 |---|---|---|
 | Planner | `resources/js/hub-tables/plan.js` | Pure rules: given the width, the column priorities and minimum widths, returns `table`, `priority` or `cards`, and which columns are visible or moved. Unit tested in Node. |
-| Adapter | `resources/js/hub-tables.js` | Measures each table's box (a `ResizeObserver` follows the sidebar and window), applies the plan with attributes and a CSS grid template, injects the details button, and re-applies after every Livewire update. Hidden cells stay in their row, so inline inputs, `wire:` bindings and actions keep working. |
+| Adapter | `resources/js/hub-tables.js` | Measures each table's box (a `ResizeObserver` follows the sidebar and window), applies the plan with attributes and a CSS grid template, injects the details button, and re-applies after Livewire updates. Hidden cells stay in their row, so inline inputs, `wire:` bindings and actions keep working. Re-rendering is cheap: the plan is kept per table and reused while the box width, screen width and column set are unchanged (`canReusePlan`), so a poll, filter-as-you-type or morph only rewrites the rows that lost their attributes (`data-hub-rt-row` marks the settled ones); a plan that had to be squeezed is planned again. A morph of a component with no table is ignored, and each run numbers the tables once instead of once per row. `window.__hubTablesStats` counts re-plans, restores and rows written so a test can bound the work. |
 | Styles | `resources/css/hub-tables.css` | The grid, details panel, cards, sort menu and wrapping rules. Tokens only, no colour literals. Imported by `resources/css/filament/admin/theme.css`, which every Filament panel uses. |
 | Loader | `App\Providers\ResponsiveTablesServiceProvider` | Registers the script on every Filament panel (`BODY_END`). The Master Personnel Directory and Master Vehicle Inventory also get tighter cell spacing from `responsive-tables-styles.blade.php`; the old sticky sideways-scroll columns are retired. |
 
@@ -53,12 +54,22 @@ and URL behaviour are unchanged.
 - `node --test tests/Node/hub-no-sideways-scroll-contract.test.mjs` fails on any new `overflow-x: auto`, `overflow-x-auto`
   or `overflow-x-scroll` in `resources/` or `app/`. `tests/Node/fixtures/sideways-scroll-allowlist.json` is a ratchet: it
   lists the few non-table strips and unmigrated surfaces with counts and reasons, and a fixed surface must be removed from it.
-- `npx playwright test --config=playwright.responsive-tables.config.ts` starts a disposable synthetic-data server
-  (`tests/e2e/support/responsive-tables-server.mjs`: 60 members, 40 vehicles, 12 generated rows for each resource
-  table, long unbroken strings) and, for every route in `tests/e2e/support/responsive-tables-routes.json`, asserts at
-  320, 390, 768, 1024, 1280 and 1440px that `document.documentElement.scrollWidth <= clientWidth` (1px tolerance), that
-  no element is a sideways scroller, that every table lies in the viewport and that its content fits, with the sidebar
-  open and closed, filters open, a row's details open and a dialog open, and that added controls are 44px on touch widths.
+- `npx playwright test --config=playwright.responsive-tables.config.ts` (or `npm run test:responsive-tables-e2e`) starts a
+  disposable synthetic-data server (`tests/e2e/support/responsive-tables-server.mjs`: 60 members, 40 vehicles, 12 generated
+  rows for each resource table with real enum values, live rather than archived, and long unbroken strings) and, for every
+  route in `tests/e2e/support/responsive-tables-routes.json` (19 routes: Admin, Workgroups, Training and Employee panels),
+  asserts at 320, 390, 768, 1024, 1280 and 1440px that `document.documentElement.scrollWidth <= clientWidth` (1px
+  tolerance), that no visible element is a sideways scroller (the shell bar and its menus are measured like everything
+  else; only the content of a closed menu is skipped), that every table lies in the viewport and that its content fits,
+  with the sidebar open and closed, filters open, a row's details open and a dialog open, and that added controls are 44px
+  on touch widths. Routes flagged `menus` also open each shell menu (module switcher, account, More sheet) and measure
+  the menu and the document. Further tests: a re-render at the same width does not re-plan or rewrite settled rows and
+  keeps open details and focus; the row checkbox keeps its box and has a 44px target.
+- `tests/e2e/captain5-ems.spec.ts` (Daily app) checks the unit statistics tables at 320, 390, 768 and 1280px;
+  `tests/e2e/operational-forms.spec.ts` checks the operational forms record and entry tables at eight widths from 320 to 1440px.
+- CI: the reusable release gate `.github/workflows/hub-release-gates.yml` runs the responsive tables and Home duty
+  browser configs in the `ui-browser-suites` job. It is path-aware (`scripts/ci/ui-browser-scope.mjs`): a candidate
+  whose diff is only documentation, the vacation app, Cloudflare workers or operations notes skips them, and any doubt runs them.
 - `tests/Feature/Personnel/ResponsiveTablesTest.php` keeps every directory and vehicle column, sort, search and filter.
 
 ## Inventory
@@ -68,11 +79,13 @@ scroller; **adapted, not yet verified** = covered by the shared module or migrat
 measured in a browser; **exception** = deliberately left, with the reason. Measurements use the synthetic fixture
 above, so a page that needs data the fixture does not create shows as having no table.
 
-Verification record (disposable synthetic-data server, Chromium): the Playwright contract passed 78 of 78 tests
-(11 routes, six widths, plus the personnel column-reachability and long-string tests); a crawl measured 51 routes
-at 320, 390, 768, 1024, 1280 and 1440px (306 page measurements) with no HTTP error, no document overflow outside the
-shell bar, no sideways scroller and no table past the viewport. The crawl scripts were scratch tools; the committed
-contract is the Playwright spec.
+Verification record. Disposable synthetic-data server, Chromium, PHP 8.4 on Windows, final code of this release:
+`playwright.responsive-tables.config.ts` ran 138 tests (19 routes at six widths plus the personnel, same-width morph and
+checkbox tests): 137 passed in the full run, and the one failure (`/admin/hub-support-tickets` at 390px, the page did not
+render within 30s on a cold server) passed in an isolated re-run (2 of 2). `tests/e2e/shell-alignment.spec.ts`: 128 passed,
+40 skipped by design, 0 failed. A crawl of the four routes that had no rows measured each at six widths with 12 rows and no
+overflow. The inventory rows below that are not in the contract routes were measured by the earlier crawl of 51 routes
+(306 page measurements, before the re-render change) and are not re-measured here.
 
 ### Filament list pages measured in a browser
 
@@ -82,6 +95,10 @@ contract is the Playwright spec.
 | `/admin/apparatus-inspection-exceptions` | admin | 320:cards 390:cards 768:priority 1024:table 1280:table 1440:table | 10 | fixed, measured at 320/390/768/1024/1280/1440 |
 | `/admin/apparatus-operational-alerts` | admin | 320:cards 390:cards 768:priority 1024:table 1280:table 1440:table | 12 | fixed, measured at 320/390/768/1024/1280/1440 |
 | `/admin/apparatuses` | admin | 320:cards 390:cards 768:priority 1024:table 1280:table 1440:table | 12 | fixed, measured at 320/390/768/1024/1280/1440 |
+| `/admin/apparatus-service-tickets` | admin | 320:cards 390:cards 768:priority 1024:table 1280:table 1440:table | 12 | fixed, measured at 320/390/768/1024/1280/1440; needs the fixture to give every unit a designation, see exception 6 |
+| `/admin/capital-projects` | admin | 320:cards 390:cards 768:priority 1024:priority 1280:priority 1440:priority | 12 | fixed, measured at 320/390/768/1024/1280/1440 |
+| `/admin/department-updates` | admin | 320:cards 390:cards 768:priority 1024:priority 1280:priority 1440:priority | 12 | fixed, measured at 320/390/768/1024/1280/1440 |
+| `/admin/hub-support-tickets` | admin | 320:cards 390:cards 768:table 1024:table 1280:table 1440:table | 12 | fixed, measured at 320/390/768/1024/1280/1440 |
 | `/admin/defects` | admin | 320:cards 390:cards 768:priority 1024:priority 1280:priority 1440:priority | 6 | fixed, measured at 320/390/768/1024/1280/1440 |
 | `/admin/employee-equipment-requests` | admin | 320:cards 390:cards 768:priority 1024:priority 1280:priority 1440:table | 6 | fixed, measured at 320/390/768/1024/1280/1440 |
 | `/admin/employees` | admin | 320:cards 390:cards 768:priority 1024:table 1280:table 1440:table | 50 | fixed, measured at 320/390/768/1024/1280/1440 |
@@ -135,9 +152,7 @@ contract is the Playwright spec.
 | Route | Panel | Result |
 |---|---|---|
 | `/admin` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
-| `/admin/apparatus-service-tickets` | admin | see notes: w390: HTTP 500 |
 | `/admin/bid-access-pin` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
-| `/admin/capital-projects` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/admin/captain5-operations` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/admin/command-board-pin` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/admin/command-communications` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
@@ -148,14 +163,12 @@ contract is the Playwright spec.
 | `/admin/dashboards/item` | admin | see notes: w390: HTTP 404 |
 | `/admin/dashboards/station-operations` | admin | see notes: w390: div.mbfd-dash-chips +748 |
 | `/admin/dashboards/vehicle-checkout` | admin | see notes: w390: div.mbfd-dash-chips +944 |
-| `/admin/department-updates` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/admin/email` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/admin/employee-messages` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/admin/employees/accounts` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/admin/equipment-intake` | admin | see notes: w390: div.ei-tabs +103 |
 | `/admin/fire-equipment-requests` | admin | see notes: w390: HTTP 403 |
 | `/admin/health-check-results` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
-| `/admin/hub-support-tickets` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/admin/inbound-emails` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/admin/inspections` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/admin/inventory-corrections` | admin | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
@@ -219,7 +232,7 @@ contract is the Playwright spec.
 | `/workgroups/evaluation-form-page` | workgroups | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/workgroups/evaluations` | workgroups | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/workgroups/files` | workgroups | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
-| `/workgroups/final-presentation` | workgroups | see notes: w390: page +11px |
+| `/workgroups/final-presentation` | workgroups | no table; a contract route: the page, the bar and each open shell menu fit at 320/390/768/1024/1280/1440 (the 11px overflow at 390 is fixed) |
 | `/workgroups/links` | workgroups | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/workgroups/login` | workgroups | no table rendered with the synthetic data (form, dashboard, empty state or custom page); page itself does not scroll sideways |
 | `/workgroups/notes` | workgroups | see notes: w390: HTTP 404 |
@@ -275,7 +288,7 @@ Status key: **fixed** = measured in a browser; **adapted, not yet verified** = m
 
 | View | Surface | Status |
 |---|---|---|
-| `workgroup/analysis-report`, `evaluation-report`, `final-recommendations`, `workgroup-summary` | Workgroups report decks (3, 16, 15, 11 tables) | fixed at 390 (`/workgroups/*` routes above); the 11px page overflow on those routes comes from the shell bar, see exceptions |
+| `workgroup/analysis-report`, `evaluation-report`, `final-recommendations`, `workgroup-summary` | Workgroups report decks (3, 16, 15, 11 tables) | fixed at 390 (`/workgroups/*` routes above); the 11px page overflow on those routes was the shell bar and is fixed, see exceptions |
 | `filament/employee/pages/training-history` | Employee training history | fixed (`/employee/training-history`) |
 | `filament/admin/pages/knowledge-base`, `media-control-media`, `medical-data-statistics`, `medical-supply-room` (5 tables), `trt-trailer-inventory` | Admin library, media, EMS statistics and supply room, TRT inventory | adapted, not yet verified |
 | `filament/admin/modals/employee-record`, `filament/employees/application-access`, `workgroups-history`, `filament/pages/partials/personnel-table-history`, `filament/pages/personnel-reconciliation` | Employee record modal and personnel histories | adapted, not yet verified |
@@ -284,8 +297,9 @@ Status key: **fixed** = measured in a browser; **adapted, not yet verified** = m
 | `filament/training/pages/course-matrix` | Training attendance matrix (many session columns) | adapted, not yet verified: each person becomes a card, sessions are the card's labelled fields |
 | `filament/workgroup/pages/session-results`, `partials/granular-tool-table`, `filament-workgroup/pages/survey-results` | Workgroup ranking and survey tables | adapted, not yet verified |
 | `security-standards` | Public standards matrix | adapted, not yet verified |
-| `filament/resources/operational-form-record/view` | Document history | exception: open PR 548 rewrites the same line; migrate after it merges |
-| `daily-roster/_section`, `daily-roster/pdf` | Daily roster | not touched: an unmerged branch owns `resources/views/daily-roster/*` and `daily-roster.css`. Their scrollers and tables need their own check after that branch merges |
+| `filament/resources/operational-form-record/view` | Document history | adapted, not yet verified: opts in to `data-hub-table` and the wrapper scroller is gone, but the fixture cannot create operational form records (`operational_form_records` is skipped) |
+| `daily-roster/_section` | Daily roster (member page) | fixed, no change needed: measured by `playwright.daily-roster.config.ts` ("fits the viewport") at 320, 360, 390, 768, 1024, 1280 and 1440px with no document overflow and no sideways scroller (a fixed-layout table with its own card layout on phones; there is no `overflow-x` in the roster views or `daily-roster.css`); 1280px was added to that config |
+| `daily-roster/pdf` | Daily roster PDF | out of scope (paper layout) |
 | `pdf/*`, `exports/*`, `filament-workgroup/pages/survey-results-pdf`, `training/roster-pdf`, `training/crew-planner-proposal` | PDF and print documents | out of scope (paper layout) |
 
 ### React tables
@@ -294,17 +308,17 @@ Status key: **fixed** = measured in a browser; **adapted, not yet verified** = m
 |---|---|
 | `workgroup-data-dashboard` (rankings table) | fixed at 390 (`/workgroups/data-dashboard`) |
 | `workgroup-l1-inventory` (126-row inventory) | fixed at 390 (`/workgroups/l1-inventory`) |
-| Daily app `captain5/ems/UnitStatistics.tsx` | exception: the Daily bundle does not load `hub-tables.js`; the table has a 22rem minimum so it fits down to 360px, not measured. Loading the module from `daily-checkout/src/main.tsx` was avoided because open PR 548 edits that file |
-| `operational-forms` record table (`of-table-wrap`) | exception: separate bundle and stylesheet (own hex palette); not yet migrated |
+| Daily app `captain5/ems/UnitStatistics.tsx` | fixed: its own container-query cards (`unit-statistics.css`, no Hub adapter bundled; the change is the Captain 5 lazy chunk plus a 682 byte stylesheet). Under a 30rem box each row is a card and each number carries its column heading; wider it is the table. Measured in `captain5-ems.spec.ts` at 320 and 390 (cards), 768 and 1280 (tables) with no overflow. `npm run check:service-workers` passes |
+| `operational-forms` record and entry tables (`of-table-wrap`) | fixed: the wrapper is a size container and the tables become cards when their room is short (record table under 640px, entry table under 900px), with the older viewport rules kept as a fallback. Measured at 320, 390, 768, 820, 900, 1024, 1280 and 1440px with no document overflow, no wrapper scroll and no table past its wrapper. The bundle's context navigation, evidence spine and preview toolbar are strips of controls, not tables (allowlisted) |
 | `training-roster/main.tsx` kiosk table (4 columns) | not yet verified; fits by construction at 320px (no minimum widths) but not measured |
-| `daily-roster.js` | not touched: owned by the unmerged Daily roster branch |
+| `daily-roster.js` | covered with the roster view above |
 
 ### Exceptions and known gaps
 
-1. **Shell bar overflow (not a table, not changed).** On every non-Admin panel at 390px the account control in the shell bar ends 11px past the viewport (`details.hub-shell-account`, right edge 401px), so the document is 11px wider than the screen; the `.hub-shell-popover` menu also reports 34px of internal horizontal scroll. `hub-shell.css` is owned by open PR 548 and the brief says not to change the bar, so this is reported only. The Playwright spec ignores `.hub-shell-popover`/`.hub-shell-bar` and its routes are Admin panel pages for this reason.
+1. **Shell bar overflow: fixed.** On the Workgroups panel at 390px the bar (brand, module switcher, two controls, account) was 23px wider than its room, so the document scrolled 11px sideways. The module switcher is now icon-only up to 419px (it already was up to 374px) in `hub-shell.css`; `--hub-shell-bar-height` is untouched and shell-alignment passes. The contract no longer excludes the shell: the document, every scroller and each open shell menu are measured on the Workgroups, Training and Employee panels.
 2. **Strips that scroll by design, not tables** (allowlisted as `not-a-table`): dashboard filter chips (`.mbfd-dash-chips`), equipment intake tab strip, wizard progress navs, Daily tab list and inspection carousels, video filmstrip, rich text toolbar. Filament page tabs (`.fi-tabs`) now wrap instead.
-3. **Checkbox size.** Row checkboxes stay at the Hub's existing coarse-pointer size (1.5rem from `hub-admin-v2.css`), not 44px. The module's own controls (details button, sort menu, in-card actions) are 44px. Enlarging the checkbox itself would change every Filament table and was left to the owner.
-4. **Pending migrations** (allowlisted as `pending`): the operational forms bundle, the Daily app EMS statistics table and the open-PR-548 document history view, listed above.
-5. **Data the synthetic fixture cannot create.** Resources whose tables need domain enums or relations (for example capital projects, department updates, hub support tickets, station requests) render no rows in the fixture and are shown under "no table on screen". The shared module applies to them, but they are not browser-measured.
-6. **Pages that returned an error in the fixture** (not layout problems): see the HTTP status in the tables above. They are caused by generated rows that violate domain constraints.
+3. **Checkbox size.** The visible row checkbox stays at the Hub's size (1.5rem from `hub-admin-v2.css`). On a coarse pointer its selection cell is at least 44px and a tap in the 44px square around the box toggles it (`onSelectionCell`, Shift/Ctrl/Meta kept for range selection); with a mouse only the box itself toggles.
+4. **Pending migrations:** none. The remaining allowlisted `overflow-x` strips are not tables (see 2 and the operational forms strips above).
+5. **Data the synthetic fixture cannot create.** Capital projects, department updates, hub support tickets and apparatus service tickets now render rows (valid enum values, live not archived). Still without rows: `operational_form_records`, `promotional_lists`, `evaluation_submissions` and `workgroup_members` (constraint failures in the generic filler), and pages that need a parent record or state. They use the shared module but are not browser-measured.
+6. **`/admin/apparatus-service-tickets` returned HTTP 500 in the fixture: a real latent product bug, not fixed here.** The exception is `Filament\Forms\Components\Select::isOptionDisabled(): Argument #2 ($label) must be of type string, null given`. `ApparatusServiceTicketResource.php` lines 89-93 build the Unit filter with `SelectFilter::make('apparatus_id')->relationship('apparatus', 'designation')->preload()`. `apparatuses.designation` is nullable (migration `2026_01_28_141500_make_all_apparatus_columns_nullable`) and the Apparatus form (`ApparatusResource.php` lines 76-78) does not require it, so one apparatus saved without a designation makes the whole list page fail in production. Verified: with `designation` set on all 12 fixture units the page returns 200. The fixture now gives every unit a designation so the page can be measured. Other 4xx/5xx statuses in the tables above are generated rows that violate domain rules, not layout problems.
 7. **Focusable wrappers kept.** A few migrated Blade wrappers keep `tabindex="0"` and `role="region"` (an existing feature test asserts one of them); they are harmless tab stops now that the wrapper does not scroll.
