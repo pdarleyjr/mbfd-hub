@@ -67,7 +67,7 @@
                     <p>{{ $duty->unavailableReason }} Days appear here as soon as a roster arrives.</p>
                 </div>
             @elseif ($duty->isVerified())
-                <p class="mt-3 font-semibold" role="status" data-roster-source="verified">{{ $dateLabel }} · {{ $duty->shiftLabel() }}</p>
+                <p class="mt-3 font-semibold" role="status" data-roster-source="{{ $duty->isOutlook ? 'outlook' : 'verified' }}">{{ $dateLabel }} · {{ $duty->shiftLabel() }}@if ($duty->isOutlook) · Outlook{{ $duty->asOf ? ', updated '.$duty->asOf->setTimezone('America/New_York')->format('M j g:i A') : '' }}, may change @endif</p>
                 @if ($duty->warning)<p role="status" class="mt-2 text-warning-700">{{ $duty->warning }}</p>@endif
             @else
                 <div class="hub-callout mt-3" role="status" data-roster-source="unavailable">

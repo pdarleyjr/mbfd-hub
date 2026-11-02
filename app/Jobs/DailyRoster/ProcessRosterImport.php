@@ -11,6 +11,7 @@ use App\Services\DailyRoster\Parsing\TeleStaffWorkbookException;
 use App\Services\DailyRoster\Parsing\TeleStaffWorkbookParser;
 use App\Services\DailyRoster\RosterAnomalyGuard;
 use App\Services\DailyRoster\RosterIncidents;
+use App\Services\DailyRoster\RosterOutlook;
 use App\Services\DailyRoster\RosterPipelineException;
 use App\Services\DailyRoster\RosterPublisher;
 use App\Services\DailyRoster\RosterStateRecorder;
@@ -140,7 +141,11 @@ final class ProcessRosterImport implements ShouldQueue
         }
 
         try {
-            return app(TeleStaffWorkbookParser::class)->parse($path, $hash);
+            $parser = app(TeleStaffWorkbookParser::class);
+
+            return $import->source === RosterOutlook::SOURCE
+                ? $parser->parse($path, $hash, RosterOutlook::maxDaysAhead())
+                : $parser->parse($path, $hash);
         } catch (TeleStaffWorkbookException $exception) {
             $context = $exception->sourceRow === null ? [] : ['source_row' => $exception->sourceRow];
             if ($exception->errorCode === 'read_failed') {
@@ -167,7 +172,8 @@ final class ProcessRosterImport implements ShouldQueue
     {
         $reasons = $guard->check($import, $report);
 
-        if (config('daily_roster.mode') !== 'publish') {
+        $publishes = $import->source === RosterOutlook::SOURCE ? RosterOutlook::publishes() : config('daily_roster.mode') === 'publish';
+        if (! $publishes) {
             $recorder->transition($import, RosterImport::STATE_SHADOWED, [
                 'warnings' => self::warningsWithHolds($report, $reasons),
             ], 'shadow_mode', $reasons === [] ? [] : ['reasons' => $reasons]);

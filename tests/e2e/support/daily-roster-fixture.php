@@ -10,6 +10,7 @@ declare(strict_types=1);
 //   php daily-roster-fixture.php publish-seat "NEW, MEMBER"
 //   php daily-roster-fixture.php confirm
 //   php daily-roster-fixture.php age-pointer
+//   php daily-roster-fixture.php outlook
 
 use App\Models\DailyRoster\RosterActiveVersion;
 use App\Models\DailyRoster\RosterAssignment;
@@ -106,6 +107,15 @@ if ($command === 'seed') {
     // So a later publish changes "Last updated" even when it lands in the same minute as the one before it.
     RosterActiveVersion::query()->whereDate('duty_date', $dutyDate->format('Y-m-d'))->toBase()
         ->update(['updated_at' => CarbonImmutable::now()->subHours(3)->format('Y-m-d H:i:s')]);
+} elseif ($command === 'outlook') {
+    // TeleStaff's 7-day outlook for the next day and the one after the gap; the day between stays missing.
+    foreach ([1 => 'OUTLOOK, OLA', 3 => 'OUTLOOK, PIA'] as $days => $name) {
+        $date = $dutyDate->addDays($days)->format('Y-m-d');
+        DailyRosterSnapshotFactory::publish($date, [
+            'Station 2 / Engine 2' => [['employee_id' => '9002'.$days, 'name' => $name, 'rank' => 'Firefighter', 'code' => 'SP', 'category' => 'Scheduled']],
+        ], ['generated_at' => CarbonImmutable::now('UTC')->subHour()]);
+        RosterActiveVersion::query()->whereDate('duty_date', $date)->update(['source' => App\Services\DailyRoster\RosterOutlook::SOURCE]);
+    }
 } else {
-    throw new InvalidArgumentException('Usage: daily-roster-fixture.php seed | publish "NAME" | publish-section "NAME" | publish-seat "NAME" | confirm | age-pointer');
+    throw new InvalidArgumentException('Usage: daily-roster-fixture.php seed | publish "NAME" | publish-section "NAME" | publish-seat "NAME" | confirm | age-pointer | outlook');
 }
