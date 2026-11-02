@@ -30,7 +30,8 @@ export function useMasterData({ paused, onForbidden }: { paused: boolean; onForb
     };
   }, [reload]);
 
-  const { setData } = load;
+  // Rows from a write replace the list through applyLocal, so a refresh that started earlier cannot undo them.
+  const { applyLocal: setData } = load;
   const replaceItem = useCallback((item: MasterItem) => {
     setData((current) => {
       if (!current) return current;
@@ -39,9 +40,15 @@ export function useMasterData({ paused, onForbidden }: { paused: boolean; onForb
     });
   }, [setData]);
 
+  /** Several rows at once, as the Edit mode save returns them. */
+  const replaceItems = useCallback((next: readonly MasterItem[]) => {
+    const byId = new Map(next.map((item) => [item.id, item]));
+    setData((current) => (current ? { ...current, items: current.items.map((entry) => byId.get(entry.id) ?? entry) } : current));
+  }, [setData]);
+
   const removeItem = useCallback((id: number) => {
     setData((current) => (current ? { ...current, items: current.items.filter((entry) => entry.id !== id) } : current));
   }, [setData]);
 
-  return { ...load, replaceItem, removeItem };
+  return { ...load, replaceItem, replaceItems, removeItem };
 }

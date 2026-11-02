@@ -91,7 +91,10 @@ final class EmsLabels
         InventorySnapshot::KIND_BASELINE => 'Baseline',
     ];
 
-    public const ORDER_STATUS = [SupplyOrder::PLACED => 'Order placed', SupplyOrder::RECEIVED => 'Received', SupplyOrder::CANCELLED => 'Cancelled'];
+    public const ORDER_STATUS = [
+        SupplyOrder::PENDING => 'Pending', SupplyOrder::PLACED => 'Ordered', SupplyOrder::BACKORDERED => 'Back ordered',
+        SupplyOrder::RECEIVED => 'Arrived', SupplyOrder::CANCELLED => 'Cancelled',
+    ];
 
     public static function status(?string $status): string
     {
