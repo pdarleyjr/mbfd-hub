@@ -361,9 +361,11 @@
                         @if($defect['closure'])
                             <div class="hub-insp-observation" data-issue-closure>
                                 <p class="hub-insp-observation__label">
-                                    {{ $defect['closed_no_action'] ? \App\Support\Fleet\DefectNoActionClosure::STATUS_LABEL : 'Resolved' }}@if($defect['closure']['at']) · {{ $defect['closure']['at'] }}@endif
+                                    {{ ($defect['closure']['kind'] ?? null) === 'merged' ? \App\Support\Fleet\DefectActionStatus::mergedLabel($defect['merged_into'] ?? null) : ($defect['closed_no_action'] ? \App\Support\Fleet\DefectNoActionClosure::STATUS_LABEL : 'Resolved') }}@if($defect['closure']['at']) · {{ $defect['closure']['at'] }}@endif
                                 </p>
-                                @if($defect['closed_no_action'])
+                                @if(($defect['closure']['kind'] ?? null) === 'merged')
+                                    <p class="hub-insp-note">A duplicate report of the same issue. Its reports, messages and members continue on that issue.</p>
+                                @elseif($defect['closed_no_action'])
                                     <p class="hub-insp-item__text">Why no corrective action was necessary: {{ $defect['closure']['reason'] ?? 'Not recorded' }}</p>
                                     <p class="hub-insp-note">Nothing was repaired or replaced. The reason and the original report stay in the apparatus history.</p>
                                 @elseif($defect['closure']['notes'])

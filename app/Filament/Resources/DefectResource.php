@@ -114,7 +114,11 @@ class DefectResource extends Resource
                     ->visible(fn (?ApparatusDefect $record): bool => (bool) $record?->resolved),
 
                 Forms\Components\DateTimePicker::make('resolved_at')
-                    ->label(fn (?ApparatusDefect $record): string => $record?->isClosedNoAction() ? 'Closed at' : 'Resolved at')
+                    ->label(fn (?ApparatusDefect $record): string => match (true) {
+                        (bool) $record?->isMergedDuplicate() => 'Merged at',
+                        (bool) $record?->isClosedNoAction() => 'Closed at',
+                        default => 'Resolved at',
+                    })
                     ->disabled()
                     ->dehydrated(false)
                     ->visible(fn (?ApparatusDefect $record): bool => (bool) $record?->resolved),

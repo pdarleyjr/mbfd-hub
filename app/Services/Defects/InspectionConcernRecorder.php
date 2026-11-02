@@ -9,6 +9,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionConcern;
 use App\Models\User;
+use App\Support\Fleet\DefectNameKey;
 
 /**
  * Concerns, damage and notes a member sends with a Daily Checkout (docs/apparatus-issue-history.md section 3).
@@ -57,9 +58,10 @@ final class InspectionConcernRecorder
             ];
         }
 
+        $rows = $this->matchOpenIssues((int) $apparatus->id, $rows);
         $open = $this->defects->lockOpenDefectIds(
             (int) $apparatus->id,
-            array_values(array_filter(array_column($rows, 'existing'))),
+            array_values(array_unique(array_filter([...array_column($rows, 'existing'), ...array_column($rows, 'matched')]))),
         );
         $compartments = $newIssues = $confirmations = [];
         foreach ($rows as $entry) {
@@ -68,12 +70,18 @@ final class InspectionConcernRecorder
             if ($row->kind !== ApparatusInspectionConcern::KIND_ISSUE) {
                 continue;
             }
-            // Closed, or on another truck, or no such issue: the report becomes a new issue and is never lost.
             if ($entry['existing'] !== null && in_array($entry['existing'], $open, true)) {
-                $confirmations[] = ['row' => $row, 'defect_id' => $entry['existing']];
+                $confirmations[] = ['row' => $row, 'defect_id' => $entry['existing'], 'matched' => false];
 
                 continue;
             }
+            // The same thing another member already reported on this truck joins that issue instead of opening a second one.
+            if ($entry['matched'] !== null && in_array($entry['matched'], $open, true)) {
+                $confirmations[] = ['row' => $row, 'defect_id' => $entry['matched'], 'matched' => true];
+
+                continue;
+            }
+            // Closed, or on another truck, or no such issue, and nothing open by that name: the report becomes a new issue and is never lost.
             $newIssues[] = $row;
             $compartments[] = $this->pseudoCompartment($row);
         }
@@ -92,6 +100,7 @@ final class InspectionConcernRecorder
                 $confirmation['defect_id'],
                 $confirmation['row']->description,
                 $confirmation['row']->photo_path,
+                $confirmation['matched'],
             );
             $confirmation['row']->linkToDefect($defect);
             $confirmed[] = (int) $defect->id;
@@ -104,6 +113,43 @@ final class InspectionConcernRecorder
             $findings->appearsCorrectedDefectIds,
             $findings->significantNewOrEscalatedDefectIds,
         );
+    }
+
+    /**
+     * For each issue the member did not tie to an open issue of this truck: the one open issue whose item is
+     * this description in the same location (case and spacing aside; no location is the default concerns
+     * location). Exact names only, and only when exactly one issue fits: a different location, an ambiguous or
+     * a merely similar description stays a new issue, which a reviewer can still merge.
+     *
+     * Read under the apparatus lock the caller holds, so the set cannot change before lockOpenDefectIds().
+     *
+     * @param  array<string, array{row: ApparatusInspectionConcern, existing: ?int}>  $rows
+     * @return array<string, array{row: ApparatusInspectionConcern, existing: ?int, matched: ?int}>
+     */
+    private function matchOpenIssues(int $apparatusId, array $rows): array
+    {
+        $open = null;
+        foreach ($rows as $clientId => $entry) {
+            $rows[$clientId]['matched'] = null;
+            if ($entry['row']->kind !== ApparatusInspectionConcern::KIND_ISSUE) {
+                continue;
+            }
+            $open ??= ApparatusDefect::query()->where('apparatus_id', $apparatusId)->where('resolved', false)
+                ->orderBy('id')->get(['id', 'compartment', 'item']);
+            if ($entry['existing'] !== null && $open->contains('id', $entry['existing'])) {
+                continue;
+            }
+            $item = $this->itemName($entry['row']);
+            // No location is the default concerns location: it joins only another unlocated report, never a located one.
+            $location = $this->compartmentName($entry['row']);
+            $fits = $open->filter(static fn (ApparatusDefect $defect): bool => DefectNameKey::same($defect->item, $item)
+                && DefectNameKey::same($defect->compartment, $location));
+            if ($fits->count() === 1) {
+                $rows[$clientId]['matched'] = (int) $fits->first()->id;
+            }
+        }
+
+        return $rows;
     }
 
     /**
@@ -137,22 +183,15 @@ final class InspectionConcernRecorder
         if ($rows === []) {
             return;
         }
-        $keys = array_map(static fn (ApparatusInspectionConcern $row): string => 'concern-'.$row->client_id, $rows);
+        // The findings pass joins names without case or spacing, so the link compares them the same way.
         $defects = ApparatusDefect::query()
             ->where('apparatus_id', $apparatusId)->where('resolved', false)
-            ->where(function ($query) use ($keys, $rows): void {
-                $query->whereIn('item_key', $keys)
-                    ->orWhere(function ($names) use ($rows): void {
-                        $names->whereIn('compartment', array_values(array_unique(array_map($this->compartmentName(...), $rows))))
-                            ->whereIn('item', array_values(array_unique(array_map($this->itemName(...), $rows))));
-                    });
-            })
             ->orderBy('id')->get();
         foreach ($rows as $row) {
             $key = 'concern-'.$row->client_id;
             $defect = $defects->first(static fn (ApparatusDefect $candidate): bool => $candidate->item_key === $key)
-                ?? $defects->first(fn (ApparatusDefect $candidate): bool => $candidate->compartment === $this->compartmentName($row)
-                    && $candidate->item === $this->itemName($row));
+                ?? $defects->first(fn (ApparatusDefect $candidate): bool => DefectNameKey::same($candidate->compartment, $this->compartmentName($row))
+                    && DefectNameKey::same($candidate->item, $this->itemName($row)));
             if ($defect instanceof ApparatusDefect) {
                 $row->linkToDefect($defect);
             }

@@ -77,12 +77,16 @@ final class InventoryCorrectionController extends Controller
             ], 409);
         }
         $correction = $result['correction'];
+        $joined = $result['joined'];
 
+        // joined_existing: another member already reported this change, so this member was added
+        // to that open request (the id and reference are that request's) instead of a new one.
         return response()->json([
             'id' => (int) $correction->getKey(),
             'reference' => $correction->reference(),
             'status' => $correction->status,
             'duplicate' => $result['duplicate'],
-        ], $result['duplicate'] ? 200 : 201);
+            'joined_existing' => $joined,
+        ], $result['duplicate'] || $joined ? 200 : 201);
     }
 }

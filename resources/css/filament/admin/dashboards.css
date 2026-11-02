@@ -838,6 +838,13 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
 .mbfd-dash-group__form { display: grid; gap: .5rem; padding: .75rem 1rem; border-bottom: 1px solid rgb(var(--hub-border-soft)); background: rgb(var(--hub-n-25)); }
 .mbfd-dash-group__form .mbfd-dash-action__submit { width: fit-content; margin: 0; }
 
+.mbfd-dash-group__history-head { cursor: pointer; list-style: none; flex-wrap: wrap; row-gap: .125rem; min-height: 2.75rem; }
+.mbfd-dash-group__history-head::-webkit-details-marker { display: none; }
+.mbfd-dash-group__history-head::before { content: "▸"; color: var(--dash-muted); }
+.mbfd-dash-group__history[open] > .mbfd-dash-group__history-head::before { content: "▾"; }
+.mbfd-dash-group__row--closed .mbfd-dash-group__name { color: var(--dash-muted); font-weight: 600; }
+.mbfd-dash-group__done-icon { width: 1.125rem; height: 1.125rem; color: rgb(var(--hub-success, 22 128 61)); }
+.mbfd-dash-group__state { display: inline-flex; align-items: center; padding: 0 .5rem; border-radius: 999px; background: rgb(var(--hub-n-100, 241 245 249)); color: rgb(var(--hub-ink-secondary)); font-size: .75rem; font-weight: 700; }
 .mbfd-dash-group__row { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); align-items: stretch; }
 .mbfd-dash-group__row + .mbfd-dash-group__row { border-top: 1px solid rgb(var(--hub-border-soft)); }
 .mbfd-dash-group__check { display: grid; place-items: center; min-height: 2.75rem; cursor: pointer; }
@@ -988,7 +995,13 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
         padding-bottom: 3.5rem;
     }
 
-    body.mbfd-dash-fit .mbfd-dash-group__section { overflow: visible; }
+    /*
+     * The group page scrolls as one column. Its section cards keep their full height: the generic
+     * fit rule below (min-height: 0; overflow: hidden) would shrink each one to fit the window and
+     * slide its rows under the action bar.
+     */
+    body.mbfd-dash-fit .mbfd-dash-group__sections > .mbfd-dash-card { min-height: auto; overflow: visible; flex: none; }
+    body.mbfd-dash-fit .mbfd-dash-group__sections > .mbfd-dash-card > .mbfd-dash-list { flex: none; overflow: visible; }
 
     body.mbfd-dash-fit .mbfd-dash-body--split {
         grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);

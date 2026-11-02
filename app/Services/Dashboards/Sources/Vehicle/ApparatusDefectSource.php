@@ -134,7 +134,7 @@ final class ApparatusDefectSource extends VehicleIssueSource
             summary: implode(' — ', array_filter([trim((string) $record->compartment) ?: null, $notes])) ?: null,
             severity: $projection['severity'],
             status: $status,
-            statusLabel: DefectActionStatus::label($status),
+            statusLabel: DefectActionStatus::labelFor($status, $record->resolution_type),
             stage: $projection['stage'],
             tags: $projection['tags'],
             subject: $projection['subject'],
@@ -170,7 +170,8 @@ final class ApparatusDefectSource extends VehicleIssueSource
             ['label' => 'Problem', 'value' => str((string) $defect->issue_type)->replace('_', ' ')->headline()->toString()],
             ['label' => 'Severity', 'value' => DefectSeverityCorrection::label($defect->severity)],
             ['label' => 'Operational impact', 'value' => DefectCorrectiveActions::IMPACT_LABELS[(string) $defect->operational_impact] ?? 'Not classified yet'],
-            ['label' => 'Status', 'value' => DefectActionStatus::label($defect->action_status)],
+            ['label' => 'Status', 'value' => DefectActionStatus::labelFor($defect->action_status, $defect->resolution_type)],
+            ['label' => 'Merged into', 'value' => $defect->duplicate_of_defect_id !== null ? 'Issue #'.$defect->duplicate_of_defect_id : ''],
             ['label' => 'Follow-up', 'value' => DefectFollowUpState::label(DefectFollowUpState::for($defect))],
             ['label' => 'First reported', 'value' => (string) self::local($defect->first_reported_at ?? $defect->created_at)],
             ['label' => 'Reported by', 'value' => (string) $fresh['issue']->actorLabel],
@@ -210,6 +211,10 @@ final class ApparatusDefectSource extends VehicleIssueSource
             self::textarea('member_message', 'Message to the member (optional)'),
             self::textarea('internal_note', 'Internal note, staff only (optional)', max: 4000),
         ];
+        // A merged duplicate lives on in the issue it was merged into; reopening it would split that issue again.
+        if ($defect->isMergedDuplicate()) {
+            return [];
+        }
         if (DefectActionStatus::isClosed($status)) {
             return [new IssueAction('reopen', 'Reopen', 'secondary', [self::textarea('reason', 'Reason for reopening', true, 5000), ...$messages])];
         }

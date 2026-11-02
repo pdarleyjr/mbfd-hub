@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import type { ChecklistItem, Compartment } from '../types';
 import { createClientSubmissionId } from '../lib/sync';
 import {
-  ELSEWHERE, ITEM_REASONS, NOTE_MAX, PHOTO_MAX_BYTES, QUANTITY_MAX, QUEUED_TEXT, SENT_TEXT,
+  ELSEWHERE, ITEM_REASONS, NOTE_MAX, PHOTO_MAX_BYTES, QUANTITY_MAX, JOINED_TEXT, QUEUED_TEXT, SENT_TEXT,
   buildCorrectionBody, correctionErrorMessage, emptyCorrectionForm, sendInventoryCorrection, validateCorrection,
   type CorrectionErrors, type CorrectionForm, type CorrectionMode, type InventoryCorrectionContext,
 } from '../utils/inventoryCorrections';
@@ -36,7 +36,7 @@ export default function InventoryCorrectionForm({ mode, fieldId, compartment, co
   const otherCompartments = compartments.filter(entry => entry.id !== compartment.id);
   const showPhoto = reason === 'replaced' || reason === 'new_item';
   const showDetails = reason === 'replaced' || reason === 'new_item';
-  const statusText = form.result === 'submitted' ? SENT_TEXT : form.result === 'queued' ? QUEUED_TEXT : '';
+  const statusText = form.result === 'submitted' ? SENT_TEXT : form.result === 'joined' ? JOINED_TEXT : form.result === 'queued' ? QUEUED_TEXT : '';
 
   const fieldProps = (key: keyof CorrectionErrors, id: string) => ({
     id,

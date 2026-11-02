@@ -87,6 +87,7 @@ class ApparatusDefect extends Model
         'resolved_by_user_id',
         'resolution_type',
         'recurrence_of_defect_id',
+        'duplicate_of_defect_id',
     ];
 
     protected $casts = [
@@ -115,14 +116,16 @@ class ApparatusDefect extends Model
         return $query->where('action_status', DefectActionStatus::RESOLVED);
     }
 
+    /** A merged duplicate is stored as dismissed but was a duplicate report, not a "no action required" call. */
     public function scopeClosedNoAction(Builder $query): Builder
     {
-        return $query->where('action_status', DefectActionStatus::DISMISSED);
+        return $query->where('action_status', DefectActionStatus::DISMISSED)->where(static fn (Builder $kind) => $kind
+            ->whereNull('resolution_type')->orWhere('resolution_type', '!=', DefectActionStatus::MERGED_DUPLICATE));
     }
 
     public function isClosedNoAction(): bool
     {
-        return DefectActionStatus::isNoAction($this->action_status);
+        return DefectActionStatus::isNoAction($this->action_status) && ! $this->isMergedDuplicate();
     }
 
     public function scopeMissing(Builder $query): Builder
@@ -203,9 +206,20 @@ class ApparatusDefect extends Model
         return $this->belongsTo(self::class, 'recurrence_of_defect_id');
     }
 
+    /** The issue this duplicate report was merged into (DefectConsolidationService). */
+    public function duplicateOf(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(self::class, 'duplicate_of_defect_id');
+    }
+
+    public function isMergedDuplicate(): bool
+    {
+        return DefectActionStatus::isMergedDuplicate($this->resolution_type);
+    }
+
     public function actionLabel(): string
     {
-        return DefectActionStatus::label($this->action_status);
+        return DefectActionStatus::labelFor($this->action_status, $this->resolution_type);
     }
 
     /** The most recent status change in the append-only history (eager-load it for tables). */
@@ -223,6 +237,9 @@ class ApparatusDefect extends Model
      */
     public function attributedActionLabel(): string
     {
+        if ($this->isMergedDuplicate()) {
+            return DefectActionStatus::mergedLabel($this->duplicate_of_defect_id);
+        }
         $event = $this->relationLoaded('latestStatusEvent')
             ? $this->getRelation('latestStatusEvent')
             : $this->latestStatusEvent()->with('actor:id,name,display_name')->first();

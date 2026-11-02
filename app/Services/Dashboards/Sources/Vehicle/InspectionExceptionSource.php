@@ -120,13 +120,17 @@ final class InspectionExceptionSource extends VehicleIssueSource
     protected function toIssue(Model $record, bool $displayMode, array $projection): DashboardIssue
     {
         $field = (string) $record->field;
+        // A decided hold must not read as still waiting: its title says what was checked, not "needs review".
+        $decided = in_array((string) $record->status, self::CLOSED, true);
 
         return new DashboardIssue(
             type: $this->type(),
             id: (string) $record->getKey(),
             title: match (true) {
-                $field === 'engine_hours' => 'Engine hours reading needs review',
-                $field === 'miles' => 'Mileage reading needs review',
+                $field === 'engine_hours' => $decided ? 'Engine hours reading reviewed' : 'Engine hours reading needs review',
+                $field === 'miles' => $decided ? 'Mileage reading reviewed' : 'Mileage reading needs review',
+                $decided && $field === InspectionHold::FIELD_REVIEW_FLAG => 'Crew review request decided',
+                $decided && str_starts_with($field, 'defect:') => 'Equipment finding reviewed',
                 $field === InspectionHold::FIELD_REVIEW_FLAG => 'Crew asked for a review',
                 $field === InspectionHold::FIELD_SIGNIFICANT_DAMAGE => 'Significant damage reported',
                 str_starts_with($field, 'defect:') => 'Equipment finding held for review',

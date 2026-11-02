@@ -32,6 +32,7 @@ final class InventoryCorrectionProjection
             ->open()
             ->orderByDesc('id')
             ->limit(self::MAX_MARKERS)
+            ->with('participants:id,apparatus_inventory_correction_id,user_id,employee_id')
             ->get(['id', 'compartment_key', 'item_key', 'reason', 'status', 'created_at', 'reporter_user_id', 'reporter_employee_id'])
             ->sortBy('id')
             ->map(function (ApparatusInventoryCorrection $correction) use ($viewer): array {
@@ -65,11 +66,18 @@ final class InventoryCorrectionProjection
     /** @return Builder<ApparatusInventoryCorrection> */
     public function ownedQuery(User $user): Builder
     {
+        // Reported by the member, or reported by someone else with the member added to it.
         return ApparatusInventoryCorrection::query()->where(function (Builder $query) use ($user): void {
             $query->where('reporter_user_id', $user->getKey());
             if ($user->employee_profile_id !== null) {
                 $query->orWhere('reporter_employee_id', $user->employee_profile_id);
             }
+            $query->orWhereHas('participants', function (Builder $participants) use ($user): void {
+                $participants->where('user_id', $user->getKey());
+                if ($user->employee_profile_id !== null) {
+                    $participants->orWhere('employee_id', $user->employee_profile_id);
+                }
+            });
         });
     }
 
@@ -109,34 +117,63 @@ final class InventoryCorrectionProjection
     }
 
     /**
-     * What the reporting member may see about their correction: proposal, decision as
-     * applied, and the member-visible thread.
+     * What a member on the correction may see about it: proposal, decision as applied, and the
+     * member-visible thread. With several members on one request, another member's entries read
+     * "Another member" (never a name), and only the viewer's own entries read "You".
      *
      * @return array<string, mixed>
      */
-    public function memberDetail(ApparatusInventoryCorrection $correction): array
+    public function memberDetail(ApparatusInventoryCorrection $correction, ?User $viewer = null): array
     {
         $events = $correction->events()->memberVisible()->with('actor:id,name,display_name')->get();
         $decision = is_array($correction->decision) ? $correction->decision : [];
         $applied = $events->last(static fn (Event $event): bool => $event->event_type === Event::APPLIED);
+        $mine = static fn (?int $actorId): bool => $viewer === null || $actorId === null || $actorId === (int) $viewer->getKey();
+        $duplicateOf = $correction->duplicate_of_correction_id !== null ? ApparatusInventoryCorrection::query()->find($correction->duplicate_of_correction_id) : null;
 
         return [
             ...$this->summary($correction),
             'target' => $correction->target_snapshot,
             'proposal' => $correction->proposal ?? [],
             'note' => $correction->member_note,
+            'reported_by_viewer' => $viewer === null || InventoryCorrectionAccess::reported($viewer, $correction),
+            'members' => max(1, $correction->participants()->count()),
+            'combined_into' => $duplicateOf === null ? null : ['id' => (int) $duplicateOf->getKey(), 'reference' => $duplicateOf->reference()],
             'decision_reason' => $correction->decision_reason,
             'final_operation' => $decision['operation'] ?? null,
             'modified' => (bool) ($decision['modified'] ?? false),
             'applied_to' => $applied?->details['units'] ?? [],
-            'thread' => $events->map(static fn (Event $event): array => [
-                'id' => (int) $event->getKey(),
-                'type' => $event->event_type,
-                'from' => $event->author_context === 'logistics' ? 'Logistics' : 'You',
-                'body' => $event->body,
-                'at' => $event->created_at,
-            ])->values()->all(),
-            'can_reply' => true,
+            'thread' => $events->map(static function (Event $event) use ($mine): array {
+                $own = $event->author_context !== 'logistics' && $mine($event->actor_user_id !== null ? (int) $event->actor_user_id : null);
+
+                return [
+                    'id' => (int) $event->getKey(),
+                    'type' => $event->event_type,
+                    'from' => $event->author_context === 'logistics' ? 'Logistics' : ($own ? 'You' : 'Another member'),
+                    'mine' => $own,
+                    'body' => self::threadBody($event, $own),
+                    'at' => $event->created_at,
+                ];
+            })->values()->all(),
+            'can_reply' => $correction->status !== ApparatusInventoryCorrection::STATUS_MERGED,
         ];
+    }
+
+    /** A "same change" entry says who it was for the viewer, plus that member's note and proposal. */
+    private static function threadBody(Event $event, bool $own): ?string
+    {
+        if ($event->event_type !== Event::JOINED) {
+            return $event->body;
+        }
+        $details = is_array($event->details) ? $event->details : [];
+        $parts = [$own ? 'You reported the same change and were added to this request.' : InventoryCorrectionConsolidator::JOINED_TEXT];
+        if (($details['proposal_differs'] ?? false) === true && filled($details['summary'] ?? null)) {
+            $parts[] = 'Proposed: '.$details['summary'].'.';
+        }
+        if (filled($details['note'] ?? null)) {
+            $parts[] = 'Note: '.$details['note'];
+        }
+
+        return implode(' ', $parts);
     }
 }

@@ -27,6 +27,37 @@ final class DefectActionStatus
     /** @var list<string> */
     public const CLOSED = [self::RESOLVED, self::DISMISSED];
 
+    /**
+     * resolution_type of a duplicate report merged into another issue. It is closed as DISMISSED
+     * (nothing was repaired on this row) and shown as MERGED_LABEL, never as a repair or a no-action call.
+     */
+    public const MERGED_DUPLICATE = 'merged_duplicate';
+
+    public const MERGED_LABEL = 'Merged';
+
+    public static function isMergedDuplicate(?string $resolutionType): bool
+    {
+        return $resolutionType === self::MERGED_DUPLICATE;
+    }
+
+    /** "Merged into issue #12": where a merged duplicate's reports, messages and members went. */
+    public static function mergedLabel(mixed $survivorId): string
+    {
+        return is_numeric($survivorId) && (int) $survivorId > 0 ? self::MERGED_LABEL.' into issue #'.(int) $survivorId : self::MERGED_LABEL;
+    }
+
+    /** How a closed issue ended, telling a merged duplicate apart: 'resolved', 'closed_no_action', 'merged', or null while open. */
+    public static function closureKindFor(?string $status, ?string $resolutionType): ?string
+    {
+        return self::isClosed($status) && self::isMergedDuplicate($resolutionType) ? 'merged' : self::closureKind($status);
+    }
+
+    /** The status a person reads, knowing how a closed issue ended: a merged duplicate reads "Merged". */
+    public static function labelFor(?string $status, ?string $resolutionType): string
+    {
+        return self::isClosed($status) && self::isMergedDuplicate($resolutionType) ? self::MERGED_LABEL : self::label($status);
+    }
+
     /** @return array<string, string> member-facing labels */
     public static function labels(): array
     {

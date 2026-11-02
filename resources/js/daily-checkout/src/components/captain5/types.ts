@@ -58,7 +58,8 @@ export interface IssueSummary {
   resolved_at: string | null;
   resolution_type: string | null;
   /** How a closed issue ended: fixed, or closed with no action required. */
-  closure?: 'resolved' | 'closed_no_action' | null;
+  /** 'merged': a duplicate report merged into another issue (action_label names it); shown as plain "Closed". */
+  closure?: 'resolved' | 'closed_no_action' | 'merged' | null;
   /** Why no corrective action was necessary, for closure = closed_no_action. */
   closure_reason?: string | null;
   state_token: string;

@@ -25,7 +25,11 @@
         'rejected' => 'Rejected',
         'reversed' => 'Change reversed',
         'linked_to_inspection' => 'Linked to the submitted inspection',
+        'joined' => 'Another member reported the same change',
+        'merged_into' => 'Combined into another request',
+        'merged_from' => 'Duplicate request combined into this one',
     ];
+    $alsoReported = $correction->participants()->where('source', 'joined')->with('user:id,name,display_name')->get();
 @endphp
 <x-filament-panels::page data-hub-ui="2" data-inventory-correction="{{ $correction->getKey() }}">
     <div class="hub-insp hub-insp-stack">
@@ -45,6 +49,12 @@
                 </dd></div>
                 <div><dt>Reported (Eastern)</dt><dd>{{ $correction->created_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}</dd></div>
                 <div><dt>Member</dt><dd>{{ $reporterName }}@if($correction->reporterEmployee?->rank) · {{ $correction->reporterEmployee->rank }}@endif</dd></div>
+                @if($alsoReported->isNotEmpty())
+                    <div><dt>Also reported by</dt><dd data-also-reported="{{ $alsoReported->count() }}">{{ $alsoReported->map(fn ($participant) => $participant->user?->display_name ?: $participant->user?->name ?: 'Member')->implode(', ') }}</dd></div>
+                @endif
+                @if($correction->duplicate_of_correction_id)
+                    <div><dt>Combined into</dt><dd data-combined-into><a class="hub-insp-link" href="{{ \App\Filament\Resources\InventoryCorrectionResource::getUrl('view', ['record' => $correction->duplicate_of_correction_id]) }}">IC-{{ str_pad((string) $correction->duplicate_of_correction_id, 6, '0', STR_PAD_LEFT) }}</a></dd></div>
+                @endif
                 <div><dt>Apparatus ID</dt><dd data-apparatus-id>{{ $correction->apparatus_id }}</dd></div>
                 <div><dt>Equipment ID</dt><dd data-equipment-id>{{ $correction->item_key ?? 'New item (not listed yet)' }}</dd></div>
                 <div><dt>Inspection</dt><dd>
@@ -175,6 +185,17 @@
                             <p class="hub-insp-item__sub">{{ $event->created_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }} · {{ $event->actor?->display_name ?: $event->actor?->name ?: 'System' }}</p>
                             @if(filled($event->body))
                                 <p class="hub-insp-item__text">{{ $event->body }}</p>
+                            @endif
+                            @if($event->event_type === 'joined')
+                                @if(($event->details['proposal_differs'] ?? false) === true)
+                                    <p class="hub-insp-item__text" data-joined-differs><strong>Proposed something different:</strong> {{ $event->details['summary'] ?? '' }}</p>
+                                @endif
+                                @if(filled($event->details['note'] ?? null))
+                                    <p class="hub-insp-item__text">Note: {{ $event->details['note'] }}</p>
+                                @endif
+                                @if(filled($event->details['photo_path'] ?? null))
+                                    <a class="hub-insp-link" href="{{ route('inventory-corrections.photo', ['correction' => $correction, 'event' => $event->getKey()]) }}" target="_blank" rel="noopener">View this member's photo</a>
+                                @endif
                             @endif
                             @if($event->event_type === 'applied' && is_array($event->details['results'] ?? null))
                                 <ul class="hub-insp-linklist">

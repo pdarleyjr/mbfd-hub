@@ -338,6 +338,10 @@ final class DefectCorrectiveActionService
             if (! DefectActionStatus::isClosed($defect->action_status)) {
                 return null; // already open (a concurrent reopen won)
             }
+            // Its reports, messages and members moved to the issue it was merged into; reopening would split them again.
+            if ($defect->isMergedDuplicate()) {
+                throw ValidationException::withMessages(['defect' => 'This report was merged into issue #'.($defect->duplicate_of_defect_id ?? '?').'. Open that issue instead.']);
+            }
             $this->assertNoNewerOpenIssue($defect);
 
             $from = (string) $defect->action_status;

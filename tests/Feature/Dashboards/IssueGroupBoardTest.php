@@ -94,6 +94,19 @@ final class IssueGroupBoardTest extends TestCase
         $this->assertStringNotContainsString('data-bulk-open="verify"', $board->html());
     }
 
+    public function test_decided_issues_move_to_history_and_never_look_pending(): void
+    {
+        $board = $this->board();
+
+        $this->assertSame(['fake_vehicle:3'], array_column($board->get('history'), 'ref'));
+        $this->assertSame(['fake_vehicle:1', 'fake_vehicle:2'], array_column($board->get('sections')[0]['rows'], 'ref'));
+        $html = $board->html();
+        $this->assertStringContainsString('History (1)', $html);
+        $this->assertStringContainsString('Fake Vehicle (2)', $html);
+        $this->assertStringContainsString('Closed earlier', substr($html, (int) strpos($html, 'data-group-history')));
+        $this->assertStringNotContainsString('value="fake_vehicle:3"', $html);
+    }
+
     public function test_acknowledge_goes_to_every_selected_issue_with_the_version_shown(): void
     {
         $board = $this->board();
@@ -140,11 +153,11 @@ final class IssueGroupBoardTest extends TestCase
 
         $board->call('sourcesChanged');
 
-        $board->assertSee('Missing: Fog Nozzle')->assertSee('could not be loaded')->assertDontSee('Nothing is open');
+        $board->assertSee('Missing: Fog Nozzle')->assertSee('could not be loaded')->assertDontSee('Nothing needs action');
         $this->assertSame(['fake_vehicle:1', 'fake_vehicle:2'], $board->get('selected'));
 
         app(DashboardReadModel::class)->forget($this->admin);
-        Livewire::test(IssueGroupBoard::class, ['group' => self::GROUP])->assertSee('could not be loaded')->assertDontSee('Nothing is open');
+        Livewire::test(IssueGroupBoard::class, ['group' => self::GROUP])->assertSee('could not be loaded')->assertDontSee('Nothing needs action');
     }
 
     public function test_a_poll_does_not_invalidate_a_click_on_its_way(): void
@@ -253,7 +266,7 @@ final class IssueGroupBoardTest extends TestCase
 
     public function test_a_group_with_nothing_left_says_so(): void
     {
-        Livewire::test(IssueGroupBoard::class, ['group' => 'apparatus:77'])->assertSee('Nothing is open here now');
+        Livewire::test(IssueGroupBoard::class, ['group' => 'apparatus:77'])->assertSee('Nothing needs action here');
     }
 
     public function test_the_dashboard_row_links_to_this_page_and_a_lone_issue_still_opens_the_panel(): void

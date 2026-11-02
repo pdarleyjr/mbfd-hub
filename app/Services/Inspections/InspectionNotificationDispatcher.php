@@ -16,6 +16,7 @@ use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusInventoryCorrection;
 use App\Models\ApparatusInventoryCorrectionEvent;
+use App\Models\ApparatusInventoryCorrectionParticipant;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
@@ -433,6 +434,12 @@ final class InspectionNotificationDispatcher
                 default => ["{$unit}: message about your inventory correction", "Logistics wrote about {$subject}: {$excerpt}"],
             };
             $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
+            $differed = $this->correctionParticipantsWhoProposedOtherwise($correction);
+            $decision = match ($event->event_type) {
+                ApparatusInventoryCorrectionEvent::APPLIED => 'approved',
+                ApparatusInventoryCorrectionEvent::REJECTED => 'rejected',
+                default => null,
+            };
 
             $this->queue(
                 'correction:'.$correction->getKey().':update:'.$event->getKey(),
@@ -440,7 +447,12 @@ final class InspectionNotificationDispatcher
                 $this->correctionOwners($correction),
                 fn (User $recipient): array => [
                     'title' => $title,
-                    'body' => $body,
+                    // A member who joined with a different proposal is told plainly what was decided for the item.
+                    'body' => $decision !== null && in_array((int) $recipient->getKey(), $differed, true)
+                        ? "Logistics {$decision} the request for {$subject} that you also reported. "
+                            .($decision === 'approved' ? 'What was approved: '.$this->approvedChange($correction).'.' : 'The checklist was not changed.')
+                            .' It may differ from what you proposed.'
+                        : $body,
                     'url' => InspectionReviewers::canReview($recipient)
                         ? $this->correctionAdminUrl((int) $correction->getKey())
                         : $this->correctionMemberUrl((int) $correction->getKey()),
@@ -491,23 +503,80 @@ final class InspectionNotificationDispatcher
         return MyInventoryCorrectionView::getUrl(['correction' => $correctionId], false, 'employee');
     }
 
-    /** @return Collection<int, User> */
+    /**
+     * The reporter and every member who reported the same change and was added to the request,
+     * each once.
+     *
+     * @return Collection<int, User>
+     */
     private function correctionOwners(ApparatusInventoryCorrection $correction): Collection
     {
-        if ($correction->reporter_user_id === null && $correction->reporter_employee_id === null) {
+        $participants = ApparatusInventoryCorrectionParticipant::query()
+            ->where('apparatus_inventory_correction_id', $correction->getKey())
+            ->get(['user_id', 'employee_id']);
+        $userIds = $participants->pluck('user_id')->push($correction->reporter_user_id)->filter()->map(static fn ($id): int => (int) $id)->unique()->values()->all();
+        $employeeIds = $participants->pluck('employee_id')->push($correction->reporter_employee_id)->filter()->map(static fn ($id): int => (int) $id)->unique()->values()->all();
+        if ($userIds === [] && $employeeIds === []) {
             return collect();
         }
 
         return User::query()
-            ->where(function ($query) use ($correction): void {
-                if ($correction->reporter_user_id !== null) {
-                    $query->orWhere('id', $correction->reporter_user_id);
+            ->where(function ($query) use ($userIds, $employeeIds): void {
+                if ($userIds !== []) {
+                    $query->orWhereIn('id', $userIds);
                 }
-                if ($correction->reporter_employee_id !== null) {
-                    $query->orWhere('employee_profile_id', $correction->reporter_employee_id);
+                if ($employeeIds !== []) {
+                    $query->orWhereIn('employee_profile_id', $employeeIds);
                 }
             })
-            ->get();
+            ->get()
+            ->unique(static fn (User $user): int => (int) $user->getKey())
+            ->values();
+    }
+
+    /**
+     * Members (user ids) who joined the request proposing something other than the request itself.
+     *
+     * @return list<int>
+     */
+    private function correctionParticipantsWhoProposedOtherwise(ApparatusInventoryCorrection $correction): array
+    {
+        $reporter = $correction->reporter_user_id !== null ? (int) $correction->reporter_user_id : null;
+
+        return ApparatusInventoryCorrectionEvent::query()
+            ->where('apparatus_inventory_correction_id', $correction->getKey())
+            ->where('event_type', ApparatusInventoryCorrectionEvent::JOINED)
+            ->whereNotNull('actor_user_id')
+            ->get(['actor_user_id', 'details'])
+            ->filter(static fn (ApparatusInventoryCorrectionEvent $joined): bool => ($joined->details['proposal_differs'] ?? false) === true)
+            ->map(static fn (ApparatusInventoryCorrectionEvent $joined): int => (int) $joined->actor_user_id)
+            ->reject(static fn (int $id): bool => $id === $reporter)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** Plain text of the approved operation: "removed from the checklist" or "Compartment: Rear Cab, Quantity: 2". */
+    private function approvedChange(ApparatusInventoryCorrection $correction): string
+    {
+        $operation = is_array($correction->decision['operation'] ?? null) ? $correction->decision['operation'] : [];
+        if (($operation['op'] ?? null) === 'remove') {
+            return 'removed from the checklist';
+        }
+        $snapshot = (array) $correction->target_snapshot;
+        $labels = ['compartment_id' => 'Compartment', 'name' => 'Name', 'expectedQuantity' => 'Quantity', 'manufacturer' => 'Manufacturer', 'model' => 'Model', 'description' => 'Description'];
+        $parts = [];
+        foreach ((array) ($operation['fields'] ?? []) as $key => $value) {
+            if (! is_scalar($value) || ! isset($labels[$key])) {
+                continue;
+            }
+            $shown = $key === 'compartment_id' && ($correction->proposal['to_compartment_id'] ?? null) === $value && isset($snapshot['to_compartment'])
+                ? (string) $snapshot['to_compartment']
+                : (string) $value;
+            $parts[] = $labels[$key].': '.$this->excerpt($shown);
+        }
+
+        return $parts === [] ? 'the change shown on the request' : implode(', ', $parts);
     }
 
     /** "Garage Door Clicker (Front Cab)" or "an unlisted item in Rear Cab". */

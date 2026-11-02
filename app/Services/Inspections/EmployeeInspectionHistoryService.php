@@ -97,6 +97,8 @@ final class EmployeeInspectionHistoryService
                             ->whereIn('o.observation', self::REPORTED_OBSERVATIONS);
                     });
             })
+            // A merged duplicate is counted once, as the issue it was merged into (its observations moved there).
+            ->whereNull('d.duplicate_of_defect_id')
             ->when($openOnly, fn ($q) => $q->where('d.resolved', false))
             // "Closed — no action required" is also resolved = true; count it apart so it is never read as a repair.
             ->when($noActionOnly, fn ($q) => $q->where('d.action_status', DefectActionStatus::DISMISSED));
@@ -211,6 +213,9 @@ final class EmployeeInspectionHistoryService
     {
         $status = strtolower((string) $defect->status);
 
+        if ($defect->resolved && $defect->isMergedDuplicate()) {
+            return DefectActionStatus::mergedLabel($defect->duplicate_of_defect_id);
+        }
         if ($defect->isClosedNoAction()) {
             return DefectNoActionClosure::STATUS_LABEL;
         }
@@ -532,18 +537,20 @@ final class EmployeeInspectionHistoryService
 
         // resolved = true also covers an issue closed with no action required; only a fix is "resolved" to a member.
         $noAction = $defect->isClosedNoAction();
-        $closedAt = $defect->resolved && $defect->resolved_at !== null ? $this->eastern($defect->resolved_at) : null;
+        // A merged duplicate was not fixed either: it continues as the issue it was merged into.
+        $merged = (bool) $defect->resolved && $defect->isMergedDuplicate();
+        $closedAt = $defect->resolved && $defect->resolved_at !== null && ! $merged ? $this->eastern($defect->resolved_at) : null;
 
         return [
             'stage' => $this->defectStageLabel($defect),
-            'resolved' => (bool) $defect->resolved && ! $noAction,
+            'resolved' => (bool) $defect->resolved && ! $noAction && ! $merged,
             'ticket_number' => $ticket?->ticket_number,
             'ticket_status' => $ticket !== null ? $this->ticketStatusLabel($ticket->status) : null,
             'repair_completed' => $ticket !== null && $ticket->status === ApparatusServiceTicketStatus::Completed->value,
             'linked' => true,
             'defect_id' => (int) $defect->getKey(),
             'action_status' => (string) ($defect->action_status ?? DefectActionStatus::REPORTED),
-            'action_label' => DefectActionStatus::label($defect->action_status),
+            'action_label' => DefectActionStatus::labelFor($defect->action_status, $defect->resolution_type),
             'first_reported_at' => $this->eastern($defect->first_reported_at),
             // A later fact shown beside the unchanged historical observation.
             'resolved_at' => $noAction ? null : $closedAt,
