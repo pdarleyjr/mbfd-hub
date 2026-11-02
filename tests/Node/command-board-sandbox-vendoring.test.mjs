@@ -186,7 +186,7 @@ test('the page may only load its own hashed assets and may not run inline script
     'a form': page.replace('</body>', '<form action="/x"></form></body>'),
     'an inline handler': page.replace('<div id="root">', '<div id="root" onclick="x()">'),
     'a missing asset': page.replace('index-B7mT2wQa.css', 'index-MISSING00.css'),
-    'no script': page.replace(/<script[^>]*><\/script>/, ''),
+    'no script': page.slice(0, page.indexOf('<script')) + page.slice(page.indexOf('</script>') + '</script>'.length),
   };
 
   for (const [label, html] of Object.entries(cases)) {

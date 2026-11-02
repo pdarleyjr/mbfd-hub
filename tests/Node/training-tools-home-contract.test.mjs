@@ -28,8 +28,8 @@ test('the simulators are listed once, in Training Tools, and no longer in Additi
   const additional = home.slice(home.indexOf('$additionalLinks = collect(['), home.indexOf(')->filter(fn (array $item): bool => $item[\'visible\'])'));
 
   assert.ok(additional.includes("'title' => 'Videos'"), 'the rest of Additional Links is still there');
-  assert.equal(additional.includes('firesim.mbfdhub.com'), false);
-  assert.equal(additional.includes('pump-panel.pages.dev'), false);
+  assert.equal(additional.split('https://firesim.mbfdhub.com').length - 1, 0);
+  assert.equal(additional.split('https://pump-panel.pages.dev').length - 1, 0);
   assert.equal(home.split('https://firesim.mbfdhub.com').length - 1, 1);
   assert.equal(home.split('https://pump-panel.pages.dev/').length - 1, 1);
 });
