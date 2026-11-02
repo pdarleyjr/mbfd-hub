@@ -138,7 +138,9 @@ SCUBA is diving equipment and airpacks (SCBA) are breathing apparatus, so they a
 
 ## 7. SCBA and radio numbers
 
-Every member sees and can change the SCBA and radio numbers on every apparatus, filled in from the last inspection of that apparatus, so they only touch what changed. They and Concerns, Damage & Additional Notes are on the Notes tab, open from the first screen, and again on the review step. Review & Sign opens only after every area is done, so neither can live there alone.
+Every member sees and can change the SCBA and radio numbers on every apparatus, filled in from the last inspection of that apparatus, so they only touch what changed. They and Concerns, Damage & Additional Notes are on the SCBA & Notes tab. The first screen and Details show an SCBA & Radio Numbers box with how many are entered and a button to the boxes, and the card leads the review step. Members follow the next-step buttons, which skip any step with nothing required, and Review & Sign opens only after every area is done, so the numbers cannot live on a step alone.
+
+- **Packs:** four boxes on every apparatus and three on a rescue (`CrewEquipmentNumbers::STANDARD_PACKS`, `RESCUE_PACKS`). A checklist pack entry past that is a spare: it shows once it holds a number or a member taps Add another SCBA, which opens the unit's own spare before adding a new box. SCUBA never counts as a pack. Radio entries are the unit's named crew seats and always show.
 
 - **Which entries:** `CrewEquipmentNumbers::slots` reads them from the checklist: any write-in field or item named for an SCBA, airpack, SCUBA or radio. Checklists are not edited, so their hashes and open drafts are untouched. A card edit writes to the checklist's own answer, so nothing is entered twice.
 - **Boxes:** at least what the checklist has. FB6 has 4 airpacks, 4 radio numbers and the Motorola serial digits. Rescues have 3 radios and one "SCBAs" item shown as 3 boxes (`expectedQuantity`) and stored comma separated. Engines and ladders have more than 3 radios on their checklists already.
