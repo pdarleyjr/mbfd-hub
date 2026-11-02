@@ -18,8 +18,9 @@ use Tests\TestCase;
 
 /**
  * Daily Checkout acceptance (docs/daily-inspection-continuity.md sections 2.1 and 2.2):
- * routine submissions are accepted automatically; only a meter rollback, a member
- * review flag or new significant damage holds an inspection for a reviewer.
+ * routine submissions are accepted automatically; only a meter rollback, a physically
+ * impossible meter increase, a member review flag or new significant damage holds an
+ * inspection for a reviewer.
  */
 final class InspectionAcceptanceTest extends TestCase
 {
@@ -63,7 +64,10 @@ final class InspectionAcceptanceTest extends TestCase
         $this->submit($this->meterPayload(1000, 400.0))->assertCreated()->assertJsonPath('processing_status', 'accepted');
         $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
 
-        // A jump far beyond the former 500 mile / 36 hour limits is no longer an exception.
+        // A jump far beyond the former 500 mile / 36 hour limits is no longer an exception when the
+        // time since the last accepted reading allows it (ImplausibleMeterIncreaseTest covers the rest).
+        $this->travel(6)->days();
+        $this->actingAsCanonicalUser($this->member);
         $this->submit($this->meterPayload(9000, 480.0))->assertCreated()->assertJsonPath('processing_status', 'accepted');
         $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
         $this->assertSame(9000, $this->unit->fresh()->current_miles);

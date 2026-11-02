@@ -1,4 +1,3 @@
-import { Pencil } from 'lucide-react';
 import OnHandCell from './OnHandCell';
 import { shelfName } from './logic';
 import type { MasterItem } from './types';
@@ -6,12 +5,11 @@ import type { MasterItem } from './types';
 interface Props {
   items: readonly MasterItem[];
   caption: string;
-  canEdit: boolean;
-  /** Search results show the shelf as a link that jumps to that shelf. */
+  /** Search and filter results show the shelf as a link that jumps to that shelf. */
   shelfLinks?: boolean;
   hrefFor?: (code: string | null) => string;
   highlightId?: number | null;
-  onEdit: (item: MasterItem) => void;
+  onOpen: (item: MasterItem) => void;
   onGoToShelf?: (item: MasterItem) => void;
 }
 
@@ -31,10 +29,11 @@ function ShelfCell({ item, link, href, onGo }: { item: MasterItem; link: boolean
 }
 
 /**
- * Item | Shelf | On hand | Edit, and nothing else. The table is fixed-layout so it fits the screen at any width:
- * names wrap, and on phones the shelf column folds in under the item name instead of scrolling sideways.
+ * Item | Shelf | On hand, and nothing else. The table is fixed-layout so it fits the screen at any width: names wrap,
+ * and on phones the shelf column folds in under the item name instead of scrolling sideways. The item name opens the
+ * item sheet with the expected amount, what to order and the order actions.
  */
-export default function MasterTable({ items, caption, canEdit, shelfLinks = false, hrefFor, highlightId = null, onEdit, onGoToShelf }: Props) {
+export default function MasterTable({ items, caption, shelfLinks = false, hrefFor, highlightId = null, onOpen, onGoToShelf }: Props) {
   return (
     <div className="overflow-hidden rounded-hub-card border border-hub-glass-border bg-hub-well">
       <table className="w-full table-fixed border-collapse" data-testid="master-table">
@@ -42,23 +41,25 @@ export default function MasterTable({ items, caption, canEdit, shelfLinks = fals
         <colgroup>
           <col />
           <col className="hidden w-24 sm:table-column" />
-          <col className="w-[6.75rem] sm:w-36" />
-          {canEdit && <col className="w-[3.25rem] sm:w-24" />}
+          <col className="w-[7.5rem] sm:w-44" />
         </colgroup>
         <thead className="border-b border-hub-border bg-hub-n-25">
           <tr>
             <th scope="col" className={HEAD}>Item</th>
             <th scope="col" className={`${HEAD} hidden sm:table-cell`}>Shelf</th>
             <th scope="col" className={HEAD}>On hand</th>
-            {canEdit && <th scope="col" className={HEAD}>Edit</th>}
           </tr>
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id} id={`master-row-${item.id}`} data-testid="master-row" data-item-id={item.id} data-highlight={highlightId === item.id ? 'true' : undefined}
+            <tr key={item.id} id={`master-row-${item.id}`} data-testid="master-row" data-item-id={item.id} data-state={item.order_state}
+              data-highlight={highlightId === item.id ? 'true' : undefined}
               className={`border-b border-hub-border-soft last:border-b-0 ${highlightId === item.id ? 'bg-hub-blue-tint' : ''}`}>
-              <td className={`${CELL} [overflow-wrap:anywhere]`}>
-                <span className="block font-semibold leading-snug text-hub-ink" data-testid="item-name">{item.name}</span>
+              <td className={`${CELL} !py-1.5 [overflow-wrap:anywhere]`}>
+                <button type="button" data-testid="open-item" aria-haspopup="dialog" onClick={() => onOpen(item)}
+                  className="flex min-h-11 w-full items-center rounded-hub-control text-left font-semibold leading-snug text-hub-ink underline decoration-hub-border decoration-1 underline-offset-4 hover:decoration-hub-ink">
+                  <span data-testid="item-name">{item.name}</span>
+                </button>
                 <span className="block text-[13px] leading-5 text-hub-n-600 sm:hidden" data-testid="item-shelf-inline">
                   <ShelfCell item={item} link={shelfLinks} href={hrefFor?.(item.location_code)} onGo={() => onGoToShelf?.(item)} />
                 </span>
@@ -67,15 +68,6 @@ export default function MasterTable({ items, caption, canEdit, shelfLinks = fals
                 <ShelfCell item={item} link={shelfLinks} href={hrefFor?.(item.location_code)} onGo={() => onGoToShelf?.(item)} />
               </td>
               <td className={CELL}><OnHandCell item={item} /></td>
-              {canEdit && (
-                <td className={`${CELL} !px-1 sm:!px-3`}>
-                  <button type="button" className="hub-btn hub-btn--secondary !min-h-11 !min-w-11 gap-1.5 !px-2 sm:!px-3" aria-label={`Edit ${item.name}`}
-                    data-testid="edit-item" onClick={() => onEdit(item)}>
-                    <Pencil className="h-4 w-4 flex-none" aria-hidden="true" />
-                    <span className="hidden sm:inline">Edit</span>
-                  </button>
-                </td>
-              )}
             </tr>
           ))}
         </tbody>

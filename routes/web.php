@@ -470,6 +470,11 @@ Route::get('/daily/{path?}', function (?string $path = null) {
         && ! app(\App\Services\Security\Captain5Access::class)->canView(auth('web')->user())) {
         abort(403, 'The Captain 5 EMS Operations Center is available to Lieutenants, Captains, Chiefs, the Captain 5 and EMS Captain positions, whoever TeleStaff has working the Captain 5 seat today, and administrators.');
     }
+    // The Master Supply Room Inventory for admins: same rule as its API (EmsAccess::canReadInventory).
+    if (preg_match('#^supply-room(?:/.*)?$#iD', trim((string) $path, '/'))
+        && ! app(\App\Services\Ems\EmsAccess::class)->canReadInventory(auth('web')->user())) {
+        abort(403, 'The Master Supply Room Inventory is available to Captain 5 and administrators.');
+    }
     $index = file_get_contents(public_path('daily/index.html'));
     abort_unless(is_string($index), 404);
 

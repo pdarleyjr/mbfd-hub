@@ -39,6 +39,16 @@ export function useEmsLoad<T>(load: () => Promise<T>, key: string, options: { ti
     }
   }, []);
 
+  /**
+   * A local change taken from a write's answer. It is newer than any load already on its way, so that load's answer is
+   * dropped when it arrives instead of putting the old row back.
+   */
+  const applyLocal = useCallback((update: (current: T | null) => T | null) => {
+    latest.current += 1;
+    setLoading(false);
+    setData(update);
+  }, []);
+
   useEffect(() => { void reload(false); }, [key, reload]);
 
   const seenTick = useRef(options.tick);
@@ -48,7 +58,7 @@ export function useEmsLoad<T>(load: () => Promise<T>, key: string, options: { ti
     void reload(true);
   }, [options.tick, reload]);
 
-  return { data, error, loading, reload, setData };
+  return { data, error, loading, reload, setData, applyLocal };
 }
 
 interface WriteState {

@@ -165,7 +165,8 @@ final class SupplyRoomQuery
     public function orders(array $filters): array
     {
         return SupplyOrder::query()->with('supplyItem:id,name')
-            ->when(! empty($filters['status']), fn ($q) => $q->where('status', (string) $filters['status']))
+            ->when(($filters['status'] ?? '') === 'open', fn ($q) => $q->whereIn('status', SupplyOrder::OPEN))
+            ->when(! empty($filters['status']) && $filters['status'] !== 'open', fn ($q) => $q->where('status', (string) $filters['status']))
             ->when(! empty($filters['supply_item_id']), fn ($q) => $q->where('supply_item_id', (int) $filters['supply_item_id']))
             ->orderByDesc('id')->limit(300)->get()
             ->map(fn (SupplyOrder $o): array => $this->order($o))->all();
@@ -179,6 +180,7 @@ final class SupplyRoomQuery
             'status' => $order->status, 'packages' => $order->packages, 'quantity_base' => $order->quantity_base,
             'supplier_code' => $order->supplier_code, 'item_number' => $order->item_number, 'notes' => $order->notes,
             'placed_by_name' => $order->placed_by_name, 'placed_at' => $order->placed_at->toIso8601String(),
+            'open' => $order->isOpen(), 'order_unit' => $order->order_unit, 'expected_on' => $order->expected_on?->toDateString(),
             'received_at' => $order->received_at?->toIso8601String(), 'cancelled_at' => $order->cancelled_at?->toIso8601String(),
         ];
     }
