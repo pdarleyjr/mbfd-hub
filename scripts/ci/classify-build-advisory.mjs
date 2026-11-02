@@ -35,14 +35,17 @@ const expires = Date.parse('2026-11-12T00:00:00Z');
 // package-lock.json is byte-identical.
 // 2026-10-30: root lock re-pinned for follow-redirects 1.16.1 -> 1.16.2 (HIGH GHSA-mrwp-f3q8-3g9p;
 // dev tooling only). Only that entry moved; the Tailwind 3 / braces graph is unchanged.
+// 2026-11-02: Daily Checkout package.json and lock re-pinned for the new component-test tooling (devDependencies only: vitest 5.0.5, jsdom 30.1.3,
+// @testing-library/react, /dom, /jest-dom and /user-event, plus a `test` script). No runtime dependency moved; braces stays 3.0.3 (dev) under
+// Tailwind 3, and `npm audit --audit-level=high` on the new lock reports no vulnerabilities. The root files are unchanged.
 const inputs = {
     '.': {
         'package.json': 'b5e98205856a0c21842199c5a88a0b34ff1476fd94582645c95350b07be23989',
         'package-lock.json': '4c2e8aa7d638cdbc299b2f280a2cdc5ce2025113f3fb85acf904c6bba85088d9',
     },
     'resources/js/daily-checkout': {
-        'resources/js/daily-checkout/package.json': 'dd808f286eff6301a2e51dd39dc08739868eac9d473c08ea818776c5ebbcfb81',
-        'resources/js/daily-checkout/package-lock.json': '3c4419f65bcca76d340ff9f537ff51b85f6e265961cdcba570d9225ad4a71903',
+        'resources/js/daily-checkout/package.json': 'a7d04913ad864992b4a443c0584df61b9a3e235fed193048b1973e2e29070259',
+        'resources/js/daily-checkout/package-lock.json': '6a42af096e8e3d9bbe54d769d1d00683809bcd31acfe2e43ebc8f6971ec766ce',
     },
 };
 const runtimeInputs = {
