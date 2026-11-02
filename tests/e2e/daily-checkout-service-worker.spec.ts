@@ -197,7 +197,7 @@ test('installed Daily worker caches the shell and an offline queue survives relo
   expect(cachedPrivateRequests).toEqual([]);
 });
 
-test('an active worker preserves and quarantines another account owner queue without submitting it', async ({ page, context }) => {
+test('an active worker preserves another account owner queue untouched without submitting it', async ({ page, context }) => {
   await installApiFixture(page);
   await page.goto('/daily/');
   await waitForControlledWorker(page);
@@ -215,14 +215,11 @@ test('an active worker preserves and quarantines another account owner queue wit
   // deterministically instead of depending on browser event timing.
   await page.evaluate(() => { window.dispatchEvent(new Event('online')); });
 
-  await expect.poll(
-    async () => (await queuedInspections(page))[0]?.ownershipState,
-    { timeout: 15_000 },
-  ).toBe('identity_mismatch');
-  expect((await queuedInspections(page))[0]).toMatchObject({
-    status: 'requires_attention',
-    lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
-  });
+  // The replay ran under the other account (it checked the member context) and left the record alone:
+  // it waits, still pending and owned, for its owner to sign in on this device.
+  await page.waitForTimeout(1_500);
+  expect((await queuedInspections(page))[0]).toMatchObject({ status: 'pending', ownershipState: 'owned' });
+  expect((await queuedInspections(page))[0]?.lastErrorCode).toBeUndefined();
   expect(await page.evaluate(() => window.__pwaSubmissions.length)).toBe(0);
 });
 

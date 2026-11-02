@@ -784,7 +784,116 @@ test('a lapsed session purges the cached member data, drops the member shell, an
       return Boolean(await cache.match('/daily/index.html'));
     }, NEW_CACHE), 'the signed-out device keeps no member shell').toBe(false);
     expect(await draftFingerprint(page)).toEqual(draftsBefore);
-    expect(await databases(page)).toContain('mbfd-daily-checkout@60') /* Dexie schema 6 is IndexedDB version 60 */;
+    expect(await databases(page)).toContain('mbfd-daily-checkout@70') /* Dexie schema 7 is IndexedDB version 70 */;
+  } finally {
+    await context.close();
+    await origin.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// IndexedDB schema 6 -> 7 (per-member queue on shared devices)
+// ---------------------------------------------------------------------------
+
+/** Exactly the schema-6 database an existing device holds (lib/db.ts versions 1 to 6), with its queued records. */
+async function createSchemaSixDevice(page: Page, records: Array<Record<string, unknown>>): Promise<void> {
+  await page.evaluate(async (rows) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('mbfd-daily-checkout', 60);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        const pending = db.createObjectStore('pendingSubmissions', { keyPath: 'id', autoIncrement: true });
+        for (const index of ['type', 'status', 'createdAt', 'retryCount', 'ownerUserId', 'ownershipState']) pending.createIndex(index, index);
+        db.createObjectStore('cachedData', { keyPath: 'key' }).createIndex('updatedAt', 'updatedAt');
+        const catalog = db.createObjectStore('trtCatalog', { keyPath: 'id' });
+        catalog.createIndex('category', 'category');
+        catalog.createIndex('sort_order', 'sort_order');
+        const queue = db.createObjectStore('dailyCheckoutSubmissions', { keyPath: 'id' });
+        queue.createIndex('[apparatusId+checklistVersion]', ['apparatusId', 'checklistVersion'], { unique: true });
+        for (const index of ['apparatusId', 'checklistVersion', 'status', 'createdAt', 'updatedAt', 'retentionExpiresAt', 'ownerUserId', 'ownershipState']) queue.createIndex(index, index);
+        const drafts = db.createObjectStore('dailyCheckoutDrafts', { keyPath: 'key' });
+        drafts.createIndex('apparatusSlug', 'apparatusSlug');
+        drafts.createIndex('timestamp', 'timestamp');
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = database.transaction(['dailyCheckoutSubmissions', 'cachedData'], 'readwrite');
+    // The one-time localStorage migration already ran on this device.
+    transaction.objectStore('cachedData').put({ key: 'daily-checkout-queue-migration-v1', data: { state: 'migrated' }, updatedAt: new Date() });
+    for (const row of rows) {
+      transaction.objectStore('dailyCheckoutSubmissions').add({ ...row, createdAt: new Date(String(row.createdAt)), updatedAt: new Date(String(row.updatedAt)) });
+    }
+    await new Promise<void>((resolve, reject) => { transaction.oncomplete = () => resolve(); transaction.onerror = () => reject(transaction.error); });
+    database.close();
+  }, records);
+}
+
+const queueIndexes = (page: Page) => page.evaluate(async () => {
+  const database = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open('mbfd-daily-checkout');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  const store = database.transaction('dailyCheckoutSubmissions', 'readonly').objectStore('dailyCheckoutSubmissions');
+  const indexes = Array.from(store.indexNames).map((name) => ({ name, unique: store.index(name).unique })).sort((left, right) => left.name.localeCompare(right.name));
+  database.close();
+  return indexes;
+});
+
+test('a device on IndexedDB schema 6 with queued checkouts upgrades to schema 7 without losing, changing or duplicating any', async ({ browser }) => {
+  const origin = await startDailyOrigin({ submitMode: 'fail' });
+  const { context, page } = await newPage(browser, origin);
+  const at = '2026-11-01T12:00:00.000Z';
+  const row = (id: string, version: string, extra: Record<string, unknown>) => ({
+    id: `daily_${id}`,
+    apparatusId: 101,
+    checklistVersion: version,
+    createdAt: at,
+    updatedAt: at,
+    retryCount: 1,
+    data: { client_submission_id: id, checklist_version: version, operator_name: 'Saved Member', compartments: [] },
+    ...extra,
+  });
+  const membersPending = row('aaaaaaaa-0000-4000-8000-000000000001', QUEUED_CHECKLIST_VERSION, { status: 'pending', ownerUserId: 101, ownerSecurityVersion: 1, ownershipState: 'owned' });
+  const otherMembersRejected = row('aaaaaaaa-0000-4000-8000-000000000002', 'c'.repeat(64), { status: 'requires_attention', ownerUserId: 202, ownerSecurityVersion: 1, ownershipState: 'owned', lastError: 'Rejected.', lastErrorStatus: 422 });
+  const legacyOne = row('aaaaaaaa-0000-4000-8000-000000000003', 'legacy-daily_one', { status: 'requires_attention', ownershipState: 'legacy_unclaimed', lastErrorCode: 'OFFLINE_QUEUE_OWNER_LEGACY' });
+  const legacyTwo = row('aaaaaaaa-0000-4000-8000-000000000004', 'legacy-daily_two', { status: 'requires_attention', ownershipState: 'legacy_unclaimed', lastErrorCode: 'OFFLINE_QUEUE_OWNER_LEGACY' });
+  const seeded = [membersPending, otherMembersRejected, legacyOne, legacyTwo];
+  try {
+    // A page of the origin that runs no app code, so the old schema is in place before the app opens it.
+    await page.goto(`${origin.url}/daily/manifest.json`);
+    await createSchemaSixDevice(page, seeded);
+    expect(await databases(page)).toContain('mbfd-daily-checkout@60');
+    const before = (await queuedInspections(page)).sort((left, right) => String(left.id).localeCompare(String(right.id)));
+    expect(before).toHaveLength(4);
+
+    await page.goto(`${origin.url}${PAGE}`);
+    await expect(page.getByRole('heading', { name: /Offline Fixture Apparatus/ })).toBeVisible({ timeout: 20_000 });
+    await expect.poll(() => databases(page), { timeout: 15_000 }).toContain('mbfd-daily-checkout@70');
+
+    // Every record is still there, once, with the same payload. Records nobody may send are byte for byte the same.
+    const after = (await queuedInspections(page)).sort((left, right) => String(left.id).localeCompare(String(right.id)));
+    expect(after.map((record) => record.id)).toEqual(before.map((record) => record.id));
+    expect(after.map((record) => record.data)).toEqual(before.map((record) => record.data));
+    expect(after.slice(1)).toEqual(before.slice(1));
+    expect(after[0]).toMatchObject({ status: 'pending', ownerUserId: 101, ownershipState: 'owned' });
+    expect(await queueIndexes(page)).toEqual(expect.arrayContaining([
+      { name: '[apparatusId+checklistVersion+ownerUserId]', unique: true },
+      { name: '[apparatusId+checklistVersion]', unique: false },
+    ]));
+    // The other member's record never blocks this member's checkout of the same truck.
+    await expect(page.getByRole('heading', { name: /Saved inspection/ })).toHaveCount(0);
+    await expect(page.getByText(/saved on this device by Saved Member/)).toBeVisible();
+
+    // The member's own pending checkout is sent exactly once; nobody else's is touched.
+    origin.state.submitMode = 'ok';
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect.poll(() => origin.submissions.length, { timeout: 20_000 }).toBe(1);
+    expect(origin.submissions[0]).toMatchObject({ client_submission_id: 'aaaaaaaa-0000-4000-8000-000000000001' });
+    await page.waitForTimeout(800);
+    expect(origin.submissions).toHaveLength(1);
+    expect((await queuedInspections(page)).sort((left, right) => String(left.id).localeCompare(String(right.id)))).toEqual(before.slice(1));
   } finally {
     await context.close();
     await origin.close();
