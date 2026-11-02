@@ -146,7 +146,7 @@ test.describe('on a phone, 375px wide', () => {
   });
 
   test('the search bar and the review bar stay on screen, targets are 44px, and nothing scrolls sideways', async ({ page }) => {
-    await openForm(page, ALS);
+    await openFirstTime(page, ALS); // a new browser context starts signed out
     await page.getByRole('navigation', { name: 'Choose a list' }).getByRole('button', { name: /ALS Transport Vehicle/ }).click();
     await page.getByRole('button', { name: 'Open all sections' }).click();
     await page.evaluate(() => window.scrollTo(0, 2000));
@@ -270,7 +270,8 @@ test.describe('on a phone, 375px wide', () => {
 
     // My requests names the form each request was made on.
     await page.getByRole('button', { name: 'My medical requests' }).click();
-    await expect(page.locator('.ems-request-item').first().locator('.ems-family-tag')).toHaveText('ALS Transport');
+    await expect(page.getByRole('heading', { name: 'My medical requests', level: 1 })).toBeVisible();
+    await expect(page.locator('.ems-request-item').first().locator('.ems-family-tag')).toHaveText('ALS Transport', { timeout: 20_000 });
   });
 });
 

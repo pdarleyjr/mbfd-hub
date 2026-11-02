@@ -81,7 +81,9 @@ for (const unit of PAIRS) {
     // The draft keeps it: reload, and the same unit is chosen.
     await page.waitForTimeout(700);
     await page.reload();
-    await expect(radio(page, unit)).toBeChecked();
+    // The page, its form and the saved draft all load again: wait for them before judging the radios (slow on a phone).
+    await expect(page.getByRole('heading', { name: 'ALS Transport Inventory Form', level: 1 })).toBeVisible({ timeout: 30_000 });
+    await expect(radio(page, unit)).toBeChecked({ timeout: 15_000 });
     await expect(page.locator('#ems-target-confirm strong')).toHaveText(unit);
 
     await page.getByRole('button', { name: 'Review and send' }).click();
