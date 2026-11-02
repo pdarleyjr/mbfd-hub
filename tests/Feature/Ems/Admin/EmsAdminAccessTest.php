@@ -129,6 +129,7 @@ final class EmsAdminAccessTest extends TestCase
         MedicalSupplyRoom::canAccess();
         SubmittedMedicalSupplyRoomInventory::canAccess();
         MedicalDataStatistics::canAccess();
+        \App\Filament\Support\EmsPanelAccess::canReadInventory(auth()->user());
 
         $this->assertSame(0, $queries, 'Admin pages have a 30-query budget, so the EMS sidebar checks must not add to it.');
     }

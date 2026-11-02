@@ -207,7 +207,7 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-clipboard-document-list')
                     ->group('EMS')
                     ->sort(15)
-                    ->visible(fn (): bool => app(\App\Services\Ems\EmsAccess::class)->canReadInventory(auth()->user())),
+                    ->visible(fn (): bool => \App\Filament\Support\EmsPanelAccess::canReadInventory(auth()->user())),
                 NavigationItem::make('Laravel Pulse')
                     ->url(fn (): string => PulseDashboard::getUrl(panel: 'admin'))
                     ->icon('heroicon-o-bolt')
