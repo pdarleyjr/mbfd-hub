@@ -33,7 +33,6 @@ final class SupplyDataLabels
     public const STATUS = [
         'zero' => ['Out of stock', 'danger'],
         'below_minimum' => ['Below minimum', 'danger'],
-        'near_minimum' => ['Near minimum', 'warning'],
         'ok' => ['OK', 'success'],
         'unknown' => ['Unknown', 'gray'],
     ];

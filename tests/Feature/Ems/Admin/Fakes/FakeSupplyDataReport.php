@@ -84,7 +84,7 @@ final class FakeSupplyDataReport
             ],
             'stock' => [
                 self::stockRow(12, 'Gloves, nitrile (L)', 'counted', 14, 'ok'),
-                self::stockRow(13, 'Tape 1 inch', 'estimate', 80, 'near_minimum', daysOfSupply: null),
+                self::stockRow(13, 'Tape 1 inch', 'estimate', 80, 'ok', daysOfSupply: null),
                 self::stockRow(14, 'Gauze 4x4', 'calculated', 3, 'below_minimum', daysOfSupply: 6.5, reorder: true),
                 self::stockRow(15, 'Stethoscope', 'none', null, 'unknown', daysOfSupply: null),
             ],

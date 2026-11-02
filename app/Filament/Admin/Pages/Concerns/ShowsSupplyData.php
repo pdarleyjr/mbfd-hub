@@ -305,7 +305,7 @@ trait ShowsSupplyData
         $overview = $state['filters'] === null ? null : $this->supplyReport()->overview($state['filters']);
         $stock = is_array($overview) ? array_values($overview['stock'] ?? []) : [];
         if ($this->stockLowOnly) {
-            $stock = array_values(array_filter($stock, static fn (array $row): bool => in_array($row['status'] ?? null, ['zero', 'below_minimum', 'near_minimum'], true) || ($row['needs_reorder'] ?? false) === true));
+            $stock = array_values(array_filter($stock, static fn (array $row): bool => in_array($row['status'] ?? null, ['zero', 'below_minimum'], true) || ($row['needs_reorder'] ?? false) === true));
         }
         $shown = max(self::STOCK_PAGE_SIZE, min(1000, $this->stockShown));
 
