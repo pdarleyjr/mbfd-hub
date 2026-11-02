@@ -143,7 +143,34 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   }
   await expect(page.getByRole('button', { name: 'Generate PDF' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath(`operational-forms-ics-editor-${testInfo.project.name}.png`), fullPage: true });
+
+  // The entry table in the editor and the record table in the library turn into cards when narrow and never scroll sideways.
+  await expectTablesFitAtEveryWidth(page, '.of-edit-table');
+  await page.goto('/employee/forms');
+  await expect(page.locator('.of-record-table')).toBeVisible();
+  await expectTablesFitAtEveryWidth(page, '.of-record-table');
 });
+
+/** Resizes through the supported widths and checks that the document and each table wrapper hold their content without scrolling. */
+async function expectTablesFitAtEveryWidth(page: import('@playwright/test').Page, table: string) {
+  for (const width of [320, 390, 768, 820, 900, 1024, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.waitForTimeout(250);
+    const fit = await page.evaluate((selector) => ({
+      document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      tables: [...document.querySelectorAll(selector)].map((element) => {
+        const wrap = element.closest('.of-table-wrap')!;
+        return { scrolls: wrap.scrollWidth - wrap.clientWidth, past: element.getBoundingClientRect().right - wrap.getBoundingClientRect().right };
+      }),
+    }), table);
+    expect(fit.tables.length, `${table} present at ${width}px`).toBeGreaterThan(0);
+    expect(fit.document, `${table} document overflow at ${width}px`).toBeLessThanOrEqual(1);
+    for (const measured of fit.tables) {
+      expect(measured.scrolls, `${table} wrapper scrolls at ${width}px`).toBeLessThanOrEqual(1);
+      expect(measured.past, `${table} runs past its wrapper at ${width}px`).toBeLessThanOrEqual(1);
+    }
+  }
+}
 
 test('employee dashboard header returns members to the main MBFD Hub', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'One touch-device header acceptance is sufficient.');

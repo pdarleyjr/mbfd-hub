@@ -14,11 +14,6 @@
     "kind": "not-a-table",
     "reason": "Rich text editor toolbar in the compose form."
   },
-  "resources/js/daily-checkout/src/components/captain5/ems/UnitStatistics.tsx": {
-    "count": 1,
-    "kind": "pending",
-    "reason": "Daily app EMS unit statistics table (minimum 22rem); the Daily bundle does not load hub-tables.js yet."
-  },
   "resources/js/daily-checkout/src/components/forms/EquipmentRequestWizard.tsx": {
     "count": 1,
     "kind": "not-a-table",
@@ -45,19 +40,14 @@
     "reason": "Shared Daily tab list."
   },
   "resources/js/operational-forms/operational-forms.css": {
-    "count": 4,
-    "kind": "pending",
-    "reason": "Operational forms record table wrapper (.of-table-wrap) plus context navigation and preview toolbars; this bundle has its own stylesheet and does not load hub-tables.css yet."
+    "count": 3,
+    "kind": "not-a-table",
+    "reason": "Operational forms evidence spine, context navigation and preview toolbar are strips of controls, not tables. The record and entry tables are size containers that become cards instead of scrolling."
   },
   "resources/js/video-conferencing/video-conferencing.css": {
     "count": 1,
     "kind": "not-a-table",
     "reason": "Video filmstrip of participant tiles."
-  },
-  "resources/views/filament/resources/operational-form-record/view.blade.php": {
-    "count": 1,
-    "kind": "pending",
-    "reason": "Document history table. Open PR 548 rewrites this same line, so the data-hub-table migration waits for it to merge."
   },
   "resources/views/vendor/filament-forms/components/rich-editor.blade.php": {
     "count": 2,
