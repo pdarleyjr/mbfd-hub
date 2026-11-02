@@ -106,7 +106,7 @@ overflow. The inventory rows below that are not in the contract routes were meas
 | `/admin/inventory-items` | admin | 320:cards 390:cards 768:priority 1024:table 1280:table 1440:table | 10 | fixed, measured at 320/390/768/1024/1280/1440 |
 | `/admin/inventory-locations` | admin | 320:cards 390:cards 768:table 1024:table 1280:table 1440:table | 10 | fixed, measured at 320/390/768/1024/1280/1440 |
 | `/admin/master-personnel-directory` | admin | 320:cards 390:cards 768:priority 1024:priority 1280:priority 1440:priority | 50 | fixed, measured at 320/390/768/1024/1280/1440 |
-| `/admin/medical-statistics` | admin | 320:cards 390:cards 768:table 1024:table 1280:table 1440:table | 6 | fixed, measured at 320/390/768/1024/1280/1440 |
+| `/admin/medical-statistics` | admin | 320:cards 390:cards 768:table 1024:table 1280:table 1440:table | 6 | Requests tab (`?tab=requests`, the page measured here) fixed, measured at 320/390/768/1024/1280/1440. The default Supply data tab (Medical Supply Data) adds `data-hub-table` tables and an SVG chart: adapted, not yet verified in a browser |
 | `/admin/my-profile` | admin | 320:cards 390:cards 768:table 1024:table 1280:table 1440:table | 7 | fixed, measured at 320/390/768/1024/1280/1440 |
 | `/admin/personnel-uniforms-equipment/assignments` | admin | 320:cards 390:cards 768:cards 1024:cards 1280:priority 1440:priority | 10 | fixed, measured at 320/390/768/1024/1280/1440 |
 | `/admin/personnel-uniforms-equipment/employee-records` | admin | 320:cards 390:cards 768:cards 1024:cards 1280:priority 1440:priority | 10 | fixed, measured at 320/390/768/1024/1280/1440 |

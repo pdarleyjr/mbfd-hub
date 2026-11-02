@@ -82,7 +82,7 @@ final class EmsAdminAccessTest extends TestCase
 
     public function test_the_ems_group_shows_the_four_screens_only_to_people_who_may_read_them(): void
     {
-        $expected = ['Submitted Inventory Forms', 'Submitted Medical Supply Room Inventory', 'Medical Supply Room', 'Medical Data / Statistics'];
+        $expected = ['Submitted Inventory Forms', 'Submitted Medical Supply Room Inventory', 'Medical Supply Room', 'Medical Supply Data'];
         foreach ([$this->emsSuperAdmin(), $this->emsAdmin(['admin.ems.view']), $this->emsAdmin(['admin.ems.manage'])] as $user) {
             $this->as($user);
             $this->assertEqualsCanonicalizing($expected, $this->navigationItems());
