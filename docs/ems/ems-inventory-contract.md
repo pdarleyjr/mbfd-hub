@@ -313,7 +313,7 @@ The actor is never notified. `redeliver()` is ready; `inspections:retry-notifica
 ### 9.6 Four forms (as built, branch feat/four-ems-forms-20261102)
 
 Implemented as `docs/ems/four-inventory-forms.md` describes: `App\Services\Ems\FormFamilies` is the table, `ems_inventory_requests.form_family` (migration
-`2026_11_02_100000_add_form_family_to_ems_inventory_requests`) stores it, and the snapshot adds `form_family` and `form_family_title`. Details the contract
+`2026_11_02_120000_add_form_family_to_ems_inventory_requests`) stores it, and the snapshot adds `form_family` and `form_family_title`. Details the contract
 leaves open:
 
 - `GET /form` with no `family` answers for ALS Transport (its lists are the imported ones of airway-bag, als-med-bag, als-transport-vehicle, handtevy). A
