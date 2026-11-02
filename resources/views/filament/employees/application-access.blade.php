@@ -7,7 +7,7 @@
     <p class="text-sm text-gray-500">Entry permission and administrator roles are separate. Saved grants do not prove that a remote integration is deployed or healthy.</p>
     @if ($account)
         <div class="hub-portal-table-scroll" tabindex="0" role="region" aria-label="Application access">
-            <table class="hub-portal-table min-w-[48rem]">
+            <table data-hub-table class="hub-portal-table min-w-[48rem]">
                 <thead><tr class="border-b"><th scope="col" class="p-3">Application</th><th scope="col" class="p-3">Access</th><th scope="col" class="p-3">Role</th><th scope="col" class="p-3">Enforcement</th></tr></thead>
                 <tbody>
                     @foreach ($registry->applications() as $key => $application)

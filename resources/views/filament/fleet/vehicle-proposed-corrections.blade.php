@@ -12,7 +12,7 @@
     <p class="text-sm text-gray-500 dark:text-gray-400">No pending corrections.</p>
 @else
     <div class="hub-insp hub-insp-table-wrap">
-        <table class="hub-insp-table" data-proposed-corrections>
+        <table data-hub-table class="hub-insp-table" data-proposed-corrections>
             <thead>
                 <tr>
                     <th>Field</th>

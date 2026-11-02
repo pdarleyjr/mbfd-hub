@@ -189,10 +189,8 @@
 /* Ranking tables sit in a white well with a bounded horizontal scroll. */
 .wg-session-results .sr-scroll {
     max-width: 100%;
-    overflow-x: auto;
     background: rgb(var(--hub-well));
 }
-.wg-session-results .sr-scroll .wg-table { min-width: 40rem; }
 .wg-session-results .sr-scroll:focus-visible {
     outline: 2px solid rgb(var(--hub-focus));
     outline-offset: -2px;
@@ -389,7 +387,7 @@
 }
 
 /* Granular tool ranking table (partials/granular-tool-table): tokens only, AA text on every cell. */
-.wg-gtt { overflow-x: auto; }
+.wg-gtt { max-width: 100%; }
 .wg-gtt :is(.wg-gtt-center, .wg-gtt-rank) { text-align: center; }
 .wg-gtt .wg-gtt-rank { width: 3rem; }
 .wg-gtt .wg-gtt-small { font-size: .75rem; }

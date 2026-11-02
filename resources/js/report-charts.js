@@ -7,6 +7,7 @@
  * Report chart colours come from the mbfd-theme.css tokens (space-separated RGB channels):
  * hubColor('--hub-chart-1', .5) -> 'rgb(1, 39, 102, 0.5)'.
  */
+import './hub-tables.js';
 window.hubColor = (token, alpha = 1) => {
     const channels = getComputedStyle(document.documentElement).getPropertyValue(token).trim().split(/\s+/).join(', ');
     return `rgb(${channels}, ${alpha})`;

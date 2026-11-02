@@ -58,7 +58,7 @@
             <section class="hub-insp-card" aria-labelledby="inv-diff-title" data-section="diff">
                 <h2 class="hub-insp-card__title" id="inv-diff-title">{{ $correction->isOpen() ? 'What would change' : 'What the member asked for' }}</h2>
                 <div class="hub-insp-table-wrap">
-                    <table class="hub-insp-table">
+                    <table data-hub-table class="hub-insp-table">
                         <thead><tr><th scope="col">Detail</th><th scope="col">Now on the checklist</th><th scope="col">Requested</th></tr></thead>
                         <tbody>
                             @foreach($diffRows as $row)

@@ -404,7 +404,7 @@
             </div>
 
             <div class="sr-scroll" tabindex="0" role="region" aria-label="Category rankings">
-                <table class="wg-table">
+                <table data-hub-table class="wg-table">
                     <thead>
                         <tr>
                             <th class="sr-col-rank">#</th>
@@ -755,7 +755,7 @@
             </a>
         </div>
         <div class="sr-scroll" tabindex="0" role="region" aria-label="Finalist rankings">
-            <table class="wg-table">
+            <table data-hub-table class="wg-table">
                 <thead>
                     <tr>
                         <th class="sr-col-rank--wide">Rank</th>

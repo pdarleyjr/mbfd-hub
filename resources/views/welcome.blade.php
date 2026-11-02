@@ -8,6 +8,7 @@
     <link rel="shortcut icon" href="/favicon.ico">
     <title>Home · MBFD Hub</title>
     @vite('resources/css/app.css')
+    @vite('resources/js/home-duty.js')
 </head>
 <body>
     @php
@@ -17,10 +18,8 @@
             && $currentUser->employeeProfile()->exists();
         $showWorkgroups = $currentUser instanceof \App\Models\User
             && app(\App\Support\Workgroups\WorkgroupAccess::class)->canEnterPanel($currentUser);
-        $now = now(\App\Support\HubTimezone::NAME);
-        $greeting = $now->hour < 12 ? 'Good morning' : ($now->hour < 18 ? 'Good afternoon' : 'Good evening');
-        $displayName = (string) ($currentUser?->display_name ?: $currentUser?->name);
-        $firstName = trim((string) strtok($displayName, ' '));
+        // Greeting, civil date, and (for members the Daily Roster admits) the shift on duty and the 300.
+        $dutyLines = app(\App\Services\DailyRoster\HomeDutyStatus::class)->forMember($currentUser);
         // Fleet tools only for super administrators and members with the Fleet manage switch on.
         $showFleetOperations = $currentUser instanceof \App\Models\User && $currentUser->canManageFleetSwaps();
         $hubNavigation = \App\Support\HubShellNavigation::forUser($currentUser, $applicationStates);
@@ -135,10 +134,7 @@
 
     <main id="main-content" class="hub-page">
         <section class="home-today" aria-labelledby="home-greeting">
-            <div>
-                <p class="hub-page-header__eyebrow"><time datetime="{{ $now->toDateString() }}">{{ $now->format('l, F j') }}</time></p>
-                <h1 id="home-greeting" class="hub-h1">{{ $greeting }}{{ $firstName !== '' ? ', '.$firstName : '' }}</h1>
-            </div>
+            <x-hub.home-duty :lines="$dutyLines" />
             @if($showEmployeePortal || $showDailyRoster || $commandBoardUrl !== null)
                 <div class="hub-page-header__actions">
                     @if($showEmployeePortal)

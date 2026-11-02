@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\DailyRoster\Parsing;
 
 use App\Services\DailyRoster\Parsing\TeleStaffCodebook;
-use App\Services\Training\CrewPlanner\TeleStaffDailyPdfParser;
 use PHPUnit\Framework\Attributes\DataProvider;
-use ReflectionClass;
 use Tests\Support\TeleStaffRosterWorkbookFactory;
 use Tests\TestCase;
 
@@ -97,17 +95,18 @@ final class TeleStaffCodebookTest extends TestCase
         $this->assertSame($prefix, $result->prefix);
     }
 
-    public function test_it_agrees_with_the_crew_planner_parser_on_availability(): void
+    /** The Crew Planner reads availability straight from these classes, so what each code means to it stays pinned. */
+    public function test_the_codes_the_crew_planner_depends_on_keep_their_availability(): void
     {
-        $reflection = new ReflectionClass(TeleStaffDailyPdfParser::class);
-        $parser = $reflection->newInstanceWithoutConstructor();
-        $code = $reflection->getMethod('code');
-
-        $map = ['WORKING' => 'working', 'NOT_WORKING' => 'not_working', 'ANNOTATION' => 'annotation'];
-        foreach (['SP', '+OT', 'OT', '2WXON', '2WXEON', '2WXOFF', 'ADONIS DAY', 'VAC', 'VACA', 'EVAC', 'SIC', '^OOC', '^ROC', '^MOC', '^TOC'] as $value) {
-            [$class] = $code->invoke($parser, $value);
-
-            $this->assertSame($map[$class] ?? $class, TeleStaffCodebook::classify($value)->availability, "Availability differs for {$value}");
+        $expected = [
+            'working' => ['SP', '+OT', 'OT', '2WXON', '2WXEON'],
+            'not_working' => ['2WXOFF', 'ADONIS DAY', 'VAC', 'VACA', 'EVAC', 'SIC'],
+            'annotation' => ['^OOC', '^ROC', '^MOC', '^TOC'],
+        ];
+        foreach ($expected as $availability => $codes) {
+            foreach ($codes as $value) {
+                $this->assertSame($availability, TeleStaffCodebook::classify($value)->availability, "Availability differs for {$value}");
+            }
         }
     }
 

@@ -13,8 +13,8 @@
         </div>
         <p class="mt-4 text-sm text-stone-600">Documented module coverage is attendance evidence. It does not certify proficiency or a Driver Engineer qualification. Paper evidence remains separate from electronic certification.</p>
     </x-filament::section>
-    <div wire:poll.15s class="overflow-x-auto rounded-lg border border-stone-200 bg-white" role="region" aria-label="Training attendance matrix" tabindex="0">
-        <table class="w-full text-left text-sm">
+    <div wire:poll.15s class="rounded-lg border border-stone-200 bg-white" role="region" aria-label="Training attendance matrix">
+        <table data-hub-table class="w-full text-left text-sm">
             <caption class="sr-only">{{ $this->course->name }} {{ $display === 'sessions' ? 'dated session attendance' : 'module coverage' }}</caption>
             <thead class="bg-stone-100">
                 <tr>

@@ -15,11 +15,18 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 /** Renders an independently revalidated personnel request; never reads or writes a domain model. */
 final class TrainingCrewPlanExporter
 {
-    public const TITLE = 'TRAINING ATTENDANCE — PERSONNEL REQUEST';
+    public const TITLE = 'PROPOSED CLASS ROSTER — PERSONNEL REQUEST';
 
     public const INTRO = 'The following personnel have not yet attended the training course or module identified below, according to current attendance records. Please coordinate their attendance at the designated session times, subject to operational staffing and coverage requirements.';
 
-    public const LEGEND = 'Eligibility reflects the uploaded daily roster and Hub attendance records at the time generated.';
+    /** A class outside the course catalog has no attendance history to speak of. */
+    public const INTRO_ADHOC = 'The following personnel are proposed for the class identified below. Please coordinate their attendance, subject to operational staffing and coverage requirements.';
+
+    public const QUALIFIER = 'Proposed roster. This is not verified attendance.';
+
+    public const LEGEND = 'Eligibility reflects the TeleStaff daily roster and Hub attendance records at the time generated.';
+
+    public const LEGEND_PROVISIONAL = 'Provisional: no TeleStaff roster was available for this date, so nobody is confirmed on duty.';
 
     public const VERIFY_NOTE = 'These entries need confirmation before scheduling.';
 
@@ -78,18 +85,20 @@ final class TrainingCrewPlanExporter
                 ['Module', $report['module_name']],
                 ['Training date', $report['date_long']],
                 ['Shift', $report['shift_label']],
+                ['Roster source', $report['source_label']],
                 ['Generated', $report['generated_display']],
                 ['Prepared by', $report['author']],
                 ['Personnel listed', $report['total']],
                 ['Assigned to a session', $report['eligible_total']],
                 ['Needs verification', $report['review_total']],
                 ['Unassigned', $report['unassigned_total']],
-                ['Notes', self::INTRO],
-                ['Eligibility', self::LEGEND],
+                ['Notes', $report['intro']],
+                ['Status', self::QUALIFIER],
+                ['Eligibility', $report['legend']],
                 ['Time zone', \App\Support\HubTimezone::NAME],
                 [],
-                ['Session', 'Time (Eastern)', 'Personnel'],
-                ...array_map(static fn (array $group): array => [$group['label'], $group['time'], count($group['rows'])], $sessions),
+                ['Session', 'Time (Eastern)', 'Location', 'Personnel'],
+                ...array_map(static fn (array $group): array => [$group['label'], $group['time'], $group['location'], count($group['rows'])], $sessions),
             ], false);
             $names = ['summary'];
             foreach ($report['groups'] as $index => $group) {
@@ -98,7 +107,7 @@ final class TrainingCrewPlanExporter
                 $this->write($sheet, [
                     [self::TITLE],
                     [$report['course_name'], $report['module_name'] !== '' ? $report['module_name'] : $report['scope_label']],
-                    [$group['label'], $group['time'], count($group['rows']).' listed'],
+                    [$group['label'], trim($group['time'].($group['location'] !== '' ? ' · '.$group['location'] : ''), ' ·'), count($group['rows']).' listed'],
                     ['Name', 'Employee ID', 'Rank', 'Published bid seat', 'Station', 'Unit', 'Status'],
                     ...array_map(static fn (array $row): array => [
                         $row['name'], $row['employee_id'], $row['rank'], $row['bid_position'],
@@ -142,10 +151,14 @@ final class TrainingCrewPlanExporter
             if ($id === '' || isset($groups[$id])) {
                 throw ValidationException::withMessages(['export' => 'Each class slot must have a unique identifier.']);
             }
-            $groups[$id] = ['kind' => 'session', 'label' => (string) ($slot['label'] ?? ''), 'time' => $this->time($slot), 'rows' => []];
+            $groups[$id] = ['kind' => 'session', 'label' => (string) ($slot['label'] ?? ''), 'time' => $this->time($slot), 'location' => (string) ($slot['location'] ?? ''), 'rows' => []];
         }
-        $unassigned = ['kind' => 'unassigned', 'label' => 'Unassigned', 'time' => 'Session not assigned', 'rows' => []];
-        $review = ['kind' => 'review', 'label' => 'Needs verification', 'time' => self::VERIFY_NOTE, 'rows' => []];
+        // With no sessions the plan is simply one list.
+        $unassigned = $groups === []
+            ? ['kind' => 'list', 'label' => 'Class list', 'time' => '', 'location' => '', 'rows' => []]
+            : ['kind' => 'unassigned', 'label' => 'Unassigned', 'time' => 'Session not assigned', 'location' => '', 'rows' => []];
+        $review = ['kind' => 'review', 'label' => 'Needs verification', 'time' => self::VERIFY_NOTE, 'location' => '', 'rows' => []];
+        $verified = (bool) ($projection['roster_verified'] ?? false);
         $seen = [];
         foreach ($rows as $key => $row) {
             $identity = (string) ($row['employee_profile_id'] ?? $key);
@@ -162,10 +175,10 @@ final class TrainingCrewPlanExporter
                 $safe['status'] = 'Needs verification'.(isset($groups[$slotId]) ? ' - '.$groups[$slotId]['label'] : '');
                 $review['rows'][] = $safe;
             } elseif ($slotId === '' || ! isset($groups[$slotId])) {
-                $safe['status'] = 'Unassigned';
+                $safe['status'] = ($row['exception'] ?? false) === true ? 'Added by planner' : ($groups === [] ? ($verified ? 'On duty this date' : 'Provisional') : 'Unassigned');
                 $unassigned['rows'][] = $safe;
             } else {
-                $safe['status'] = 'On duty during session';
+                $safe['status'] = ($row['exception'] ?? false) === true ? 'Added by planner' : ($verified ? 'On duty during session' : 'Provisional');
                 $groups[$slotId]['rows'][] = $safe;
             }
         }
@@ -176,18 +189,24 @@ final class TrainingCrewPlanExporter
         }
         unset($group);
         $report = [];
-        foreach (['course_name', 'module_name', 'scope_label', 'schedule_date', 'shift', 'printed_at', 'generated_at', 'author'] as $field) {
+        foreach (['course_name', 'module_name', 'scope_label', 'schedule_date', 'shift', 'shift_label', 'roster_as_of', 'generated_at', 'author'] as $field) {
             $report[$field] = trim((string) ($projection[$field] ?? ''));
         }
-        $shift = $report['shift'];
-        $report['shift_label'] = $shift === '' ? '' : (preg_match('/shift$/i', $shift) === 1 ? $shift : $shift.' Shift');
+        if ($report['shift_label'] === '' && $report['shift'] !== '') {
+            $report['shift_label'] = preg_match('/shift$/i', $report['shift']) === 1 ? $report['shift'] : $report['shift'].' Shift';
+        }
+        $report['roster_verified'] = $verified;
+        $report['source_label'] = $verified
+            ? 'TeleStaff roster'.($report['roster_as_of'] !== '' ? ', as of '.$this->formatDate($report['roster_as_of'], 'M j g:i A T') : '')
+            : 'Provisional: no TeleStaff roster for this date';
         $report['date_long'] = $this->formatDate($report['schedule_date'], 'l, F j, Y');
         $report['generated_display'] = $this->formatDate($report['generated_at'], 'F j, Y g:i A T');
 
         return $report + [
             'groups' => $groups, 'total' => count($seen), 'eligible_total' => $eligible,
             'review_total' => count($review['rows']), 'unassigned_total' => count($unassigned['rows']),
-            'legend' => self::LEGEND, 'title' => self::TITLE, 'intro' => self::INTRO, 'verify_note' => self::VERIFY_NOTE,
+            'legend' => $verified ? self::LEGEND : self::LEGEND_PROVISIONAL, 'title' => self::TITLE, 'qualifier' => self::QUALIFIER,
+            'intro' => $report['scope_label'] === 'Class' ? self::INTRO_ADHOC : self::INTRO, 'verify_note' => self::VERIFY_NOTE,
         ];
     }
 

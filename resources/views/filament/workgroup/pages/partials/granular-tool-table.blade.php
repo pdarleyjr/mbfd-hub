@@ -6,7 +6,7 @@
      Styles: .wg-gtt-* in resources/css/filament/workgroup-pages.css (tokens only).
 --}}
 <div class="wg-gtt" tabindex="0" role="region" aria-label="Tool rankings">
-    <table class="wg-table">
+    <table data-hub-table class="wg-table">
         <thead>
             <tr>
                 <th class="wg-gtt-rank">#</th>

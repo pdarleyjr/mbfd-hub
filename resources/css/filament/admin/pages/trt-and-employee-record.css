@@ -110,7 +110,6 @@
 
 .trt-page .trt-table-wrap {
     max-width: 100%;
-    overflow-x: auto;
     border: 1px solid rgb(var(--hub-glass-border));
     border-radius: var(--hub-radius-card);
     background: rgb(var(--hub-glass) / var(--hub-glass-alpha));
@@ -537,7 +536,6 @@
 /* Level-2 wells (the modal itself is already overlay glass). */
 .er-root .er-well {
     max-width: 100%;
-    overflow-x: auto;
     border: 1px solid rgb(var(--hub-glass-border));
     border-radius: var(--hub-radius-control);
     background: rgb(var(--hub-well));

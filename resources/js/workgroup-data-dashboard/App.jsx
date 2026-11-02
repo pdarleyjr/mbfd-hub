@@ -145,8 +145,8 @@ export default function App() {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-hub-focus" tabIndex={0} role="region" aria-label={currentData.title}>
-              <table className="w-full text-left text-sm whitespace-nowrap">
+            <div role="region" aria-label={currentData.title}>
+              <table data-hub-table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                   <tr>
                     {currentData.columns.map((col, idx) => (

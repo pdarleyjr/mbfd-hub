@@ -189,6 +189,10 @@ Code colors match the TeleStaff online roster, read on 2026-10-30. They are defi
 
 **Export PDF** on the roster page downloads the entire roster for the date on screen as landscape Letter, ignoring any collapsed sections, with its date, shift, times and any warning. It holds what the Hub publishes, the Suppression/Rescue block, not TeleStaff's other divisions. Access is the same as the page, it is never cached, and each member is limited to 10 exports a minute.
 
+### Training Crew Planner
+
+The Crew Planner reads this roster and nothing else, through `TrainingRosterDutySource` and `CurrentRosterReader::forDutyDate()`. It has no upload and no parser of its own. A date with no accepted export has no staff: the planner says why and offers a provisional list, labelled wherever the plan goes, and never borrows another day's roster. Working intervals, the A-Day and overtime rule, and identity by exact employee ID behave as they do for the 300 card. Codes and leave reasons are never copied into a plan. When a newer export changes the duty of someone on a plan, the plan keeps its list and waits for the planner to acknowledge the change before it can be exported or sent.
+
 ### When TeleStaff posts the next shift early
 
 A duty day runs 08:00 to 08:00. As soon as an export for the next duty date is accepted, `/daily-roster` opens on it, tagged **Next shift**, with a note saying when it starts and a link to the shift on duty. The PDF follows the page. Everything else stays on the duty day on the clock until 08:00: the 300 and Captain 5 cards and pages, and the shift Captain 5 alerts. Inside a duty day they change hands at the times the roster prints, for example 20:00 on a split seat. `RosterFreshnessResolver::pageStatus()` is the page's answer, and `status()` is everyone else's.

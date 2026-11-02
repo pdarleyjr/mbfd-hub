@@ -23,7 +23,9 @@
         "test:employee-messages-e2e": "playwright test --config=playwright.employee-messages.config.ts",
         "test:email-center-e2e": "playwright test --config=playwright.email-center.config.ts",
         "test:narcotics-check-e2e": "playwright test --config=playwright.narcotics-check.config.ts",
-        "test:fleet-changeout-e2e": "playwright test --config=playwright.fleet-changeout.config.ts"
+        "test:fleet-changeout-e2e": "playwright test --config=playwright.fleet-changeout.config.ts",
+        "test:responsive-tables-e2e": "playwright test --config=playwright.responsive-tables.config.ts",
+        "test:home-duty-e2e": "playwright test --config=playwright.home-duty.config.ts"
     },
     "devDependencies": {
         "@axe-core/playwright": "4.13.0",

@@ -162,8 +162,8 @@
                     {{ $reachable ? 'No images or videos match.' : 'The library appears here once Media Control is reachable.' }}
                 </p>
             @else
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm" data-testid="mc-library">
+                <div>
+                    <table data-hub-table class="min-w-full divide-y divide-gray-200 text-sm" data-testid="mc-library">
                         <thead class="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                             <tr>
                                 <th class="px-5 py-3">Media</th>

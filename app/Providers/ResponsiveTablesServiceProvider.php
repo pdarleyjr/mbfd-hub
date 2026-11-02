@@ -11,14 +11,19 @@ use Filament\View\PanelsRenderHook;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Compact, sticky-column layout for the two widest admin tables: the Master Personnel Directory
- * and the Master Vehicle Inventory. The styles load only on those pages (render hook scopes), so
- * every other table keeps the standard Filament look. No admin theme file is touched.
+ * Responsive tables for every Filament panel. A shared script (resources/js/hub-tables.js) keeps tables
+ * from scrolling sideways by moving lower-priority columns into a row details panel and stacking rows as
+ * cards on phones. The Master Personnel Directory and Master Vehicle Inventory also get tighter cell spacing.
  */
 final class ResponsiveTablesServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_END,
+            static fn (): \Illuminate\Contracts\View\View => view('filament.hooks.hub-tables-script'),
+        );
+
         FilamentView::registerRenderHook(
             PanelsRenderHook::CONTENT_START,
             static fn (): \Illuminate\Contracts\View\View => view('filament.hooks.responsive-tables-styles'),

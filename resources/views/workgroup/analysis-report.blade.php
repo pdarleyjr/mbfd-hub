@@ -77,7 +77,7 @@
                 </div>
                 <p id="analysis-brand-description" class="hub-chart-description">Technical performance scores for the three frontline tool categories: Holmatro 90.72, Hurst 86.53, TNT 75.12, and Amkus 73.56. The chart axis runs from 65 to 95; the complete values are listed below.</p>
                 <div class="hub-chart-data" tabindex="0" role="region" aria-label="Manufacturer performance chart data">
-                    <table>
+                    <table data-hub-table>
                         <caption>Manufacturer technical performance scores</caption>
                         <thead><tr><th scope="col">Manufacturer</th><th scope="col">Score</th></tr></thead>
                         <tbody>
@@ -120,7 +120,7 @@
                 </div>
                 <p id="analysis-tools-description" class="hub-chart-description">Composite scores compare four manufacturers across 32-inch spreaders, cutters, and rams. Holmatro has the highest score in each category. The chart axis runs from 60 to 100; every plotted score appears in the table.</p>
                 <div class="hub-chart-data" tabindex="0" role="region" aria-label="Frontline tool chart data">
-                    <table>
+                    <table data-hub-table>
                         <caption>Frontline tool composite scores by manufacturer</caption>
                         <thead><tr><th scope="col">Tool category</th><th scope="col">Holmatro</th><th scope="col">Hurst</th><th scope="col">TNT</th><th scope="col">Amkus</th></tr></thead>
                         <tbody>
@@ -169,7 +169,7 @@
                 </div>
                 <p id="analysis-saws-description" class="hub-chart-description">Technical scores on a 0–100 chart scale: DeWalt 12-inch DCPS612AG2, 91.25; Makita 14-inch GEC01PL4, 64.83; Husqvarna 14-inch K1 Pace, 61.78.</p>
                 <div class="hub-chart-data" tabindex="0" role="region" aria-label="Cut-off saw chart data">
-                    <table>
+                    <table data-hub-table>
                         <caption>Cut-off saw technical scores</caption>
                         <thead><tr><th scope="col">Saw</th><th scope="col">Score</th></tr></thead>
                         <tbody>

@@ -54,6 +54,9 @@ final class MasterPersonnelDirectory extends Page implements HasTable
     /** Columns whose values also appear beneath another column (main column => companions). */
     private const STACKED = ['shift' => ['a_day'], 'unit' => ['bid_position', 'division'], 'city_email' => ['email_match_status']];
 
+    /** Which columns stay in the row longest (lower is more important). The first column is always kept. */
+    private const PRIORITY = ['name' => 0, 'employee_id' => 1, 'rank' => 2, 'shift' => 3, 'station' => 4, 'unit' => 5, 'city_email' => 6, 'phone' => 7, 'display_name' => 8];
+
     /** Companion columns that start hidden because their values show under a main column. */
     private const SECONDARY = ['a_day', 'bid_position', 'division', 'email_match_status'];
 
@@ -250,9 +253,9 @@ final class MasterPersonnelDirectory extends Page implements HasTable
                     ->filter()->implode(' · ') ?: null);
             }
         }
-        if ($key !== 'employee_id' && ! $first) {
-            $column->visibleFrom('md');
-        }
+        // Responsive tables (resources/js/hub-tables.js): lower priority columns move into the row's details panel
+        // when the table is short of room, and rows stack as cards on phones. Every column stays sortable and editable.
+        $column->extraHeaderAttributes(['data-hub-priority' => self::PRIORITY[$key] ?? 20] + ($key === 'city_email' ? ['data-hub-min' => '12'] : []));
         if ($key !== 'email_match_status') {
             $column->sortable(query: fn (Builder $query, string $direction): Builder => $this->orderSource($query, $key, $direction));
         }

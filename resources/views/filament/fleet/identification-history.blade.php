@@ -7,7 +7,7 @@
     <p class="text-sm text-gray-500 dark:text-gray-400">Nothing recorded for this question yet.</p>
 @else
     <div class="hub-insp hub-insp-table-wrap">
-        <table class="hub-insp-table" data-identification-history>
+        <table data-hub-table class="hub-insp-table" data-identification-history>
             <thead>
                 <tr>
                     <th>When (ET)</th>

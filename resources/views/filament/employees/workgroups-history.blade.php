@@ -38,7 +38,7 @@
     <section>
         <h3 class="text-base font-semibold">Security audit — latest 50 events</h3>
         <div class="hub-portal-table-scroll" tabindex="0" role="region" aria-label="Security audit">
-            <table class="hub-portal-table mt-2 min-w-[36rem]">
+            <table data-hub-table class="hub-portal-table mt-2 min-w-[36rem]">
                 <thead><tr><th scope="col" class="p-2">Time</th><th scope="col" class="p-2">Action / result</th><th scope="col" class="p-2">Administrator</th><th scope="col" class="p-2">Reason</th></tr></thead>
                 <tbody>
                     @forelse ($events as $event)

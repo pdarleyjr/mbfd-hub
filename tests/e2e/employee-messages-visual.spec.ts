@@ -209,8 +209,13 @@ test.describe.serial('Support Services visual QA', () => {
       await link.click();
       await expect(page).toHaveURL(/inventory-corrections\/\d+/);
       await expect(page.getByText(/Passports/).first()).toBeVisible();
-      await expect(page.getByText('Now on the checklist').first()).toBeVisible();
-      await expect(page.getByText('Requested', { exact: true }).first()).toBeVisible();
+      // A heading on a wide screen; on a phone each row is a card and the value carries the same words as its label.
+      for (const label of ['Now on the checklist', 'Requested']) {
+        await expect(page.locator(`[data-section="diff"] th:text-is("${label}"):visible, [data-section="diff"] td[data-hub-label="${label}"]:visible`).first()).toBeVisible();
+      }
+      const change = page.locator('[data-diff-row]').first();
+      await expect(change.locator('s')).toBeVisible();
+      await expect(change.locator('strong')).toBeVisible();
       await expectNoHorizontalOverflow(page);
       await shot(page, info, '05-equipment-review', true);
     });

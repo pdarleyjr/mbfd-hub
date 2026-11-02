@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <x-hub.head />
     <title>MBFD Workgroup Summary — Mid-Mount Ladder Equipment Evaluation Report</title>
-    @vite(['resources/css/reports/workgroup-summary.css', 'resources/css/app.css'])
+    @vite(['resources/css/reports/workgroup-summary.css', 'resources/css/app.css', 'resources/js/hub-tables.js'])
 </head>
 <body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--workgroup-summary">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
@@ -133,7 +133,7 @@
             <h3 class="subsection-heading">3.2 The Compartment Challenge: Asymmetrical Storage</h3>
             <p>The most consequential platform constraint identified on Day 1 was the asymmetrical compartment architecture inherent to the mid-mount design:</p>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Side</th><th scope="col">Configuration</th><th scope="col">Implication</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Driver Side (L Zones)</strong></td><td>Full height, full depth</td><td>Primary bulk storage for fans, saws, rescue kits</td></tr>
@@ -221,7 +221,7 @@
             <h3 class="subsection-heading">5.1 Extrication Brand Overall Performance (Corrected)</h3>
             <p>Four extrication manufacturers advanced to the final evaluation. Brand averages are derived strictly from the frontline triad (32-inch spreader, cutter, ram):</p>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Rank</th><th scope="col">Brand</th><th scope="col">Corrected Avg</th><th scope="col">Capability</th><th scope="col">Usability</th><th scope="col">Maintainability</th><th scope="col">Deployability</th></tr></thead>
                     <tbody>
                         <tr><td><span class="rank-badge rank-1">#1</span></td><td><strong>Holmatro</strong></td><td class="score-elite">90.72</td><td>89.41</td><td>93.99</td><td>89.82</td><td>89.69</td></tr>
@@ -235,7 +235,7 @@
 
             <h3 class="subsection-heading">5.2 Frontline Extrication Tools: Individual Corrected Scores</h3>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Tool Category</th><th scope="col">Product Model</th><th scope="col">Manufacturer</th><th scope="col">Corrected Score</th></tr></thead>
                     <tbody>
                         <tr><td>Spreader</td><td>PSP40 (32-inch)</td><td>Holmatro</td><td class="score-elite">92.02</td></tr>
@@ -294,7 +294,7 @@
                 </div>
             </div>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Rank</th><th scope="col">Product</th><th scope="col">Manufacturer</th><th scope="col">Score</th></tr></thead>
                     <tbody>
                         <tr><td><span class="rank-badge rank-1">#1</span></td><td>12-inch (DCPS612AG2)</td><td>DeWalt</td><td class="score-elite">91.25</td></tr>
@@ -316,7 +316,7 @@
                 </div>
             </div>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Rank</th><th scope="col">System</th><th scope="col">Manufacturer</th><th scope="col">Score</th></tr></thead>
                     <tbody>
                         <tr><td><span class="rank-badge rank-1">#1</span></td><td>V-Strut (Auto-locking)</td><td>Holmatro</td><td class="score-capable">87.28</td></tr>
@@ -343,7 +343,7 @@
                 </div>
             </div>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Specification</th><th scope="col">Value</th></tr></thead>
                     <tbody>
                         <tr><td>Weight</td><td>17.0 lbs (7.7 kg)</td></tr>
@@ -390,7 +390,7 @@
 
             <h3 class="subsection-heading">7.2 Final Selected Equipment Package</h3>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Category</th><th scope="col">Selected Equipment</th><th scope="col">Platform Assignment</th></tr></thead>
                     <tbody>
                         <tr><td>Cut-Off Saw</td><td>DeWalt 12" Battery Cut-Off Saw (DCPS612AG2)</td><td>Frontline (L1/L3)</td></tr>
@@ -426,7 +426,7 @@
 
             <h4 class="sub-subsection-heading">Frontline Apparatus (L1 / L3)</h4>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Equipment</th><th scope="col">Deployment Role</th></tr></thead>
                     <tbody>
                         <tr><td>Hurst SP 777 E3 Connect Spreader</td><td>Primary extrication spreading</td></tr>
@@ -442,7 +442,7 @@
 
             <h4 class="sub-subsection-heading">Command Level (300 / Captain 5)</h4>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Equipment</th><th scope="col">Deployment Role</th></tr></thead>
                     <tbody>
                         <tr><td>Hurst M40 40" Spreader</td><td>Heavy extrication beyond standard parameters</td></tr>
@@ -483,7 +483,7 @@
 
             <h3 class="subsection-heading">9.2 Ladder Truck In-Service Requirements</h3>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Training Component</th><th scope="col">Requirement</th></tr></thead>
                     <tbody>
                         <tr><td>Driving Operations</td><td>Full certification on mid-mount ladder configuration</td></tr>
@@ -508,7 +508,7 @@
         <div class="report-section page-break" id="sec-appendix-a">
             <h2 class="section-heading"><span class="section-num">A.</span> Appendix A — Product Evaluation Data Summary</h2>
             <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
-                <table class="report-table">
+                <table data-hub-table class="report-table">
                     <thead><tr><th scope="col">Product</th><th scope="col">Category</th><th scope="col">Manufacturer</th><th scope="col">Corrected Score</th></tr></thead>
                     <tbody>
                         <tr><td>Holmatro PSP40 (32" Spreader)</td><td>Hydraulic Tool</td><td>Holmatro</td><td class="score-elite">92.02</td></tr>

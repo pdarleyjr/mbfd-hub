@@ -112,6 +112,19 @@ final class TrainingPlannerAttendanceLookup
                     'start_at' => $session->starts_at->toIso8601String(), 'end_at' => null])->values()->all()];
     }
 
+    /** The active population for a class with no course behind it: there is no attendance history to check. */
+    public function population(User $actor, string $personnelAsOf): array
+    {
+        Gate::forUser($actor)->authorize('create', TrainingCourse::class);
+        $rows = [];
+        foreach ($this->personnel->population($personnelAsOf) as $person) {
+            $rows[$person['employee_profile_id']] = $person + ['attendance_status' => 'NO_PRIOR_ATTENDANCE',
+                'has_review' => false, 'has_provisional' => false, 'applicable' => true, 'evidence' => [], 'attended_session_ids' => []];
+        }
+
+        return ['course' => null, 'module' => null, 'personnel_as_of' => $personnelAsOf, 'rows' => $rows, 'exceptions' => [], 'session_suggestions' => []];
+    }
+
     private function applicable(array $person, array $audience): ?bool
     {
         $unknown = false;
