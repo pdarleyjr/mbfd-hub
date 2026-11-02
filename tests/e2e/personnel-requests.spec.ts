@@ -737,8 +737,9 @@ test('real station inventory snapshot and supply request appear in their station
   await writeFile(pdfPath, pdfBody);
   await testInfo.attach('inventory-submission.pdf', { path: pdfPath, contentType: 'application/pdf' });
   await page.getByRole('tab', { name: 'Supply Requests', exact: true }).click();
-  const supplyRow = page.locator('tr').filter({ hasText: '[QA TEST] Real browser station supply request.' });
-  await expect(supplyRow).toBeVisible();
+  // The tab loads over Livewire like the one above, and a retry finds the first attempt's request as well: newest is first.
+  const supplyRow = page.locator('tr').filter({ hasText: '[QA TEST] Real browser station supply request.' }).first();
+  await expect(supplyRow).toBeVisible({ timeout: 30_000 });
   await supplyRow.getByRole('button', { name: 'Edit', exact: true }).click();
   const supplyModal = page.locator('.fi-modal-window:visible').last();
   await expect(supplyModal).toBeVisible({ timeout: 30_000 });
