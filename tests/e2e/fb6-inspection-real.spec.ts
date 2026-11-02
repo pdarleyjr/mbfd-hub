@@ -106,7 +106,10 @@ test('a note written from the first screen, before any area is done, reaches the
   await page.goto('/daily/vehicle-inspections/fb6');
   await expect(page.getByRole('heading', { name: 'FB6', exact: true, level: 1 })).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('.inspection-readiness')).not.toContainText('unavailable');
-  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Notes and numbers' }).click();
+  const prompt = page.getByRole('region', { name: 'SCBA & Radio Numbers' });
+  await expect(prompt).toContainText('of 13 entered');
+  await prompt.getByRole('button', { name: 'Enter SCBA & radio numbers' }).click();
+  await expect(page.getByLabel('Airpack (SCBA) ID 4')).toBeVisible();
   await page.getByRole('button', { name: 'Add a concern or note' }).click();
   await page.getByLabel('What did you notice?').fill('Starboard cleat loose, noted from the first screen');
   await page.getByRole('radio', { name: 'Note for the record: no action needed' }).check();
@@ -122,6 +125,27 @@ test('a note written from the first screen, before any area is done, reaches the
   const evidence = fixture<Fb6State>('fb6-state').inspections.at(-1)?.checklist_evidence;
   const recorded = Object.fromEntries((JSON.parse(evidence ?? '[]') as Array<{ id: string; value: unknown }>).map((field) => [field.id, field.value]));
   expect(recorded['fb6-deck-hand-radio-number']).toBe('6107');
+});
+
+test('an engine crew sees four SCBA boxes and every radio from the first screen, and a typed number counts', async ({ browser }, info) => {
+  const { slug } = fixture<{ slug: string }>('engine');
+  const { page, problems } = await member(browser, info, 'member');
+
+  await page.goto(`/daily/vehicle-inspections/${slug}`);
+  const prompt = page.getByRole('region', { name: 'SCBA & Radio Numbers' });
+  await expect(prompt).toContainText('of 9 entered', { timeout: 60_000 });
+  await prompt.getByRole('button', { name: 'Enter SCBA & radio numbers' }).click();
+
+  const card = page.locator('[data-equipment-numbers]');
+  for (const label of ['SCBA #1', 'SCBA #2', 'SCBA #3', 'SCBA #4', 'Crew Radio# OIC', 'DE Radio#', 'FI Radio# 1', 'FI Radio# 2', 'FI Radio# 3']) {
+    await expect(card.getByLabel(label, { exact: true })).toBeVisible();
+  }
+  await expect(card.getByLabel('SCBA #5', { exact: true })).toHaveCount(0);
+  await card.getByLabel('SCBA #1', { exact: true }).fill('3101');
+
+  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Apparatus', exact: true }).click();
+  await expect(prompt).toContainText('1 of 9 entered');
+  expect(problems).toEqual([]);
 });
 
 test('Station 6 opens the boat, the daily readings are on screen, and they are saved', async ({ browser }, info) => {

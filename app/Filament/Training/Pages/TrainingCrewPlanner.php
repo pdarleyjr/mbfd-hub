@@ -72,6 +72,9 @@ final class TrainingCrewPlanner extends Page
 
     public array $filters = ['search' => '', 'rank' => '', 'day_station' => '', 'day_apparatus' => '', 'assignment_category' => '', 'published_assignment' => '', 'de_bid' => false];
 
+    /** Ranks ticked in the filter; none ticked shows every rank. */
+    public array $ranks = [];
+
     public array $candidateSelection = [];
 
     public array $planSelection = [];
@@ -94,6 +97,13 @@ final class TrainingCrewPlanner extends Page
         $actor = $this->actor();
         $draft = $this->store()->latest($actor) ?? $this->newDraft($actor);
         $this->loadDraft($this->syncRoster($draft));
+        // A saved plan for a day with no roster on file moves to today's roster, or the newest one.
+        $dates = $this->rosterDates();
+        if ($dates !== [] && ! in_array($this->scheduleDate, $dates, true)) {
+            $today = app(TrainingRosterDutySource::class)->today();
+            $this->scheduleDate = in_array($today, $dates, true) ? $today : $dates[0];
+            $this->updatedScheduleDate();
+        }
     }
 
     public function reloadProposal(): void
@@ -183,19 +193,34 @@ final class TrainingCrewPlanner extends Page
         });
     }
 
-    /** Sessions keep their clock times on the new date, and selections stay put to be rechecked against that day's roster. */
+    public function updatedRanks(): void
+    {
+        $this->actor();
+        $this->validate(['ranks' => ['array', 'max:50'], 'ranks.*' => ['string', 'max:100']]);
+    }
+
+    /** One tap ticks or unticks one rank. Taps run in order on the server, so quick taps never undo each other. */
+    public function toggleRank(string $rank): void
+    {
+        $this->actor();
+        abort_unless($rank !== '' && mb_strlen($rank) <= 100, 422);
+        $ranks = array_values(array_filter($this->ranks, static fn ($ticked): bool => is_string($ticked) && $ticked !== ''));
+        $this->ranks = in_array($rank, $ranks, true)
+            ? array_values(array_diff($ranks, [$rank]))
+            : array_slice([...$ranks, $rank], 0, 50);
+    }
+
+    /** Only a date with a TeleStaff roster on file can be chosen. Sessions keep their clock times on the new date. */
     public function updatedScheduleDate(): void
     {
         $this->actor();
-        $today = CarbonImmutable::now(self::TZ);
-        $valid = (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/D', $this->scheduleDate) && checkdate((int) substr($this->scheduleDate, 5, 2), (int) substr($this->scheduleDate, 8, 2), (int) substr($this->scheduleDate, 0, 4))
-            && $this->scheduleDate >= $today->subYear()->toDateString() && $this->scheduleDate <= $today->addYear()->toDateString();
-        if (! $valid) {
-            $this->addError('scheduleDate', 'Choose a date within a year of today.');
+        if (! in_array($this->scheduleDate, $this->rosterDates(), true)) {
+            $this->addError('scheduleDate', 'Choose a day that has a TeleStaff roster.');
             $this->scheduleDate = $this->composer()->date($this->draft());
 
             return;
         }
+        $this->resetErrorBag('scheduleDate');
         $date = $this->scheduleDate;
         $snapshot = app(TrainingRosterDutySource::class)->forDate($date)->snapshotId;
         $this->change(function (array $draft) use ($date, $snapshot): array {
@@ -484,38 +509,28 @@ final class TrainingCrewPlanner extends Page
         $filters = $this->cleanFilters($draft);
         $filtered = $filters === [] ? $all : $this->analysis($draft, $filters, $duty);
         $labels = $this->slotLabels($draft['slots']);
-        $searching = trim((string) ($filters['search'] ?? '')) !== '';
 
-        $candidates = $notListed = [];
+        $candidates = [];
         foreach ($filtered['rows'] ?? [] as $id => $row) {
             if ($composer->eligible($row, $draft)) {
                 $candidates[$id] = $this->candidateCard($id, $row, $draft, $labels);
-            } elseif (! ($row['off_roster'] ?? false) || $searching) {
-                $notListed[] = ['id' => (int) $id, 'name' => $row['name'], 'rank' => $row['rank'] ?? '', 'employee_id' => $row['employee_id'],
-                    'reason' => $this->notListedReason($row, $draft), 'selected' => isset($draft['selections'][$id])];
             }
         }
 
         $courses = TrainingCourse::query()->when($this->courseSearch !== '', fn ($query) => $query->where('name', 'like', '%'.mb_substr($this->courseSearch, 0, 200).'%'))->orderBy('name')->limit(500)->get()->filter(fn (TrainingCourse $course): bool => app(TrainingRosterPolicy::class)->view($actor, $course));
         $chosen = $composer->course($actor, $draft['course_id'] ?? null);
-        $contexts = collect($all['rows'] ?? [])->pluck('observed_unit_context')->flatten(1);
         $publisher = app(TrainingCrewPlanPublisher::class);
 
         return [
-            'draft' => $draft, 'duty' => $duty, 'all' => $all, 'candidates' => $candidates, 'notListed' => array_slice($notListed, 0, 100),
-            'unmatched' => $this->unmatchedIdentities($filtered['review'] ?? [], $filters),
+            'draft' => $draft, 'duty' => $duty, 'all' => $all, 'candidates' => $candidates,
             'courses' => $courses, 'chosen' => $chosen, 'showCourseSearch' => $this->courseSearch !== '' || $courses->count() >= 15,
-            'hasClass' => $composer->hasClass($draft), 'dates' => $this->dateChoices($duty),
+            'hasClass' => $composer->hasClass($draft), 'dates' => $this->dateChoices(),
+            'rankChoices' => $this->rankChoices(array_filter($all['rows'] ?? [], fn (array $row): bool => $composer->eligible($row, $draft))),
             'rosterChange' => $composer->rosterChange($actor, $draft, $duty),
             'eligibleTotal' => count(array_filter($all['rows'] ?? [], fn (array $row): bool => $composer->eligible($row, $draft))),
             'review' => $this->reviewModel($draft, $all, $labels), 'cutoff' => $cutoff, 'cutoffIsClassStart' => $fromClassStart,
             'slotLabels' => $labels, 'stationsList' => Station::query()->orderBy('station_number')->get(['id', 'name', 'station_number']),
             'locationConflicts' => $this->locationConflicts($draft['slots']),
-            'ranks' => collect($all['rows'] ?? [])->pluck('rank')->filter()->unique()->sort()->values()->all(),
-            'stations' => $contexts->pluck('station')->filter()->unique()->sort()->values()->all(),
-            'units' => $contexts->pluck('apparatus')->filter()->unique()->sort()->values()->all(),
-            'assignments' => collect($all['rows'] ?? [])->pluck('assignment')->filter()->unique()->sort()->values()->all(),
-            'categories' => collect($all['rows'] ?? [])->pluck('assignment_category')->filter()->unique()->sort()->values()->all(),
             'targets' => [
                 ['id' => TrainingCrewPlanPublisher::COMMAND_300, 'label' => '300 message card', 'allowed' => $publisher->allows($actor, TrainingCrewPlanPublisher::COMMAND_300)],
                 ['id' => TrainingCrewPlanPublisher::CAPTAIN_5, 'label' => 'Captain 5 message card', 'allowed' => $publisher->allows($actor, TrainingCrewPlanPublisher::CAPTAIN_5)],
@@ -614,9 +629,13 @@ final class TrainingCrewPlanner extends Page
         }
     }
 
+    /** Only people a TeleStaff roster places on duty are offered; a day without one offers nobody. */
     private function analysis(array $draft, array $filters = [], ?TrainingRosterDuty $duty = null): array
     {
-        return $this->composer()->analyze($this->actor(), $draft, $filters, $duty);
+        $duty ??= $this->composer()->duty($draft);
+        $analysis = $this->composer()->analyze($this->actor(), $draft, $filters, $duty);
+
+        return $duty->isVerified() ? $analysis : [...$analysis, 'rows' => []];
     }
 
     /** Re-reads current eligibility on the server; the browser never decides who qualifies. */
@@ -657,6 +676,10 @@ final class TrainingCrewPlanner extends Page
         }
         if (($this->filters['de_bid'] ?? false) === true) {
             $filters['de_bid'] = true;
+        }
+        $ranks = array_values(array_unique(array_filter($this->ranks, static fn ($rank): bool => is_string($rank) && trim($rank) !== '' && mb_strlen($rank) <= 100)));
+        if ($ranks !== []) {
+            $filters['ranks'] = array_slice($ranks, 0, 50);
         }
         // With one session, station and unit filters follow that session's own hours.
         if (count($draft['slots']) === 1 && (isset($filters['day_station']) || isset($filters['day_apparatus']))) {
@@ -832,19 +855,45 @@ final class TrainingCrewPlanner extends Page
         return $conflicts;
     }
 
-    /** @return list<array{date: string, label: string, verified: bool}> */
-    private function dateChoices(TrainingRosterDuty $duty): array
+    /** @return list<string> duty dates with a TeleStaff roster on file, newest first */
+    private function rosterDates(): array
     {
-        $source = app(TrainingRosterDutySource::class);
-        $today = $source->today();
-        $verified = array_slice($source->availableDates(5), 0, 5);
-        $dates = array_values(array_unique([$today, ...$verified]));
-        rsort($dates);
+        return app(TrainingRosterDutySource::class)->availableDates(14);
+    }
+
+    /**
+     * Ranks of the people who still need the class that day, chiefs first, then any ticked rank nobody holds.
+     *
+     * @return list<array{value: string, label: string, count: int}>
+     */
+    private function rankChoices(array $eligible): array
+    {
+        $order = ['Fire Chief', 'Deputy Fire Chief', 'Division Chief', 'Captain', 'Lieutenant', 'Firefighter'];
+        $counts = collect($eligible)->countBy(static fn (array $row): string => (string) ($row['rank'] ?? ''))->forget('')->all();
+        foreach ($this->ranks as $ticked) {
+            if (is_string($ticked) && $ticked !== '') {
+                $counts[$ticked] ??= 0;
+            }
+        }
+        uksort($counts, static function (string $left, string $right) use ($order): int {
+            $a = array_search($left, $order, true);
+            $b = array_search($right, $order, true);
+
+            return ($a === false ? 99 : $a) <=> ($b === false ? 99 : $b) ?: strnatcasecmp($left, $right);
+        });
+
+        return array_map(static fn (string $rank, int $count): array => ['value' => $rank, 'label' => Str::plural($rank), 'count' => $count],
+            array_keys($counts), array_values($counts));
+    }
+
+    /** @return list<array{date: string, label: string}> */
+    private function dateChoices(): array
+    {
+        $today = CarbonImmutable::now(self::TZ)->toDateString();
 
         return array_map(static fn (string $date): array => [
-            'date' => $date, 'verified' => in_array($date, $verified, true),
-            'label' => ($date === $today ? 'Today · ' : '').CarbonImmutable::parse($date, self::TZ)->format('D M j'),
-        ], $dates);
+            'date' => $date, 'label' => CarbonImmutable::parse($date, self::TZ)->format('l, M j').($date === $today ? ' (today)' : ''),
+        ], $this->rosterDates());
     }
 
     private function candidateCard(int|string $id, array $row, array $draft, array $labels): array
@@ -854,7 +903,7 @@ final class TrainingCrewPlanner extends Page
 
         return [
             'id' => (int) $id, 'name' => $row['name'], 'rank' => $row['rank'] ?? '', 'employee_id' => $row['employee_id'],
-            'station' => $place['station'], 'unit' => $place['unit'], 'duty' => $this->dutyWindow($row['working_intervals'] ?? []),
+            'station' => $place['station'], 'unit' => $place['unit'],
             'selected' => isset($draft['selections'][$id]), 'slot_id' => $draft['selections'][$id]['slot_id'] ?? null,
             'slot_options' => array_map(fn (string $slotId): array => ['id' => $slotId] + $labels[$slotId], $eligibleSlots),
             'partial' => count($eligibleSlots) < count($labels), 'provisional' => $row['provisional'] ?? false,
@@ -880,66 +929,6 @@ final class TrainingCrewPlanner extends Page
         $join = static fn (array $values): string => implode(' / ', array_unique(array_filter($values))) ?: 'Not reported';
 
         return ['station' => $join($stations), 'unit' => $join($units)];
-    }
-
-    private function dutyWindow(array $intervals): string
-    {
-        $parts = [];
-        foreach ($intervals as $interval) {
-            $start = CarbonImmutable::parse($interval['start_at'])->setTimezone(self::TZ);
-            $end = CarbonImmutable::parse($interval['end_at'])->setTimezone(self::TZ);
-            $parts[] = $start->format('H:i').'–'.$end->format('H:i').($end->toDateString() !== $start->toDateString() ? ' (next day)' : '');
-        }
-
-        return implode(', ', $parts) ?: 'Not reported';
-    }
-
-    private function notListedReason(array $row, array $draft): string
-    {
-        $status = $row['attendance_status'] ?? '';
-        if ($status === 'VERIFIED_ATTENDED') {
-            return $draft['module_id'] ? 'Already attended this module (verified record)' : 'Already attended this course (verified record)';
-        }
-        if ($status === 'NOT_APPLICABLE') {
-            return "Outside this module's audience";
-        }
-        if (in_array($status, ['UNVERIFIED_OR_PROVISIONAL', 'IDENTITY_OR_EVIDENCE_REVIEW'], true)) {
-            return 'Attendance record needs verification';
-        }
-        if ($row['off_roster'] ?? false) {
-            return 'Not on this roster';
-        }
-        foreach ($row['slot_review_reasons'] ?? [] as $reasons) {
-            foreach ($reasons as $reason) {
-                if (is_string($reason) && $reason !== '') {
-                    return 'Duty needs verification: '.$reason;
-                }
-            }
-        }
-        if ($draft['slots'] === []) {
-            return ($row['needs_review'] ?? []) !== [] ? 'Duty needs verification' : 'Not working on this date';
-        }
-
-        return 'Not on duty for the whole session';
-    }
-
-    /** Roster identities with no unique active Hub employee; searchable so absence is explained. */
-    private function unmatchedIdentities(array $review, array $filters): array
-    {
-        if (array_intersect_key($filters, array_flip(['rank', 'day_station', 'day_apparatus', 'assignment_category', 'published_assignment', 'de_bid'])) !== []) {
-            return [];
-        }
-        $needle = mb_strtolower($filters['search'] ?? '');
-        $result = [];
-        foreach ($review as $identity) {
-            $name = (string) ($identity['raw_name'] ?? '') ?: 'Name not reported';
-            $id = (string) ($identity['raw_employee_id'] ?? '');
-            if ($needle === '' || str_contains(mb_strtolower($name.' '.$id), $needle)) {
-                $result[] = ['name' => $name, 'employee_id' => $id, 'reason' => 'Not matched to an active Hub employee (ID '.($id !== '' ? $id : 'not reported').')'];
-            }
-        }
-
-        return $result;
     }
 
     /** Selected members grouped by session; anyone who stopped qualifying is held apart for verification. */

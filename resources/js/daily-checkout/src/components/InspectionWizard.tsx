@@ -43,6 +43,7 @@ import { EMPTY_REVIEW_FLAG, buildReviewFlag, normalizeReviewFlagDraft, reviewFla
 import { normalizeTaskStatus } from '../utils/checklistFields.ts';
 import ConcernsSection from './findings/ConcernsSection';
 import EquipmentNumbersCard from './EquipmentNumbersCard';
+import EquipmentNumbersPrompt from './EquipmentNumbersPrompt';
 import { prefillBlankCompartments, prefillBlankFieldValues, prefillCompartments, prefillFieldValues, seenNumbers, toExtraSubmissions } from '../utils/equipmentNumbers.ts';
 import { checklistUsesVehicleId, defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
 import { activeVehicleIdentification, optionalIdentification, toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
@@ -1177,7 +1178,7 @@ export default function InspectionWizard() {
         <button type="button" className="px-3" aria-label={memberStepLabel} aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => changeStep('officer')}><Users size={20} aria-hidden="true" />Member</button>
         <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Readings · Optional'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => changeStep(isV2Checklist ? 'details' : 'meter')}><Gauge size={20} aria-hidden="true" /><span>{isV2Checklist ? 'Details' : <>Readings <small>Optional</small></>}</span></button>
         {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-label="Checklist details" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => changeStep('details')}><ClipboardList size={20} aria-hidden="true" />Details</button>}
-        <button type="button" className="px-3" aria-label="Notes and numbers" aria-current={currentStep === 'notes' ? 'page' : undefined} onClick={() => changeStep('notes')}><StickyNote size={20} aria-hidden="true" />Notes{concerns.length > 0 ? ` (${concerns.length})` : ''}</button>
+        <button type="button" className="px-3" aria-label="SCBA, radio numbers and notes" aria-current={currentStep === 'notes' ? 'page' : undefined} onClick={() => changeStep('notes')}><StickyNote size={20} aria-hidden="true" /><span>SCBA <small>&amp; Notes{concerns.length > 0 ? ` (${concerns.length})` : ''}</small></span></button>
       </nav>
 
       {currentStep === 'officer' && (
@@ -1213,6 +1214,10 @@ export default function InspectionWizard() {
         />
       )}
 
+      {(currentStep === 'compartments' || currentStep === 'details') && checklist.equipment_numbers && (
+        <EquipmentNumbersPrompt block={checklist.equipment_numbers} fields={checklist.fields} fieldValues={fieldValues} compartments={compartments} extras={equipmentExtras} onOpen={() => changeStep('notes')} />
+      )}
+
       {currentStep === 'details' && (
         <ChecklistFieldsStep
           continueLabel={continueLabel}
@@ -1246,9 +1251,8 @@ export default function InspectionWizard() {
       {/* Open from the first screen: nobody should have to finish every area before they can write down what they saw. */}
       {currentStep === 'notes' && (
         <section className="inspection-review" aria-labelledby="inspection-notes-heading">
-          <h2 id="inspection-notes-heading">Notes &amp; Numbers</h2>
-          <p className="inspection-muted mb-4">Add these at any point. They are saved with this inspection and sent when you submit it.</p>
-          <ConcernsSection concerns={concerns} onChange={setConcerns} openIssues={concernIssues} />
+          <h2 id="inspection-notes-heading">SCBA, Radios &amp; Notes</h2>
+          <p className="inspection-muted mb-4">Fill these in at any point. They are saved with this inspection and sent when you submit it.</p>
           {checklist.equipment_numbers && <EquipmentNumbersCard
             block={checklist.equipment_numbers}
             fields={checklist.fields}
@@ -1259,6 +1263,7 @@ export default function InspectionWizard() {
             extras={equipmentExtras}
             onExtrasChange={setEquipmentExtras}
           />}
+          <ConcernsSection concerns={concerns} onChange={setConcerns} openIssues={concernIssues} />
           <button type="button" className="hub-btn hub-btn--primary" onClick={() => changeStep(readiness.nextStep)}>{readiness.label}</button>
         </section>
       )}
