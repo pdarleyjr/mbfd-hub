@@ -308,7 +308,7 @@ Status key: **fixed** = measured in a browser; **adapted, not yet verified** = m
 |---|---|
 | `workgroup-data-dashboard` (rankings table) | fixed at 390 (`/workgroups/data-dashboard`) |
 | `workgroup-l1-inventory` (126-row inventory) | fixed at 390 (`/workgroups/l1-inventory`) |
-| Daily app `captain5/ems/UnitStatistics.tsx` | fixed: its own container-query cards (`unit-statistics.css`, no Hub adapter bundled; the change is the Captain 5 lazy chunk plus a 682 byte stylesheet). Under a 30rem box each row is a card and each number carries its column heading; wider it is the table. Measured in `captain5-ems.spec.ts` at 320 and 390 (cards), 768 and 1280 (tables) with no overflow. `npm run check:service-workers` passes |
+| Daily app `captain5/ems/master/MasterTable.tsx` | fits by construction: fixed layout, and on phones the shelf column folds under the item name. Measured by the Captain 5 master inventory suite (`captain5-master-inventory.spec.ts`), not by this contract |
 | `operational-forms` record and entry tables (`of-table-wrap`) | fixed: the wrapper is a size container and the tables become cards when their room is short (record table under 640px, entry table under 900px), with the older viewport rules kept as a fallback. Measured at 320, 390, 768, 820, 900, 1024, 1280 and 1440px with no document overflow, no wrapper scroll and no table past its wrapper. The bundle's context navigation, evidence spine and preview toolbar are strips of controls, not tables (allowlisted) |
 | `training-roster/main.tsx` kiosk table (4 columns) | not yet verified; fits by construction at 320px (no minimum widths) but not measured |
 | `daily-roster.js` | covered with the roster view above |

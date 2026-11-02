@@ -118,11 +118,15 @@
 
         {{-- ============================== RECONCILE ============================== --}}
         @if ($this->tab === 'reconcile')
-            <x-filament::section heading="Reconcile supplies issued since the last inventory"
+            <x-filament::section heading="Calculated snapshot of supplies issued since the last inventory"
                 description="Works out what should be on the shelf now: the last count, minus what was issued, plus what was received, plus adjustments. Nothing is saved until you confirm.">
                 @if ($canAct && ! $preview['nothing_to_reconcile'])
                     <x-slot name="headerEnd">{{ $this->confirmReconciliationAction }}</x-slot>
                 @endif
+
+                <p class="mb-4 text-sm text-gray-700 dark:text-gray-300" data-testid="calculated-snapshot-note">
+                    This is a calculation, not a count. Reconciling submitted inventory forms is done on the Captain 5 page.
+                </p>
 
                 <div class="space-y-4" data-testid="reconcile-preview">
                     @if ($preview['nothing_to_reconcile'])

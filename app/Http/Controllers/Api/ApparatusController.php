@@ -20,6 +20,7 @@ use App\Services\DailyCheckoutInspectionSessionService;
 use App\Services\Display\DisplaySnapshotService;
 use App\Services\Fleet\ApparatusChangeoutPlanner;
 use App\Services\Fleet\CheckoutVehicleReport;
+use App\Services\Fleet\CrewEquipmentNumbers;
 use App\Services\Fleet\VehicleIdentificationPlanner;
 use App\Services\Fleet\VehicleIdentificationService;
 use App\Services\Fleet\VehicleIdentificationSubmission;
@@ -119,6 +120,7 @@ class ApparatusController extends Controller
             // Outside the hashed checklist on purpose: answering a question never changes checklist_version.
             'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
             'vehicle_id_required' => VehicleIdentificationFields::usesFleetNumber($apparatus),
+            'equipment_numbers' => app(CrewEquipmentNumbers::class)->block($apparatus, $checklist),
             // Outside the hashed checklist too: what stayed on the truck this crew just left.
             'changeout_handoff' => app(ApparatusChangeoutPlanner::class)->handoffNotice($apparatus),
         ]);
@@ -240,6 +242,7 @@ class ApparatusController extends Controller
             // Not part of the frozen session snapshot or its hash.
             'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
             'vehicle_id_required' => VehicleIdentificationFields::usesFleetNumber($apparatus),
+            'equipment_numbers' => app(CrewEquipmentNumbers::class)->block($apparatus, $sessionChecklist),
         ], $issued['created'] ? 201 : 200);
 
         if ($browserBinding['new']) {
@@ -348,6 +351,7 @@ class ApparatusController extends Controller
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
             'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
             'vehicle_id_required' => VehicleIdentificationFields::usesFleetNumber($apparatus),
+            'equipment_numbers' => app(CrewEquipmentNumbers::class)->block($apparatus, $sessionChecklist),
         ], $issued['created'] ? 201 : 200);
     }
 
@@ -401,9 +405,32 @@ class ApparatusController extends Controller
             'scheduled_tasks' => ['nullable', 'array', 'max:100'],
             'scheduled_tasks.*' => ['required', 'array'],
             'scheduled_tasks.*.id' => ['required', 'string', 'max:255'],
-            'scheduled_tasks.*.status' => ['required', 'string', 'in:Present,Missing,Damaged'],
+            // Completed and Not Completed since 2026-11. The equipment words remain valid for a queued older payload.
+            'scheduled_tasks.*.status' => ['required', 'string', 'in:Completed,Not Completed,Present,Missing,Damaged'],
             'scheduled_tasks.*.observed' => ['sometimes', 'boolean'],
             'scheduled_tasks.*.notes' => ['nullable', 'string', 'max:2000'],
+            // Notes, damage and reports about known issues (docs/apparatus-issue-history.md section 3). Processed with the
+            // checkout, so only a processing_version 1 submission may carry them.
+            'concerns' => ['nullable', 'array', 'max:20', 'prohibited_unless:processing_version,1'],
+            'concerns.*' => ['required', 'array'],
+            'concerns.*.client_id' => ['required', 'uuid', 'distinct:ignore_case'],
+            'concerns.*.kind' => ['required', 'string', 'in:note,issue'],
+            'concerns.*.description' => ['required', 'string', 'max:2000', 'regex:/\S/'],
+            'concerns.*.location' => ['nullable', 'string', 'max:255'],
+            'concerns.*.photo' => ['nullable', 'string', 'max:7000000'],
+            'concerns.*.existing_issue_id' => ['nullable', 'integer', 'min:1'],
+            // The SCBA and radio numbers the app showed the member, so only what they changed is applied. Sent, even empty, by an app that shows them.
+            'equipment_numbers_seen' => ['sometimes', 'array', 'max:200', 'prohibited_unless:processing_version,1'],
+            'equipment_numbers_seen.*' => ['required', 'array'],
+            'equipment_numbers_seen.*.slot' => ['required', 'string', 'max:255'],
+            'equipment_numbers_seen.*.number' => ['required', 'string', 'max:255'],
+            // SCBA and radio numbers the checklist has no entry for.
+            'extra_equipment_numbers' => ['sometimes', 'array', 'max:'.CrewEquipmentNumbers::MAX_EXTRAS, 'prohibited_unless:processing_version,1'],
+            'extra_equipment_numbers.*' => ['required', 'array'],
+            'extra_equipment_numbers.*.client_id' => ['required', 'uuid', 'distinct:ignore_case'],
+            'extra_equipment_numbers.*.kind' => ['required', 'string', 'in:'.CrewEquipmentNumbers::KIND_SCBA.','.CrewEquipmentNumbers::KIND_RADIO],
+            'extra_equipment_numbers.*.label' => ['nullable', 'string', 'max:120'],
+            'extra_equipment_numbers.*.number' => ['required', 'string', 'max:64', 'regex:/\S/'],
             'inspection_session_id' => ['nullable', 'uuid'],
             'inspection_session_token' => ['nullable', 'string', 'regex:/\A[a-f0-9]{64}\z/i'],
             'inspection_session_replay_key' => ['nullable', 'uuid'],
@@ -430,6 +457,10 @@ class ApparatusController extends Controller
             'vehicle_identification' => ['nullable'],
         ]);
         $validated = app(InspectionSubmissionSignals::class)->normalize($validated);
+        if (($validated['concerns'] ?? []) === []) {
+            // No concerns is one thing, whether the key was absent, null or empty: it hashes as it always did.
+            unset($validated['concerns']);
+        }
         $identification = app(VehicleIdentificationSubmission::class)
             ->clean($validated['vehicle_identification'] ?? null, $this->identificationKind($id, (string) $validated['client_submission_id']))['section'];
         if ($identification === null) {
@@ -628,6 +659,14 @@ class ApparatusController extends Controller
                     'defects' => $prepared['defects'] ?? [],
                     'has_critical_defects' => $hasCriticalDefects,
                 ];
+                if (($prepared['concerns'] ?? []) !== []) {
+                    $pendingEffects['concerns'] = $prepared['concerns'];
+                }
+                foreach (['equipment_numbers_seen', 'extra_equipment_numbers'] as $numbersKey) {
+                    if (array_key_exists($numbersKey, $prepared)) {
+                        $pendingEffects[$numbersKey] = $prepared[$numbersKey];
+                    }
+                }
                 if ($this->isV2Checklist($lockedChecklist)) {
                     $pendingEffects['checklist_v2'] = $this->snapshotV2ChecklistEvidence(
                         $prepared,
@@ -656,7 +695,10 @@ class ApparatusController extends Controller
                     'processing_status' => null,
                     'results' => $prepared['compartments'] ?? null,
                     'checklist_evidence' => ($prepared['processing_version'] ?? null) === 1
-                        ? app(\App\Services\InspectionPaperFields::class)->snapshot($prepared, $lockedChecklist)
+                        ? [
+                            ...app(\App\Services\InspectionPaperFields::class)->snapshot($prepared, $lockedChecklist),
+                            ...app(CrewEquipmentNumbers::class)->evidenceLines($prepared['extra_equipment_numbers'] ?? []),
+                        ]
                         : null,
                     'officer_signature' => $prepared['officer_signature_path'] ?? null,
                     'employee_id' => $prepared['employee_id'] ?? null,
@@ -1216,6 +1258,22 @@ class ApparatusController extends Controller
         }
         unset($defect);
 
+        // Concern photos are stored like defect photos, so a failed submission deletes them with the rest. An optional
+        // photo the server cannot read costs the photo, never the concern or the checkout.
+        foreach ($data['concerns'] ?? [] as $index => $concern) {
+            if (filled($concern['photo'] ?? null)) {
+                $path = Base64Image::store((string) $concern['photo'], 'defects', 'concern');
+                if ($path === null) {
+                    Log::warning('A concern photo could not be read and was left out of the checkout.', ['client_id' => $concern['client_id'] ?? null]);
+                } else {
+                    $concern['photo_path'] = $path;
+                    $storedPaths[] = $path;
+                }
+            }
+            unset($concern['photo']);
+            $data['concerns'][$index] = $concern;
+        }
+
         foreach ($data['compartments'] as $compartmentIndex => &$compartment) {
             foreach ($compartment['items'] as $itemIndex => &$item) {
                 if (filled($item['photo'] ?? null)) {
@@ -1476,6 +1534,8 @@ class ApparatusController extends Controller
             $expectedFields[$fieldId] = [
                 'input_type' => $inputType,
                 'required' => ($field['required'] ?? false) === true,
+                'min' => $field['min'] ?? null,
+                'max' => $field['max'] ?? null,
             ];
         }
 
@@ -1493,6 +1553,8 @@ class ApparatusController extends Controller
                 $expectedFields[$fieldId]['input_type'],
                 $fieldValue['value'],
                 $expectedFields[$fieldId]['required'],
+                $expectedFields[$fieldId]['min'],
+                $expectedFields[$fieldId]['max'],
             )) {
                 throw ValidationException::withMessages([
                     'field_values' => 'A Daily Checkout field value does not match its configured type.',
@@ -1568,6 +1630,7 @@ class ApparatusController extends Controller
                 'name' => $name,
                 'input_type' => $inputType,
                 'required' => ($field['required'] ?? false) === true,
+                'unit' => is_string($field['unit'] ?? null) ? $field['unit'] : null,
             ];
         }
 
@@ -1589,6 +1652,7 @@ class ApparatusController extends Controller
                 'input_type' => $definition['input_type'],
                 'required' => $definition['required'],
                 'value' => $fieldValue['value'],
+                ...($definition['unit'] !== null ? ['unit' => $definition['unit']] : []),
             ];
         }
 
@@ -1653,7 +1717,7 @@ class ApparatusController extends Controller
         };
     }
 
-    private function isValidV2FieldValue(string $inputType, mixed $value, bool $required): bool
+    private function isValidV2FieldValue(string $inputType, mixed $value, bool $required, mixed $min = null, mixed $max = null): bool
     {
         if ($value === null) {
             return ! $required;
@@ -1661,7 +1725,9 @@ class ApparatusController extends Controller
 
         return match ($inputType) {
             'text', 'date' => is_string($value),
-            'number' => (is_int($value) || is_float($value)) && is_finite((float) $value),
+            'number' => (is_int($value) || is_float($value)) && is_finite((float) $value)
+                && (! is_numeric($min) || $value >= $min)
+                && (! is_numeric($max) || $value <= $max),
             'percentage' => (is_int($value) || is_float($value))
                 && is_finite((float) $value)
                 && $value >= 0

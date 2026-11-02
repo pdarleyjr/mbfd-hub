@@ -86,14 +86,55 @@ const overview = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const rosterRow = (name: string, overrides: Record<string, unknown> = {}) => ({
+  is_first_in_seat: true,
+  is_vacant: false,
+  rank: 'Lt',
+  employee_id: '50001',
+  name,
+  source_marker: '',
+  certifications: ['PM', 'AO'],
+  status: { label: 'SP', tone: 'sp', title: 'Scheduled position', screen_reader_text: '' },
+  from: '08:00',
+  through: '08:00',
+  hours: '24.0',
+  ...overrides,
+});
+
+const stationRoster = (overrides: Record<string, unknown> = {}) => ({
+  available: true,
+  date_label: 'Sunday, November 1',
+  shift: 'A Shift',
+  window: 'Nov 1, 08:00 to Nov 2, 08:00 ET',
+  updated: 'Nov 1, 2:45 PM EST',
+  tag: { label: 'Data current', class: 'hub-tag--success' },
+  notice: null,
+  next_shift_posted: false,
+  sections: [
+    { key: 'Station 1 / Ladder 1', unit: 'Ladder 1', image: null, seats: [
+      [rosterRow('RIVERA, ALEX')],
+      [
+        rosterRow('DAYTON, SAM', { rank: 'FF', employee_id: '50002', from: '08:00', through: '20:00', hours: '12.0', status: { label: '+OT', tone: 'ot', title: 'Overtime', screen_reader_text: '' } }),
+        rosterRow('NIGHTLY, JO', { is_first_in_seat: false, rank: 'FF', employee_id: '50003', from: '20:00', through: '08:00', hours: '12.0', status: { label: '+OT', tone: 'ot', title: 'Overtime', screen_reader_text: '' } }),
+      ],
+    ] },
+    { key: 'Station 1 / Rescue 11', unit: 'Rescue 11', image: null, seats: [
+      [rosterRow('Vacant', { is_vacant: true, employee_id: '', certifications: [], source_marker: '**Vacancy**', status: { label: 'Vacant', tone: 'vacant', title: 'Vacant', screen_reader_text: 'Open seat' } })],
+    ] },
+  ],
+  ...overrides,
+});
+
 interface Mock {
   overview: unknown;
   overviewStatus: number;
   overviewRequests: Array<{ background: boolean }>;
+  rosterRequests: number;
+  rosterStatus: number;
 }
 
-async function openStation(page: Page, initial: unknown = overview()): Promise<Mock> {
-  const mock: Mock = { overview: initial, overviewStatus: 200, overviewRequests: [] };
+async function openStation(page: Page, initial: unknown = overview(), options: { canViewRoster?: boolean; roster?: unknown } = {}): Promise<Mock> {
+  const mock: Mock = { overview: initial, overviewStatus: 200, overviewRequests: [], rosterRequests: 0, rosterStatus: 200 };
   await page.route('**/images/**', (route) => (new URL(route.request().url()).pathname.includes('/stations/station-1')
     ? route.fulfill({ path: 'public/images/stations/station-1.webp', contentType: 'image/webp' })
     : route.fulfill({ status: 204 })));
@@ -107,10 +148,14 @@ async function openStation(page: Page, initial: unknown = overview()): Promise<M
         personnel: { employee_profile_id: 1_401, employee_number: 'E401', name: 'Alex Rivera', rank: 'Lieutenant' },
         offline: { security_version: 1 },
         session: { authenticated: true },
-        authorization: { capabilities: { command_300_access: false } },
+        authorization: { capabilities: { command_300_access: false, daily_roster: options.canViewRoster === true } },
       } });
     }
     if (path === `/api/public/stations/${STATION_ID}`) return route.fulfill({ json: station });
+    if (path === `/api/public/stations/${STATION_ID}/roster`) {
+      mock.rosterRequests += 1;
+      return route.fulfill({ status: mock.rosterStatus, json: (options.roster ?? stationRoster()) as object });
+    }
     if (path === `/api/public/stations/${STATION_ID}/overview`) {
       mock.overviewRequests.push({ background: request.headers()['x-hub-background-refresh'] === '1' });
       return route.fulfill({ status: mock.overviewStatus, json: mock.overview as object });
@@ -330,3 +375,82 @@ for (const { width, height, identity, header } of BASELINE) {
     await testInfo.attach(`station ${width}`, { path: shot, contentType: 'image/png' });
   });
 }
+
+test('a member the Daily Roster does not admit gets no roster tab and nothing is requested', async ({ page }) => {
+  const mock = await openStation(page);
+  await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Today\'s Roster' })).toHaveCount(0);
+  expect(mock.rosterRequests).toBe(0);
+});
+
+test('Today\'s Roster sits beside Overview, loads only when opened, and shows the station\'s units', async ({ page }, testInfo) => {
+  const mock = await openStation(page, overview(), { canViewRoster: true });
+  const tab = page.getByRole('tab', { name: 'Today\'s Roster' });
+  await expect(tab).toBeVisible();
+  expect(mock.rosterRequests).toBe(0);
+  const names = await page.getByRole('tab').allTextContents();
+  expect(names.slice(0, 2)).toEqual(['Overview', 'Today\'s Roster']);
+
+  await tab.click();
+  const panel = page.getByTestId('station-roster');
+  await expect(panel.getByRole('heading', { name: 'A Shift · Sunday, November 1' })).toBeVisible();
+  await expect(panel.getByRole('heading', { level: 4 })).toHaveText(['Ladder 1', 'Rescue 11']);
+  await expect(panel.getByText('RIVERA, ALEX')).toBeVisible();
+  await expect(panel.getByText('08:00 to 20:00 · 12.0 hours')).toBeVisible();
+  await expect(panel.getByText('Data current')).toBeVisible();
+  await expect(panel.locator('.roster-pill--ot').first()).toHaveCSS('background-color', 'rgb(0, 255, 0)');
+  await expect(panel.getByRole('link', { name: 'Open the full Daily Roster' })).toHaveAttribute('href', '/daily-roster');
+  await page.screenshot({ path: testInfo.outputPath('roster-desktop.png'), fullPage: true });
+});
+
+test('Today\'s Roster fits a phone, and says so when the next shift is already posted', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await openStation(page, overview(), { canViewRoster: true, roster: stationRoster({ next_shift_posted: true, tag: { label: 'On duty now', class: 'hub-tag--success' } }) });
+  await page.getByRole('tab', { name: 'Today\'s Roster' }).click();
+  const panel = page.getByTestId('station-roster');
+  await expect(panel.getByText('On duty now')).toBeVisible();
+  await expect(panel.getByText('This tab stays on the crew working until 8:00 AM.')).toBeVisible();
+  await expect(panel.getByRole('link', { name: 'See the next shift' })).toHaveAttribute('href', '/daily-roster');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('roster-phone.png'), fullPage: true });
+});
+
+test('Today\'s Roster says plainly when today\'s has not arrived', async ({ page }) => {
+  await openStation(page, overview(), { canViewRoster: true, roster: { available: false, message: 'Today\'s roster has not arrived yet. It will appear here on its own.', next_shift_posted: false, sections: [] } });
+  await page.getByRole('tab', { name: 'Today\'s Roster' }).click();
+  await expect(page.getByText('No roster for today yet')).toBeVisible();
+  await expect(page.getByText('It will appear here on its own.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open the Daily Roster' })).toHaveAttribute('href', '/daily-roster');
+});
+
+test('a failed roster refresh keeps the crew up and says it may be out of date; a withdrawn permission clears them', async ({ page }) => {
+  const clock = page.clock;
+  await clock.install();
+  const mock = await openStation(page, overview(), { canViewRoster: true });
+  await page.getByRole('tab', { name: 'Today\'s Roster' }).click();
+  const panel = page.getByTestId('station-roster');
+  await expect(panel.getByText('RIVERA, ALEX')).toBeVisible();
+
+  mock.rosterStatus = 500;
+  await clock.fastForward(121_000);
+  await expect(panel.getByText('This roster could not be refreshed and may be out of date.')).toBeVisible();
+  await expect(panel.getByText('RIVERA, ALEX')).toBeVisible();
+
+  mock.rosterStatus = 200;
+  await clock.fastForward(121_000);
+  await expect(panel.getByText('This roster could not be refreshed and may be out of date.')).toHaveCount(0);
+
+  mock.rosterStatus = 403;
+  await clock.fastForward(121_000);
+  await expect(page.getByText('RIVERA, ALEX')).toHaveCount(0);
+  await expect(page.getByText('Today\'s roster could not be loaded').first()).toBeVisible();
+});
+
+test('a long code TeleStaff sends wraps inside its card at the narrowest phone', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  const longCode = rosterRow('HOLIDAYTON-WASHINGTON, ALEXANDRIA', { status: { label: 'VAC-HOLIDAY-EXCHANGE-COVERAGE-EXTENDED', tone: 'unknown', title: 'Not recognized', screen_reader_text: '' } });
+  await openStation(page, overview(), { canViewRoster: true, roster: stationRoster({ sections: [{ key: 'Station 1 / Engine 1', unit: 'Engine 1', image: null, seats: [[longCode]] }] }) });
+  await page.getByRole('tab', { name: 'Today\'s Roster' }).click();
+  await expect(page.getByText('VAC-HOLIDAY-EXCHANGE-COVERAGE-EXTENDED')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

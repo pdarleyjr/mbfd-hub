@@ -45,6 +45,7 @@ final class RequestSubmissionService
     {
         $data = EmsValidator::validate($input, [
             'client_submission_id' => ['required', 'uuid'],
+            'revises' => ['nullable', 'uuid'],
             'target' => ['required', 'array'],
             'target.kind' => ['required', 'in:'.implode(',', InventoryRequest::TARGET_KINDS)],
             'target.apparatus_id' => ['nullable', 'integer'],
@@ -93,6 +94,14 @@ final class RequestSubmissionService
         } catch (UniqueConstraintViolationException $exception) {
             // A parallel retry of the same submission won the race; return what it saved.
             $winner = InventoryRequest::query()->where('client_submission_id', $data['client_submission_id'])->first();
+            if ($winner === null) {
+                throw $exception;
+            }
+
+            return $this->replay($winner, $user);
+        } catch (EmsException $exception) {
+            // Two sends of one correction: the second waited on the row lock and found it already corrected, by itself.
+            $winner = $exception->errorCode === 'cannot_revise' ? InventoryRequest::query()->where('client_submission_id', $data['client_submission_id'])->first() : null;
             if ($winner === null) {
                 throw $exception;
             }
@@ -231,7 +240,8 @@ final class RequestSubmissionService
     private function create(User $user, Employee $employee, array $data, array $target, array $lines, array $forms, string $note): InventoryRequest
     {
         $now = now();
-        $number = $this->nextNumber();
+        $original = isset($data['revises']) ? $this->lockRevisable((string) $data['revises'], $user) : null;
+        $number = $original !== null ? $this->revisionNumber($original) : $this->nextNumber();
         $actor = EmsActor::member($user);
         $versions = [];
         foreach ($forms as $key => $form) {
@@ -248,6 +258,7 @@ final class RequestSubmissionService
             'member_note' => $note !== '' ? $note : null,
             'forms' => $versions,
             'lines' => $snapshotLines,
+            'revises' => $original?->number,
         ];
         $encoded = json_encode($snapshot, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -270,6 +281,8 @@ final class RequestSubmissionService
             'snapshot' => $snapshot,
             'snapshot_sha256' => hash('sha256', $encoded),
             'last_activity_at' => $now,
+            'revision_of_request_id' => $original?->getKey(),
+            'revision_number' => $original !== null ? $original->revision_number + 1 : 1,
         ]);
 
         foreach ($snapshotLines as $index => $line) {
@@ -299,8 +312,19 @@ final class RequestSubmissionService
             'actor_user_id' => $actor->userId, 'actor_name' => $actor->name, 'actor_rank' => $actor->rank,
             'actor_context' => InventoryRequestEvent::CONTEXT_MEMBER,
             'action' => 'submitted', 'from_status' => null, 'to_status' => InventoryRequest::SUBMITTED,
-            'payload' => ['line_count' => count($snapshotLines), 'has_note' => $note !== '', 'snapshot_sha256' => $request->snapshot_sha256],
+            'payload' => ['line_count' => count($snapshotLines), 'has_note' => $note !== '', 'snapshot_sha256' => $request->snapshot_sha256, 'revises' => $original?->number],
         ]);
+
+        if ($original !== null) {
+            $original->update(['status' => InventoryRequest::SUPERSEDED, 'last_activity_at' => $now]);
+            InventoryRequestEvent::query()->create([
+                'request_id' => $original->getKey(),
+                'actor_user_id' => $actor->userId, 'actor_name' => $actor->name, 'actor_rank' => $actor->rank,
+                'actor_context' => InventoryRequestEvent::CONTEXT_MEMBER,
+                'action' => 'revised', 'from_status' => InventoryRequest::RETURNED, 'to_status' => InventoryRequest::SUPERSEDED,
+                'payload' => ['replaced_by' => $request->uuid, 'replaced_by_number' => $number],
+            ]);
+        }
 
         $this->notifier->requestSubmitted($request);
         $this->queueFilesCopy($request);
@@ -335,6 +359,23 @@ final class RequestSubmissionService
             'requested_flag' => $line['flag'],
             'flags' => $item->flags ?? [],
         ];
+    }
+
+    /** Only the member who sent it, and only while it is waiting for them. The row lock makes a double send one revision. */
+    private function lockRevisable(string $uuid, User $user): InventoryRequest
+    {
+        $original = InventoryRequest::query()->where('uuid', $uuid)->lockForUpdate()->first();
+        if ($original === null || (int) $original->submitted_by_user_id !== (int) $user->getKey() || $original->status !== InventoryRequest::RETURNED) {
+            throw EmsException::conflict('This form was already corrected or cancelled, so it cannot be corrected again. Your entries are still here.', 'cannot_revise');
+        }
+
+        return $original;
+    }
+
+    /** MIR-000004, then MIR-000004-R2, MIR-000004-R3: the corrected form keeps its family name. */
+    private function revisionNumber(InventoryRequest $original): string
+    {
+        return preg_replace('/-R\d+$/', '', $original->number).'-R'.($original->revision_number + 1);
     }
 
     /** MIR numbers come from one counter row: the UPDATE locks it until commit, so concurrent submissions never share a number. */

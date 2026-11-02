@@ -1,4 +1,5 @@
 import type { ChecklistData, ChecklistFieldValue, ChecklistItem, Compartment, MeterData, OfficerInfo, ScheduledChecklistTaskResult, VehicleIdentificationAnswers } from '../types';
+import { fieldValueOutOfRange } from './checklistFields.ts';
 import { resolveFindingTargets } from './previousFindings.ts';
 import { checklistUsesVehicleId, vehicleConfirmationComplete } from './vehicleConfirmation.ts';
 import { activeVehicleIdentification, vehicleIdentificationComplete } from './vehicleIdentification.ts';
@@ -25,8 +26,9 @@ export function findingsForArea(compartment: Compartment, findings: ChecklistDat
 export function inspectionReadiness(checklist: ChecklistData | null, compartments: Compartment[], fieldValues: Array<{ id: string; value: ChecklistFieldValue }>, scheduledTasks: ScheduledChecklistTaskResult[], officer: OfficerInfo, meters: MeterData, identification: VehicleIdentificationAnswers = {}) {
   const equipment = inspectionProgress(compartments);
   const missingFields = checklist?.fields.filter(field => {
-    if (!field.required) return false;
     const value = fieldValues.find(answer => answer.id === field.id)?.value;
+    if (fieldValueOutOfRange(field, value)) return true;
+    if (!field.required) return false;
     return value === null || value === undefined || (typeof value === 'string' && value.trim() === '')
       || (typeof value === 'number' && !Number.isFinite(value));
   }) ?? [];

@@ -1,4 +1,5 @@
 import type { ChangeoutHandoff } from './components/changeout/types';
+import type { ConcernDraft, ConcernSubmission } from './types/issueHistory';
 export type ApparatusType = 'engine' | 'ladder1' | 'ladder3' | 'rescue' | 'rope' | 'fireboat' | 'fire boat';
 export type DailyCheckoutRequirement = 'required' | 'exempt' | 'reserve' | 'administrative' | 'inactive' | 'unknown';
 export type DailyCheckoutState = 'checked' | 'attention' | 'review_pending' | 'not_checked' | 'out_of_service' | 'exempt' | 'classification_required';
@@ -185,7 +186,51 @@ export interface ChecklistField {
   name: string;
   inputType: ChecklistInputType;
   required: boolean;
+  /** The heading it is shown under. Without one it is an optional detail in the collapsed section. */
+  group?: string;
+  /** Shown beside the input and kept with the recorded value. */
+  unit?: string;
+  hint?: string;
+  min?: number;
+  max?: number;
 }
+
+export type EquipmentKind = 'scba' | 'radio';
+
+/** One SCBA or radio entry on the issued checklist, with the number the last member left. */
+export interface EquipmentSlot {
+  slot: string;
+  kind: EquipmentKind;
+  label: string;
+  field_id: string | null;
+  compartment_id: string | null;
+  item_id: string | null;
+  /** How many numbers one checklist entry holds (a rescue's "SCBAs"). */
+  boxes: number;
+  number: string;
+}
+
+/** A number the checklist has no entry for, added by a member. */
+export interface EquipmentExtra {
+  client_id: string;
+  kind: EquipmentKind;
+  label: string | null;
+  number: string;
+}
+
+export interface SeenNumber {
+  slot: string;
+  number: string;
+}
+
+/** The SCBA and radio numbers carried from the last inspection; outside the hashed checklist. */
+export interface EquipmentNumbers {
+  slots: EquipmentSlot[];
+  extras: EquipmentExtra[];
+}
+
+/** Scheduled duties are procedures. The equipment words remain only on a draft or payload from before 2026-11. */
+export type ScheduledTaskStatus = 'Completed' | 'Not Completed' | ItemStatus;
 
 export interface ScheduledChecklistTask {
   id: string;
@@ -215,7 +260,7 @@ export interface InspectionSessionContract {
 export interface ScheduledChecklistTaskResult {
   observed?: boolean;
   id: string;
-  status: ItemStatus;
+  status: ScheduledTaskStatus;
   notes?: string | null;
 }
 
@@ -291,6 +336,8 @@ export interface ChecklistData {
   vehicle_identification?: VehicleIdentification;
   /** False for a unit with no fleet vehicle ID at all (Fire Boat 6). Missing means true. */
   vehicle_id_required?: boolean;
+  /** SCBA and radio numbers from the last inspection. Absent on older cached responses. */
+  equipment_numbers?: EquipmentNumbers;
   /** Equipment the last changeout left on the old truck. Absent on older cached responses. */
   changeout_handoff?: ChangeoutHandoff;
   checklist_version: string;
@@ -375,6 +422,12 @@ export interface InspectionSubmission {
   review_flag?: ReviewFlag;
   /** Links inventory corrections reported while this draft was open; the server treats it as optional. */
   inventory_draft_id?: string;
+  /** Concerns, damage and notes the member added (max 20). Omitted when there are none. */
+  concerns?: ConcernSubmission[];
+  /** Numbers the member added or kept beyond the checklist's own entries. */
+  extra_equipment_numbers?: EquipmentExtra[];
+  /** Sent, even empty, when the member was shown the numbers, so the server applies only what they changed. */
+  equipment_numbers_seen?: SeenNumber[];
 }
 
 export interface MeterData {
@@ -396,6 +449,12 @@ export interface InspectionData {
   draftId?: string;
   /** Working answers to the one-time vehicle information questions. */
   vehicleIdentification?: VehicleIdentificationAnswers;
+  /** Concerns, damage and notes being written. Live issue findings are never kept here. */
+  concerns?: ConcernDraft[];
+  /** SCBA and radio numbers added on this checkout; absent on a draft from before they could be added. */
+  equipmentExtras?: EquipmentExtra[];
+  /** The numbers this draft was filled in from; absent on a draft from before they carried over. */
+  equipmentSeen?: SeenNumber[];
   actorUserId?: number;
   actorSecurityVersion?: number;
   checklist_version: string;
@@ -654,6 +713,41 @@ export interface StationCheckoutDetail extends StationCheckoutRow {
     name: string;
     items: Array<{ name: string; status: string; value?: string | null; notes?: string | null; has_photo: boolean }>;
   }>;
+}
+
+export interface StationRosterRow {
+  is_first_in_seat: boolean;
+  is_vacant: boolean;
+  rank: string;
+  employee_id: string;
+  name: string;
+  source_marker: string;
+  certifications: string[];
+  status: { label: string; tone: string; title: string; screen_reader_text: string };
+  from: string;
+  through: string;
+  hours: string;
+}
+
+export interface StationRosterSection {
+  key: string;
+  unit: string;
+  image: { src: string; srcset: string; width: number; height: number } | null;
+  seats: StationRosterRow[][];
+}
+
+/** The part of the roster on duty now that belongs to one station; `available` is false until today's has arrived. */
+export interface StationRoster {
+  available: boolean;
+  message?: string;
+  date_label?: string;
+  shift?: string;
+  window?: string;
+  updated?: string;
+  tag?: { label: string; class: string };
+  notice?: string | null;
+  next_shift_posted: boolean;
+  sections: StationRosterSection[];
 }
 
 export interface StationOverview {

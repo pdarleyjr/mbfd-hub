@@ -177,26 +177,17 @@ final class DefectContinuityService
      */
     public function openFindings(Apparatus $apparatus, array $checklist): array
     {
-        $definitions = app(InspectionPaperFields::class)->equipmentDefinitions($checklist);
-        $flat = [];
-        foreach ($definitions as $compartmentId => $items) {
-            foreach ($items as $itemId => $identity) {
-                $flat[] = ['compartment_id' => (string) $compartmentId, 'item_id' => (string) $itemId, 'identity' => $identity];
-            }
-        }
+        $index = $this->checklistIndex($checklist);
         $defects = $apparatus->openDefects()->with(['latestObservation', 'serviceTicket'])->orderBy('id')->get();
         $updates = $this->latestMemberUpdates($defects->pluck('id')->all());
 
-        return $defects->map(static function (ApparatusDefect $defect) use ($flat, $updates): array {
-            $matches = array_values(array_filter($flat, static fn (array $row): bool => in_array($defect->compartment, $row['identity']['compartment_names'], true)
-                && in_array($defect->item, $row['identity']['item_names'], true)));
-            $match = count($matches) === 1 ? $matches[0] : null;
-            $identity = $match['identity'] ?? null;
+        return $defects->map(function (ApparatusDefect $defect) use ($index, $updates): array {
+            $location = $this->currentLocation($index, $defect);
 
             return [
                 'id' => $defect->id,
-                'compartment' => $identity['compartment'] ?? $defect->compartment,
-                'item' => $identity['item'] ?? $defect->item,
+                'compartment' => $location['compartment'],
+                'item' => $location['item'],
                 'issue_type' => $defect->issue_type,
                 'operational_impact' => $defect->operational_impact,
                 'last_observation' => $defect->latestObservation?->observation,
@@ -204,8 +195,8 @@ final class DefectContinuityService
                 'service_status' => $defect->serviceTicket?->status,
                 // Where the item is listed now (an approved inventory move keeps its id and adds the old
                 // compartment as an alias); the stored keys only when the current checklist is ambiguous.
-                'compartment_id' => $match['compartment_id'] ?? $defect->compartment_key,
-                'item_id' => $match['item_id'] ?? $defect->item_key,
+                'compartment_id' => $location['compartment_id'],
+                'item_id' => $location['item_id'],
                 'action_status' => $defect->action_status,
                 'action_label' => DefectActionStatus::label($defect->action_status),
                 'severity' => $defect->severity,
@@ -213,6 +204,86 @@ final class DefectContinuityService
                 'latest_member_update' => $updates[$defect->id] ?? null,
             ];
         })->all();
+    }
+
+    /**
+     * Every item of a checklist with the names it has had, for placing an issue on the current list.
+     * An unusable checklist is passed as an empty array and places nothing.
+     *
+     * @param  array<string, mixed>  $checklist
+     * @return list<array{compartment_id: string, item_id: string, identity: array<string, mixed>}>
+     */
+    public function checklistIndex(array $checklist): array
+    {
+        $flat = [];
+        foreach (app(InspectionPaperFields::class)->equipmentDefinitions($checklist) as $compartmentId => $items) {
+            foreach ($items as $itemId => $identity) {
+                $flat[] = ['compartment_id' => (string) $compartmentId, 'item_id' => (string) $itemId, 'identity' => $identity];
+            }
+        }
+
+        return $flat;
+    }
+
+    /**
+     * Where an issue is listed now: the current names and keys when exactly one checklist item matches,
+     * the stored ones otherwise. Never a guess.
+     *
+     * @param  list<array{compartment_id: string, item_id: string, identity: array<string, mixed>}>  $index
+     * @return array{compartment: string, item: string, compartment_id: string|null, item_id: string|null}
+     */
+    public function currentLocation(array $index, ApparatusDefect $defect): array
+    {
+        $matches = array_values(array_filter($index, static fn (array $row): bool => in_array($defect->compartment, $row['identity']['compartment_names'], true)
+            && in_array($defect->item, $row['identity']['item_names'], true)));
+        $match = count($matches) === 1 ? $matches[0] : null;
+        $identity = $match['identity'] ?? null;
+
+        return [
+            'compartment' => $identity['compartment'] ?? $defect->compartment,
+            'item' => $identity['item'] ?? $defect->item,
+            'compartment_id' => $match['compartment_id'] ?? $defect->compartment_key,
+            'item_id' => $match['item_id'] ?? $defect->item_key,
+        ];
+    }
+
+    /**
+     * Locks, in ascending id order, the unresolved defects among $ids that belong to this physical apparatus.
+     * Anything else is simply absent from the answer: a closed issue or another truck's is never reached.
+     *
+     * @param  list<int>  $ids
+     * @return list<int>
+     */
+    public function lockOpenDefectIds(int $apparatusId, array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        return ApparatusDefect::query()
+            ->where('apparatus_id', $apparatusId)->where('resolved', false)->whereIn('id', $ids)
+            ->orderBy('id')->lockForUpdate()
+            ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+    }
+
+    /**
+     * A member's report about an issue already on record: one observed_again event carrying the note, and
+     * the inspection's one observation when it has none yet. The origin report, status and severity stay as they were.
+     * The caller holds the apparatus lock and has locked the defect with lockOpenDefectIds().
+     */
+    public function recordConcernConfirmation(ApparatusInspection $inspection, int $defectId, string $description, ?string $photoPath): ApparatusDefect
+    {
+        $defect = ApparatusDefect::query()->findOrFail($defectId);
+        $defect->forceFill(['last_observed_inspection_id' => $inspection->id, 'last_observed_at' => now()])->save();
+        $this->event($defect, $inspection, 'observed_again', ['details' => ['notes' => $description, 'member_concern' => true]]);
+        // One observation per defect and inspection: a checklist finding on the same item came first and keeps it.
+        ApparatusDefectObservation::query()->firstOrCreate(
+            ['apparatus_defect_id' => $defect->id, 'apparatus_inspection_id' => $inspection->id],
+            ['actor_user_id' => $inspection->actor_user_id, 'observation' => 'confirmed_again', 'reported_status' => null, 'notes' => $description, 'photo_path' => $photoPath],
+        );
+        $this->enrollParticipants($inspection, [(int) $defect->id => 'confirmed']);
+
+        return $defect;
     }
 
     /**

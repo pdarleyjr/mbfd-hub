@@ -25,6 +25,11 @@ Route::get('/daily-roster/changes', [DailyRosterController::class, 'changes'])
     ->middleware(['auth:web', 'throttle:60,1'])
     ->name('daily-roster.changes');
 
+Route::get('/daily-roster/members/{employeeId}', [DailyRosterController::class, 'member'])
+    ->where('employeeId', '[^/]{1,32}')
+    ->middleware(['auth:web', 'throttle:daily-roster-member'])
+    ->name('daily-roster.member');
+
 Route::get('/daily-roster/pdf', [DailyRosterController::class, 'pdf'])
     ->middleware(['auth:web', 'throttle:daily-roster-pdf'])
     ->name('daily-roster.pdf');

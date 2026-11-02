@@ -3,7 +3,7 @@
 Audit of every Filament table surface in the Hub (Admin, Employee, Training and Workgroups panels) as of 2026-10-23, branch `feat/ems-table-audit`. It records what each table can do today, what this release changed, and why the rest was left alone.
 
 - **Resources:** 50 Filament resource classes, after `VehicleSwapRequestResource` was removed on 2026-11-01 along with the old Daily Checkout swap report (`PersonnelUniformResource` and `TrainingTodoAdminResource` are subclasses and inherit their parent's table).
-- **Other surfaces:** 31 custom pages, tables inside resource pages, and hand-built Blade tables. Relation managers are not listed separately; they follow their parent resource.
+- **Other surfaces:** 32 custom pages, tables inside resource pages, and hand-built Blade tables. Relation managers are not listed separately; they follow their parent resource.
 - Facts come from reading the source, not from running the app. Where a cell says "none" it means none was found in the resource or its pages.
 
 ## Decision categories
@@ -24,7 +24,7 @@ A surface can carry more than one decision, so the counts below add up to more t
 | --- | ---: | ---: | ---: |
 | Exports added | 30 | 0 | 30 |
 | Editing added | 5 | 0 | 5 |
-| Read-only by design | 15 | 16 | 31 |
+| Read-only by design | 15 | 17 | 32 |
 | Deferred (other workstream) | 4 | 7 | 11 |
 | Skipped | 16 | 16 | 32 |
 
@@ -140,6 +140,7 @@ Filament's own queued exporters (`app/Filament/Exports`, `app/Filament/Workgroup
 | `ListUniforms view_employee_record modal` | Blade table | admin | AssignedEquipment for a selected employee | none | no | none | none | none → none | Skipped - One selected employee's issued equipment; the Assigned Equipment list covers the full set. |
 | `ViewUnitMasterVehicle partials` | Blade table | admin | vehicle change, inspection and proposed-correction history | none | no | none | none | none → none | Deferred (other workstream) - Part of UnitMasterVehicleResource (other workstream). |
 | `personnel-table-history partial` | Blade table | admin | personnel table change events | none | no | none | none | none → none | Deferred (other workstream) + Read-only by design - Personnel tables workstream audit trail. |
+| `SubmittedMedicalSupplyRoomInventory` | Filament page, stacked grid rows | admin | final Monday counts (InventorySnapshot, origin count form or older) and their stamped lines | none | yes (items inside one report) | 1 (Only items to order) | none | none → Excel and PDF per report (SupplyCountReportExporter, ReportWriter) | Read-only by design - A submitted count is evidence and every value is read from its stamped lines. No `<table>` and no horizontal scroll: each row is a grid that stacks with labels on a phone. Exports are formula-safe, private and no-store, and say the quantities are recommendations, not purchase orders. It has no write action and never creates a supply order. |
 
 ## Findings
 

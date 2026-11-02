@@ -499,6 +499,27 @@
                     <x-inspection-checklist-v2-evidence :evidence="$workspace['pending_effects']['checklist_v2']" />
                 @endif
 
+                @if(count($workspace['concerns']) > 0)
+                    <div class="hub-insp-card" data-section="member-concerns">
+                        <h3 class="hub-insp-card__title">Concerns and notes from the member</h3>
+                        <ul class="hub-insp-linklist">
+                            @foreach($workspace['concerns'] as $concern)
+                                <li>
+                                    <span class="hub-insp-badge hub-insp-badge--{{ $concern['is_issue'] ? 'warning' : 'neutral' }}">{{ $concern['kind'] }}</span>
+                                    {{ $concern['description'] }}
+                                    <span class="hub-insp-note">
+                                        @if($concern['location']) · Location: {{ $concern['location'] }}@endif
+                                        · Reported by {{ $concern['reporter'] ?: 'Not recorded' }}
+                                    </span>
+                                    @if($concern['photo_key'])
+                                        <a href="{{ $imageUrl($concern['photo_key']) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Concern photo" class="hub-insp-table-link">View photo</a>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 @forelse($checklist['compartments'] as $compartment)
                     <div class="hub-insp-card">
                         <h3 class="hub-insp-card__title">{{ $compartment['name'] }}</h3>

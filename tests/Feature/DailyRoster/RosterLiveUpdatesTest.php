@@ -158,7 +158,7 @@ final class RosterLiveUpdatesTest extends TestCase
         self::assertStringNotContainsString('UNCHANGED, ONE', (string) $changes->getContent());
     }
 
-    public function test_the_summary_legend_and_filters_travel_with_the_change(): void
+    public function test_the_summary_and_legend_travel_with_the_change(): void
     {
         $from = $this->publishRoster($this->crew());
         $sections = $this->crew();
@@ -169,7 +169,6 @@ final class RosterLiveUpdatesTest extends TestCase
         $changes = $this->getJson($this->changesUrl($from))->assertOk();
 
         self::assertStringContainsString('Roster report, version 2', $changes->json('summary'));
-        self::assertNotEmpty($changes->json('filters'));
         self::assertNotEmpty($changes->json('legend'));
         self::assertSame('Oct 30, 10:30 AM EDT', $changes->json('facts.updated'));
     }

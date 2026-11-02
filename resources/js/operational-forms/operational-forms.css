@@ -231,7 +231,9 @@
     .of-main { padding: 14px 12px 28px; }
     .of-employee small, .of-commandbar .of-command-divider, .of-save-state { display: none; }
     .of-commandbar { position: fixed; inset: auto 0 0; z-index: 50; min-height: 64px; padding: 8px max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); justify-content: space-around; border-width: 1px 0 0; box-shadow: 0 -3px 12px #14233a1f; }
-    .of-commandbar button { min-width: 48px; min-height: 48px; font-size: 0; }
+    /* The id restates the height: `#operational-forms-root .fui-Button { min-height: 40px }` otherwise wins. */
+    #operational-forms-root .of-commandbar button { min-height: 48px; }
+    .of-commandbar button { min-width: 48px; font-size: 0; }
     .of-commandbar button[aria-label="Generate PDF"] { min-width: 56px; }
     .of-context-nav { top: 0; }
     .of-form-canvas { padding: 10px 0; }

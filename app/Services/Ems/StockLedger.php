@@ -181,6 +181,70 @@ final class StockLedger
     }
 
     /**
+     * The newest real count per item. A calculated reconciliation snapshot is not a count, so it never appears here.
+     *
+     * @param  list<int>  $itemIds
+     * @return array<int, array{through: int, counted_at: CarbonImmutable|null, counted_by: string|null}>
+     */
+    public function lastCounts(array $itemIds): array
+    {
+        $latest = DB::table('ems_inventory_snapshot_lines as l')
+            ->join('ems_inventory_snapshots as s', 's.id', '=', 'l.snapshot_id')
+            ->where('s.status', InventorySnapshot::FINAL)
+            ->where('l.value_source', InventorySnapshotLine::COUNTED)
+            ->whereNotNull('l.quantity_base')
+            ->whereIn('l.supply_item_id', $itemIds)
+            ->groupBy('l.supply_item_id')
+            ->selectRaw('l.supply_item_id as supply_item_id, MAX(s.version) as v');
+
+        $rows = DB::table('ems_inventory_snapshot_lines as l')
+            ->join('ems_inventory_snapshots as s', 's.id', '=', 'l.snapshot_id')
+            ->joinSub($latest, 'm', fn ($join) => $join->on('m.supply_item_id', '=', 'l.supply_item_id')->on('m.v', '=', 's.version'))
+            ->where('l.value_source', InventorySnapshotLine::COUNTED)
+            ->get(['l.supply_item_id', 'l.through_movement_id as line_through', 's.through_movement_id', 's.finalized_at', 's.finalized_name']);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) $row->supply_item_id] = [
+                'through' => (int) ($row->line_through ?? $row->through_movement_id),
+                'counted_at' => $row->finalized_at !== null ? CarbonImmutable::parse($row->finalized_at) : null,
+                'counted_by' => $row->finalized_name,
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * Units taken off the shelf for apparatus since each item's last real count: issued movements plus the
+     * corrections that belong to a request. Receipts and manual adjustments are not deductions. An item
+     * never counted has nothing to compare against and reports zero.
+     *
+     * @param  array<int, array{through: int, counted_at: CarbonImmutable|null, counted_by: string|null}>  $lastCounts
+     * @return array<int, int> supply_item_id => units deducted (never negative)
+     */
+    public function deductionsSinceCount(array $lastCounts): array
+    {
+        $deducted = [];
+        $byThrough = collect($lastCounts)->map(fn (array $count): int => $count['through'])->groupBy(fn (int $through): int => $through, preserveKeys: true);
+        foreach ($byThrough as $through => $group) {
+            $totals = StockMovement::query()
+                ->whereIn('supply_item_id', $group->keys()->all())
+                ->where('id', '>', (int) $through)
+                ->where(fn ($query) => $query->where('movement_type', StockMovement::ISSUED)
+                    ->orWhere(fn ($corrections) => $corrections->where('movement_type', StockMovement::ADJUSTED)->whereNotNull('request_id')))
+                ->groupBy('supply_item_id')
+                ->selectRaw('supply_item_id, SUM(quantity_base) as total')
+                ->pluck('total', 'supply_item_id');
+            foreach ($totals as $itemId => $total) {
+                $deducted[(int) $itemId] = max(0, -(int) $total);
+            }
+        }
+
+        return $deducted;
+    }
+
+    /**
      * @param  Collection<int, SupplyItem>|null  $items  null = every item that tracks stock
      * @return array<int, array{quantity: int|null, basis: string, basis_at: string|null, basis_label: string, movements_since: int, baseline_snapshot_id: int|null}>
      */

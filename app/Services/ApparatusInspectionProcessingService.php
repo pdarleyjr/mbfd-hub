@@ -14,9 +14,12 @@ use App\Models\ApparatusInspectionReviewEvent;
 use App\Services\Captain5\Captain5Notifier;
 use App\Services\Defects\DefectContinuityService;
 use App\Services\Defects\FindingsResult;
+use App\Services\Defects\InspectionConcernRecorder;
+use App\Services\Fleet\CrewEquipmentNumbers;
 use App\Services\Inspections\InspectionHold;
 use App\Services\Inspections\InspectionNotificationDispatcher;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Applies one submitted inspection to its physical apparatus
@@ -54,10 +57,22 @@ final class ApparatusInspectionProcessingService
         }
 
         $observations = $inspection->results ?? [];
-        if (! empty($evidence['checklist_v2']['scheduled_tasks'])) {
-            $observations[] = ['id' => 'scheduled_duties', 'name' => 'Scheduled duties', 'items' => $evidence['checklist_v2']['scheduled_tasks']];
+        // A duty done or not done is recorded on the inspection. It says nothing about equipment. Only a queued older
+        // payload, which answered a duty with the equipment words, still feeds the defect history.
+        $legacyDuties = array_values(array_filter(
+            $evidence['checklist_v2']['scheduled_tasks'] ?? [],
+            static fn (array $task): bool => ! in_array($task['status'] ?? null, ['Completed', 'Not Completed'], true),
+        ));
+        if ($legacyDuties !== []) {
+            $observations[] = ['id' => 'scheduled_duties', 'name' => 'Scheduled duties', 'items' => $legacyDuties];
         }
-        $findings = app(DefectContinuityService::class)->recordFindings($inspection, $apparatus, $observations, $definitions, $evidence);
+        // Member concerns ride the same pass: a new issue is reported like a checklist finding, a note is only its row,
+        // and a report about an issue already on record is added to it afterwards. All on the physical apparatus.
+        $concerns = app(InspectionConcernRecorder::class);
+        $batch = $concerns->begin($inspection, $apparatus, $evidence['concerns'] ?? []);
+        $findings = app(DefectContinuityService::class)->recordFindings($inspection, $apparatus, [...$observations, ...$batch->compartments], $definitions, $evidence);
+        $findings = $concerns->finish($batch, $inspection, $apparatus, $findings);
+        $this->carryEquipmentNumbers($inspection, $apparatus, $checklist, $evidence);
 
         $this->recordNonMeterHolds($inspection, $apparatus, $findings);
         $this->settle($inspection, $apparatus, $evidence, $meterOutcomes);
@@ -71,6 +86,22 @@ final class ApparatusInspectionProcessingService
                 AuditEquipmentAfterInspection::dispatch((int) $inspection->id, (int) $apparatus->id)->delay(now()->addSeconds(5));
             }
         });
+    }
+
+    /**
+     * The inspection already holds these numbers, so a problem keeping the current copy must not cost the member their
+     * checkout. The savepoint leaves the surrounding PostgreSQL transaction usable.
+     *
+     * @param  array<string, mixed>  $checklist
+     * @param  array<string, mixed>  $evidence
+     */
+    private function carryEquipmentNumbers(ApparatusInspection $inspection, Apparatus $apparatus, array $checklist, array $evidence): void
+    {
+        try {
+            DB::transaction(static fn () => app(CrewEquipmentNumbers::class)->record($inspection, $apparatus, $checklist, $evidence));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     /** Reviewers hear about a held inspection and about new significant damage; routine acceptance is silent. */

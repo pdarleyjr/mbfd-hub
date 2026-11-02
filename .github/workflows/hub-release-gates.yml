@@ -591,6 +591,16 @@ jobs:
           name: operational-forms-lifecycle-evidence
           path: test-results/operational-forms-lifecycle
           retention-days: 7
+      - name: Verify Operational Forms tables never scroll sideways
+        id: operational-forms-tables
+        if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
+        run: >-
+          npx playwright test tests/e2e/operational-forms.spec.ts
+          --config=playwright.operational-forms.config.ts
+          --project=desktop
+          --grep 'record and entry tables turn into cards'
+          --output=test-results/operational-forms-tables
+          --reporter=list
       - name: Verify PWA worker core and service-worker drift
         id: pwa-worker-core
         if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}

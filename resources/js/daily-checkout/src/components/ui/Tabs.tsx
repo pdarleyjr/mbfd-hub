@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
 
 export interface TabItem<T extends string> {
   id: T;
@@ -25,6 +25,15 @@ interface TabsProps<T extends string> {
  */
 export default function Tabs<T extends string>({ tabs, active, onChange, label, idPrefix, renderPanel, panelClassName = '' }: TabsProps<T>) {
   const tabRefs = useRef<Partial<Record<T, HTMLButtonElement | null>>>({});
+
+  // A deep link can select a tab past the phone's edge. Move the strip only, never the page.
+  useEffect(() => {
+    const tab = tabRefs.current[active];
+    const strip = tab?.parentElement;
+    if (!tab || !strip) return;
+    const left = tab.offsetLeft - strip.offsetLeft;
+    if (left < strip.scrollLeft || left + tab.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = left;
+  }, [active]);
 
   const activate = (id: T) => {
     onChange(id);

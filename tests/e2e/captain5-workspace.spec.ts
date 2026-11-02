@@ -448,7 +448,7 @@ test.describe('workspace shell', () => {
     await expect(page.getByTestId('captain5-acting-open')).toHaveCount(0);
     await expect(page.getByTestId('captain5-authority')).toContainText('Captain 5 (on duty)');
     const tabs = page.getByRole('tablist', { name: 'Captain 5 workspace' });
-    await expect(tabs.getByRole('tab')).toHaveText([/Today/, /Issues\s*2/, /Replacements/, /Truck Changes/, /Messages\s*3/, /Department Updates/, /History/]);
+    await expect(tabs.getByRole('tab')).toHaveText([/Today/, /Issues\s*2/, /Truck Changes/, /Messages\s*3/, /Department Updates/, /History/]);
     await expect(tabs.getByRole('tab', { name: 'Duty' })).toHaveCount(0);
     await expect(page.getByText('View only')).toHaveCount(0);
   });
@@ -470,9 +470,9 @@ test.describe('workspace shell', () => {
   });
 
   test('tabs follow the URL, support the keyboard and a deep link opens the right tab', async ({ page }) => {
-    await open(page, newServer(), '/daily/captain-5?tab=replacements');
-    await expect(page.getByRole('tab', { name: /Replacements/ })).toHaveAttribute('aria-selected', 'true');
-    await page.getByRole('tab', { name: /Replacements/ }).press('ArrowRight');
+    await open(page, newServer(), '/daily/captain-5?tab=issues');
+    await expect(page.getByRole('tab', { name: /Issues/ })).toHaveAttribute('aria-selected', 'true');
+    await page.getByRole('tab', { name: /Issues/ }).press('ArrowRight');
     await expect(page.getByRole('tab', { name: /Truck Changes/ })).toHaveAttribute('aria-selected', 'true');
     await expect(page).toHaveURL(/tab=trucks/);
     await page.getByRole('tab', { name: /Truck Changes/ }).press('ArrowRight');
@@ -480,6 +480,12 @@ test.describe('workspace shell', () => {
     await expect(page).toHaveURL(/tab=messages/);
     await page.getByRole('tab', { name: 'Today' }).click();
     await expect(page).not.toHaveURL(/tab=/);
+  });
+
+  test('the retired Replacements tab is gone and an old link lands on Today', async ({ page }) => {
+    await open(page, newServer(), '/daily/captain-5?tab=replacements');
+    await expect(page.getByRole('tab', { name: /Replacements/ })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Today' })).toHaveAttribute('aria-selected', 'true');
   });
 
   test('a 403 from the workspace shows the access-denied state and nothing protected', async ({ page }) => {
@@ -1002,12 +1008,12 @@ test.describe('Truck Changes', () => {
     { id: 'changeout:2', unit: 'R 1', from_vehicle_number: '2200', to_vehicle_number: '2201', at: minutesAgo(60 * 24 * 5), by: 'Sam Fleet', recent: false, note: null, left_behind: [] },
   ];
 
-  test('the tab sits after Replacements, shows who is on what truck and what changed, and its badge is the last 24 hours', async ({ page }) => {
+  test('the tab sits after Issues, shows who is on what truck and what changed, and its badge is the last 24 hours', async ({ page }) => {
     await open(page, newServer({ trucks, truckChanges: changes }));
     const tabs = page.getByRole('tablist', { name: 'Captain 5 workspace' }).getByRole('tab');
-    await expect(tabs.nth(2)).toContainText('Replacements');
-    await expect(tabs.nth(3)).toHaveText(/Truck Changes\s*1/);
-    await tabs.nth(3).click();
+    await expect(tabs.nth(1)).toContainText('Issues');
+    await expect(tabs.nth(2)).toHaveText(/Truck Changes\s*1/);
+    await tabs.nth(2).click();
     await expect(page).toHaveURL(/tab=trucks/);
 
     const rows = page.getByTestId('captain5-truck-row');
@@ -1055,29 +1061,7 @@ test.describe('Truck Changes', () => {
   });
 });
 
-test.describe('Replacements, History and Messages', () => {
-  test('Replacements lists ordered and ready items, overdue first, with delivery and vendor reference', async ({ page }) => {
-    const server = newServer({
-      issues: [
-        makeIssue(1),
-        makeIssue(2, { item: 'Backboard straps', action_status: 'action_pending', expected_delivery: ymd(6), details: { vendor_reference: 'PO-LATE' }, state_token: 'action_pending:20' }),
-        makeIssue(3, { item: 'AED pads', action_status: 'replacement_available', state_token: 'replacement_available:30' }),
-        makeIssue(4, { item: 'Suction tubing', action_status: 'action_pending', expected_delivery: ymd(-2), overdue: true, state_token: 'action_pending:40' }),
-      ],
-    });
-    await open(page, server, '/daily/captain-5?tab=replacements');
-    const rows = page.getByTestId('captain5-issue-row');
-    await expect(rows).toHaveCount(3);
-    await expect(rows.nth(0)).toContainText('Suction tubing');
-    await expect(rows.nth(0)).toContainText('Overdue');
-    await expect(rows.nth(1)).toContainText('AED pads');
-    await expect(rows.nth(1)).toContainText('Ready for pickup');
-    await expect(rows.nth(2)).toContainText('Backboard straps');
-    await expect(rows.nth(2)).toContainText('PO-LATE');
-    await rows.nth(2).click();
-    await expect(sheet(page)).toContainText('Backboard straps');
-  });
-
+test.describe('History and Messages', () => {
   test('History searches closed issues through the server', async ({ page }) => {
     const server = newServer({ closed: [makeIssue(8, { item: 'Glucometer', open: false, action_status: 'resolved', resolved_at: minutesAgo(2000), resolution_type: 'replacement_installed', actions: ['reopen'] }), makeIssue(9, { item: 'Bandage shears', open: false, action_status: 'dismissed', closure: 'closed_no_action', closure_reason: 'Duplicate of the report entered on Oct 20', resolved_at: minutesAgo(3000), actions: ['reopen'] })] });
     await open(page, server, '/daily/captain-5?tab=history');

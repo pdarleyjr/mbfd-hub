@@ -39,6 +39,9 @@ class ViewInventoryRequest extends ViewRecord
 
     private const OTHER_REASON = '__other';
 
+    /** Forms the Prepare, Issue, Not issued, Close and Reopen buttons never apply to. */
+    private const FINISHED_FORM_STATUSES = [InventoryRequest::RETURNED, InventoryRequest::RECONCILED, InventoryRequest::SUPERSEDED];
+
     public function getTitle(): string
     {
         return 'Request '.$this->getRecord()->getAttribute('number');
@@ -65,18 +68,48 @@ class ViewInventoryRequest extends ViewRecord
             'detail' => $detail,
             'groups' => $this->groupedLines($detail['lines'], $issuances),
             'timeline' => array_reverse(array_map(fn (array $event): array => $event + [
-                'sentence' => EmsLabels::eventSentence($event),
+                'sentence' => $this->sentence($event),
                 'stock' => $event['action'] === 'issued' ? EmsLabels::stockEffect((array) $event['payload']) : null,
                 'at' => EmsLabels::et($event['created_at']),
             ], $detail['history'])),
             'messages' => array_map(fn (array $m): array => $m + ['at' => EmsLabels::et($m['created_at'])], $detail['messages']),
             'canAct' => $this->emsCan('act'),
-            'open' => $request->isOpen(),
+            'open' => $this->isWorkable($request),
             'statusLabel' => EmsLabels::status($request->status),
             'statusColor' => EmsLabels::STATUS_COLOR[$request->status] ?? 'gray',
             'submittedAt' => EmsLabels::et($request->submitted_at),
             'lastActivity' => EmsLabels::et($request->last_activity_at ?? $request->submitted_at),
+            'acknowledgedAt' => EmsLabels::et($request->reviewed_at),
+            'returnedAt' => EmsLabels::et($request->returned_at),
+            'reconciledAt' => EmsLabels::et($request->reconciled_at),
+            'replacedByUrl' => filled($detail['replaced_by'] ?? null) ? InventoryRequestResource::getUrl('view', ['record' => $detail['replaced_by']]) : null,
+            'revisions' => collect((array) ($detail['revisions'] ?? []))->map(fn (array $version): array => $version + [
+                'url' => InventoryRequestResource::getUrl('view', ['record' => $version['id']]),
+            ])->all(),
         ];
+    }
+
+    /**
+     * Whether the older Prepare, Issue and Close workflow may still touch this record. A returned,
+     * reconciled or replaced form is finished as far as that workflow goes; only a correction is allowed there.
+     */
+    private function isWorkable(InventoryRequest $request): bool
+    {
+        return $request->isOpen() && ! in_array($request->status, self::FINISHED_FORM_STATUSES, true);
+    }
+
+    /** Sentences for the events the Friday forms workflow adds; everything else is worded by EmsLabels. */
+    private function sentence(array $event): string
+    {
+        $payload = (array) ($event['payload'] ?? []);
+        $why = filled($payload['reason'] ?? null) ? ' Reason: '.$payload['reason'] : '';
+
+        return match ((string) $event['action']) {
+            'rejected' => 'Sent the form back to the member to correct.'.$why,
+            'reconciled' => 'Reconciled the form with the supply room.',
+            'revised' => 'The member sent a corrected version'.(filled($payload['replaced_by_number'] ?? null) ? ' ('.$payload['replaced_by_number'].')' : '').'.',
+            default => EmsLabels::eventSentence($event),
+        };
     }
 
     /**
@@ -146,7 +179,8 @@ class ViewInventoryRequest extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            $this->reviewAction(),
+            $this->acknowledgeAction(),
+            $this->rejectAction(),
             $this->prepareAction(),
             $this->issueAction(),
             $this->correctAction(),
@@ -169,7 +203,13 @@ class ViewInventoryRequest extends ViewRecord
 
     private function canWork(): bool
     {
-        return $this->emsCan('act') && $this->request()->isOpen();
+        return $this->emsCan('act') && $this->isWorkable($this->request());
+    }
+
+    /** Acknowledge and Reject apply to a form nothing was issued against and that is still active. */
+    private function canTriage(): bool
+    {
+        return $this->emsCan('act') && $this->request()->canBeWorked();
     }
 
     private function keyField(): Hidden
@@ -177,13 +217,35 @@ class ViewInventoryRequest extends ViewRecord
         return Hidden::make('idempotency_key')->default(fn (): string => (string) Str::uuid());
     }
 
-    private function reviewAction(): Action
+    /** Captain 5 has seen the form. Stock does not move and the form stays on the active list. */
+    private function acknowledgeAction(): Action
     {
-        return Action::make('review')->label('Review')->icon('heroicon-o-eye')->color('gray')
-            ->visible(fn (): bool => $this->emsCan('act') && $this->request()->status === InventoryRequest::SUBMITTED)
+        return Action::make('acknowledge')->label('Acknowledge')->icon('heroicon-o-eye')->color('gray')
+            ->visible(fn (): bool => $this->canTriage() && ! $this->request()->isAcknowledged())
             ->action(function (Action $action): void {
                 $request = $this->request();
-                $this->emsRun($action, 'act', fn ($user) => app(RequestWorkflowService::class)->review((int) $request->getKey(), $user, (string) Str::uuid()), 'Request reviewed');
+                $this->emsRun($action, 'act', fn ($user) => app(RequestWorkflowService::class)->acknowledge((int) $request->getKey(), $user, (string) Str::uuid()), 'Form acknowledged', 'Stock did not change.');
+            });
+    }
+
+    /** Rejects the form: it goes back to the member with a reason. Stock does not move and the acknowledgment is cleared. */
+    private function rejectAction(): Action
+    {
+        return Action::make('reject')->label('Reject')->icon('heroicon-o-arrow-uturn-left')->color('danger')->outlined()
+            ->visible(fn (): bool => $this->canTriage())
+            ->modalHeading('Reject this form and send it back to the member?')
+            ->modalDescription('The member is told, sees your reason, and can correct and resend the form. Nothing changes in stock.')
+            ->modalSubmitActionLabel('Reject form')
+            ->fillForm(fn (): array => ['idempotency_key' => (string) Str::uuid()])
+            ->form([
+                $this->keyField(),
+                Textarea::make('reason')->label('What should the member correct?')->required()->minLength(3)->maxLength(500)->rows(3),
+            ])
+            ->action(function (array $data, Action $action): void {
+                $request = $this->request();
+                $this->emsRun($action, 'act', fn ($user) => app(RequestWorkflowService::class)->reject(
+                    (int) $request->getKey(), $user, $this->emsKey($data), ['reason' => trim((string) ($data['reason'] ?? ''))],
+                ), 'Form rejected', 'It went back to the member, who can correct and resend it.');
             });
     }
 

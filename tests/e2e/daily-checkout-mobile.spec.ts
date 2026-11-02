@@ -77,6 +77,8 @@ test('E2 mobile selection preserves artwork and geometry, exposes equipment, and
       await expect(button).toHaveAttribute('aria-pressed', 'true');
       await page.locator(`.blueprint-zone[data-area-id="${selected.compartmentId}"]`).click();
     } else {
+      // The picker is sticky, so the columns line up only at the top of the page.
+      await page.evaluate(() => window.scrollTo(0, 0));
       const picker = await page.getByRole('complementary', { name: 'Apparatus navigation' }).boundingBox();
       const equipment = await page.getByRole('region', { name: 'Compartment Inspection' }).boundingBox();
       expect(picker!.x + picker!.width).toBeLessThanOrEqual(equipment!.x);

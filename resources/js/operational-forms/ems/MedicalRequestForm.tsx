@@ -1,10 +1,11 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, MessageBar, MessageBarBody } from '@fluentui/react-components';
+import { Button, MessageBar, MessageBarActions, MessageBarBody, MessageBarTitle } from '@fluentui/react-components';
 import { AlertTriangle, ArrowLeft, Check, ClipboardList, ListChecks, Search, WifiOff, X } from 'lucide-react';
 import { EmsApiError, type EmsApi } from './emsApi';
 import {
     blankDraft, buildPayload, bumpQuantity, retiredCount, classifyFailure, countRequested, discardRetired, fieldForError, filterForms, formName, groupSections,
     hasUnsavedWork, itemsLabel, lineKey, newSubmissionId, payloadItemCount, readiness, requestedInSections, restoreDraft, serializeDraft,
+    CANNOT_REVISE_MESSAGE, isCannotRevise, isUuid, reviseStoreKey, revisionBanner,
     setAnswer, setQuantity, unitForChoice, variantCaption,
 } from './emsLogic.js';
 import { emsDrafts } from './emsStore';
@@ -16,7 +17,7 @@ import { ReviewSheet } from './ReviewSheet';
 import type { EmsOutbox } from './useEmsOutbox';
 
 type Result =
-    | { kind: 'sent'; request: EmsRequestDetail }
+    | { kind: 'sent'; request: EmsRequestDetail; replaces: string | null }
     | { kind: 'queued'; reason: 'offline' | 'server' | 'auth'; message: string };
 
 interface FieldErrors { target?: string; event?: string; note?: string; items?: string }
@@ -34,7 +35,11 @@ export interface MedicalRequestFormProps {
     outbox: EmsOutbox;
     /** A request sent back for fixing ("Edit and resend"); otherwise the saved draft is restored. */
     startFrom: EmsDraft | null;
+    /** True when `startFrom` is a correction picked up again from this device rather than started from the sent form. */
+    resumed?: boolean;
     onStartConsumed: () => void;
+    /** Opens the plain form (used after a correction, so a new request starts from the member's own saved draft). */
+    goForm?: () => void;
     goForms: () => void;
     goMine: () => void;
     goDetail: (id: string) => void;
@@ -42,7 +47,7 @@ export interface MedicalRequestFormProps {
     onSubmitted: () => void;
 }
 
-export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, onStartConsumed, goForms, goMine, goDetail, editEntry, onSubmitted }: MedicalRequestFormProps) {
+export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, resumed = false, onStartConsumed, goForm, goForms, goMine, goDetail, editEntry, onSubmitted }: MedicalRequestFormProps) {
     const [draft, setDraft] = useState<EmsDraft | null>(null);
     const [restored, setRestored] = useState(false);
     const [query, setQuery] = useState('');
@@ -54,6 +59,9 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     const [reviewError, setReviewError] = useState('');
     const [errors, setErrors] = useState<FieldErrors>({});
     const [result, setResult] = useState<Result | null>(null);
+    /** The server said the returned form was already corrected or cancelled. What the member typed is kept. */
+    const [stale, setStale] = useState(false);
+    const discardedRef = useRef(false);
     const sendingRef = useRef(false);
     const retiredAfterSend = useRef<{ retired: NonNullable<EmsDraft['retired']>; labels?: EmsDraft['labels'] } | null>(null);
     const latestDraft = useRef<EmsDraft | null>(null);
@@ -64,13 +72,15 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
 
     const max = definition.limits.max_quantity;
     const controlledNote = definition.rules.controlled_substance_note;
+    // A correction is kept in its own row, so the normal unfinished request on this device is never touched.
+    const storeKeyOf = useCallback((value: EmsDraft) => (isUuid(value.revises) ? reviseStoreKey(owner, value.revises as string) : owner), [owner]);
 
     // Open with the request sent back for fixing, else with whatever was saved on this device.
     useEffect(() => {
         let active = true;
         const begin = async () => {
             if (startFrom) {
-                setDraft(startFrom); setRestored(false); onStartConsumed();
+                setDraft(startFrom); setRestored(resumed); onStartConsumed();
                 return;
             }
             const saved = restoreDraft(await emsDrafts.get(owner), definition);
@@ -87,11 +97,11 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
 
     // Keep the unfinished request on this device: quantities, the unit choice and the submission id only.
     const persist = useCallback(async (value: EmsDraft | null) => {
-        if (!value) return;
+        if (!value || discardedRef.current) return;
         const stored = serializeDraft(value, undefined, definition);
-        if (stored) await emsDrafts.put(owner, stored);
-        else await emsDrafts.remove(owner);
-    }, [owner, definition]);
+        if (stored) await emsDrafts.put(storeKeyOf(value), stored);
+        else await emsDrafts.remove(storeKeyOf(value));
+    }, [storeKeyOf, definition]);
 
     useEffect(() => {
         if (!draft || result) return;
@@ -148,6 +158,8 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     };
 
     const startNew = () => {
+        // After a correction the page is still addressed to the returned form: go to the plain form, which opens the member's own saved request.
+        if (isUuid(latestDraft.current?.revises) && goForm) { goForm(); return; }
         setResult(null); setDraft(retiredAfterSend.current ? { ...blankDraft(), ...retiredAfterSend.current } : blankDraft()); setRestored(false); setQuery(''); setOpenPanels({}); setActiveBag(''); setErrors({}); setReviewError('');
         window.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
     };
@@ -156,6 +168,14 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         if (!window.confirm('Clear everything you entered on this form?')) return;
         void emsDrafts.remove(owner);
         setDraft(blankDraft()); setRestored(false); setErrors({}); setQuery('');
+    };
+
+    // Throwing away a correction removes only the correction. The returned form stays as Captain 5 sent it back.
+    const discardCorrection = async () => {
+        if (!draft || !window.confirm('Throw away your changes? The returned form stays as Captain 5 sent it back, and you can fix it again.')) return;
+        discardedRef.current = true;
+        await emsDrafts.remove(storeKeyOf(draft));
+        goMine();
     };
 
     const ready = draft ? readiness(draft) : null;
@@ -181,15 +201,18 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         sendingRef.current = true; setSending(true); setReviewError('');
         const payload = buildPayload(draft, definition);
         const unit = unitForChoice(draft.targetChoice, definition.units);
+        const fixing = isUuid(draft.revises);
         try {
+            // A request that comes back already replayed (same client_submission_id) is a success like any other.
             const outcome = await api.submit(payload);
-            await emsDrafts.remove(owner);
+            await emsDrafts.remove(storeKeyOf(draft));
             // Entries kept for items that are not on the form right now are not part of what was sent; they stay saved.
-            retiredAfterSend.current = draft.retired ? { retired: draft.retired, labels: draft.labels } : null;
-            const leftover = draft.retired ? serializeDraft({ ...blankDraft(), retired: draft.retired, labels: draft.labels }, undefined, definition) : null;
+            // A correction's own leftovers end with the correction; they never move into the normal saved request.
+            retiredAfterSend.current = !fixing && draft.retired ? { retired: draft.retired, labels: draft.labels } : null;
+            const leftover = !fixing && draft.retired ? serializeDraft({ ...blankDraft(), retired: draft.retired, labels: draft.labels }, undefined, definition) : null;
             if (leftover) await emsDrafts.put(owner, leftover);
             await outbox.discard(payload.client_submission_id);
-            setResult({ kind: 'sent', request: outcome.request });
+            setResult({ kind: 'sent', request: outcome.request, replaces: fixing ? (draft.revisesNumber || null) : null });
             setReviewOpen(false);
             onSubmitted();
         } catch (error) {
@@ -197,14 +220,20 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
                 console.error('The medical inventory request could not be sent.', error);
                 setReviewError('Something went wrong on this device. Your entries are still here. Try again.');
             } else {
-                await handleFailure(error, payload, unit?.label ?? draft.targetChoice);
+                await handleFailure(error, payload, unit?.label ?? draft.targetChoice, draft);
             }
         } finally {
             sendingRef.current = false; setSending(false);
         }
     };
 
-    const handleFailure = async (error: EmsApiError, payload: ReturnType<typeof buildPayload>, unitLabel: string) => {
+    const handleFailure = async (error: EmsApiError, payload: ReturnType<typeof buildPayload>, unitLabel: string, sent: EmsDraft) => {
+        if (isCannotRevise(error)) {
+            // Already corrected or cancelled: say so, keep everything typed (it stays saved on this device), and point to My requests.
+            setReviewOpen(false); setStale(true);
+            window.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
+            return;
+        }
         const kind = classifyFailure({ status: error.status, code: error.code, network: error.network });
         if (kind === 'message') {
             const field = fieldForError(error.code, error.fields);
@@ -226,13 +255,14 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         const entry: EmsOutboxEntry = {
             clientSubmissionId: payload.client_submission_id, payload, createdAt: new Date().toISOString(),
             state: 'pending', unitLabel, itemCount: payloadItemCount(payload),
+            ...(isUuid(sent.revises) ? { revision: { number: sent.revisesNumber ?? '', reason: sent.returnReason ?? '' } } : {}),
         };
         const saved = await outbox.enqueue(entry);
         if (!saved) {
             setReviewError('This could not be sent and this browser could not save it. Keep this page open and try again.');
             return;
         }
-        await emsDrafts.remove(owner);
+        await emsDrafts.remove(storeKeyOf(sent));
         setResult({
             kind: 'queued',
             reason: kind === 'auth' ? 'auth' : error.network ? 'offline' : 'server',
@@ -244,11 +274,11 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     if (!draft || !ready) return <div className="ems-app"><p className="ems-loading" role="status">Opening the form</p></div>;
 
     if (result?.kind === 'sent') {
-        return <div className="ems-app"><SentConfirmation request={result.request} onView={() => goDetail(result.request.id)} onNew={startNew} onBack={goForms} onMine={goMine} /></div>;
+        return <div className="ems-app"><SentConfirmation request={result.request} replaces={result.replaces} onView={() => goDetail(result.request.id)} onNew={startNew} onBack={goForms} onMine={goMine} /></div>;
     }
     if (result?.kind === 'queued') {
         return <div className="ems-app">
-            <QueuedNotice reason={result.reason} message={result.message} outbox={outbox} onNew={startNew} onBack={goForms} />
+            <QueuedNotice reason={result.reason} message={result.message} outbox={outbox} replaces={revisionBanner(draft) ? (draft.revisesNumber || 'the earlier form') : null} onNew={startNew} onBack={goForms} />
             <PendingRequests outbox={outbox} openRequest={goDetail} editEntry={editEntry} />
         </div>;
     }
@@ -256,6 +286,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     const requestedCount = countRequested(draft);
     const isDetail = draft.targetChoice === 'detail';
     const unit = unitForChoice(draft.targetChoice, definition.units);
+    const fixing = revisionBanner(draft);
 
     return <div className="ems-app has-bar" ref={topRef}>
         <div className="ems-topline">
@@ -265,12 +296,25 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         <header className="ems-head">
             <p className="of-eyebrow">Captain 5 EMS supply</p>
             <h1>Medical Inventory Request</h1>
-            <p>Choose your unit, pick a list, and enter how many you need of each item. Leave the rest blank; a partial request is fine.</p>
+            {fixing
+                ? <p>Change what Captain 5 asked about, then send it again. The corrected form replaces the earlier one.</p>
+                : <p>Choose your unit, pick a list, and enter how many you need of each item. Leave the rest blank; a partial request is fine.</p>}
         </header>
+
+        {fixing && !stale && <MessageBar intent="warning" className="ems-revision-banner" role="region" aria-label="Correcting a returned form">
+            <MessageBarBody><strong>{fixing.title}</strong> {fixing.reason}</MessageBarBody>
+        </MessageBar>}
+
+        {stale && <MessageBar intent="error" className="ems-revision-stale" role="alert">
+            <MessageBarBody><MessageBarTitle>This form can no longer be corrected</MessageBarTitle>{CANNOT_REVISE_MESSAGE}</MessageBarBody>
+            <MessageBarActions><Button size="small" appearance="primary" onClick={goMine}>Go to My medical requests</Button></MessageBarActions>
+        </MessageBar>}
 
         <PendingRequests outbox={outbox} openRequest={goDetail} editEntry={editEntry} />
 
-        {restored && <MessageBar intent="info"><MessageBarBody>Your unfinished request was restored from this device. Notes and event text are not kept when you leave, so add yours again if you had one.</MessageBarBody></MessageBar>}
+        {restored && (fixing
+            ? <MessageBar intent="info"><MessageBarBody>Your correction was restored from this device. The note and event text show what you sent before, because they are not kept on the device.</MessageBarBody></MessageBar>
+            : <MessageBar intent="info"><MessageBarBody>Your unfinished request was restored from this device. Notes and event text are not kept when you leave, so add yours again if you had one.</MessageBarBody></MessageBar>)}
 
         {retired > 0 && <MessageBar intent="warning" className="ems-retired"><MessageBarBody>
             {retired === 1 ? '1 saved entry is' : `${retired} saved entries are`} for items that are no longer on this form. {retired === 1 ? 'It is' : 'They are'} kept on this device and not sent; you can see {retired === 1 ? 'it' : 'them'} when you review.
@@ -361,7 +405,9 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
             {(draft.note.length > definition.limits.note_max * 0.8) && <p className="ems-hint">{draft.note.length} of {definition.limits.note_max} characters</p>}
         </section>
 
-        {hasUnsavedWork(draft) && <div className="ems-clear"><Button appearance="subtle" onClick={clearForm}>Clear form</Button></div>}
+        {fixing
+            ? <div className="ems-clear"><Button appearance="subtle" onClick={() => void discardCorrection()}>Discard my changes</Button></div>
+            : hasUnsavedWork(draft) && <div className="ems-clear"><Button appearance="subtle" onClick={clearForm}>Clear form</Button></div>}
 
         <div className="ems-bar" role="region" aria-label="Request summary">
             <div className="ems-bar-summary">
@@ -379,17 +425,18 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     </div>;
 }
 
-function SentConfirmation({ request, onView, onNew, onBack, onMine }: {
-    request: EmsRequestDetail; onView: () => void; onNew: () => void; onBack: () => void; onMine: () => void;
+function SentConfirmation({ request, replaces, onView, onNew, onBack, onMine }: {
+    request: EmsRequestDetail; replaces: string | null; onView: () => void; onNew: () => void; onBack: () => void; onMine: () => void;
 }) {
     const items = request.lines.filter((line) => (line.response_type === 'yes_no' ? line.requested_flag === true : (line.requested_qty ?? 0) > 0)).length;
     const headingRef = useRef<HTMLHeadingElement | null>(null);
     useEffect(() => { headingRef.current?.focus(); }, []);
     return <section className="ems-result" aria-labelledby="ems-sent-title">
         <div className="ems-result-icon is-success"><Check size={28} aria-hidden="true" /></div>
-        <h1 id="ems-sent-title" tabIndex={-1} ref={headingRef}>Request sent</h1>
+        <h1 id="ems-sent-title" tabIndex={-1} ref={headingRef}>{replaces ? 'Corrected form sent' : 'Request sent'}</h1>
         <p className="ems-result-number" role="status">{request.number}</p>
         <p className="ems-unit-banner">Sent for <strong>{request.target_label}</strong></p>
+        {replaces && <p className="ems-hint" role="status">This replaces {replaces}. Captain 5 will review this one instead.</p>}
         <dl className="ems-review-facts">
             <div><dt>For</dt><dd>{request.target_label}{request.event_assignment ? `, ${request.event_assignment}` : ''}</dd></div>
             <div><dt>Items</dt><dd>{itemsLabel(items)}</dd></div>
@@ -404,8 +451,8 @@ function SentConfirmation({ request, onView, onNew, onBack, onMine }: {
     </section>;
 }
 
-function QueuedNotice({ reason, message, outbox, onNew, onBack }: {
-    reason: 'offline' | 'server' | 'auth'; message: string; outbox: EmsOutbox; onNew: () => void; onBack: () => void;
+function QueuedNotice({ reason, message, outbox, replaces, onNew, onBack }: {
+    reason: 'offline' | 'server' | 'auth'; message: string; outbox: EmsOutbox; replaces: string | null; onNew: () => void; onBack: () => void;
 }) {
     const headingRef = useRef<HTMLHeadingElement | null>(null);
     useEffect(() => { headingRef.current?.focus(); }, []);
@@ -419,11 +466,12 @@ function QueuedNotice({ reason, message, outbox, onNew, onBack }: {
         <div className="ems-result-icon is-warning"><WifiOff size={26} aria-hidden="true" /></div>
         <h1 id="ems-queued-title" tabIndex={-1} ref={headingRef}>{title}</h1>
         <p role="status">{detail}</p>
+        {replaces && <p className="ems-hint">When it goes through, it replaces {replaces}.</p>}
         <div className="ems-result-actions">
             {reason === 'auth'
                 ? <Button appearance="primary" onClick={() => window.location.reload()}>Sign in again</Button>
                 : <Button appearance="primary" disabled={outbox.flushing} onClick={() => void outbox.flush()}>{outbox.flushing ? 'Sending' : 'Try sending now'}</Button>}
-            <Button onClick={onNew}>Start another request</Button>
+            <Button onClick={onNew}>{replaces ? 'New request' : 'Start another request'}</Button>
             <Button appearance="subtle" onClick={onBack}>Back to Forms</Button>
         </div>
     </section>;

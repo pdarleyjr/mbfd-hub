@@ -79,6 +79,13 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('apparatuses/{apparatus}/changeout-context', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'context'])->whereNumber('apparatus');
     Route::post('apparatuses/{apparatus}/changeouts', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'store'])->whereNumber('apparatus')->middleware(['throttle:30,1']);
     Route::get('changeouts/{changeout}', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'show'])->whereNumber('changeout');
+    // Issue history for the Daily Checkout (docs/apparatus-issue-history.md). Network only, never offline-cached by the server.
+    Route::get('apparatuses/{apparatus}/findings', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'index'])->whereNumber('apparatus');
+    Route::get('apparatuses/{apparatus}/findings/closed', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'closed'])->whereNumber('apparatus');
+    Route::get('apparatus-issues/{defect}/history', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'timeline'])->whereNumber('defect');
+    Route::get('apparatus-issues/{defect}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'defectPhoto'])->whereNumber('defect');
+    Route::get('apparatus-issues/{defect}/observations/{observation}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'observationPhoto'])->whereNumber(['defect', 'observation']);
+    Route::get('inspection-concerns/{concern}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'concernPhoto'])->whereNumber('concern');
     Route::get('stations/{station}/operational-alerts', [\App\Http\Controllers\Api\OperationalAlertController::class, 'station'])->whereNumber('station');
     // One-time vehicle questions outside a checkout (Captain 5 page); the unit is authorized per request.
     Route::get('apparatuses/{apparatus}/vehicle-identification', [\App\Http\Controllers\Api\VehicleIdentificationController::class, 'show'])->whereNumber('apparatus');
@@ -99,6 +106,7 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('stations/{station}/service-tickets', [PublicApparatusServiceTicketController::class, 'stationIndex']);
     Route::get('stations/{station}/activity', [StationContextController::class, 'activity']);
     Route::get('stations/{station}/overview', [\App\Http\Controllers\Api\StationOverviewController::class, 'show'])->whereNumber('station');
+    Route::get('stations/{station}/roster', [\App\Http\Controllers\Api\StationRosterController::class, 'show'])->whereNumber('station');
     Route::get('stations/{station}/checkouts/{inspection}', [\App\Http\Controllers\Api\StationOverviewController::class, 'checkout'])->whereNumber(['station', 'inspection']);
     Route::get('stations/{station}/rooms/{room}/profile', [StationContextController::class, 'roomProfile']);
     Route::get('station-requests/{stationRequest}', [PublicStationRequestController::class, 'show']);

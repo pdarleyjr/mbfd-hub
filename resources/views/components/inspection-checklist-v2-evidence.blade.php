@@ -50,7 +50,7 @@
                                 <p class="font-medium text-gray-900 dark:text-white">{{ $task['name'] ?? $task['id'] ?? 'Unnamed duty' }}</p>
                                 <p class="text-xs text-gray-600 dark:text-gray-300">{{ $task['recurrence_label'] ?? 'Configured recurrence' }}</p>
                             </div>
-                            <span class="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/30 dark:text-sky-200">{{ $task['status'] ?? 'Reported' }}</span>
+                            <span class="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/30 dark:text-sky-200">{{ \App\Support\Fleet\ScheduledDutyStatus::label($task['status'] ?? null) }}</span>
                         </div>
                         @if(filled($task['instructions'] ?? null))
                             <p class="mt-2 text-sm text-gray-700 dark:text-gray-200">{{ $task['instructions'] }}</p>

@@ -285,7 +285,7 @@ export function buildPayload(draft, definition) {
     if (unit.kind === 'detail_event' && event !== '') target.event_assignment = event;
 
     /** @type {EmsSubmitPayload} */
-    const payload = { client_submission_id: draft.clientSubmissionId, target, lines };
+    const payload = { client_submission_id: draft.clientSubmissionId, ...(isUuid(draft.revises) ? { revises: draft.revises } : {}), target, lines };
     const note = draft.note.trim();
     if (note !== '') payload.member_note = note;
     return payload;
@@ -298,9 +298,10 @@ export function payloadItemCount(payload) {
 
 /**
  * Rebuild an editable draft from a payload that could not be sent ("Edit again").
- * @param {EmsSubmitPayload} payload @param {EmsFormDefinition} definition @returns {EmsDraft}
+ * A correction keeps its `revises`; the number and reason (display only) come from the queue entry.
+ * @param {EmsSubmitPayload} payload @param {EmsFormDefinition} definition @param {{number?: string, reason?: string}} [revision] @returns {EmsDraft}
  */
-export function draftFromPayload(payload, definition) {
+export function draftFromPayload(payload, definition, revision = undefined) {
     const keys = validKeys(definition);
     let draft = blankDraft(payload.client_submission_id);
     const retired = { quantities: /** @type {Record<string, number>} */ ({}), answers: /** @type {Record<string, boolean>} */ ({}) };
@@ -323,7 +324,167 @@ export function draftFromPayload(payload, definition) {
         targetChoice: unit ? choiceForUnit(unit) : '',
         eventAssignment: payload.target.event_assignment ?? '',
         note: payload.member_note ?? '',
+        ...(isUuid(payload.revises) ? { revises: payload.revises, revisesNumber: revision?.number ?? '', returnReason: revision?.reason ?? '' } : {}),
     };
+}
+
+// ---------------------------------------------------------------- fixing a request Captain 5 sent back
+
+/**
+ * Where the correction in progress is kept on this device: its own row, never the member's normal saved draft.
+ * @param {string} owner @param {string} requestId
+ */
+export function reviseStoreKey(owner, requestId) {
+    return `${owner}:revise:${requestId}`;
+}
+
+/**
+ * The returned request the page is asked to fix, from `?revises=<uuid>`, or null.
+ * @param {string} search @returns {string | null}
+ */
+export function revisesFromSearch(search) {
+    const value = (new URLSearchParams(search).get('revises') ?? '').toLowerCase();
+    return isUuid(value) ? value : null;
+}
+
+/** The unit choice for a stored request: its apparatus id, else the one unit with exactly its name; never a guess between units. @param {import('./emsTypes').EmsRequestDetail} request @param {EmsUnit[]} units */
+function choiceForRequest(request, units) {
+    if (request.target_kind === 'detail_event') {
+        const detail = units.find((unit) => unit.kind === 'detail_event');
+        return detail ? choiceForUnit(detail) : '';
+    }
+    if (request.apparatus_id !== undefined && request.apparatus_id !== null) {
+        const unit = units.find((candidate) => candidate.kind !== 'detail_event' && candidate.id === request.apparatus_id);
+        return unit ? choiceForUnit(unit) : '';
+    }
+    const same = units.filter((unit) => unit.kind !== 'detail_event' && unit.label === request.target_label);
+    return same.length === 1 ? choiceForUnit(same[0]) : '';
+}
+
+/**
+ * A request Captain 5 sent back, as an editable draft ("Fix and resend"). Quantities and Yes/No answers are what the member
+ * asked for (not what was issued), keyed `<form key>|<item_key>`. A line whose item is not on the form now is retired
+ * (saved with the draft, named on the review screen, never sent), never dropped. The draft gets a NEW client submission id
+ * and `revises` pointing at the returned request.
+ * @param {import('./emsTypes').EmsRequestDetail} request @param {EmsFormDefinition} definition @param {string} [clientSubmissionId] @returns {EmsDraft}
+ */
+export function draftFromRequest(request, definition, clientSubmissionId = newSubmissionId()) {
+    const keys = validKeys(definition);
+    const max = definition.limits.max_quantity;
+    let draft = blankDraft(clientSubmissionId);
+    const retired = { quantities: /** @type {Record<string, number>} */ ({}), answers: /** @type {Record<string, boolean>} */ ({}) };
+    /** @type {Record<string, string>} */
+    const labels = {};
+    for (const line of request.lines ?? []) {
+        const key = lineKey(line.bag_key ?? '', line.item_key);
+        if (line.response_type === 'yes_no') {
+            if (typeof line.requested_flag !== 'boolean') continue;
+            if (keys.has(key)) draft = setAnswer(draft, key, line.requested_flag);
+            else { retired.answers[key] = line.requested_flag; labels[key] = line.label; }
+        } else {
+            const quantity = normalizeQuantity(line.requested_qty, max);
+            if (quantity === null) continue;
+            if (keys.has(key)) draft = setQuantity(draft, key, quantity, max);
+            else { retired.quantities[key] = quantity; labels[key] = line.label; }
+        }
+    }
+    const targetChoice = choiceForRequest(request, definition.units);
+    return {
+        ...draft,
+        ...(Object.keys(retired.quantities).length + Object.keys(retired.answers).length > 0 ? { retired, labels } : {}),
+        targetChoice,
+        eventAssignment: targetChoice === 'detail' ? (request.event_assignment ?? '') : '',
+        note: request.member_note ?? '',
+        revises: request.id,
+        revisesNumber: request.number,
+        returnReason: returnReason(request),
+    };
+}
+
+/**
+ * Where "Fix and resend" starts: the correction already in progress on this device when there is one for this request
+ * (so a refresh or a closed tab loses nothing), else the request as it was sent. The note and event text are not kept on
+ * the device, so a resumed correction shows them as they were sent.
+ * @param {import('./emsTypes').EmsRequestDetail} request @param {unknown} stored @param {EmsFormDefinition} definition
+ * @returns {{draft: EmsDraft, resumed: boolean}}
+ */
+export function reviseStart(request, stored, definition) {
+    const saved = restoreDraft(stored, definition);
+    if (!saved || saved.revises !== request.id) return { draft: draftFromRequest(request, definition), resumed: false };
+    return {
+        resumed: true,
+        draft: {
+            ...saved,
+            eventAssignment: saved.targetChoice === 'detail' ? (request.event_assignment ?? '') : '',
+            note: request.member_note ?? '',
+            revises: request.id,
+            revisesNumber: request.number,
+            returnReason: returnReason(request) || saved.returnReason || '',
+        },
+    };
+}
+
+/**
+ * The correction in progress from a stored row alone (no connection to load the request): the draft, or null.
+ * @param {unknown} stored @param {EmsFormDefinition} definition @param {string} requestId @returns {EmsDraft | null}
+ */
+export function reviseFromStored(stored, definition, requestId) {
+    const saved = restoreDraft(stored, definition);
+    return saved && saved.revises === requestId ? saved : null;
+}
+
+/** What the banner says while fixing. @param {EmsDraft} draft @returns {{title: string, reason: string} | null} */
+export function revisionBanner(draft) {
+    if (!isUuid(draft.revises)) return null;
+    const number = (draft.revisesNumber ?? '').trim();
+    const reason = (draft.returnReason ?? '').trim();
+    return {
+        title: number ? `Correcting ${number}.` : 'Correcting an earlier form.',
+        reason: reason ? `Captain 5 said: ${reason}` : 'Captain 5 sent it back.',
+    };
+}
+
+/** Optional correction fields of a stored row, only when they are well formed. @param {Record<string, any>} data */
+function storedRevision(data) {
+    if (!isUuid(data.revises)) return {};
+    return {
+        revises: /** @type {string} */ (data.revises),
+        revisesNumber: typeof data.revisesNumber === 'string' ? data.revisesNumber.slice(0, 60) : '',
+        returnReason: typeof data.returnReason === 'string' ? data.returnReason.slice(0, 600) : '',
+    };
+}
+
+/** Captain 5 sent it back and the server says the member can fix it. @param {import('./emsTypes').EmsRequestSummary} request */
+export function needsCorrection(request) {
+    return request.can_revise === true;
+}
+
+/**
+ * Why Captain 5 sent it back: the field, else the "rejected" history entry.
+ * @param {{return_reason?: string | null, history?: {action: string, payload?: {reason?: string}}[]}} request
+ */
+export function returnReason(request) {
+    if (typeof request.return_reason === 'string' && request.return_reason.trim() !== '') return request.return_reason.trim();
+    const event = [...(request.history ?? [])].reverse().find((entry) => entry.action === 'rejected');
+    return event?.payload?.reason?.trim() ?? '';
+}
+
+/**
+ * Who sent it back and when, from the fields or the "rejected" history entry.
+ * @param {import('./emsTypes').EmsRequestDetail} request @returns {{by: string, at: string | null}}
+ */
+export function returnInfo(request) {
+    const event = [...(request.history ?? [])].reverse().find((entry) => entry.action === 'rejected');
+    const by = typeof request.returned_by === 'string' && request.returned_by.trim() !== '' ? request.returned_by.trim() : (event?.actor_name ?? '');
+    return { by, at: request.returned_at ?? event?.created_at ?? null };
+}
+
+export const CANNOT_REVISE_SHORT = 'This form was already corrected or cancelled, so it cannot be resent.';
+export const CANNOT_REVISE_MESSAGE = `${CANNOT_REVISE_SHORT} What you typed is still here.`;
+
+/** The server refused a correction because the request is no longer waiting for one. @param {{code?: string | null}} failure */
+export function isCannotRevise(failure) {
+    return failure.code === 'cannot_revise';
 }
 
 // ---------------------------------------------------------------- what is stored on the device
@@ -355,7 +516,8 @@ function entryLabels(draft, definition) {
  */
 export function serializeDraft(draft, savedAt = new Date().toISOString(), definition = undefined) {
     const hasEntries = Object.keys(draft.quantities).length > 0 || Object.keys(draft.answers).length > 0 || retiredCount(draft) > 0;
-    if (!hasEntries && draft.targetChoice === '') return null;
+    // A correction is always worth keeping, even when emptied: reopening it must not bring the sent copy back over the member's edit.
+    if (!hasEntries && draft.targetChoice === '' && !isUuid(draft.revises)) return null;
     return {
         v: STORED_DRAFT_VERSION,
         clientSubmissionId: draft.clientSubmissionId,
@@ -365,6 +527,7 @@ export function serializeDraft(draft, savedAt = new Date().toISOString(), defini
         // Additive and optional, so the stored version stays 1 and a build that does not know them ignores them.
         ...(retiredCount(draft) > 0 ? { retired: { quantities: { ...draft.retired?.quantities }, answers: { ...draft.retired?.answers } } } : {}),
         ...(entryLabels(draft, definition) ? { labels: entryLabels(draft, definition) } : {}),
+        ...(isUuid(draft.revises) ? { revises: draft.revises, revisesNumber: draft.revisesNumber ?? '', returnReason: draft.returnReason ?? '' } : {}),
         savedAt,
     };
 }
@@ -406,7 +569,7 @@ export function restoreDraft(stored, definition) {
     for (const key of Object.keys(draft.quantities)) delete retired.quantities[key];
     for (const key of Object.keys(draft.answers)) delete retired.answers[key];
     const choice = typeof data.targetChoice === 'string' && unitForChoice(data.targetChoice, definition.units) ? data.targetChoice : '';
-    const restored = { ...draft, targetChoice: choice };
+    const restored = { ...draft, targetChoice: choice, ...storedRevision(data) };
     if (Object.keys(retired.quantities).length + Object.keys(retired.answers).length === 0) return restored;
     /** @type {Record<string, string>} */
     const labels = {};
@@ -548,16 +711,21 @@ const STATUS_LABELS = {
     issued: 'Issued',
     closed: 'Closed',
     cancelled: 'Cancelled',
+    returned: 'Returned',
 };
 
-/** Plain language for the member. @param {string} status */
-export function statusLabel(status) {
-    return /** @type {Record<string, string>} */ (STATUS_LABELS)[status] ?? status;
+/** Plain language for the member. A status this build does not list (reconciled, superseded) uses the server's own label. @param {string} status @param {unknown} [serverLabel] */
+export function statusLabel(status, serverLabel = undefined) {
+    const known = /** @type {Record<string, string>} */ (STATUS_LABELS)[status];
+    if (known) return known;
+    return typeof serverLabel === 'string' && serverLabel.trim() !== '' ? serverLabel.trim() : status;
 }
 
-/** @param {string} status @returns {'info' | 'progress' | 'done' | 'muted'} */
+/** @param {string} status @returns {'info' | 'progress' | 'done' | 'muted' | 'attention'} */
 export function statusTone(status) {
-    if (status === 'issued') return 'done';
+    if (status === 'returned') return 'attention';
+    if (status === 'issued' || status === 'reconciled') return 'done';
+    if (status === 'superseded') return 'muted';
     if (status === 'closed' || status === 'cancelled') return 'muted';
     if (status === 'prepared' || status === 'partially_issued') return 'progress';
     return 'info';
@@ -573,6 +741,9 @@ const EVENT_LABELS = {
     closed: 'Closed',
     reopened: 'Reopened',
     cancelled: 'Cancelled',
+    rejected: 'Returned for correction',
+    reconciled: 'Reconciled',
+    revised: 'Corrected and resent',
     status_changed: 'Status changed',
 };
 
@@ -613,7 +784,11 @@ export function viewFromSearch(search) {
     const params = new URLSearchParams(search);
     const request = (params.get('ems_request') ?? '').toLowerCase();
     if (isUuid(request)) return { name: 'detail', id: request };
-    if (params.get('form') === FORM_KEY) return params.get('view') === 'mine' ? { name: 'mine' } : { name: 'form' };
+    if (params.get('form') === FORM_KEY) {
+        if (params.get('view') === 'mine') return { name: 'mine' };
+        const revises = revisesFromSearch(search);
+        return revises ? { name: 'form', revises } : { name: 'form' };
+    }
     return null;
 }
 
@@ -621,6 +796,7 @@ export function viewFromSearch(search) {
 export function searchForView(view) {
     if (!view) return '';
     if (view.name === 'detail') return `?ems_request=${view.id}`;
+    if (view.name === 'form' && view.revises) return `?form=${FORM_KEY}&revises=${view.revises}`;
     return view.name === 'mine' ? `?form=${FORM_KEY}&view=mine` : `?form=${FORM_KEY}`;
 }
 

@@ -708,7 +708,8 @@ const assetResponse = (name) => fakeResponse({ body: `bundle ${name}`, url: `${O
 
 test('every station and apparatus read the Daily app makes is either served offline or deliberately live (audit of utils/api.ts)', async () => {
   // A station's Overview and its checkouts are current-shift data with an alert in them: never replayed from a cache.
-  const live = [/\/service-tickets$/, /\/service-notices$/, /^stations\/1\/overview$/, /^stations\/1\/checkouts\/1$/];
+  // Its roster carries names, employee IDs and leave codes, and an old copy would name the wrong crew.
+  const live = [/\/service-tickets$/, /\/service-notices$/, /^stations\/1\/overview$/, /^stations\/1\/checkouts\/1$/, /^stations\/1\/roster$/];
   // apparatuses/{id}/{endpoint} is the checklist GET plus the inspection-session POSTs; the GET is checked explicitly below.
   // apparatuses/{id}/vehicle-identification is the Captain 5 page's one-time vehicle answers POST (online only).
   const writes =[/^apparatuses\/1\/inspections$/, /^apparatuses\/1\/1$/, /^apparatuses\/1\/vehicle-identification$/];

@@ -12,6 +12,7 @@ use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\ApparatusServiceTicketResource\Pages;
 use App\Filament\Support\ArchiveFilter;
 use App\Filament\Support\InspectionWorkspace;
+use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusServiceTicket;
@@ -88,6 +89,8 @@ class ApparatusServiceTicketResource extends Resource
                 Tables\Filters\SelectFilter::make('station_id')->relationship('station', 'station_number')->label('Station'),
                 Tables\Filters\SelectFilter::make('apparatus_id')
                     ->relationship('apparatus', 'designation')
+                    // Designation is optional on a unit, and a null option label would take the whole page down.
+                    ->getOptionLabelFromRecordUsing(fn (Apparatus $unit): string => $unit->designation ?: $unit->unit_id ?: $unit->name ?: 'Unit '.$unit->getKey())
                     ->label('Unit')
                     ->searchable()
                     ->preload(),

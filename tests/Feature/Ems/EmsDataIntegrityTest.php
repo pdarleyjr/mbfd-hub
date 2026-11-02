@@ -75,7 +75,7 @@ final class EmsDataIntegrityTest extends TestCase
         $stock = $this->stockOf($this->staff, 'sr.t.02');
         $this->assertSame(8, $stock['current_quantity']);
         $this->assertSame('calculated', $stock['current_basis']);
-        $line = DB::table('ems_inventory_snapshot_lines')->sole();
+        $line = DB::table('ems_inventory_snapshot_lines')->whereNotNull('quantity_base')->sole();
         $this->assertSame(0, (int) $line->through_movement_id, 'The line remembers it was typed before movement 1.');
         $this->assertSame(1, (int) DB::table('ems_inventory_snapshots')->value('through_movement_id'), 'The snapshot itself was finalized after it.');
     }

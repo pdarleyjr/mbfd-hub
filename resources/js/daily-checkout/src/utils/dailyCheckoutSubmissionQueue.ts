@@ -1,6 +1,8 @@
 import { db, type DailyCheckoutQueuedSubmission } from '../lib/db';
 import type { InspectionData, InspectionSubmission } from '../types';
 import { AUTOSAVE_STORAGE_PREFIX, createClientSubmissionId } from './storage';
+import { toConcernSubmissions } from './concerns';
+import { toExtraSubmissions } from './equipmentNumbers.ts';
 import { ApiClient, ApiRequestError, ApiTimeoutError, READ_TIMEOUT_MS, isChecklistVersion } from './api';
 import { identityForQueueCapture, refreshOfflineIdentity, type OfflineIdentity } from '../lib/offlineIdentity';
 
@@ -641,6 +643,9 @@ const draftMatchesSubmission = (
   && draft!.officer?.shift === submission.data.shift
   && JSON.stringify(draft!.fieldValues ?? []) === JSON.stringify(submission.data.field_values ?? [])
   && JSON.stringify(draft!.scheduledTasks ?? []) === JSON.stringify(submission.data.scheduled_tasks ?? [])
+  // A draft that still holds concerns the accepted checkout did not carry is not that checkout's draft.
+  && JSON.stringify(toConcernSubmissions(draft!.concerns ?? [])) === JSON.stringify(submission.data.concerns ?? [])
+  && JSON.stringify(toExtraSubmissions(draft!.equipmentExtras ?? [])) === JSON.stringify(submission.data.extra_equipment_numbers ?? [])
   && draft!.meter?.engine_hours === submission.data.engine_hours
   && draft!.meter?.miles === submission.data.miles
   && equipmentEvidence(draft!.compartments) === acceptedEvidence;

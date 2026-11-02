@@ -295,7 +295,7 @@ class HomeNavigationTest extends TestCase
 
         // The six are not repeated as standalone cards.
         $standalone = $xpath->query('//a[@data-quick-access-card]');
-        self::assertSame(['Station / Vehicles / Equipment', 'Daily Roster', 'Employee Portal'], array_map(
+        self::assertSame(['Station / Vehicles / Equipment', 'Message Support Services', 'Employee Portal'], array_map(
             fn (\DOMNode $node): string => trim($xpath->query('.//*[contains(@class,"hub-tile__title")]', $node)->item(0)->textContent),
             iterator_to_array($standalone),
         ));
@@ -307,7 +307,7 @@ class HomeNavigationTest extends TestCase
         config(['daily_roster.mode' => 'shadow']);
         $this->actingAsCanonicalFixture();
 
-        $this->assertSame(['Station / Vehicles / Equipment', 'Employee Portal'], $this->quickAccessTitles());
+        $this->assertFalse($this->homeOffersTheRoster());
 
         // The route stays open: an old bookmark gets the safe empty state, not an error.
         $this->get(route('daily-roster.show'))->assertOk()
@@ -324,7 +324,7 @@ class HomeNavigationTest extends TestCase
             'Station 1 / Engine 1' => [['employee_id' => '40001', 'name' => 'ALPHA, MEMBER']],
         ]);
 
-        $this->assertSame(['Station / Vehicles / Equipment', 'Daily Roster', 'Employee Portal'], $this->quickAccessTitles());
+        $this->assertTrue($this->homeOffersTheRoster());
     }
 
     public function test_home_shows_the_roster_in_publish_mode_without_looking_for_a_pointer(): void
@@ -334,9 +334,9 @@ class HomeNavigationTest extends TestCase
         $this->actingAsCanonicalFixture();
 
         DB::enableQueryLog();
-        $titles = $this->quickAccessTitles();
+        $offered = $this->homeOffersTheRoster();
 
-        $this->assertSame(['Station / Vehicles / Equipment', 'Daily Roster', 'Employee Portal'], $titles);
+        $this->assertTrue($offered);
         $this->assertSame(0, $this->pointerQueries());
     }
 
@@ -428,6 +428,14 @@ class HomeNavigationTest extends TestCase
             fn (\DOMNode $node): string => trim($xpath->query('.//*[contains(@class,"hub-tile__title")]', $node)->item(0)->textContent),
             iterator_to_array($xpath->query('//a[@data-quick-access-card]')),
         );
+    }
+
+    private function homeOffersTheRoster(): bool
+    {
+        $xpath = $this->xpath($this->get('/')->assertOk()->getContent());
+
+        return $xpath->query('//section[contains(@class,"home-today")]//a[@data-home-daily-roster]')->length === 1
+            && $xpath->query('//a[@data-quick-access-card and contains(.,"Daily Roster")]')->length === 0;
     }
 
     private function pointerQueries(): int

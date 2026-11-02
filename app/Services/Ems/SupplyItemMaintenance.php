@@ -68,6 +68,13 @@ final class SupplyItemMaintenance
                 $changes['review_reasons'] = [];
             }
 
+            // Packaging is what makes a typed count convert, so it cannot change out from under an item counted in packages.
+            $packageUnit = array_key_exists('package_unit', $changes) ? $changes['package_unit'] : $item->package_unit;
+            $perPackage = array_key_exists('units_per_package', $changes) ? $changes['units_per_package'] : $item->units_per_package;
+            if ($item->count_unit !== 'each' && ($packageUnit !== $item->count_unit || $perPackage === null)) {
+                throw new EmsException("This item is counted by the {$item->count_unit}. Change how it is counted on the Master Supply Room Inventory first.", 'counted_in_package', 422);
+            }
+
             $written = [];
             foreach ($changes as $field => $after) {
                 $before = $item->getAttribute($field);

@@ -11,6 +11,7 @@ import SavedWorkElsewhereNotice from './pwa/SavedWorkElsewhereNotice';
 
 const ApparatusList = lazy(() => import('./components/ApparatusList'));
 const InspectionWizard = lazy(() => import('./components/InspectionWizard'));
+const ApparatusIssuesPage = lazy(() => import('./components/findings/ApparatusIssuesPage'));
 const StationListPage = lazy(() => import('./components/StationListPage'));
 const StationDetailPage = lazy(() => import('./components/StationDetailPage'));
 const Command300Page = lazy(() => import('./components/Command300Page'));
@@ -65,6 +66,8 @@ function DailyShell() {
             {/* Vehicle Inspection Routes */}
             <Route path="/vehicle-inspections" element={<VehicleInspectionSelect />} />
             <Route path="/vehicle-inspections/:slug" element={<InspectionWizard />} />
+            {/* Read-only: open issues, their history and earlier closed issues for one apparatus. */}
+            <Route path="/vehicle-inspections/:slug/issues" element={<ApparatusIssuesPage />} />
             <Route path="/vehicle-inspections/success" element={<SuccessPage />} />
             {/* Legacy apparatus routes */}
             <Route path="/apparatuses" element={<ApparatusList />} />

@@ -20,6 +20,16 @@ use LogicException;
  * @property string $value_source
  * @property array<int|string, mixed>|null $warnings
  * @property int|null $through_movement_id
+ * @property string|null $section_key
+ * @property string|null $count_unit
+ * @property int|null $units_per_count_unit
+ * @property int|null $counted_value
+ * @property int|null $expected_quantity_base
+ * @property int|null $required_qty_base
+ * @property string|null $threshold_source_text
+ * @property int|null $order_qty_base
+ * @property int|null $order_qty_count_unit
+ * @property string|null $config_problem
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */
@@ -50,7 +60,11 @@ class InventorySnapshotLine extends Model
 
     protected function casts(): array
     {
-        return ['through_movement_id' => 'integer', 'quantity_base' => 'integer', 'entry' => 'array', 'warnings' => 'array'];
+        return [
+            'through_movement_id' => 'integer', 'quantity_base' => 'integer', 'entry' => 'array', 'warnings' => 'array',
+            'units_per_count_unit' => 'integer', 'counted_value' => 'integer', 'expected_quantity_base' => 'integer',
+            'required_qty_base' => 'integer', 'order_qty_base' => 'integer', 'order_qty_count_unit' => 'integer',
+        ];
     }
 
     /** @return BelongsTo<InventorySnapshot, $this> */

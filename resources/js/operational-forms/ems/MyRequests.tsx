@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, MessageBar, MessageBarBody, Spinner,
 } from '@fluentui/react-components';
-import { ArrowLeft, ChevronRight, Download, Eye, FilePlus2, LoaderCircle, RefreshCw, Send } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronRight, Download, Eye, FilePlus2, LoaderCircle, RefreshCw, Send } from 'lucide-react';
 import { EmsApiError, type EmsApi } from './emsApi';
 import {
-    eventDetail, eventLabel, formatEastern, itemsLabel, newSubmissionId, requestedText, statusLabel, statusTone,
+    eventDetail, eventLabel, formatEastern, itemsLabel, needsCorrection, newSubmissionId, requestedText, returnInfo, returnReason, statusLabel, statusTone,
 } from './emsLogic.js';
 import type { EmsOutboxEntry, EmsRequestDetail, EmsRequestLine, EmsRequestSummary } from './emsTypes';
 import { PendingRequests } from './PendingRequests';
@@ -15,8 +15,21 @@ const BAG_NAMES: Record<string, string> = { 'airway-bag': 'Airway Bag', 'als-med
 const MESSAGE_MAX = 2000;
 const CANCEL_REASON_MAX = 255;
 
-function StatusTag({ status }: { status: string }) {
-    return <span className={`ems-status is-${statusTone(status)}`}>{statusLabel(status)}</span>;
+function StatusTag({ status, label }: { status: string; label?: string }) {
+    return <span className={`ems-status is-${statusTone(status)}`}>{statusLabel(status, label)}</span>;
+}
+
+/** "Replaced by MIR-000004-R2" / "Corrects MIR-000004": a link to the other form. The number comes from the server when it sends it, else from that request. */
+function RequestLink({ api, id, number, lead, goDetail }: { api: EmsApi; id: string; number?: string | null; lead: string; goDetail: (id: string) => void }) {
+    const [fetched, setFetched] = useState<string | null>(null);
+    useEffect(() => {
+        if (number) return undefined;
+        let active = true;
+        // Only the label depends on this call; the link works without it, so a failure leaves the generic wording.
+        api.show(id).then((other) => { if (active) setFetched(other.number); }).catch(() => undefined);
+        return () => { active = false; };
+    }, [api, id, number]);
+    return <p className="ems-hint ems-request-link">{lead} <button type="button" className="ems-link" onClick={() => goDetail(id)}>{number || fetched || 'the other form'}</button></p>;
 }
 
 function problemText(error: unknown, fallback: string) {
@@ -25,8 +38,9 @@ function problemText(error: unknown, fallback: string) {
 
 // ---------------------------------------------------------------- list
 
-export function MyRequestsList({ api, outbox, goForm, goDetail, goForms, editEntry }: {
+export function MyRequestsList({ api, outbox, goForm, goDetail, goForms, editEntry, onFix }: {
     api: EmsApi; outbox: EmsOutbox; goForm: () => void; goDetail: (id: string) => void; goForms: () => void; editEntry: (entry: EmsOutboxEntry) => void;
+    onFix: (id: string) => void;
 }) {
     const [requests, setRequests] = useState<EmsRequestSummary[] | null>(null);
     const [page, setPage] = useState(1);
@@ -69,10 +83,12 @@ export function MyRequestsList({ api, outbox, goForm, goDetail, goForms, editEnt
             <p>When you send a Medical Inventory Request it shows up here with its status.</p>
         </div>}
         {requests !== null && requests.length > 0 && <ul className="ems-request-list">
-            {requests.map((request) => <li key={request.id}>
-                <button type="button" className="ems-request-row" onClick={() => goDetail(request.id)} aria-label={`${request.number}, ${statusLabel(request.status)}, ${request.target_label}. Open request`}>
+            {requests.map((request) => {
+                const attention = needsCorrection(request);
+                return <li key={request.id} className={attention ? 'ems-request-item is-attention' : 'ems-request-item'}>
+                <button type="button" className="ems-request-row" onClick={() => goDetail(request.id)} aria-label={`${request.number}, ${statusLabel(request.status, request.status_label)}, ${request.target_label}.${attention ? ' Needs your correction.' : ''} Open request`}>
                     <span className="ems-request-main">
-                        <span className="ems-request-top"><strong className="ems-request-number">{request.number}</strong><StatusTag status={request.status} /></span>
+                        <span className="ems-request-top"><strong className="ems-request-number">{request.number}</strong><StatusTag status={request.status} label={request.status_label} /></span>
                         <span className="ems-request-unit">{request.target_label}{request.event_assignment ? `, ${request.event_assignment}` : ''}</span>
                         <span className="ems-request-meta">
                             {formatEastern(request.submitted_at)}
@@ -82,7 +98,12 @@ export function MyRequestsList({ api, outbox, goForm, goDetail, goForms, editEnt
                     </span>
                     <ChevronRight size={18} aria-hidden="true" />
                 </button>
-            </li>)}
+                {attention && <div className="ems-attention-strip">
+                    <p className="ems-attention-text"><strong>Needs your correction.</strong> {returnReason(request) ? `Captain 5 said: ${returnReason(request)}` : 'Captain 5 sent this back.'}</p>
+                    <Button appearance="primary" onClick={() => onFix(request.id)}>Fix and resend</Button>
+                </div>}
+            </li>;
+            })}
         </ul>}
         {page < lastPage && <div className="ems-more"><Button disabled={loading} onClick={() => void load(page + 1)}>{loading ? 'Loading' : 'Show older requests'}</Button></div>}
     </div>;
@@ -111,9 +132,9 @@ function LineRow({ line }: { line: EmsRequestLine }) {
     </li>;
 }
 
-export function RequestDetail({ api, id, goMine, goForm, goForms, goDetail, openPdf, outbox, editEntry }: {
+export function RequestDetail({ api, id, goMine, goForm, goForms, goDetail, openPdf, outbox, editEntry, onFix }: {
     api: EmsApi; id: string; goMine: () => void; goForm: () => void; goForms: () => void; goDetail: (id: string) => void;
-    openPdf: (url: string, name: string) => void; outbox: EmsOutbox; editEntry: (entry: EmsOutboxEntry) => void;
+    openPdf: (url: string, name: string) => void; outbox: EmsOutbox; editEntry: (entry: EmsOutboxEntry) => void; onFix: (id: string) => void;
 }) {
     const [detail, setDetail] = useState<EmsRequestDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -189,21 +210,35 @@ export function RequestDetail({ api, id, goMine, goForm, goForms, goDetail, open
 
     const copy = detail.files_copy;
     const cancelled = detail.status === 'cancelled';
+    const fixable = needsCorrection(detail);
+    const reason = returnReason(detail);
+    const returned = returnInfo(detail);
     return <div className="ems-app">
         {back}
         <PendingRequests outbox={outbox} openRequest={goDetail} editEntry={editEntry} />
         {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
         <header className="ems-head">
             <p className="of-eyebrow">Medical Inventory Request</p>
-            <h1 className="ems-detail-title">{detail.number} <StatusTag status={detail.status} /></h1>
+            <h1 className="ems-detail-title">{detail.number} <StatusTag status={detail.status} label={detail.status_label} /></h1>
             <dl className="ems-review-facts">
                 <div><dt>For</dt><dd>{detail.target_label}{detail.event_assignment ? `, ${detail.event_assignment}` : ''}</dd></div>
                 <div><dt>Sent</dt><dd>{formatEastern(detail.submitted_at)}</dd></div>
                 <div><dt>Items</dt><dd>{itemsLabel(detail.lines.length)}</dd></div>
             </dl>
+            {detail.revision_of && <RequestLink api={api} id={detail.revision_of} number={detail.revision_of_number} lead="Corrects" goDetail={goDetail} />}
+            {detail.replaced_by && <RequestLink api={api} id={detail.replaced_by} number={detail.replaced_by_number} lead="Replaced by" goDetail={goDetail} />}
+            {detail.status === 'returned' && !fixable && <p className="ems-hint">Captain 5 sent this back{reason ? `: ${reason}` : '.'}</p>}
             {cancelled && <p className="ems-hint">This request was cancelled{detail.cancel_reason ? `: ${detail.cancel_reason}` : '.'}</p>}
             {detail.status === 'closed' && detail.close_reason && <p className="ems-hint">Closed: {detail.close_reason}</p>}
         </header>
+
+        {fixable && <section className="ems-card ems-attention" aria-labelledby="ems-fix-title">
+            <h2 id="ems-fix-title"><AlertTriangle size={19} aria-hidden="true" /> Needs your correction</h2>
+            <p className="ems-attention-by">Returned{returned.by ? ` by ${returned.by}` : ' by Captain 5'}{returned.at ? ` on ${formatEastern(returned.at)}` : ''}.</p>
+            <p className="ems-return-reason"><span>Captain 5 said:</span> {reason || 'No reason was given.'}</p>
+            <p className="ems-hint">Your fix starts from what you sent. When you send it, it replaces this form.</p>
+            <div><Button appearance="primary" size="large" onClick={() => onFix(detail.id)}>Fix and resend</Button></div>
+        </section>}
 
         <section className="ems-card" aria-labelledby="ems-copy-title">
             <h2 id="ems-copy-title">PDF copy</h2>

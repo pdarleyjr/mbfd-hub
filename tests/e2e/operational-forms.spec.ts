@@ -51,10 +51,11 @@ test('entitled home exposes the exact unified Quick Access destinations', async 
   const cards = page.locator('[data-quick-access-card]');
   await expect(cards).toHaveText([
     /Station \/ Vehicles \/ Equipment/,
-    ...(rosterPublishing ? [/Daily Roster/] : []),
+    /Message Support Services/,
     /Employee Portal/,
     /Additional Links/,
   ]);
+  await expect(page.locator('[data-home-daily-roster]')).toHaveCount(rosterPublishing ? 1 : 0);
   await expect(page.getByRole('link', { name: /ICS Forms/i })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Take Home Vehicle Inspection/i })).toHaveCount(0);
   const additional = page.locator('[data-additional-links]');

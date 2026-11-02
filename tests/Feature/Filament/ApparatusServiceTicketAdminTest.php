@@ -95,6 +95,20 @@ class ApparatusServiceTicketAdminTest extends TestCase
         $this->assertCount(1, $ticket->updates);
     }
 
+    public function test_a_unit_without_a_designation_does_not_take_down_the_ticket_list(): void
+    {
+        Apparatus::query()->create([
+            'station_id' => $this->apparatus->station_id,
+            'unit_id' => 'R44',
+            'name' => 'Rescue 44',
+            'type' => 'Rescue',
+            'slug' => 'rescue-44',
+            'status' => 'In Service',
+        ]);
+
+        $this->get(ApparatusServiceTicketResource::getUrl('index'))->assertOk()->assertSee('R44');
+    }
+
     public function test_fleet_table_filters_search_and_view_transition_are_operational(): void
     {
         $ticket = $this->ticket('submitted', 'Pump primer inspection', 'urgent');
