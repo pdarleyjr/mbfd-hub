@@ -7,6 +7,7 @@ import {
 } from './logic';
 import { FIELD, HINT, LABEL, LiveNote, useEmsLoad } from './shared';
 import type { EmsMeta, StatisticsReport } from './types';
+import './unit-statistics.css';
 
 const KINDS = [
   { id: '', label: 'All kinds' },
@@ -29,13 +30,18 @@ const TH = 'px-3 py-2 text-left text-[13px] font-semibold text-hub-n-600';
 const TD = 'px-3 py-2 text-sm text-hub-ink';
 const NUM = `${TD} text-right tabular-nums`;
 
+/** One cell. `label` is the column heading, shown beside the number when the table narrows into cards. */
+function Cell({ label, numeric, children }: { label: string; numeric?: boolean; children: ReactNode }) {
+  return <td role="cell" data-label={label} className={numeric ? NUM : TD}>{children}</td>;
+}
+
 function Table({ caption, head, children }: { caption: string; head: Array<{ label: string; numeric?: boolean }>; children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-hub-control border border-hub-border">
-      <table className="w-full min-w-[22rem] border-collapse">
+    <div className="ems-stat-table-box rounded-hub-control border border-hub-border">
+      <table role="table" className="ems-stat-table w-full border-collapse">
         <caption className="sr-only">{caption}</caption>
-        <thead className="bg-hub-n-25"><tr>{head.map((cell) => <th key={cell.label} scope="col" className={`${TH} ${cell.numeric ? '!text-right' : ''}`}>{cell.label}</th>)}</tr></thead>
-        <tbody className="divide-y divide-hub-border">{children}</tbody>
+        <thead role="rowgroup" className="bg-hub-n-25"><tr role="row">{head.map((cell) => <th key={cell.label} role="columnheader" scope="col" className={`${TH} ${cell.numeric ? '!text-right' : ''}`}>{cell.label}</th>)}</tr></thead>
+        <tbody role="rowgroup" className="divide-y divide-hub-border">{children}</tbody>
       </table>
     </div>
   );
@@ -70,20 +76,20 @@ function Report({ report }: { report: StatisticsReport }) {
       <Section title="Most common items" definition={d.top_requested_items} testId="ems-stats-top">
         {report.top_requested_items.length === 0 ? <p className={HINT}>No items were requested in this range.</p> : (
           <Table caption="Most requested items" head={[{ label: 'Item' }, { label: 'Requested', numeric: true }, { label: 'Issued', numeric: true }, { label: 'Requests', numeric: true }]}>
-            {report.top_requested_items.map((item) => <tr key={`${item.bag_key}|${item.item_key}`}><td className={TD}>{item.label}</td><td className={NUM}>{item.qty_requested}</td><td className={NUM}>{item.qty_issued}</td><td className={NUM}>{item.requests}</td></tr>)}
+            {report.top_requested_items.map((item) => <tr role="row" key={`${item.bag_key}|${item.item_key}`}><Cell label="Item">{item.label}</Cell><Cell label="Requested" numeric>{item.qty_requested}</Cell><Cell label="Issued" numeric>{item.qty_issued}</Cell><Cell label="Requests" numeric>{item.requests}</Cell></tr>)}
           </Table>
         )}
       </Section>
 
       <Section title="Month by month" definition={d.monthly_trend} testId="ems-stats-monthly">
         <Table caption="Requests by month" head={[{ label: 'Month' }, { label: 'Requests', numeric: true }, { label: 'Requested', numeric: true }, { label: 'Issued', numeric: true }]}>
-          {report.monthly_trend.map((month) => <tr key={month.month}><td className={TD}>{monthLabel(month.month)}</td><td className={NUM}>{month.requests}</td><td className={NUM}>{month.qty_requested}</td><td className={NUM}>{month.qty_issued}</td></tr>)}
+          {report.monthly_trend.map((month) => <tr role="row" key={month.month}><Cell label="Month">{monthLabel(month.month)}</Cell><Cell label="Requests" numeric>{month.requests}</Cell><Cell label="Requested" numeric>{month.qty_requested}</Cell><Cell label="Issued" numeric>{month.qty_issued}</Cell></tr>)}
         </Table>
       </Section>
 
       <Section title="By unit" definition={d.by_unit} testId="ems-stats-units">
         <Table caption="Requests by unit" head={[{ label: 'Unit' }, { label: 'Requests', numeric: true }, { label: 'Requested', numeric: true }, { label: 'Issued', numeric: true }]}>
-          {report.by_unit.map((unit) => <tr key={`${unit.apparatus_id ?? 'detail'}-${unit.label}`}><td className={TD}>{unit.label}</td><td className={NUM}>{unit.requests}</td><td className={NUM}>{unit.qty_requested}</td><td className={NUM}>{unit.qty_issued}</td></tr>)}
+          {report.by_unit.map((unit) => <tr role="row" key={`${unit.apparatus_id ?? 'detail'}-${unit.label}`}><Cell label="Unit">{unit.label}</Cell><Cell label="Requests" numeric>{unit.requests}</Cell><Cell label="Requested" numeric>{unit.qty_requested}</Cell><Cell label="Issued" numeric>{unit.qty_issued}</Cell></tr>)}
         </Table>
       </Section>
 
@@ -94,7 +100,7 @@ function Report({ report }: { report: StatisticsReport }) {
         </p>
         {report.detail_special_event.events.length > 0 && (
           <Table caption="Detail and special events" head={[{ label: 'Event or assignment' }, { label: 'Requests', numeric: true }]}>
-            {report.detail_special_event.events.map((event) => <tr key={event.event_assignment}><td className={TD}>{event.event_assignment}</td><td className={NUM}>{event.requests}</td></tr>)}
+            {report.detail_special_event.events.map((event) => <tr role="row" key={event.event_assignment}><Cell label="Event or assignment">{event.event_assignment}</Cell><Cell label="Requests" numeric>{event.requests}</Cell></tr>)}
           </Table>
         )}
       </Section>

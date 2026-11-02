@@ -145,6 +145,51 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   await page.screenshot({ path: testInfo.outputPath(`operational-forms-ics-editor-${testInfo.project.name}.png`), fullPage: true });
 });
 
+// Its own test, so a width problem is reported on its own and not behind the phone command bar checks above.
+test('record and entry tables turn into cards when narrow and never scroll sideways', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'The test resizes through every supported width itself.');
+  await page.goto('/employee/forms');
+  await page.getByLabel('Employee ID').fill(employeeId);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page.getByRole('heading', { name: 'Operational Forms' })).toBeVisible({ timeout: 60_000 });
+  await page.locator('.of-form-card').filter({ hasText: 'ICS 214' }).getByRole('button', { name: 'Create form' }).click();
+  await expect(page.getByText('Incident and operational period')).toBeVisible();
+
+  // The entry table lives in a later section of the editor: step through the sections until it shows.
+  const sections = page.locator('.of-context-nav button');
+  for (let index = 0; index < await sections.count() && await page.locator('.of-edit-table').count() === 0; index += 1) {
+    await sections.nth(index).click();
+  }
+  await expect(page.locator('.of-edit-table').first()).toBeVisible();
+  await expectTablesFitAtEveryWidth(page, '.of-edit-table');
+
+  await page.goto('/employee/forms');
+  await expect(page.locator('.of-record-table')).toBeVisible({ timeout: 60_000 });
+  await expectTablesFitAtEveryWidth(page, '.of-record-table');
+});
+
+/** Resizes through the supported widths and checks that the document and each table wrapper hold their content without scrolling. */
+async function expectTablesFitAtEveryWidth(page: import('@playwright/test').Page, table: string) {
+  for (const width of [320, 390, 768, 820, 900, 1024, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.waitForTimeout(250);
+    const fit = await page.evaluate((selector) => ({
+      document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      tables: [...document.querySelectorAll(selector)].map((element) => {
+        const wrap = element.closest('.of-table-wrap')!;
+        return { scrolls: wrap.scrollWidth - wrap.clientWidth, past: element.getBoundingClientRect().right - wrap.getBoundingClientRect().right };
+      }),
+    }), table);
+    expect(fit.tables.length, `${table} present at ${width}px`).toBeGreaterThan(0);
+    expect(fit.document, `${table} document overflow at ${width}px`).toBeLessThanOrEqual(1);
+    for (const measured of fit.tables) {
+      expect(measured.scrolls, `${table} wrapper scrolls at ${width}px`).toBeLessThanOrEqual(1);
+      expect(measured.past, `${table} runs past its wrapper at ${width}px`).toBeLessThanOrEqual(1);
+    }
+  }
+}
+
 test('employee dashboard header returns members to the main MBFD Hub', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'One touch-device header acceptance is sufficient.');
 

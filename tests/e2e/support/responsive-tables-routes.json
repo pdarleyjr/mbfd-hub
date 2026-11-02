@@ -1,5 +1,5 @@
 [
-  { "path": "/admin/master-personnel-directory", "label": "Master Personnel Directory", "table": true, "filament": true, "deep": true, "dialog": "Details" },
+  { "path": "/admin/master-personnel-directory", "label": "Master Personnel Directory", "table": true, "filament": true, "deep": true, "dialog": "Details", "menus": true },
   { "path": "/admin/unit-master-vehicles", "label": "Master Vehicle Inventory", "table": true, "filament": true, "deep": true },
   { "path": "/admin/apparatuses", "label": "Fire Apparatus", "table": true, "filament": true, "deep": true },
   { "path": "/admin/employees", "label": "Employees", "table": true, "filament": true },
@@ -9,5 +9,13 @@
   { "path": "/admin/inventory-items", "label": "Inventory items", "table": true, "filament": true },
   { "path": "/admin/take-home-vehicle-inspections", "label": "Take-home vehicle inspections", "table": true, "filament": true },
   { "path": "/admin/roster-imports", "label": "Roster imports", "table": true, "filament": true },
-  { "path": "/admin/todos", "label": "Todos (layout list)", "filament": true }
+  { "path": "/admin/capital-projects", "label": "Capital projects (long names)", "table": true, "filament": true },
+  { "path": "/admin/department-updates", "label": "Department updates (long titles and links)", "table": true, "filament": true },
+  { "path": "/admin/hub-support-tickets", "label": "Hub support tickets (long descriptions)", "table": true, "filament": true },
+  { "path": "/admin/apparatus-service-tickets", "label": "Apparatus service tickets (tabs, long titles)", "table": true, "filament": true },
+  { "path": "/admin/todos", "label": "Todos (layout list)", "filament": true },
+  { "path": "/workgroups/final-presentation", "label": "Workgroups shell bar (account control)", "filament": true, "menus": true },
+  { "path": "/workgroups/data-dashboard", "label": "Workgroups data dashboard", "table": true, "filament": true },
+  { "path": "/training/training-rosters", "label": "Training rosters", "table": true, "filament": true, "menus": true },
+  { "path": "/employee/training-history", "label": "Employee training history", "table": true, "filament": true, "menus": true }
 ]

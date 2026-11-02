@@ -85,3 +85,18 @@ export function priorityOf(explicit, position) {
   const parsed = Number.parseInt(explicit ?? '', 10);
   return Number.isFinite(parsed) ? parsed : position;
 }
+
+/**
+ * Whether the plan made for a table can be used again after the page re-rendered it (a Livewire morph,
+ * a poll, filter-as-you-type). It can when the width the table may use, the screen width and the column
+ * set (headings, priorities, minimum widths) are all unchanged: only rows still need their attributes.
+ *
+ * @param {{ available: number, viewport: number, signature: string } | undefined} previous
+ * @param {{ available: number, viewport: number, signature: string }} next
+ */
+export function canReusePlan(previous, next) {
+  return Boolean(previous)
+    && previous.available === next.available
+    && previous.viewport === next.viewport
+    && previous.signature === next.signature;
+}

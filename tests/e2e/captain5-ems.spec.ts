@@ -739,6 +739,37 @@ test.describe('unit statistics', () => {
     await expect.poll(() => server.reads.filter((entry) => entry.path === '/statistics').pop()?.search ?? '').toMatch(/apparatus_id=2.*target_kind=rescue_unit|target_kind=rescue_unit.*apparatus_id=2/);
   });
 
+  test('statistics tables never scroll sideways: tables when there is room, labelled cards when narrow', async ({ page }) => {
+    await open(page, newServer(), '/daily/captain-5?tab=rescue&view=stats');
+    await expect(page.getByTestId('ems-stats-monthly')).toContainText('Sep 2026');
+    for (const width of [320, 390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.waitForTimeout(250);
+      const fit = await page.evaluate(() => ({
+        document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        tables: [...document.querySelectorAll('.ems-stat-table')].map((table) => {
+          const box = table.closest('.ems-stat-table-box')!;
+          const cell = table.querySelector('tbody td:not(:first-child)');
+          return {
+            scrolls: box.scrollWidth - box.clientWidth,
+            past: table.getBoundingClientRect().right - box.getBoundingClientRect().right,
+            cards: getComputedStyle(table.tBodies[0]).display === 'block',
+            label: cell ? getComputedStyle(cell, '::before').content : '',
+          };
+        }),
+      }));
+      expect(fit.tables.length, `statistics tables at ${width}px`).toBeGreaterThan(0);
+      expect(fit.document, `document overflow at ${width}px`).toBeLessThanOrEqual(1);
+      for (const table of fit.tables) {
+        expect(table.scrolls, `table box scrolls at ${width}px`).toBeLessThanOrEqual(1);
+        expect(table.past, `table runs past its box at ${width}px`).toBeLessThanOrEqual(1);
+        // Phones get cards whose numbers carry their column heading; laptops keep the real table.
+        expect(table.cards, `cards at ${width}px`).toBe(width <= 390);
+        if (width <= 390) expect(table.label, `column heading shown beside the number at ${width}px`).toMatch(/"\w/);
+      }
+    }
+  });
+
   test('an empty range explains why', async ({ page }) => {
     await open(page, newServer({ statsCounted: 0 }), '/daily/captain-5?tab=rescue&view=stats');
     await expect(page.getByText('No requests in this range')).toBeVisible();
