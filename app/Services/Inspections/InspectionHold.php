@@ -19,6 +19,13 @@ final class InspectionHold
 
     public const REASON_ROLLBACK = 'rollback';
 
+    /**
+     * A meter rose more than physically possible since the previous accepted reading of the same
+     * truck (docs/daily-inspection-continuity.md section 2.2). Like a rollback, the reading does not
+     * become the truck's meter until a reviewer accepts it.
+     */
+    public const REASON_IMPLAUSIBLE_INCREASE = 'implausible_increase';
+
     public const REASON_MEMBER_FLAGGED = 'member_flagged';
 
     public const REASON_SIGNIFICANT_DAMAGE = 'new_significant_damage';
@@ -40,5 +47,19 @@ final class InspectionHold
     public static function isMeter(ApparatusInspectionException $exception): bool
     {
         return in_array($exception->field, self::METER_FIELDS, true);
+    }
+
+    /** Plain label for a meter hold, or null when the reason is not a meter reason. */
+    public static function meterReasonLabel(string $field, string $reason): ?string
+    {
+        $hours = $field === 'engine_hours';
+
+        return match ($reason) {
+            self::REASON_ROLLBACK => $hours ? 'Engine hours lower than last reading' : 'Mileage lower than last reading',
+            self::REASON_IMPLAUSIBLE_INCREASE => $hours
+                ? 'Engine hours rose more than time allows since the last reading'
+                : 'Mileage rose more than a truck can drive since the last reading',
+            default => null,
+        };
     }
 }

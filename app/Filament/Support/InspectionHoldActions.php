@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 
 /**
- * The four reviewer decisions on a meter rollback hold. Each one is a call to
+ * The four reviewer decisions on a meter hold (a rollback or an implausible increase). Each one is a call to
  * ApparatusInspectionExceptionService::reconcile with the inspection page id (so a
  * forged exception id from another inspection is "not found") and the authoritative
  * meter value the reviewer was looking at when the modal opened. If the fleet value
@@ -62,16 +62,21 @@ final class InspectionHoldActions
             ->label(self::LABELS[self::ACCEPT])
             ->icon('heroicon-o-check-circle')
             ->modalHeading('Accept the reported reading')
-            ->modalDescription('The vehicle meter becomes the value the member reported. Because that is lower than the current reading, it lowers the baseline every later inspection is compared with. The decision is recorded in the review history.')
-            ->modalSubmitActionLabel('Accept and lower the meter')
+            ->modalDescription(fn (Action $action): string => self::lowersMeter($action, $holdOf)
+                ? 'The vehicle meter becomes the value the member reported. Because that is lower than the current reading, it lowers the baseline every later inspection is compared with. The decision is recorded in the review history.'
+                : 'The vehicle meter becomes the value the member reported. It rose more than the time since the last reading allows, so check it against the vehicle first. The decision is recorded in the review history.')
+            ->modalSubmitActionLabel(fn (Action $action): string => self::lowersMeter($action, $holdOf) ? 'Accept and lower the meter' : 'Accept and raise the meter')
             ->mountUsing(fn (Forms\ComponentContainer $form, Action $action) => $form->fill(self::startingState($action, $holdOf)))
-            ->form([
+            ->form(fn (Action $action): array => [
                 Forms\Components\Hidden::make('expected_current_value'),
-                Forms\Components\Toggle::make('confirm_meter_reset')
-                    ->label('I confirm the vehicle meter was reset or replaced')
-                    ->helperText('Required. Without it the reading is not accepted.')
-                    ->accepted()
-                    ->validationMessages(['accepted' => 'Confirm the meter was reset or replaced to accept a lower reading.']),
+                // Only lowering the meter needs the reset confirmation; a held increase raises it.
+                ...(self::lowersMeter($action, $holdOf) ? [
+                    Forms\Components\Toggle::make('confirm_meter_reset')
+                        ->label('I confirm the vehicle meter was reset or replaced')
+                        ->helperText('Required. Without it the reading is not accepted.')
+                        ->accepted()
+                        ->validationMessages(['accepted' => 'Confirm the meter was reset or replaced to accept a lower reading.']),
+                ] : []),
                 self::reason('Why is the reported reading correct?'),
             ])
             ->action(fn (array $data, Action $action) => self::run($action, $holdOf, $inspectionId, [...$data, 'action' => 'accept_submitted'], 'Reading accepted'));
@@ -173,6 +178,23 @@ final class InspectionHoldActions
                     && $user instanceof User
                     && InspectionReviewers::canReview($user);
             });
+    }
+
+    /**
+     * True when accepting the reported value would lower the vehicle's current meter (a rollback hold).
+     * A held increase raises it. The service enforces the reset confirmation either way.
+     *
+     * @param  Closure(Action): ?ApparatusInspectionException  $holdOf
+     */
+    private static function lowersMeter(Action $action, Closure $holdOf): bool
+    {
+        $hold = $holdOf($action);
+        if (! $hold instanceof ApparatusInspectionException || $hold->submitted_value === null) {
+            return true;
+        }
+        $current = Apparatus::query()->find($hold->apparatus_id)?->getAttribute($hold->field === 'miles' ? 'current_miles' : 'current_engine_hours');
+
+        return $current === null ? false : (float) $hold->submitted_value < (float) $current;
     }
 
     private static function reason(string $helper, string $label = 'Reason for the decision'): Forms\Components\Textarea

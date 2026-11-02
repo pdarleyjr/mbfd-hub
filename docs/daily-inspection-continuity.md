@@ -50,6 +50,7 @@ New column `blocks_acceptance boolean not null default false`. A hold is an exce
 | field | reason | created when |
 |---|---|---|
 | `miles` / `engine_hours` | `rollback` | submitted < reference reading (see 2.2) |
+| `miles` / `engine_hours` | `implausible_increase` | submitted rose more than physically possible since the truck's previous accepted reading (see 2.2, rule 2a) |
 | `member_review_flag` | `member_flagged` | payload `review_flag` present; metadata `{explanation, items:[{compartment_id,item_id,compartment,item}]}` |
 | `significant_damage` | `new_significant_damage` | at least one item reported `Damaged` with `significant=true` that is a NEW defect or an escalation of an existing non-significant defect; metadata `{defect_ids:[...]}` |
 
@@ -59,7 +60,8 @@ Routine Missing/Damaged equipment and previously reported unresolved issues neve
 After processing: if any open blocking hold exists -> `pending_review`/`held_for_review`, else `approved`/`accepted`.
 Defects, observations and participants are ALWAYS recorded at submission time, even when held
 (they are facts; holding the inspection must not hide them from the next inspector).
-Non-rollback meters are applied at submission; a held rollback meter is never applied until decided.
+Unheld meters are applied at submission; a held meter (`rollback` or `implausible_increase`) is never applied
+until a reviewer accepts it.
 
 Release: `InspectionReviewService::releaseIfClear(ApparatusInspection $locked)` flips to
 `approved`/`accepted` and appends a review event (`status=accepted`, `metadata.released_by`)
@@ -72,7 +74,18 @@ Per meter (`miles` -> `current_miles`, `engine_hours` -> `current_engine_hours`)
 `authoritative` = locked apparatus value.
 
 1. authoritative null -> accept and set (first reading). No exception.
-2. submitted >= authoritative -> accept; set authoritative if greater. No exception (no maximum-increase rule).
+2. submitted >= authoritative -> accept; set authoritative if greater. No exception, except 2a.
+   2a. Physically impossible increase (added 2026-11-02). `previous` = latest accepted inspection of the same
+   physical truck with a reading for this field; `elapsed` = hours from its `completed_at` to this inspection's
+   `completed_at`. Hold when `engine_hours` rose by more than `elapsed + 24`, or `miles` rose by more than
+   `1500 x max(1, elapsed / 24)`. No previous accepted reading -> never held. The hold is a blocking
+   `implausible_increase` exception (`submitted_value`, `baseline_value`, `authoritative_value`, metadata
+   `{previous_inspection_id, previous_reading_at, previous_value, elapsed_hours, increase, allowed_increase}`) and the
+   truck keeps its meter, exactly like a rollback hold.
+   Why: on 2026-10-30 a Rescue 22 checkout carried Rescue 2's readings (103,179 mi / 16,518 h, +44,228 mi and
+   +8,155 h three days after 58,951 / 8,363). It became the meter and every correct reading after it was held as a
+   rollback. This is NOT the removed 500 mi / 36 h `implausible_increase` rule (section 1), which fired on ordinary
+   use: a day of 600 mi or 40 h is accepted; only what no truck can do is held.
 3. submitted < authoritative AND initial !== null AND submitted >= initial -> the fleet reading advanced after the
    form loaded (concurrent or late offline submission). Accept inspection, do NOT change authoritative,
    record `metadata.meter_outcomes[field]='superseded'` on the processing review event. No exception.
@@ -87,9 +100,13 @@ request rules (`miles` integer 0..2147483647, `engine_hours` 0..9999999.9 one de
 
 ### 2.3 Hold decisions
 
-- Meter rollback: existing `ApparatusInspectionExceptionService::reconcile` actions.
+- Meter hold (`rollback` or `implausible_increase`): existing `ApparatusInspectionExceptionService::reconcile` actions.
   `accept_submitted` (lower value) now requires `confirm_meter_reset=true` and records
-  `metadata.meter_reset=true` (explicit, audited baseline decrease; never silent).
+  `metadata.meter_reset=true` (explicit, audited baseline decrease; never silent). Accepting an
+  `implausible_increase` applies the higher submitted value (no reset confirmation; the reviewer modal only shows the
+  reset toggle when the value would lower the meter); `dismiss` keeps the truck's meter.
+  Labels: "Engine hours rose more than time allows since the last reading" /
+  "Mileage rose more than a truck can drive since the last reading" (`InspectionHold::meterReasonLabel`).
   `correct` (verified value), `request_revision` (asks the member; hold stays open; member-visible message posted),
   `dismiss` (keep authoritative, reject questionable value; reason required). Afterwards call `releaseIfClear`.
 - Member flag / significant damage: `InspectionReviewService::approve()` resolves them (status `resolved`,
@@ -335,6 +352,15 @@ repair_scheduled); Recently completed inspections (informational). Counts are di
   Help text verbatim from the directive.
 - Previously reported items summarized on Review & Sign.
 - Offline: additive optional fields inside the existing queued payload; no queue schema bump; server treats all new fields optional.
+- Shared station devices (2026-11-02, Dexie version 7): the saved-checkout queue is per member. The unique index is
+  `[apparatusId+checklistVersion+ownerUserId]` (version 6 had `[apparatusId+checklistVersion]`, which let one
+  member's unsent or rejected checkout block every other member for that truck). Only the signed-in member's own
+  unresolved record blocks a duplicate; another member's record shows a notice above the form ("A checkout for R 22
+  saved on this device by NAME at TIME has not been sent yet. It will send when NAME signs in on this device.").
+  Replay skips other members' records and leaves them untouched (it no longer moves them to `identity_mismatch`);
+  a record an earlier release moved there returns to pending when its owner signs in with the same security
+  version. The upgrade keeps every record as it is; records without an owner (legacy) are not in the owner index,
+  so they never collide. The owner's own rejected record can be discarded from the blocking screen.
 
 ### 5.4 Employee portal (D)
 `MyVehicleInspectionView`: acceptance status with reason (Needs approval / Accepted / Rejected + member-visible reason);
