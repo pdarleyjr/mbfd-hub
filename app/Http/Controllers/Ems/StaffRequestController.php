@@ -12,6 +12,7 @@ use App\Services\Ems\EmsAccess;
 use App\Services\Ems\EmsException;
 use App\Services\Ems\EmsUnitDirectory;
 use App\Services\Ems\EmsValidator;
+use App\Services\Ems\FormFamilies;
 use App\Services\Ems\RequestMessageService;
 use App\Services\Ems\RequestPresenter;
 use App\Services\Ems\RequestWorkflowService;
@@ -40,6 +41,10 @@ final class StaffRequestController extends Controller
             'inventory' => ['read' => $this->access->canReadInventory($this->user($request)), 'edit' => $this->access->canEditInventory($this->user($request))],
             'statuses' => InventoryRequest::STATUSES,
             'target_kinds' => InventoryRequest::TARGET_KINDS,
+            'families' => array_map(
+                static fn (array $family): array => ['key' => $family['key'], 'title' => $family['title'], 'short_title' => $family['short_title']],
+                FormFamilies::all(),
+            ),
             'units' => $this->units->options(),
             'close_reasons' => RequestWorkflowService::CLOSE_REASONS,
         ]));
@@ -53,13 +58,14 @@ final class StaffRequestController extends Controller
                 'state' => ['nullable', 'in:active,archived'],
                 'unit' => ['nullable', 'regex:/^(detail|\d{1,9})$/'],
                 'target_kind' => ['nullable', 'in:'.implode(',', InventoryRequest::TARGET_KINDS)],
+                'family' => ['nullable', 'in:'.implode(',', FormFamilies::keys())],
                 'date_from' => ['nullable', 'date_format:Y-m-d'],
                 'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
                 'q' => ['nullable', 'string', 'max:100'],
                 'page' => ['nullable', 'integer', 'min:1', 'max:100000'],
                 'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             ], [
-                'unit.regex' => 'Choose a unit from the list.', 'date_from.date_format' => 'Enter the start date as year-month-day.',
+                'unit.regex' => 'Choose a unit from the list.', 'family.in' => 'Choose one of the medical inventory forms from the list.', 'date_from.date_format' => 'Enter the start date as year-month-day.',
                 'date_to.date_format' => 'Enter the end date as year-month-day.', 'date_to.after_or_equal' => 'The end date cannot be before the start date.',
                 'q.max' => 'Search text can be at most 100 characters.', 'q.string' => 'Search text must be plain text.',
             ]);
@@ -79,6 +85,12 @@ final class StaffRequestController extends Controller
             }
             if (! empty($f['target_kind'])) {
                 $query->where('target_kind', $f['target_kind']);
+            }
+            if (! empty($f['family'])) {
+                // A request with no family (written before the four forms) is ALS Transport.
+                $f['family'] === FormFamilies::DEFAULT
+                    ? $query->where(fn ($w) => $w->where('form_family', FormFamilies::DEFAULT)->orWhereNull('form_family'))
+                    : $query->where('form_family', $f['family']);
             }
             if (! empty($f['date_from'])) {
                 $query->where('submitted_at', '>=', CarbonImmutable::parse($f['date_from'], \App\Support\HubTimezone::NAME)->startOfDay()->utc());

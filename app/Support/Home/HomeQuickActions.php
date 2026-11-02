@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Home;
 
 use App\Models\User;
+use App\Services\Ems\FormFamilies;
 use App\Services\Narcotics\NarcoticsCheckAccess;
 use App\Services\Security\Command300Access;
 use App\Support\Ems\EmsLinks;
@@ -24,7 +25,8 @@ final class HomeQuickActions
     /**
      * The Rescue Forms this member may open, in display order.
      *
-     * - Medical Inventory Forms and Vehicle Inspection: the Employee Portal audience (a linked personnel profile),
+     * - The four medical inventory forms (FormFamilies, in that order, each keyed by its deep-link key) and Vehicle Inspection:
+     *   the Employee Portal audience (a linked personnel profile),
      *   which is what the Forms page and the Vehicle Checkout button already require.
      * - Narcotics Check: additionally NarcoticsCheckAccess::canSubmit() (feature switch and usable account),
      *   the same test the Forms page uses before it offers the card.
@@ -37,11 +39,11 @@ final class HomeQuickActions
             return [];
         }
 
-        $links = [[
-            'key' => 'medical-inventory',
-            'label' => 'Medical Inventory Forms',
-            'href' => url(EmsLinks::memberForm()),
-        ]];
+        $links = array_map(static fn (array $family): array => [
+            'key' => $family['form_key'],
+            'label' => $family['title'],
+            'href' => url(EmsLinks::memberForm($family['key'])),
+        ], FormFamilies::all());
 
         if (app(NarcoticsCheckAccess::class)->canSubmit($user)) {
             $links[] = [

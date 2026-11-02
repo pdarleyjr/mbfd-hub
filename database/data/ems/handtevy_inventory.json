@@ -1,0 +1,3269 @@
+{
+  "schema": "mbfd.ems.source_form.v1",
+  "source": {
+    "key": "handtevy",
+    "title": "Handtevy Inventory",
+    "version_label": "undated",
+    "file_name": "handtevy_inventory.pdf",
+    "sha256": "fe5a47d26489b061be52a03dd0609ceeea1836eddd15e7e3ed218c8ad6acd43c",
+    "pages": 1,
+    "columns": [
+      "ITEM",
+      "Amount",
+      "Need"
+    ],
+    "notes": [
+      "Transcribed from the one-page PDF handtevy_inventory.pdf. The sheet prints no title, no date and no revision; the title here is the file's name and version_label is \"undated\", as on the airway bag list.",
+      "Two item blocks sit side by side: the left half is Top Insert, Bottom Bin, < 1 Y/O (Grey / Pink / Red) and 1 year (Purple); the right half is 2 year (Yellow), 3 & 4 years (White), 5 & 6 year (Blue), 7 & 8 year (Orange) and 9 - 13 year (Green). Items are in that reading order. The iGels row is last in the Bottom Bin; the PDF text layer lists it last on the page, the picture shows it above the < 1 Y/O heading.",
+      "The Amount and Need columns are empty on the sheet. The sheet prints one rule at the bottom right (white on black): \"Quantity 1 unless indicated in ( )\". min_text is that printed per-item quantity: the number in ( ) when a size has one, otherwise 1. Nothing else was assumed.",
+      "A row that lists several sizes is split into one item per printed size (variant_group / variant_label). Where the row gives a quantity in ( ) it is that size's quantity, e.g. \"IV Catheter - 18Ga, 20Ga, 22Ga(2 each)\" is 2 of each gauge; \"Needles - 21Ga 1\"(2), 25Ga 1\" (1 each)\" is 2 of 21Ga and 1 of 25Ga; \"ET Tube - 6.5mm, 7.0mm Cuffed(1 each)\" is 1 of each. A multi-size row with no quantity (for example \"Syringes - 1cc, 3cc, 10cc\") is read as 1 of each size.",
+      "The < 1 Y/O block is printed across the Grey, Pink and Red color columns. Its rows are kept as printed under one color_band (\"Grey / Pink / Red (< 1 year)\") and every item in it is flagged for review: the sheet does not say which size goes with which color.",
+      "color_band on the other blocks is the printed color and age group of that block. Top Insert and Bottom Bin print no color name.",
+      "Sizes written with a mm, F, Ga or cc value share a catalog item with the same size on the bag and vehicle lists (for example ET tube 4.5 cuffed, OPA 60mm, NPA 20F, IV catheter 18 gauge, i-gel 2.5). Items with no exact match have their own catalog key."
+    ],
+    "printed_header": "Top Insert | Amount | Need | 2 year (Yellow) | Amount | Need",
+    "review_notes": [
+      "The sheet prints no title, date or revision, so version_label is \"undated\". If a revision date exists elsewhere it should be added.",
+      "< 1 Y/O block: the rows span the Grey, Pink and Red columns and the sheet does not say which size belongs to which color. All 13 items in the block are flagged for review.",
+      "Rows that list several sizes with no quantity (for example \"Syringes - 1cc, 3cc, 10cc\", \"French Catheter- 6F,8F\", \"Blade - 2 Straight & Curved\") are read as 1 of each size. A person should confirm that 1 per size, not 1 per row, is meant."
+    ]
+  },
+  "sections": [
+    {
+      "key": "ht-top-insert",
+      "label": "Top Insert",
+      "source_label": "Top Insert",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 10,
+      "items": [
+        {
+          "item_ref": "ht.top.ace-3in",
+          "catalog_ref": "ace-bandage-3in",
+          "label": "Ace bandage 3\"",
+          "source_label": "Ace 3\"",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 2,
+            "sheet_order": 1
+          }
+        },
+        {
+          "item_ref": "ht.top.kling-3in",
+          "catalog_ref": "kling-3in",
+          "label": "Kling 3\"",
+          "source_label": "Kling 3\"",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 3,
+            "sheet_order": 2
+          }
+        },
+        {
+          "item_ref": "ht.top.bite-stick",
+          "catalog_ref": "bite-stick",
+          "label": "Bite stick",
+          "source_label": "Bite Stick",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 4,
+            "sheet_order": 3
+          }
+        },
+        {
+          "item_ref": "ht.top.laryngoscope-handle",
+          "catalog_ref": "laryngoscope-handle",
+          "label": "Laryngoscope handle",
+          "source_label": "Laryngoscope Handle",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 5,
+            "sheet_order": 4
+          }
+        },
+        {
+          "item_ref": "ht.top.meconium-aspirator-mad-device",
+          "catalog_ref": "meconium-aspirator-mad-device",
+          "label": "Meconium aspirator / MAD device",
+          "source_label": "Meconium Aspirator/ MAD Device",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "meconium aspirator",
+              "MAD device",
+              "mucosal atomizer"
+            ]
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1. The row names two things (a meconium aspirator and a MAD device) with one quantity; kept as one item.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 6,
+            "sheet_order": 5
+          }
+        },
+        {
+          "item_ref": "ht.top.needle-21ga-1in",
+          "catalog_ref": "needle-21ga-1in",
+          "label": "Needle 21Ga 1\"",
+          "source_label": "Needles - 21Ga 1\"(2), 25Ga 1\" (1 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "needles",
+          "variant_label": "21Ga 1\"",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(2)\" after the 21Ga size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 7,
+            "sheet_order": 6
+          }
+        },
+        {
+          "item_ref": "ht.top.needle-25ga-1in",
+          "catalog_ref": "needle-25ga-1in",
+          "label": "Needle 25Ga 1\"",
+          "source_label": "Needles - 21Ga 1\"(2), 25Ga 1\" (1 each)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "needles",
+          "variant_label": "25Ga 1\"",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(1 each)\" after the 25Ga size; read as 1 of the 25Ga size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 7,
+            "sheet_order": 7
+          }
+        },
+        {
+          "item_ref": "ht.top.penlight",
+          "catalog_ref": "pen-light",
+          "label": "Penlight",
+          "source_label": "Penlight",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "pen light"
+            ]
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 8,
+            "sheet_order": 8
+          }
+        },
+        {
+          "item_ref": "ht.top.trauma-shears",
+          "catalog_ref": "trauma-shears",
+          "label": "Trauma shears",
+          "source_label": "Trauma Shears",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 9,
+            "sheet_order": 9
+          }
+        },
+        {
+          "item_ref": "ht.top.syringe-1cc",
+          "catalog_ref": "syringe-1cc",
+          "label": "Syringe 1cc",
+          "source_label": "Syringes- 1cc(2), 3cc(2), 10cc(2)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "1cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(2)\" after 1cc.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 10,
+            "sheet_order": 10
+          }
+        },
+        {
+          "item_ref": "ht.top.syringe-3cc",
+          "catalog_ref": "syringe-3cc",
+          "label": "Syringe 3cc",
+          "source_label": "Syringes- 1cc(2), 3cc(2), 10cc(2)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "3cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(2)\" after 3cc.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 10,
+            "sheet_order": 11
+          }
+        },
+        {
+          "item_ref": "ht.top.syringe-10cc",
+          "catalog_ref": "tv-syringe-10-cc",
+          "label": "Syringe 10cc",
+          "source_label": "Syringes- 1cc(2), 3cc(2), 10cc(2)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "10cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(2)\" after 10cc.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 10,
+            "sheet_order": 12
+          }
+        },
+        {
+          "item_ref": "ht.top.tape-1in",
+          "catalog_ref": "tape-1in",
+          "label": "Tape 1\"",
+          "source_label": "Tape- 1\"(1roll)",
+          "min_text": "1 roll",
+          "min_qty": 1,
+          "min_unit": "roll",
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(1roll)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 11,
+            "sheet_order": 13
+          }
+        },
+        {
+          "item_ref": "ht.top.three-way-stopcock",
+          "catalog_ref": "three-way-stopcock",
+          "label": "Three-way stopcock",
+          "source_label": "Three-way stopcock(2)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(2)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 12,
+            "sheet_order": 14
+          }
+        },
+        {
+          "item_ref": "ht.top.iv-start-kit",
+          "catalog_ref": "iv-start-kit",
+          "label": "IV start kit",
+          "source_label": "IV Start Kit(located in each pouch)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "location_text": "located in each pouch"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 13,
+            "sheet_order": 15
+          }
+        }
+      ]
+    },
+    {
+      "key": "ht-bottom-bin",
+      "label": "Bottom Bin",
+      "source_label": "Bottom Bin",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 20,
+      "items": [
+        {
+          "item_ref": "ht.bottom.arm-board-9in",
+          "catalog_ref": "arm-board-9in",
+          "label": "Arm board 9\"",
+          "source_label": "Arm Board 9\"(1)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(1)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 15,
+            "sheet_order": 16
+          }
+        },
+        {
+          "item_ref": "ht.bottom.bulb-syringe",
+          "catalog_ref": "bulb-syringe",
+          "label": "Bulb syringe",
+          "source_label": "Bulb Syringe(1)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(1)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 16,
+            "sheet_order": 17
+          }
+        },
+        {
+          "item_ref": "ht.bottom.bvm-infant-small-child",
+          "catalog_ref": "bvm-infant-small-child",
+          "label": "Infant / small child size BVM",
+          "source_label": "Infant / Small Child Size BVM (1)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(1)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 17,
+            "sheet_order": 18
+          }
+        },
+        {
+          "item_ref": "ht.bottom.pedi-tube-holder",
+          "catalog_ref": "tube-holder-pedi",
+          "label": "Pedi tube holder",
+          "source_label": "Pedi Tube Holder",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 18,
+            "sheet_order": 19
+          }
+        },
+        {
+          "item_ref": "ht.bottom.bp-cuff-infant-child",
+          "catalog_ref": "bp-cuff-infant-child",
+          "label": "Infant & child BP cuff",
+          "source_label": "Infant & Child BP Cuff",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1. The row names an infant and a child cuff with one quantity; kept as one item.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 19,
+            "sheet_order": 20
+          }
+        },
+        {
+          "item_ref": "ht.bottom.pediatric-capnoline-nasal-cannula",
+          "catalog_ref": "pediatric-capnoline-nasal-cannula",
+          "label": "Pediatric Capnoline / nasal cannula",
+          "source_label": "Pediatric Capnoline/Nasal Cannula(1)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(1)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 20,
+            "sheet_order": 21
+          }
+        },
+        {
+          "item_ref": "ht.bottom.safety-glasses",
+          "catalog_ref": "safety-glasses",
+          "label": "Safety glasses",
+          "source_label": "Safety Glasses(2)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed \"(2)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 21,
+            "sheet_order": 22
+          }
+        },
+        {
+          "item_ref": "ht.bottom.stethoscope",
+          "catalog_ref": "stethoscope",
+          "label": "Stethoscope",
+          "source_label": "Stethoscope",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 22,
+            "sheet_order": 23
+          }
+        },
+        {
+          "item_ref": "ht.bottom.trauma-sleeves",
+          "catalog_ref": "trauma-sleeves",
+          "label": "Trauma sleeves",
+          "source_label": "Trauma Sleevs(3 sets)",
+          "min_text": "3 sets",
+          "min_qty": 3,
+          "min_unit": "sets",
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "trauma sleevs",
+              "sleeves"
+            ]
+          },
+          "notes": "Printed \"(3 sets)\"; spelled \"Sleevs\" on the sheet.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 23,
+            "sheet_order": 24
+          }
+        },
+        {
+          "item_ref": "ht.bottom.igel-1-0",
+          "catalog_ref": "tv-i-gel-size-1-0",
+          "label": "i-gel 1.0",
+          "source_label": "iGels 1.0 / 1.5 / 2.0 / 2.5",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "igel",
+          "variant_label": "1.0",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed on one row (after Trauma Sleevs, inside the Bottom Bin color band) as four sizes; one item per size. No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 24,
+            "sheet_order": 25
+          }
+        },
+        {
+          "item_ref": "ht.bottom.igel-1-5",
+          "catalog_ref": "tv-i-gel-size-1-5",
+          "label": "i-gel 1.5",
+          "source_label": "iGels 1.0 / 1.5 / 2.0 / 2.5",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "igel",
+          "variant_label": "1.5",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed on one row (after Trauma Sleevs, inside the Bottom Bin color band) as four sizes; one item per size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 24,
+            "sheet_order": 26
+          }
+        },
+        {
+          "item_ref": "ht.bottom.igel-2-0",
+          "catalog_ref": "tv-i-gel-size-2-0",
+          "label": "i-gel 2.0",
+          "source_label": "iGels 1.0 / 1.5 / 2.0 / 2.5",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "igel",
+          "variant_label": "2.0",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed on one row (after Trauma Sleevs, inside the Bottom Bin color band) as four sizes; one item per size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 24,
+            "sheet_order": 27
+          }
+        },
+        {
+          "item_ref": "ht.bottom.igel-2-5",
+          "catalog_ref": "tv-i-gel-size-2-5",
+          "label": "i-gel 2.5",
+          "source_label": "iGels 1.0 / 1.5 / 2.0 / 2.5",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "igel",
+          "variant_label": "2.5",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Printed on one row (after Trauma Sleevs, inside the Bottom Bin color band) as four sizes; one item per size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 24,
+            "sheet_order": 28
+          }
+        }
+      ]
+    },
+    {
+      "key": "ht-under-1",
+      "label": "< 1 Y/O (Grey / Pink / Red)",
+      "source_label": "< 1 Y/O Grey Pink Red",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 30,
+      "items": [
+        {
+          "item_ref": "ht.under-1.blade-1-straight",
+          "catalog_ref": "blade-1-straight",
+          "label": "Blade 1 straight",
+          "source_label": "Blade- 1 Straight",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 26,
+            "sheet_order": 29
+          }
+        },
+        {
+          "item_ref": "ht.under-1.et-tube-2-5",
+          "catalog_ref": "et-tube-2-5-cuffed",
+          "label": "ET tube 2.5mm cuffed",
+          "source_label": "ET Tube- 2.5mm Cuffed",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 27,
+            "sheet_order": 30
+          }
+        },
+        {
+          "item_ref": "ht.under-1.et-tube-3-0",
+          "catalog_ref": "et-tube-3-0-cuffed",
+          "label": "ET tube 3.0mm cuffed",
+          "source_label": "ET Tube- 3.0mm Cuffed",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 28,
+            "sheet_order": 31
+          }
+        },
+        {
+          "item_ref": "ht.under-1.et-tube-3-5",
+          "catalog_ref": "et-tube-3-5-cuffed",
+          "label": "ET tube 3.5mm cuffed",
+          "source_label": "ET Tube- 3.5mm Cuffed",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 29,
+            "sheet_order": 32
+          }
+        },
+        {
+          "item_ref": "ht.under-1.iv-catheter-22ga",
+          "catalog_ref": "iv-catheter-22g",
+          "label": "IV catheter 22Ga",
+          "source_label": "IV Catheter- 22Ga(2 each), 24Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "22Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 30,
+            "sheet_order": 33
+          }
+        },
+        {
+          "item_ref": "ht.under-1.iv-catheter-24ga",
+          "catalog_ref": "iv-catheter-24g",
+          "label": "IV catheter 24Ga",
+          "source_label": "IV Catheter- 22Ga(2 each), 24Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "24Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 30,
+            "sheet_order": 34
+          }
+        },
+        {
+          "item_ref": "ht.under-1.opa-50mm",
+          "catalog_ref": "opa-50mm",
+          "label": "OPA 50mm",
+          "source_label": "OPA- 50mm",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 31,
+            "sheet_order": 35
+          }
+        },
+        {
+          "item_ref": "ht.under-1.npa-14f",
+          "catalog_ref": "npa-14",
+          "label": "NPA 14F",
+          "source_label": "NPA- 14F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 32,
+            "sheet_order": 36
+          }
+        },
+        {
+          "item_ref": "ht.under-1.french-catheter-6f",
+          "catalog_ref": "french-catheter-6f",
+          "label": "French catheter 6F",
+          "source_label": "French Catheter- 6F,8F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "french-catheter",
+          "variant_label": "6F",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 33,
+            "sheet_order": 37
+          }
+        },
+        {
+          "item_ref": "ht.under-1.french-catheter-8f",
+          "catalog_ref": "french-catheter-8f",
+          "label": "French catheter 8F",
+          "source_label": "French Catheter- 6F,8F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "french-catheter",
+          "variant_label": "8F",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 33,
+            "sheet_order": 38
+          }
+        },
+        {
+          "item_ref": "ht.under-1.syringe-1cc",
+          "catalog_ref": "syringe-1cc",
+          "label": "Syringe 1cc",
+          "source_label": "Syringes- 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "1cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 34,
+            "sheet_order": 39
+          }
+        },
+        {
+          "item_ref": "ht.under-1.syringe-3cc",
+          "catalog_ref": "syringe-3cc",
+          "label": "Syringe 3cc",
+          "source_label": "Syringes- 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "3cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 34,
+            "sheet_order": 40
+          }
+        },
+        {
+          "item_ref": "ht.under-1.syringe-10cc",
+          "catalog_ref": "tv-syringe-10-cc",
+          "label": "Syringe 10cc",
+          "source_label": "Syringes- 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "10cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Grey / Pink / Red (< 1 year)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": true,
+          "review_reason": "Printed across the Grey, Pink and Red color columns of the < 1 Y/O block; the sheet does not say which size belongs to which color, so the block is kept as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 34,
+            "sheet_order": 41
+          }
+        }
+      ]
+    },
+    {
+      "key": "ht-1-year",
+      "label": "1 year (Purple)",
+      "source_label": "1 year (Purple)",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 40,
+      "items": [
+        {
+          "item_ref": "ht.1-year.blade-1-straight",
+          "catalog_ref": "blade-1-straight",
+          "label": "Blade 1 straight",
+          "source_label": "Blade- 1 Straight",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Purple (1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 36,
+            "sheet_order": 42
+          }
+        },
+        {
+          "item_ref": "ht.1-year.et-tube-4-0",
+          "catalog_ref": "et-tube-4-0-cuffed",
+          "label": "ET tube 4.0mm cuffed",
+          "source_label": "ET Tube- 4.0mm Cuffed",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Purple (1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 37,
+            "sheet_order": 43
+          }
+        },
+        {
+          "item_ref": "ht.1-year.iv-catheter-22ga",
+          "catalog_ref": "iv-catheter-22g",
+          "label": "IV catheter 22Ga",
+          "source_label": "IV Catheter- 22Ga(2 each), 24Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "22Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Purple (1 year)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 38,
+            "sheet_order": 44
+          }
+        },
+        {
+          "item_ref": "ht.1-year.iv-catheter-24ga",
+          "catalog_ref": "iv-catheter-24g",
+          "label": "IV catheter 24Ga",
+          "source_label": "IV Catheter- 22Ga(2 each), 24Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "24Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Purple (1 year)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 38,
+            "sheet_order": 45
+          }
+        },
+        {
+          "item_ref": "ht.1-year.opa-60mm",
+          "catalog_ref": "opa-60mm",
+          "label": "OPA 60mm",
+          "source_label": "OPA - 60mm",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Purple (1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 39,
+            "sheet_order": 46
+          }
+        },
+        {
+          "item_ref": "ht.1-year.npa-18f",
+          "catalog_ref": "npa-18",
+          "label": "NPA 18F",
+          "source_label": "NPA - 18F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Purple (1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 40,
+            "sheet_order": 47
+          }
+        },
+        {
+          "item_ref": "ht.1-year.french-catheter-10f",
+          "catalog_ref": "french-catheter-10f",
+          "label": "French catheter 10F",
+          "source_label": "French Catheter - 10F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Purple (1 year)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 41,
+            "sheet_order": 48
+          }
+        },
+        {
+          "item_ref": "ht.1-year.syringe-1cc",
+          "catalog_ref": "syringe-1cc",
+          "label": "Syringe 1cc",
+          "source_label": "Syringes- 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "1cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Purple (1 year)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 42,
+            "sheet_order": 49
+          }
+        },
+        {
+          "item_ref": "ht.1-year.syringe-3cc",
+          "catalog_ref": "syringe-3cc",
+          "label": "Syringe 3cc",
+          "source_label": "Syringes- 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "3cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Purple (1 year)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 42,
+            "sheet_order": 50
+          }
+        },
+        {
+          "item_ref": "ht.1-year.syringe-10cc",
+          "catalog_ref": "tv-syringe-10-cc",
+          "label": "Syringe 10cc",
+          "source_label": "Syringes- 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "10cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Purple (1 year)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 42,
+            "sheet_order": 51
+          }
+        }
+      ]
+    },
+    {
+      "key": "ht-2-year",
+      "label": "2 year (Yellow)",
+      "source_label": "2 year (Yellow)",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 50,
+      "items": [
+        {
+          "item_ref": "ht.2-year.blade-2-straight",
+          "catalog_ref": "blade-2-straight",
+          "label": "Blade 2 straight",
+          "source_label": "Blade - 2 Straight",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 2,
+            "sheet_order": 52
+          }
+        },
+        {
+          "item_ref": "ht.2-year.et-tube-4-5",
+          "catalog_ref": "et-tube-4-5-cuffed",
+          "label": "ET tube 4.5mm cuffed",
+          "source_label": "ET TUBE - 4.5mm Cuffed",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 3,
+            "sheet_order": 53
+          }
+        },
+        {
+          "item_ref": "ht.2-year.iv-catheter-18ga",
+          "catalog_ref": "iv-catheter-18g",
+          "label": "IV catheter 18Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga, 22Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "18Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 4,
+            "sheet_order": 54
+          }
+        },
+        {
+          "item_ref": "ht.2-year.iv-catheter-20ga",
+          "catalog_ref": "iv-catheter-20g",
+          "label": "IV catheter 20Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga, 22Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "20Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 4,
+            "sheet_order": 55
+          }
+        },
+        {
+          "item_ref": "ht.2-year.iv-catheter-22ga",
+          "catalog_ref": "iv-catheter-22g",
+          "label": "IV catheter 22Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga, 22Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "22Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 4,
+            "sheet_order": 56
+          }
+        },
+        {
+          "item_ref": "ht.2-year.opa-60mm",
+          "catalog_ref": "opa-60mm",
+          "label": "OPA 60mm",
+          "source_label": "OPA - 60mm",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 5,
+            "sheet_order": 57
+          }
+        },
+        {
+          "item_ref": "ht.2-year.npa-20f",
+          "catalog_ref": "npa-20",
+          "label": "NPA 20F",
+          "source_label": "NPA - 20F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 6,
+            "sheet_order": 58
+          }
+        },
+        {
+          "item_ref": "ht.2-year.french-catheter-10f",
+          "catalog_ref": "french-catheter-10f",
+          "label": "French catheter 10F",
+          "source_label": "French Catheter - 10F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 7,
+            "sheet_order": 59
+          }
+        },
+        {
+          "item_ref": "ht.2-year.syringe-1cc",
+          "catalog_ref": "syringe-1cc",
+          "label": "Syringe 1cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "1cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 8,
+            "sheet_order": 60
+          }
+        },
+        {
+          "item_ref": "ht.2-year.syringe-3cc",
+          "catalog_ref": "syringe-3cc",
+          "label": "Syringe 3cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "3cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 8,
+            "sheet_order": 61
+          }
+        },
+        {
+          "item_ref": "ht.2-year.syringe-10cc",
+          "catalog_ref": "tv-syringe-10-cc",
+          "label": "Syringe 10cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "10cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Yellow (2 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 8,
+            "sheet_order": 62
+          }
+        }
+      ]
+    },
+    {
+      "key": "ht-3-4-years",
+      "label": "3 & 4 years (White)",
+      "source_label": "3 & 4 years (White)",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 60,
+      "items": [
+        {
+          "item_ref": "ht.3-4-years.blade-2-straight",
+          "catalog_ref": "blade-2-straight",
+          "label": "Blade 2 straight",
+          "source_label": "Blade - 2 Straight",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 10,
+            "sheet_order": 63
+          }
+        },
+        {
+          "item_ref": "ht.3-4-years.et-tube-5-0",
+          "catalog_ref": "et-tube-5-0-cuffed",
+          "label": "ET tube 5.0mm cuffed",
+          "source_label": "ET TUBE - 5.0mm Cuffed",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 11,
+            "sheet_order": 64
+          }
+        },
+        {
+          "item_ref": "ht.3-4-years.iv-catheter-18ga",
+          "catalog_ref": "iv-catheter-18g",
+          "label": "IV catheter 18Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga, 22Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "18Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 12,
+            "sheet_order": 65
+          }
+        },
+        {
+          "item_ref": "ht.3-4-years.iv-catheter-20ga",
+          "catalog_ref": "iv-catheter-20g",
+          "label": "IV catheter 20Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga, 22Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "20Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 12,
+            "sheet_order": 66
+          }
+        },
+        {
+          "item_ref": "ht.3-4-years.iv-catheter-22ga",
+          "catalog_ref": "iv-catheter-22g",
+          "label": "IV catheter 22Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga, 22Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "22Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 12,
+            "sheet_order": 67
+          }
+        },
+        {
+          "item_ref": "ht.3-4-years.opa-60mm",
+          "catalog_ref": "opa-60mm",
+          "label": "OPA 60mm",
+          "source_label": "OPA - 60mm",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 13,
+            "sheet_order": 68
+          }
+        },
+        {
+          "item_ref": "ht.3-4-years.npa-22f",
+          "catalog_ref": "npa-22",
+          "label": "NPA 22F",
+          "source_label": "NPA - 22F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 14,
+            "sheet_order": 69
+          }
+        },
+        {
+          "item_ref": "ht.3-4-years.french-catheter-10f",
+          "catalog_ref": "french-catheter-10f",
+          "label": "French catheter 10F",
+          "source_label": "French Catheter - 10F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 15,
+            "sheet_order": 70
+          }
+        },
+        {
+          "item_ref": "ht.3-4-years.syringe-1cc",
+          "catalog_ref": "syringe-1cc",
+          "label": "Syringe 1cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "1cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 16,
+            "sheet_order": 71
+          }
+        },
+        {
+          "item_ref": "ht.3-4-years.syringe-3cc",
+          "catalog_ref": "syringe-3cc",
+          "label": "Syringe 3cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "3cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 16,
+            "sheet_order": 72
+          }
+        },
+        {
+          "item_ref": "ht.3-4-years.syringe-10cc",
+          "catalog_ref": "tv-syringe-10-cc",
+          "label": "Syringe 10cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "10cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "White (3 & 4 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 16,
+            "sheet_order": 73
+          }
+        }
+      ]
+    },
+    {
+      "key": "ht-5-6-years",
+      "label": "5 & 6 year (Blue)",
+      "source_label": "5 & 6 year (Blue)",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 70,
+      "items": [
+        {
+          "item_ref": "ht.5-6-years.blade-2-straight",
+          "catalog_ref": "blade-2-straight",
+          "label": "Blade 2 straight",
+          "source_label": "Blade - 2 Straight & Curved",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "blade-2",
+          "variant_label": "Straight",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 18,
+            "sheet_order": 74
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.blade-2-curved",
+          "catalog_ref": "blade-2-curved",
+          "label": "Blade 2 curved",
+          "source_label": "Blade - 2 Straight & Curved",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "blade-2",
+          "variant_label": "Curved",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 18,
+            "sheet_order": 75
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.et-tube-5-5",
+          "catalog_ref": "et-tube-5-5-cuffed",
+          "label": "ET tube 5.5mm cuffed",
+          "source_label": "ET Tube - 5.5mm Cuffed",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 19,
+            "sheet_order": 76
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.iv-catheter-18ga",
+          "catalog_ref": "iv-catheter-18g",
+          "label": "IV catheter 18Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga, 22Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "18Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 20,
+            "sheet_order": 77
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.iv-catheter-20ga",
+          "catalog_ref": "iv-catheter-20g",
+          "label": "IV catheter 20Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga, 22Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "20Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 20,
+            "sheet_order": 78
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.iv-catheter-22ga",
+          "catalog_ref": "iv-catheter-22g",
+          "label": "IV catheter 22Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga, 22Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "22Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 20,
+            "sheet_order": 79
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.opa-70mm",
+          "catalog_ref": "opa-70mm",
+          "label": "OPA 70mm",
+          "source_label": "OPA - 70mm",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 21,
+            "sheet_order": 80
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.npa-24f",
+          "catalog_ref": "npa-24",
+          "label": "NPA 24F",
+          "source_label": "NPA - 24F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 22,
+            "sheet_order": 81
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.french-catheter-10f",
+          "catalog_ref": "french-catheter-10f",
+          "label": "French catheter 10F",
+          "source_label": "French Catheter - 10F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 23,
+            "sheet_order": 82
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.syringe-1cc",
+          "catalog_ref": "syringe-1cc",
+          "label": "Syringe 1cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "1cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 24,
+            "sheet_order": 83
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.syringe-3cc",
+          "catalog_ref": "syringe-3cc",
+          "label": "Syringe 3cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "3cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 24,
+            "sheet_order": 84
+          }
+        },
+        {
+          "item_ref": "ht.5-6-years.syringe-10cc",
+          "catalog_ref": "tv-syringe-10-cc",
+          "label": "Syringe 10cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "10cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Blue (5 & 6 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 24,
+            "sheet_order": 85
+          }
+        }
+      ]
+    },
+    {
+      "key": "ht-7-8-years",
+      "label": "7 & 8 year (Orange)",
+      "source_label": "7 & 8 year (Orange)",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 80,
+      "items": [
+        {
+          "item_ref": "ht.7-8-years.blade-2-straight",
+          "catalog_ref": "blade-2-straight",
+          "label": "Blade 2 straight",
+          "source_label": "Blade - 2 Straight & Curved",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "blade-2",
+          "variant_label": "Straight",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 26,
+            "sheet_order": 86
+          }
+        },
+        {
+          "item_ref": "ht.7-8-years.blade-2-curved",
+          "catalog_ref": "blade-2-curved",
+          "label": "Blade 2 curved",
+          "source_label": "Blade - 2 Straight & Curved",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "blade-2",
+          "variant_label": "Curved",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 26,
+            "sheet_order": 87
+          }
+        },
+        {
+          "item_ref": "ht.7-8-years.et-tube-6-0",
+          "catalog_ref": "et-tube-6-0-cuffed",
+          "label": "ET tube 6.0mm cuffed",
+          "source_label": "ET Tube - 6.0mm Cuffed",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 27,
+            "sheet_order": 88
+          }
+        },
+        {
+          "item_ref": "ht.7-8-years.iv-catheter-18ga",
+          "catalog_ref": "iv-catheter-18g",
+          "label": "IV catheter 18Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "18Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 28,
+            "sheet_order": 89
+          }
+        },
+        {
+          "item_ref": "ht.7-8-years.iv-catheter-20ga",
+          "catalog_ref": "iv-catheter-20g",
+          "label": "IV catheter 20Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "20Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 28,
+            "sheet_order": 90
+          }
+        },
+        {
+          "item_ref": "ht.7-8-years.opa-80mm",
+          "catalog_ref": "opa-80mm",
+          "label": "OPA 80mm",
+          "source_label": "OPA - 80mm",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 29,
+            "sheet_order": 91
+          }
+        },
+        {
+          "item_ref": "ht.7-8-years.npa-26f",
+          "catalog_ref": "npa-26",
+          "label": "NPA 26F",
+          "source_label": "NPA - 26F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 30,
+            "sheet_order": 92
+          }
+        },
+        {
+          "item_ref": "ht.7-8-years.french-catheter-10f",
+          "catalog_ref": "french-catheter-10f",
+          "label": "French catheter 10F",
+          "source_label": "French Catheter - 10F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 31,
+            "sheet_order": 93
+          }
+        },
+        {
+          "item_ref": "ht.7-8-years.syringe-1cc",
+          "catalog_ref": "syringe-1cc",
+          "label": "Syringe 1cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "1cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 32,
+            "sheet_order": 94
+          }
+        },
+        {
+          "item_ref": "ht.7-8-years.syringe-3cc",
+          "catalog_ref": "syringe-3cc",
+          "label": "Syringe 3cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "3cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 32,
+            "sheet_order": 95
+          }
+        },
+        {
+          "item_ref": "ht.7-8-years.syringe-10cc",
+          "catalog_ref": "tv-syringe-10-cc",
+          "label": "Syringe 10cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "10cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Orange (7 & 8 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 32,
+            "sheet_order": 96
+          }
+        }
+      ]
+    },
+    {
+      "key": "ht-9-13-years",
+      "label": "9 - 13 year (Green)",
+      "source_label": "9 - 13 year (Green)",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 90,
+      "items": [
+        {
+          "item_ref": "ht.9-13-years.blade-3-straight",
+          "catalog_ref": "blade-3-straight",
+          "label": "Blade 3 straight",
+          "source_label": "Blade - 3 Straight & Curved",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "blade-3",
+          "variant_label": "Straight",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 34,
+            "sheet_order": 97
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.blade-3-curved",
+          "catalog_ref": "blade-3-curved",
+          "label": "Blade 3 curved",
+          "source_label": "Blade - 3 Straight & Curved",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "blade-3",
+          "variant_label": "Curved",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 34,
+            "sheet_order": 98
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.et-tube-6-5",
+          "catalog_ref": "et-tube-6-5-cuffed",
+          "label": "ET tube 6.5mm cuffed",
+          "source_label": "ET Tube - 6.5mm, 7.0mm Cuffed(1 each)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "et-tube",
+          "variant_label": "6.5mm",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Printed \"(1 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 35,
+            "sheet_order": 99
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.et-tube-7-0",
+          "catalog_ref": "et-tube-7-0-cuffed",
+          "label": "ET tube 7.0mm cuffed",
+          "source_label": "ET Tube - 6.5mm, 7.0mm Cuffed(1 each)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "et-tube",
+          "variant_label": "7.0mm",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Printed \"(1 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 35,
+            "sheet_order": 100
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.iv-catheter-18ga",
+          "catalog_ref": "iv-catheter-18g",
+          "label": "IV catheter 18Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "18Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 36,
+            "sheet_order": 101
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.iv-catheter-20ga",
+          "catalog_ref": "iv-catheter-20g",
+          "label": "IV catheter 20Ga",
+          "source_label": "IV Catheter - 18Ga, 20Ga(2 each)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "iv-catheter",
+          "variant_label": "20Ga",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Printed \"(2 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 36,
+            "sheet_order": 102
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.opa-80mm",
+          "catalog_ref": "opa-80mm",
+          "label": "OPA 80mm",
+          "source_label": "OPA - 80mm",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 37,
+            "sheet_order": 103
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.npa-26f",
+          "catalog_ref": "npa-26",
+          "label": "NPA 26F",
+          "source_label": "NPA - 26F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "No quantity is printed in the row, so the sheet's rule 'Quantity 1 unless indicated in ( )' gives 1.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 38,
+            "sheet_order": 104
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.french-catheter-10f",
+          "catalog_ref": "french-catheter-10f",
+          "label": "French catheter 10F",
+          "source_label": "French Catheter - 10F, 12F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "french-catheter",
+          "variant_label": "10F",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 39,
+            "sheet_order": 105
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.french-catheter-12f",
+          "catalog_ref": "french-catheter-12f",
+          "label": "French catheter 12F",
+          "source_label": "French Catheter - 10F, 12F",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "french-catheter",
+          "variant_label": "12F",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Sizes are listed without a quantity; read as 1 of each size under the sheet's rule 'Quantity 1 unless indicated in ( )'. The 9 - 13 year block prints '(1 each)' on its multi-size rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 39,
+            "sheet_order": 106
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.syringe-1cc",
+          "catalog_ref": "syringe-1cc",
+          "label": "Syringe 1cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc(1 each)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "1cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Printed \"(1 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 40,
+            "sheet_order": 107
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.syringe-3cc",
+          "catalog_ref": "syringe-3cc",
+          "label": "Syringe 3cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc(1 each)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "3cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Printed \"(1 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 40,
+            "sheet_order": 108
+          }
+        },
+        {
+          "item_ref": "ht.9-13-years.syringe-10cc",
+          "catalog_ref": "tv-syringe-10-cc",
+          "label": "Syringe 10cc",
+          "source_label": "Syringes - 1cc, 3cc, 10cc(1 each)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "syringes",
+          "variant_label": "10cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "color_band": "Green (9 - 13 years)"
+          },
+          "notes": "Printed \"(1 each)\".",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 40,
+            "sheet_order": 109
+          }
+        }
+      ]
+    }
+  ]
+}

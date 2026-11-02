@@ -33,10 +33,11 @@ final class EmsStatistics
         'monthly_trend' => 'Counted requests, requested quantity and issued quantity by calendar month of submission (Eastern time).',
         'detail_special_event' => 'Counted requests for Detail / Special Event, and how often each typed event or assignment appears.',
         'by_unit' => 'The same requested and issued figures grouped by the unit the request was for, or Detail / Special Event.',
+        'by_family' => 'The same requested and issued figures grouped by the medical inventory form the request was sent on. Forms sent before the four forms existed are ALS Transport. Corrections replace the form they correct, so nothing is counted twice.',
     ];
 
     /**
-     * @param  array<string, mixed>  $filters  apparatus_id, target_kind, date_from, date_to (Y-m-d, Eastern)
+     * @param  array<string, mixed>  $filters  apparatus_id, target_kind, family (a FormFamilies key), date_from, date_to (Y-m-d, Eastern)
      * @return array<string, mixed>
      */
     public function report(array $filters): array
@@ -45,13 +46,18 @@ final class EmsStatistics
         $from = ! empty($filters['date_from']) ? CarbonImmutable::parse((string) $filters['date_from'], $tz)->startOfDay() : null;
         $to = ! empty($filters['date_to']) ? CarbonImmutable::parse((string) $filters['date_to'], $tz)->endOfDay() : null;
 
+        $family = ! empty($filters['family']) && FormFamilies::find((string) $filters['family']) !== null ? (string) $filters['family'] : null;
+
         $base = fn (): Builder => InventoryRequest::query()
             ->when($from !== null, fn ($q) => $q->where('submitted_at', '>=', $from->utc()))
             ->when($to !== null, fn ($q) => $q->where('submitted_at', '<=', $to->utc()))
             ->when(! empty($filters['apparatus_id']), fn ($q) => $q->where('apparatus_id', (int) $filters['apparatus_id']))
-            ->when(! empty($filters['target_kind']) && in_array($filters['target_kind'], InventoryRequest::TARGET_KINDS, true), fn ($q) => $q->where('target_kind', (string) $filters['target_kind']));
+            ->when(! empty($filters['target_kind']) && in_array($filters['target_kind'], InventoryRequest::TARGET_KINDS, true), fn ($q) => $q->where('target_kind', (string) $filters['target_kind']))
+            ->when($family !== null, fn ($q) => $family === FormFamilies::DEFAULT
+                ? $q->where(fn ($w) => $w->where('form_family', FormFamilies::DEFAULT)->orWhereNull('form_family'))
+                : $q->where('form_family', $family));
 
-        $requests = $base()->get(['id', 'status', 'submitted_at', 'target_kind', 'apparatus_id', 'target_label', 'event_assignment']);
+        $requests = $base()->get(['id', 'status', 'submitted_at', 'target_kind', 'apparatus_id', 'target_label', 'event_assignment', 'form_family']);
         // A form sent back or replaced by its correction would count the same supplies twice.
         $notCounted = [InventoryRequest::CANCELLED, InventoryRequest::RETURNED, InventoryRequest::SUPERSEDED];
         $counted = $requests->whereNotIn('status', $notCounted)->values();
@@ -69,6 +75,7 @@ final class EmsStatistics
             'filters' => [
                 'apparatus_id' => ! empty($filters['apparatus_id']) ? (int) $filters['apparatus_id'] : null,
                 'target_kind' => $filters['target_kind'] ?? null,
+                'family' => $family,
                 'date_from' => $from?->format('Y-m-d'), 'date_to' => $to?->format('Y-m-d'),
             ],
             'totals' => [
@@ -87,6 +94,7 @@ final class EmsStatistics
             'monthly_trend' => $this->monthly($counted, $asked, $quantityLines),
             'detail_special_event' => $this->detail($counted),
             'by_unit' => $this->byUnit($counted, $asked, $quantityLines),
+            'by_family' => $this->byFamily($counted, $asked, $quantityLines),
             'definitions' => self::DEFINITIONS,
         ];
     }
@@ -180,6 +188,31 @@ final class EmsStatistics
                 ->map(fn (Collection $group): array => ['event_assignment' => trim((string) $group->first()->event_assignment), 'requests' => $group->count()])
                 ->sortByDesc('requests')->values()->take(20)->all(),
         ];
+    }
+
+    /**
+     * Counted requests only (a form sent back or replaced by its correction is never in them), so a correction counts once.
+     * All four forms are listed, in order, so a form nobody has used shows as zero rather than missing.
+     *
+     * @param  Collection<int, InventoryRequest>  $counted
+     * @param  Collection<int, InventoryRequestLine>  $asked
+     * @param  Collection<int, InventoryRequestLine>  $lines
+     * @return list<array<string, mixed>>
+     */
+    private function byFamily(Collection $counted, Collection $asked, Collection $lines): array
+    {
+        $rows = [];
+        foreach (FormFamilies::all() as $family) {
+            $ids = $counted->filter(fn (InventoryRequest $r): bool => $r->family()['key'] === $family['key'])->pluck('id')->all();
+            $rows[] = [
+                'family' => $family['key'], 'title' => $family['title'], 'short_title' => $family['short_title'],
+                'requests' => count($ids),
+                'qty_requested' => (int) $asked->whereIn('request_id', $ids)->where('response_type', 'quantity')->sum('requested_qty'),
+                'qty_issued' => (int) $lines->whereIn('request_id', $ids)->sum('issued_qty'),
+            ];
+        }
+
+        return $rows;
     }
 
     /**

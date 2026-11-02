@@ -23,7 +23,7 @@ async function signIn(page: Page) {
   await page.getByLabel('Employee ID').fill(employeeId);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page.getByRole('heading', { name: 'Medical Inventory Request', level: 1 })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'ALS Transport Inventory Form', level: 1 })).toBeVisible({ timeout: 30_000 });
 }
 
 async function ownerOf(page: Page): Promise<string> {
@@ -74,7 +74,7 @@ async function openSeeded(context: BrowserContext, row: Record<string, unknown>)
   await quiet.close();
   const page = await context.newPage();
   await page.goto(FORM_URL);
-  await expect(page.getByRole('heading', { name: 'Medical Inventory Request', level: 1 })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'ALS Transport Inventory Form', level: 1 })).toBeVisible({ timeout: 30_000 });
   return page;
 }
 
@@ -93,9 +93,9 @@ test('a draft saved before the upgrade comes back whole, the new list is empty a
   await expect(page.getByText('1 saved entry is for items that are no longer on this form')).toBeVisible();
 
   const chooser = page.getByRole('navigation', { name: 'Choose a list' });
-  await expect(chooser.getByRole('button', { name: /Airway Bag/ })).toContainText('1 needed');
-  await expect(chooser.getByRole('button', { name: /ALS Med Bag/ })).toContainText('1 needed');
-  await expect(chooser.getByRole('button', { name: /ALS Transport Vehicle/ })).not.toContainText('needed');
+  await expect(chooser.getByRole('button', { name: /Airway Bag/ })).toContainText('1 entered');
+  await expect(chooser.getByRole('button', { name: /ALS Med Bag/ })).toContainText('1 entered');
+  await expect(chooser.getByRole('button', { name: /ALS Transport Vehicle/ })).not.toContainText('entered');
 
   await chooser.getByRole('button', { name: /ALS Transport Vehicle/ }).click();
   const narcan = page.locator('.ems-form .ems-item', { hasText: 'Narcan' });
@@ -121,16 +121,19 @@ test('a draft saved before the upgrade comes back whole, the new list is empty a
 });
 
 test('a page loaded before the third list existed can still send once the server has it', async ({ page }) => {
-  await page.route('**/employee/forms/api/ems/form', async (route) => {
+  const FORM_API = /\/employee\/forms\/api\/ems\/form(\?.*)?$/; // the page asks for its own family: form?family=als-transport
+  await page.route(FORM_API, async (route) => {
     const response = await route.fetch();
     const json = await response.json();
     json.data.forms = json.data.forms.filter((form: { key: string }) => form.key !== 'als-transport-vehicle');
     await route.fulfill({ response, json });
   });
   await signIn(page);
-  await expect(page.getByRole('navigation', { name: 'Choose a list' }).getByRole('button')).toHaveCount(2);
+  const chooser = page.getByRole('navigation', { name: 'Choose a list' });
+  await expect(chooser.getByRole('button', { name: /Airway Bag/ })).toBeVisible();
+  await expect(chooser.getByRole('button', { name: /ALS Transport Vehicle/ })).toHaveCount(0);
 
-  await page.unroute('**/employee/forms/api/ems/form'); // the server now has three lists; this page still has two
+  await page.unroute(FORM_API); // the server now has the vehicle list; this page still does not
   const gloves = page.locator('.ems-item', { hasText: 'Gloves' }).first();
   await gloves.getByRole('button', { name: /One more/ }).click();
   await page.getByRole('radio', { name: 'RESCUE R2', exact: true }).click();

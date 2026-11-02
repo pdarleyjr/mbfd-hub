@@ -24,6 +24,7 @@ final class RequestPdfRenderer
 
         $pdf = Pdf::loadView('pdf.medical-inventory-request', [
             'number' => (string) ($snapshot['number'] ?? $request->number),
+            'formTitle' => MemberCopyService::formTitle($request),
             'submittedAt' => CarbonImmutable::parse((string) ($snapshot['submitted_at'] ?? $request->submitted_at))->setTimezone(StockLedger::TIMEZONE)->format('M j, Y g:i A T'),
             'submitterName' => (string) ($snapshot['submitter']['name'] ?? $request->submitter_name),
             'submitterRank' => $snapshot['submitter']['rank'] ?? $request->submitter_rank,

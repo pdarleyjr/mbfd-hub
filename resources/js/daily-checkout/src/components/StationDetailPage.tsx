@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import {
-  Activity, ChevronRight, ClipboardCheck, ClipboardList, DoorOpen, Gauge, ShieldCheck, Truck, Video, Wrench,
+  Activity, Anchor, ChevronRight, ClipboardCheck, ClipboardList, DoorOpen, Gauge, ShieldCheck, Truck, Video, Wrench,
 } from 'lucide-react';
 import {
   StationDetail,
@@ -27,6 +27,7 @@ import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBluepri
 import Tabs, { type TabItem } from './ui/Tabs';
 import type { QuickLinkProps } from './ui/QuickLink';
 import StationHeader from './station/StationHeader';
+import { fireBoat6FormLink } from './station/stationFormLinks';
 import StationOverviewPanel from './station/StationOverviewPanel';
 import StationRosterPanel from './station/StationRosterPanel';
 import StationShiftAlert from './station/StationShiftAlert';
@@ -266,6 +267,9 @@ export default function StationDetailPage() {
   const apparatusServicePath = `/employee/apparatus-service-request?station_id=${station.id}&return_to=${hubStationReturn}`;
   const stationInspectionPath = `/forms-hub/station-inspection?station_id=${station.id}&station_number=${stationNumber}&return_to=${stationReturn}`;
 
+  // Station 6 (by number) also links to the Fire Boat 6 form; no other station does.
+  const fireBoat6Link = fireBoat6FormLink(stationNumber);
+
   const quickLinks: QuickLinkProps[] = [
     ...(LINEUP_STATION_NUMBERS.includes(stationNumber) ? [{
       label: stationNumber === 2 ? 'Morning Lineup Video Conference — Station 2' : 'Morning Lineup Video Conference',
@@ -277,6 +281,7 @@ export default function StationDetailPage() {
     { label: 'Apparatus Service', href: apparatusServicePath, icon: <Wrench size={20} /> },
     { label: 'Station Inspection', to: stationInspectionPath, icon: <ClipboardCheck size={20} /> },
     { label: 'Vehicle Inspection', to: `/vehicle-inspections?return_to=${stationReturn}`, icon: <Truck size={20} /> },
+    ...(fireBoat6Link ? [{ label: fireBoat6Link.label, href: fireBoat6Link.href, icon: <Anchor size={20} /> }] : []),
   ];
 
   const tabLoadState = (tab: TabId, label: string): ReactNode => {

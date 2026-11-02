@@ -934,6 +934,29 @@ test('a string Station 6 API value renders its conference link', async ({ page }
   await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true })).toHaveCount(0);
 });
 
+test('Station 6 links to the Fire Boat 6 form as a plain same-origin page link', async ({ page }) => {
+  await mockInspectionApi(page, { stationNumber: '6' });
+
+  await page.goto('/daily/stations/1');
+
+  const actions = page.getByRole('navigation', { name: 'Station actions' });
+  const link = actions.getByRole('link', { name: 'Fire Boat 6 Medical Inventory Form', exact: true });
+  await expect(link).toHaveAttribute('href', '/employee/forms?form=fire-boat-6-medical-inventory');
+  // A plain anchor, not a router link: the Employee portal is a different app than /daily, and it opens in the same window.
+  await expect(link).not.toHaveAttribute('target', /.+/);
+});
+
+for (const stationNumber of ['2', '5', 'not-a-station']) {
+  test(`Station API value ${stationNumber} does not get the Fire Boat 6 form link`, async ({ page }) => {
+    await mockInspectionApi(page, { stationNumber });
+
+    await page.goto('/daily/stations/1');
+
+    await expect(page.getByRole('navigation', { name: 'Station actions' })).toBeVisible();
+    await expect(page.locator('a[href*="fire-boat-6-medical-inventory"]')).toHaveCount(0);
+  });
+}
+
 test('an unsupported Station API value does not render conference links', async ({ page }) => {
   await mockInspectionApi(page, { stationNumber: '5' });
 

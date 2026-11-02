@@ -53,9 +53,14 @@ final class RequestPresenter
     /** @return array<string, mixed> */
     public function summary(InventoryRequest $request): array
     {
+        $family = $request->family();
+
         return [
             'id' => $request->uuid,
             'number' => $request->number,
+            'form_family' => $family['key'],
+            'form_family_title' => $family['title'],
+            'form_family_short' => $family['short_title'],
             'status' => $request->status,
             'status_label' => self::STATUS_LABELS[$request->status] ?? $request->status,
             'submitted_at' => $request->submitted_at->toIso8601String(),

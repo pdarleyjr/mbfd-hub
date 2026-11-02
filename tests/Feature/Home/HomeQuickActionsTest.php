@@ -39,11 +39,12 @@ final class HomeQuickActionsTest extends TestCase
     public function test_the_deep_links_are_the_ones_the_forms_page_understands(): void
     {
         self::assertSame('/employee/forms?form=medical-inventory-request', EmsLinks::memberForm());
+        self::assertSame('/employee/forms?form=fire-boat-6-medical-inventory', EmsLinks::memberForm('fire-boat-6'));
         self::assertSame('/employee/forms?form=narcotics-check', NarcoticsLinks::memberForm());
         self::assertSame('/daily/vehicle-inspections', HomeQuickActions::VEHICLE_INSPECTION_PATH);
     }
 
-    public function test_a_member_sees_one_gray_native_disclosure_with_exactly_three_links_in_order(): void
+    public function test_a_member_sees_one_gray_native_disclosure_with_exactly_seven_links_in_order(): void
     {
         $this->signIn($this->member('Firefighter'));
 
@@ -67,7 +68,10 @@ final class HomeQuickActionsTest extends TestCase
             $found[trim($link->textContent)] = $link->getAttribute('href');
         }
         self::assertSame([
-            'Medical Inventory Forms' => url('/employee/forms?form=medical-inventory-request'),
+            'ALS Transport Inventory Form' => url('/employee/forms?form=als-transport-inventory'),
+            'ALS Non Transport Inventory Form' => url('/employee/forms?form=als-non-transport-inventory'),
+            'Fire Boat 6 Medical Inventory Form' => url('/employee/forms?form=fire-boat-6-medical-inventory'),
+            'BLS Detail Medical Inventory Form' => url('/employee/forms?form=bls-detail-medical-inventory'),
             'Narcotics Check' => url('/employee/forms?form=narcotics-check'),
             'Vehicle Inspection' => url('/daily/vehicle-inspections'),
         ], $found);
@@ -88,7 +92,7 @@ final class HomeQuickActionsTest extends TestCase
         config(['narcotics_checks.enabled' => false]);
         $this->signIn($this->member('Firefighter'));
 
-        $this->assertRescueLinks(['Medical Inventory Forms', 'Vehicle Inspection']);
+        $this->assertRescueLinks(['ALS Transport Inventory Form', 'ALS Non Transport Inventory Form', 'Fire Boat 6 Medical Inventory Form', 'BLS Detail Medical Inventory Form', 'Vehicle Inspection']);
     }
 
     public function test_narcotics_check_is_hidden_while_the_member_must_change_their_password(): void
@@ -102,7 +106,7 @@ final class HomeQuickActionsTest extends TestCase
 
             return;
         }
-        $this->assertRescueLinks(['Medical Inventory Forms', 'Vehicle Inspection'], $response->getContent());
+        $this->assertRescueLinks(['ALS Transport Inventory Form', 'ALS Non Transport Inventory Form', 'Fire Boat 6 Medical Inventory Form', 'BLS Detail Medical Inventory Form', 'Vehicle Inspection'], $response->getContent());
     }
 
     public function test_an_account_without_a_personnel_profile_sees_no_card_at_all(): void

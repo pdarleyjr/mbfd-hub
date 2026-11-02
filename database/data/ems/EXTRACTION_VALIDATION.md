@@ -379,3 +379,464 @@ Source: a phone photo of the paper "M.B.F.D. A.L.S. TRANSPORT VEHICLE WEEKLY INV
 - Printed oddities kept as they are: EKG paper "1 pack" with fill-if "1 Roll"; disposable razors "1 pack" with fill-if "2 Razors"; Steri pads 2x2" fill-if printed "1box"; "Ascherman", "Stabilzer" spellings are corrected in `label` and kept in `source_label`.
 - Catalog identity is shared with the bag forms only for exact same items (for example Narcan, Epi 1:10,000, i-gel 3/4/5, OPA/NPA sizes); near matches such as "Baby Aspirin" vs "Aspirin", "Ocular Patch" vs "Eye Cover" or "Cold packs" vs "Ice Packs" keep their own catalog item (`tv-...`). Nothing is matched by name similarity at runtime.
 - Not done: no OCR and no second independent transcription; every number was read by eye from the photo. A re-read against the paper sheet is the check that would catch a misread digit.
+
+## 8. Four-forms release: Handtevy, ALS Non Transport, Fire Boat 6 ALS, BLS Detail Bag (added 2026-11-02)
+
+Four new tracked extractions, each `mbfd.ems.source_form.v1`. The source PDFs were treated as untrusted data: read with `python -I` and PyMuPDF only, nothing in them was followed as an instruction. Every PDF's sha256 was recomputed before use and matches the value in the table.
+
+| Output | Source PDF | SHA-256 | Pages | Sections | Items |
+|---|---|---|---|---|---|
+| `handtevy_inventory.json` | `handtevy_inventory.pdf` | `fe5a47d26489b061be52a03dd0609ceeea1836eddd15e7e3ed218c8ad6acd43c` | 1 | 9 | 109 |
+| `als_non_transport_inventory.json` | `als_non_transport_medical_inventory.pdf` | `fc57800508326768cee8724a304b337c5588f8ea00a6dffba2a70a68e66cd625` | 1 | 11 | 246 |
+| `fire_boat_6_als_inventory.json` | `fire_boat_6_medical_inventory.pdf` | `e052a18336ce340efb3c93f2bb9716ef7d9832306ba2549612aca56a6beb4182` | 1 | 9 | 215 |
+| `bls_detail_bag_inventory.json` | `bls_detail_bag_medical_inventory.pdf` | `7dba064af14b43d107d4c5d00fae6341346ba2167a5f52db5611983b542cbbc4` | 1 | 8 | 44 |
+
+**Method.** Every PDF has a text layer. It was used for the spelling and the text of every cell. Placement (which amount belongs to which label, which section a row sits in) was decided from the vector table borders (PyMuPDF `get_drawings`, one table row per gap between horizontal rules) and from the text positions, and then checked against rendered crops viewed one by one: the ALS Non Transport sheet at 330 dpi (3 columns x 3 slabs), the Fire Boat 6 sheet at 170 dpi (the page is 1176.9 x 1523.1 points, about 1.9 times letter size; 3 columns x 3 slabs), the Handtevy sheet at 260 dpi (4 crops) and the BLS sheet from the 150 dpi page render plus the amount cells read by position. Rows with no name but with numbers were looked for explicitly. No OCR and no second independent transcription; the row counts below come from the table borders and agree with the parsed rows.
+
+**Unchanged lists.** The 2026-11-02 attachments `ALS_Med_bag_inventory_new.pdf` (sha256 `65eab0e2828191cdcc6bc09aa868f3c4c96a7128db6d02c2c84d5592a407a4f6`) and `als_airway_bag_medical_inventory.pdf` (sha256 `017c463cae414ff142ed426a9527f0eba8d37ba01f99023cdede6a14d065e06f`) are byte-identical to the already imported sources of `als_med_bag_inventory.json` and `airway_bag_inventory.json`. Those two lists are unchanged and `ems:import-sources` reports them as `unchanged`.
+
+**Conventions for the four lists.** Item identities (`item_ref`) are `ht.`, `nt.`, `fb6.` and `bls.` followed by a lowercase section slug and a label slug; they are unique within the file and become permanent draft and request keys, so they are never reused or renumbered. `source_label` is the printed cell text with whitespace runs collapsed to one space (misspellings and capital letters kept; where the printed cell also carries a location such as `(1) PLACED IN BVM BAG` or `-IN HANDTEVY-` the whole cell is the `source_label` and the location goes to `flags.location_text`). `label` fixes only an obvious spelling of the same product (listed per sheet). A blank AMOUNT stays blank, never 0. Nothing printed as a controlled, refrigerated, rescue-only or detail-airway-bag-only item exists on these sheets, so those four flags are false everywhere. `catalog_ref` is reused from the three older lists only when the item is the same product, the same dose or concentration and the same size (an identical printed label, an obvious spelling or plural or abbreviation difference, a printed parenthetical qualifier, or the same measured size such as ET tube 4.5 cuffed, OPA 60mm, NPA 20F, IV catheter 18 gauge, i-gel 2.5); everything else has its own specific key. Nothing is matched by name similarity.
+
+### 8a. Handtevy (`handtevy_inventory.json`, key `handtevy`)
+
+Source: `handtevy_inventory.pdf`, one page, no title, date or revision printed (the title is the file's name, `version_label` is "undated" as on the airway bag list). Two side-by-side item blocks: the left half is Top Insert, Bottom Bin, < 1 Y/O (Grey / Pink / Red) and 1 year (Purple); the right half is 2 year (Yellow), 3 & 4 years (White), 5 & 6 year (Blue), 7 & 8 year (Orange) and 9 - 13 year (Green). Items follow that reading order.
+
+Printed rows and items per section (a row that lists several sizes is one printed row and one item per printed size):
+
+| Section key | Printed heading | Printed rows | Items |
+|---|---|---|---|
+| `ht-top-insert` | Top Insert | 12 | 15 |
+| `ht-bottom-bin` | Bottom Bin | 10 | 13 |
+| `ht-under-1` | < 1 Y/O Grey Pink Red | 9 | 13 |
+| `ht-1-year` | 1 year (Purple) | 7 | 10 |
+| `ht-2-year` | 2 year (Yellow) | 7 | 11 |
+| `ht-3-4-years` | 3 & 4 years (White) | 7 | 11 |
+| `ht-5-6-years` | 5 & 6 year (Blue) | 7 | 12 |
+| `ht-7-8-years` | 7 & 8 year (Orange) | 7 | 11 |
+| `ht-9-13-years` | 9 - 13 year (Green) | 7 | 13 |
+| **Total** | | **73** | **109** |
+
+Cross-check from the table borders: each half has 42 table rows. Left half = 4 headings + 38 item rows (12 + 10 + 9 + 7). Right half = 5 headings + 35 item rows (7 x 5) + 1 empty row + the black legend row. 73 printed item rows, 109 items.
+
+How the tricky cells were read:
+
+- The Amount and Need columns are empty. The only printed quantity rule is the black legend at the bottom right, "Quantity 1 unless indicated in ( )" (recorded in the source notes, not as an item). `min_text` is the number in ( ) for a size that has one, otherwise "1". `min_applies_to` is `item`.
+- `Needles - 21Ga 1"(2), 25Ga 1" (1 each)`: two items. 21Ga 1" is 2 (the `(2)` right after it). 25Ga 1" is 1 (the `(1 each)` that closes the row; read as applying to the 25Ga size because 21Ga already has its own number). The other reading, "1 each" overriding the 21Ga `(2)`, is not supported by the print.
+- `Syringes- 1cc(2), 3cc(2), 10cc(2)`: three items, 2 each. `IV Catheter- 22Ga(2 each), 24Ga(2 each)` (< 1 Y/O and 1 year): two items, 2 each. `IV Catheter - 18Ga, 20Ga, 22Ga(2 each)` (2 year, 3 & 4 years, 5 & 6 year): three items, 2 each, because "each" covers the whole list. `IV Catheter - 18Ga, 20Ga(2 each)` (7 & 8 year, 9 - 13 year): two items, 2 each.
+- `ET Tube - 6.5mm, 7.0mm Cuffed(1 each)` and `Syringes - 1cc, 3cc, 10cc(1 each)` (9 - 13 year): one item per size, 1 each.
+- Multi-size rows with no quantity (`Syringes - 1cc, 3cc, 10cc` in every other age block, `French Catheter- 6F,8F`, `French Catheter - 10F, 12F`, `Blade - 2 Straight & Curved`, `Blade - 3 Straight & Curved`) are one item per printed size or type with the rule's default 1. This is a reading, not a printed number: the "(1 each)" printed on the 9 - 13 year multi-size rows supports 1 per size but a person should confirm it (see `docs/ems/source-review-2026-11.md`). The item notes say so.
+- `iGels   1.0 / 1.5 / 2.0 / 2.5`: four items (variant group `igel`, 1 each). In the PDF text layer this row is the last text on the page; in the picture it is the last row of the Bottom Bin color band, above the < 1 Y/O heading, and that is where it is placed.
+- `Tape- 1"(1roll)` is `1 roll` (unit `roll`); `Trauma Sleevs(3 sets)` is `3 sets` (unit `sets`; label corrected to "Trauma sleeves", "Sleevs" stays in the source label and a search term); `IV Start Kit(located in each pouch)` is 1 with `location_text` "located in each pouch".
+- `Meconium Aspirator/ MAD Device` and `Infant & Child BP Cuff` name two things with one quantity; each stays one item (item notes say so).
+- < 1 Y/O block: the rows are printed across the Grey, Pink and Red color columns (the text is centered over all three; the backgrounds differ per row). The rows are kept as printed, every one of the 13 items has `color_band` "Grey / Pink / Red (< 1 year)" and `needs_review` true with the reason "does not say which size belongs to which color". No size was assigned to a color.
+- `color_band` on the age blocks is the printed color and age group, for example "Yellow (2 years)", "Green (9 - 13 years)". Top Insert and Bottom Bin print no color name.
+
+Flagged `needs_review` (13): all items of `ht-under-1` (reason above).
+
+Rows with numbers but no label: none. Empty table rows: one (right half, between the 9 - 13 year block and the legend).
+
+Catalog: 39 keys reused from the older lists, 22 new. Reused (this sheet's printed row <- key):
+
+```
+bite-stick <- Bite Stick   [older list: Bite Stick]
+pen-light <- Penlight   [older list: Pen Lights]
+trauma-shears <- Trauma Shears   [older list: TRAUMA SHEARS]
+syringe-1cc <- Syringes- 1cc(2), 3cc(2), 10cc(2) | Syringes- 1cc, 3cc, 10cc | Syringes - 1cc, 3cc, 10cc | Syringes - 1cc, 3cc, 10cc(1 each)   [older list: Syringe 1cc]
+syringe-3cc <- Syringes- 1cc(2), 3cc(2), 10cc(2) | Syringes- 1cc, 3cc, 10cc | Syringes - 1cc, 3cc, 10cc | Syringes - 1cc, 3cc, 10cc(1 each)   [older list: Syringe 3cc]
+tv-syringe-10-cc <- Syringes- 1cc(2), 3cc(2), 10cc(2) | Syringes- 1cc, 3cc, 10cc | Syringes - 1cc, 3cc, 10cc | Syringes - 1cc, 3cc, 10cc(1 each)   [older list: Syringe 10cc]
+tape-1in <- Tape- 1"(1roll)   [older list: 1" tape]
+three-way-stopcock <- Three-way stopcock(2)   [older list: 3 way stopcock]
+arm-board-9in <- Arm Board 9"(1)   [older list: Armboards 9"]
+tube-holder-pedi <- Pedi Tube Holder   [older list: Tube-lock / Pedi]
+safety-glasses <- Safety Glasses(2)   [older list: Safety Glasses (Clear)]
+stethoscope <- Stethoscope   [older list: STETHOSCOPE]
+tv-i-gel-size-1-0 <- iGels 1.0 / 1.5 / 2.0 / 2.5   [older list: i-gel 1.0]
+tv-i-gel-size-1-5 <- iGels 1.0 / 1.5 / 2.0 / 2.5   [older list: i-gel 1.5]
+tv-i-gel-size-2-0 <- iGels 1.0 / 1.5 / 2.0 / 2.5   [older list: i-gel 2.0]
+tv-i-gel-size-2-5 <- iGels 1.0 / 1.5 / 2.0 / 2.5   [older list: i-gel 2.5]
+et-tube-2-5-cuffed <- ET Tube- 2.5mm Cuffed   [older list: ET tube 2.5 (cuffed)]
+et-tube-3-0-cuffed <- ET Tube- 3.0mm Cuffed   [older list: ET tube 3.0 (cuffed)]
+et-tube-3-5-cuffed <- ET Tube- 3.5mm Cuffed   [older list: ET tube 3.5 (cuffed)]
+iv-catheter-22g <- IV Catheter- 22Ga(2 each), 24Ga(2 each) | IV Catheter - 18Ga, 20Ga, 22Ga(2 each)   [older list: IV cath 22ga]
+iv-catheter-24g <- IV Catheter- 22Ga(2 each), 24Ga(2 each)   [older list: IV cath 24ga]
+opa-50mm <- OPA- 50mm   [older list: OPA #1 50mm]
+npa-14 <- NPA- 14F   [older list: NPA #14 FR]
+et-tube-4-0-cuffed <- ET Tube- 4.0mm Cuffed   [older list: ET tube 4.0 (cuffed)]
+opa-60mm <- OPA - 60mm   [older list: OPA #2 60mm]
+npa-18 <- NPA - 18F   [older list: NPA #18 FR]
+et-tube-4-5-cuffed <- ET TUBE - 4.5mm Cuffed   [older list: ET tube 4.5 (cuffed)]
+iv-catheter-18g <- IV Catheter - 18Ga, 20Ga, 22Ga(2 each) | IV Catheter - 18Ga, 20Ga(2 each)   [older list: IV cath 18ga]
+iv-catheter-20g <- IV Catheter - 18Ga, 20Ga, 22Ga(2 each) | IV Catheter - 18Ga, 20Ga(2 each)   [older list: IV cath 20ga]
+npa-20 <- NPA - 20F   [older list: NPA #20 FR]
+et-tube-5-0-cuffed <- ET TUBE - 5.0mm Cuffed   [older list: ET tube 5.0 (cuffed)]
+npa-22 <- NPA - 22F   [older list: NPA #22 FR]
+et-tube-5-5-cuffed <- ET Tube - 5.5mm Cuffed   [older list: ET tube 5.5 (cuffed)]
+npa-24 <- NPA - 24F   [older list: NPA #24 FR]
+et-tube-6-0-cuffed <- ET Tube - 6.0mm Cuffed   [older list: ET tube 6.0 (cuffed)]
+opa-80mm <- OPA - 80mm   [older list: OPA #3 80mm]
+npa-26 <- NPA - 26F   [older list: NPA #26 FR]
+et-tube-6-5-cuffed <- ET Tube - 6.5mm, 7.0mm Cuffed(1 each)   [older list: ET tube 6.5 (cuffed)]
+et-tube-7-0-cuffed <- ET Tube - 6.5mm, 7.0mm Cuffed(1 each)   [older list: ET tube 7.0 (cuffed)]
+```
+
+New keys: `ace-bandage-3in`, `kling-3in`, `laryngoscope-handle`, `meconium-aspirator-mad-device`, `needle-21ga-1in`, `needle-25ga-1in`, `iv-start-kit`, `bulb-syringe`, `bvm-infant-small-child`, `bp-cuff-infant-child`, `pediatric-capnoline-nasal-cannula`, `trauma-sleeves`, `blade-1-straight`, `french-catheter-6f`, `french-catheter-8f`, `french-catheter-10f`, `blade-2-straight`, `blade-2-curved`, `opa-70mm`, `blade-3-straight`, `blade-3-curved`, `french-catheter-12f`.
+
+Not matched on purpose: `Needles 21Ga 1"` and `25Ga 1"` (the bag lists print the gauge without a length), `Blade - N Straight/Curved` (not the MAC / MILLER blades of the other lists), `French Catheter` (not the suction catheters), `Infant / Small Child Size BVM` (not `BVM Infant`), `Trauma Sleevs` (the airway bag's `SLEEVES` prints no "trauma").
+
+### 8b. ALS Non Transport (`als_non_transport_inventory.json`, key `als-non-transport`)
+
+Source: `als_non_transport_medical_inventory.pdf`, one page, printed header `Date: / / M.B.F.D. A.L.S. NON-TRANSPORT UNIT WEEKLY INVENTORY Unit# Revised 1-2024`. Three printed columns, each ITEM / AMOUNT / Fill if < / NEED; read left column, middle column, right column, top to bottom.
+
+| Section key | Printed heading | Printed rows | Items |
+|---|---|---|---|
+| `nt-handtevy` | (none printed) | 2 | 2 |
+| `nt-medications` | Medications | 28 | 28 |
+| `nt-iv-needles` | I.V./NEEDLES | 33 | 33 |
+| `nt-airway-left` | AIRWAY | 17 | 17 |
+| `nt-airway-middle` | AIRWAY | 12 | 12 |
+| `nt-airway-bvm-bag` | AIRWAY / BVM Bag | 52 | 52 |
+| `nt-trauma-supplies` | TRAUMA SUPPLIES (continued as TRAUMA SUPPLIES CONT.) | 34 | 34 |
+| `nt-ppe-decon` | PPE - DECON | 29 | 30 |
+| `nt-ekg-supplies` | EKG SUPPLIES | 5 | 5 |
+| `nt-miscellaneous` | MISCELLANEOUS | 12 | 12 |
+| `nt-life-pack-inventory` | LIFE PACK INVENTORY | 17 | 21 |
+| **Total** | | **241** | **246** |
+
+Cross-check from the table borders (rows per column, including headings and empty rows): left 87 = 3 headings + 80 rows with a name + 2 nameless numbered + 2 empty; middle 88 = 3 headings + 1 italic note + 83 rows + 1 empty; right 88 = 5 headings + 78 rows + 5 empty. 241 named rows (headings, the note and the empty rows excluded). The 246 items are those 241 rows plus 5 variant expansions: 1 extra for "Manual B/P Cuffs Adult/ Pedi" (2 items) and 4 extra for "Auto BP Cuffs XL, L, REG,, PEDI, INFANT" (5 items).
+
+How the tricky cells were read:
+
+- The first two rows of the left column, above the "Medications" heading, have no heading of their own: they are section `nt-handtevy`. `HANDTEVY` (AMOUNT 1, Fill if 1) is a quantity item, no catalog item. `HANDTEVY 1st Tuesday-Monthly Inventory-Inspection completed` is one table cell wrapped over two text lines with no numbers: a `yes_no` item with `flags.cadence = monthly_first_tuesday`.
+- Two headings are both printed `AIRWAY` (bottom of the left column with OPA and NPA, top of the middle column with the masks); kept as two sections `nt-airway-left` and `nt-airway-middle`. `TRAUMA SUPPLIES CONT.` (top of the right column) is merged into `TRAUMA SUPPLIES` with the printed headings in the section's `source_label`, as the Cont. headings are on the transport vehicle list.
+- The italic row `BVMs come with Reg Adult & Child Masks / PEEP Valve / Filter / Tubing` under the first row of `AIRWAY / BVM Bag` is the printed note of that section (`section.note`) and is repeated in the item note of the `CURAPLEX BVMs W/ Manometer` row. It is not an item.
+- Five yellow rows `ET Tube extention(1) PLACED IN BVM BAG`, `BVM CO Capnoline (1) PLACED IN BVM BAG`, `i-gel 5/4/3 (1) PLACED IN BVM BAG`: AMOUNT is blank and `1 in bag` is printed under `Fill if <`. Recorded as printed (`min_text` null, `fill_if_text` "1 in bag", `fill_if_qty` 1, `location_text` "Placed in BVM bag"), flagged `needs_review`.
+- Rows marked `-IN HANDTEVY-` (i-gel 2.5, 2.0, 1.5, 1.0, CURAPLEX infant BVM, Pedi Manual BP Cuff, Infant Manual BP Cuff) have `location_text` "In Handtevy"; AMOUNT and Fill if are printed normally.
+- Differences from the transport vehicle sheet are kept exactly: Tyvek sleeves 24 / 12, red biohazard bags (LG) and (Sm) 5 / 3, CURAPLEX BVMs 2 / 1, `2 IN BOX` / 2 for the adult EZ-IO and `1 IN BOX` / 1 for the other two, Steri and Surgi pads `5 each` / `5 each`, EKG paper `2 rolls` / `2 roll`, disposable razors `2 pack` / `2 razors` (unit pack against razors, as on the transport sheet), Quick-trach `1 in bag` / 1 (the "in bag" is in the AMOUNT cell), shoe covers `3 pair`, disposable straps `2 pair` / `1 pair`, `1 box` rows, `1 each` rows, `2 bags`, `1 bag`. Latex gloves are printed XXL, XL, Large, medium, small and there are four purple nitrile glove sizes (XL, LG, MED, SM); Tyvek suits are printed 2XL and XL only.
+- `Manual B/P Cuffs   Adult/ Pedi` (`1 each`) is one item for Adult and one for Pedi; `Auto BP Cuffs XL, L, REG,, PEDI, INFANT` (`1 each`; printed with a double comma after REG) is five items (XL, L, REG, PEDI, INFANT). `Syringe 10/12cc` stays one item (a 10cc or a 12cc).
+- `Stethescope` sits in the PPE - DECON block (by position, between the BP cuff row and EKG SUPPLIES); kept there.
+- Repeated words in different places are separate items: `Disposable razors` (EKG SUPPLIES, 2 pack / 2 razors) and `Disposable Razors` (LIFE PACK INVENTORY, 2 / 1); `EKG electrodes` and `EKG Electrodes`; `Ammonia inhalants / wipes` (MISCELLANEOUS) and `Ammonia inhalants` (LIFE PACK); `Stethescope` and `Stethoscope`.
+- Printed qualifiers moved to flags: `( MCI BAG)` on the CAT tourniquet (`qualifier_text` "MCI BAG"), `(single use)` on the two SPO2 sensors, `-sensor-Connected to LP` and `-sensor-Rear Pouch of LP` as `location_text`. Obvious spelling fixed in `label` only: Adenocard 12 mg (spacing), Solu-Medrol, Asherman chest seals, Stethoscope, ET tube extension, Gluco lancets, Glucometer w/ lancets & strips, EZ set 21ga (Butterfly). Not changed: Nasal MADDET, Speedy Cleans, CURAPLEX, TPOD, Carry alls.
+
+**Rows with numbers but no label (2, not items):** left column, between `22GA 1.5" ADMIN NEEDLES` (table row 54) and `Saline flush 10cc` (table row 57): table row 55 prints AMOUNT 2 / Fill if 2, table row 56 prints AMOUNT 2 / Fill if 2, both with an empty ITEM cell (PDF text layer: AMOUNT at x 133.0 and Fill if at x 151.6, y 460.3 and y 467.4 points). Not imported; listed in `source.review_notes` and in `docs/ems/source-review-2026-11.md`.
+
+Flagged `needs_review` (5): `nt.bvm-bag.et-tube-extension`, `nt.bvm-bag.bvm-co-capnoline`, `nt.bvm-bag.i-gel-5`, `nt.bvm-bag.i-gel-4`, `nt.bvm-bag.i-gel-3`. Reason for all five: AMOUNT is blank and "1 in bag" is printed under Fill if <.
+
+Catalog: 193 keys reused from the older lists, 43 new. Reused (this sheet's printed row <- key):
+
+```
+adenocard-12mg <- Adenocard 12mg   [older list: Adenocard 12mg]
+amiodarone <- Amiodarone   [older list: Amiodarone]
+atropine <- Atropine   [older list: Atropine]
+tv-baby-aspirin <- Baby Aspirin   [older list: Baby Aspirin]
+benadryl <- Benadryl   [older list: Benadryl]
+sodium-bicarb-8-4 <- Bicarb 8.4%   [older list: Bicarb 8.4%]
+sodium-bicarb-4-2 <- Bicarb 4.2%   [older list: Bicarb 4.2%]
+calcium-chloride <- Calcium chloride   [older list: Calcium chloride]
+cardene <- Cardene   [older list: Cardene]
+dextrose-50 <- Dextrose 50%   [older list: Dextrose 50%]
+dextrose-25 <- Dextrose 25%   [older list: Dextrose 25%]
+dopamine <- Dopamine drip   [older list: Dopamine drip]
+duoneb-als-bag <- Duoneb   [older list: Duoneb]
+epi-1-10000 <- Epi 1:10,000   [older list: Epi 1:10,000]
+epi-1-1000 <- Epi 1:1,000   [older list: Epi 1:1,000]
+etomidate <- Etomidate   [older list: Etomidate]
+glucose-gel <- Glucose oral gel   [older list: Glucose oral gel]
+glucagon <- Glucagon   [older list: Glucagon]
+lasix <- Lasix   [older list: Lasix]
+lidocaine <- Lidocaine   [older list: Lidocaine]
+mag-sulfate <- Magnesium sulf.   [older list: Magnesium sulf.]
+narcan <- Narcan   [older list: Narcan]
+nitro-spray-als-bag <- Nitro Spray   [older list: Nitromist Spray]
+racemic-epi <- Racemic Epi   [older list: Racemic Epi]
+solu-medrol <- Solu-Mederol   [older list: SOLU-MEDEROL]
+tetracaine-drops <- Tetracaine drops   [older list: Tetracaine drops]
+zofran-oral <- Zofran Oral   [older list: ZOFRAN]
+zofran-iv <- Zofran IV   [older list: ZOFRAN]
+test-strips <- Glucometer strips   [older list: Glucometer strips]
+lancets <- Gluco lancettes   [older list: Gluco lancettes]
+mini-drip-set <- Mini drips   [older list: Mini drips]
+maxi-drip-set <- Maxi drips   [older list: Maxi drips]
+tv-extension-sets <- Extension sets   [older list: Extension sets]
+three-way-stopcock <- 3 way stopcock   [older list: 3 way stopcock]
+veniguard <- Veniguards   [older list: Veniguards]
+tv-adult-ez-io-blue <- Adult EZ-IO (BLUE)   [older list: Adult EZ-IO Blue]
+tv-pedi-ez-io-pink <- Pedi EZ-IO (PINK)   [older list: Pedi EZ-IO Pink]
+tv-large-adult-ez-io-yellow <- Lg Adult EZ-IO (YELLOW)   [older list: Lg Adult EZ-IO Yellow]
+iv-catheter-24g <- IV cath 24ga   [older list: IV cath 24ga]
+iv-catheter-22g <- IV cath 22ga   [older list: IV cath 22ga]
+iv-catheter-20g <- IV cath 20ga   [older list: IV cath 20ga]
+iv-catheter-18g <- IV cath 18ga   [older list: IV cath 18ga]
+iv-catheter-16g <- IV cath 16ga   [older list: IV cath 16ga]
+iv-catheter-14g <- IV cath 14ga   [older list: IV cath 14ga]
+ez-set-21ga-butterfly <- EZ set 21ga ( Butterfly)   [older list: EZ set 21ga]
+flush-10cc-als-bag <- Saline flush 10cc   [older list: Saline flush 10cc]
+syringe-1cc <- Syringe 1cc   [older list: Syringe 1cc]
+syringe-3cc <- Syringe 3cc   [older list: Syringe 3cc]
+syringe-10-12cc <- Syringe 10/12cc   [older list: SYRINGE 1cc / 3cc / 10 or 12cc]
+syringe-60cc <- Syringe 60cc   [older list: Syringe 60cc]
+arm-board-9in <- Armboards 9"   [older list: Armboards 9"]
+arm-board-18in <- Armboards 18"   [older list: Armboards 18"]
+betadine-prep <- Betadine preps   [older list: Betadine preps]
+alcohol-prep <- Alcohol preps   [older list: Alcohol preps]
+normal-saline-1000 <- N. Saline 1000cc   [older list: N. Saline 1000cc]
+d5w-50cc <- D5w 50cc   [older list: D5w 50cc]
+nasal-maddet <- Nasal MADDET   [older list: NASAL MADDET]
+opa-40mm <- OPA #0 40mm   [older list: OPA #0 40mm]
+opa-50mm <- OPA #1 50mm   [older list: OPA #1 50mm]
+opa-60mm <- OPA #2 60mm   [older list: OPA #2 60mm]
+opa-80mm <- OPA #3 80mm   [older list: OPA #3 80mm]
+opa-90mm <- OPA #4 90mm   [older list: OPA #4 90mm]
+opa-100mm <- OPA #5 100mm   [older list: OPA #5 100mm]
+opa-110mm <- OPA #6 110mm   [older list: OPA #6 110mm]
+npa-30 <- NPA #30 FR   [older list: NPA #30 FR]
+npa-28 <- NPA #28 FR   [older list: NPA #28 FR]
+npa-26 <- NPA #26 FR   [older list: NPA #26 FR]
+npa-24 <- NPA #24 FR   [older list: NPA #24 FR]
+npa-22 <- NPA #22 FR   [older list: NPA #22 FR]
+npa-20 <- NPA #20 FR   [older list: NPA #20 FR]
+npa-18 <- NPA #18 FR   [older list: NPA #18 FR]
+npa-16 <- NPA #16 FR   [older list: NPA #16 FR]
+npa-14 <- NPA #14 FR   [older list: NPA #14 FR]
+npa-12 <- NPA #12 FR   [older list: NPA #12 FR]
+bite-stick <- Bite sticks   [older list: Bite Stick]
+non-rebreather-mask-adult <- Non-rebreather/adult   [older list: Non-rebreather Adult]
+nasal-cannula-adult <- Nasal cannula adult   [older list: Nasal cannula Adult]
+nebulizer-mask-adult <- Nebulizer adult   [older list: Nebulizer Adult]
+t-nebulizer-adult <- T-nebulizer adult   [older list: T-nebulizer Adult]
+nasal-capnoline-adult <- Nasal Capnoline adult   [older list: Nasal Prong Capnoline Adult]
+non-rebreather-pedi <- Non-rebreather/pedi   [older list: Non-rebreather/Pedi]
+nasal-cannula-pedi <- Nasal cannula pedi   [older list: Nasal cannula Pedi]
+nebulizer-mask-pedi <- Nebulizer pedi   [older list: Nebulizer Pedi]
+nasal-capnoline-pedi <- Nasal Capnoline pedi   [older list: Nasal Prong Capnoline Pedi]
+non-rebreather-infant <- Non-rebreather/infant   [older list: Non-rebreather/Infant]
+tv-cpap-tube-mask-set <- CPAP tube/mask set   [older list: CPAP tube/mask set]
+et-tube-extension <- ET Tube extention(1) PLACED IN BVM BAG   [older list: ET tube extension]
+igel-5 <- i-gel 5 (1) PLACED IN BVM BAG   [older list: i-gel 5]
+igel-4 <- i-gel 4 (1) PLACED IN BVM BAG   [older list: i-gel 4]
+igel-3 <- i-gel 3 (1) PLACED IN BVM BAG   [older list: i-gel 3]
+tv-i-gel-size-2-5 <- i-gel 2.5 -IN HANDTEVY-   [older list: i-gel 2.5]
+tv-i-gel-size-2-0 <- i-gel 2.0 -IN HANDTEVY-   [older list: i-gel 2.0]
+tv-i-gel-size-1-5 <- i-gel 1.5 -IN HANDTEVY-   [older list: i-gel 1.5]
+tv-i-gel-size-1-0 <- i-gel 1.0 -IN HANDTEVY-   [older list: i-gel 1.0]
+et-tube-2-5-cuffed <- ET tube 2.5 (cuffed)   [older list: ET tube 2.5 (cuffed)]
+et-tube-3-0-cuffed <- ET tube 3.0 (cuffed)   [older list: ET tube 3.0 (cuffed)]
+et-tube-3-5-cuffed <- ET tube 3.5 (cuffed)   [older list: ET tube 3.5 (cuffed)]
+et-tube-4-0-cuffed <- ET tube 4.0 (cuffed)   [older list: ET tube 4.0 (cuffed)]
+et-tube-4-5-cuffed <- ET tube 4.5 (cuffed)   [older list: ET tube 4.5 (cuffed)]
+et-tube-5-0-cuffed <- ET tube 5.0 (cuffed)   [older list: ET tube 5.0 (cuffed)]
+et-tube-5-5-cuffed <- ET tube 5.5 (cuffed)   [older list: ET tube 5.5 (cuffed)]
+et-tube-6-0-cuffed <- ET tube 6.0 (cuffed)   [older list: ET tube 6.0 (cuffed)]
+et-tube-6-5-cuffed <- ET tube 6.5 (cuffed)   [older list: ET tube 6.5 (cuffed)]
+et-tube-7-0-cuffed <- ET tube 7.0 (cuffed)   [older list: ET tube 7.0 (cuffed)]
+et-tube-7-5-cuffed <- ET tube 7.5 (cuffed)   [older list: ET tube 7.5 (cuffed)]
+et-tube-8-0-cuffed <- ET tube 8.0 (cuffed)   [older list: ET tube 8.0 (cuffed)]
+et-tube-8-5-cuffed <- ET tube 8.5 (cuffed)   [older list: ET tube 8.5 (cuffed)]
+et-tube-9-0-cuffed <- ET tube 9.0 (cuffed)   [older list: ET tube 9.0 (cuffed)]
+bougie-10fr <- Bougie 10Fr   [older list: Pedi Bougie 10FR]
+bougie-15fr <- Bougie 15Fr   [older list: Adult Bougie 15FR]
+tube-holder-adult <- Tube-lock / adult   [older list: Tube-lock / Adult]
+tube-holder-pedi <- Tube-lock / pedi   [older list: Tube-lock / Pedi]
+suction-catheter-6fr <- Suction cath 6Fr   [older list: Suction cath 6Fr]
+suction-catheter-8fr <- Suction cath 8Fr   [older list: Suction cath 8Fr]
+suction-catheter-10fr <- Suction cath 10Fr   [older list: Suction cath 10Fr]
+suction-catheter-12fr <- Suction cath 12Fr   [older list: Suction cath 12Fr]
+suction-catheter-14fr <- Suction cath 14Fr   [older list: Suction cath 14Fr]
+suction-catheter-16fr <- Suction cath 16Fr   [older list: Suction cath 6Fr-18Fr]
+suction-catheter-18fr <- Suction cath 18Fr   [older list: Suction cath 18Fr]
+tv-suction-yankauer <- Suction yankauer   [older list: Suction yankauer]
+meconium-aspirator <- Meconium aspirators   [older list: Meconium aspirators]
+tv-portable-suction-canister <- Portable suction canister   [older list: Portable suction canister]
+tv-portable-suction-tubing <- Portable suction tubing   [older list: Portable suction tubing]
+tv-lubricating-gel <- Lubricating gel   [older list: Lubricating gel]
+mac-blade-4 <- MAC #4   [older list: MAC #4]
+mac-blade-3 <- MAC #3   [older list: MAC #3]
+mac-blade-2 <- MAC #2   [older list: MAC #2]
+miller-blade-3 <- MILLER #3   [older list: MILLER #3]
+miller-blade-2 <- MILLER #2   [older list: MILLER #2]
+miller-blade-1 <- MILLER #1   [older list: MILLER #1]
+miller-blade-0 <- MILLER #0   [older list: MILLER #0]
+adult-quick-trach <- Quick-trach / adult   [older list: Quick-trach / Adult]
+pedi-quick-trach <- Quick-trach / pedi   [older list: Quick-trach / Pedi]
+et-madd-device <- ET Tube MADD Device   [older list: ET MADD]
+tracheostomy-mask-set <- Tracheostomy Mask Set   [older list: Tracheostomy mask set]
+tv-500-ml-irrigation-water <- 500 ml irrigation water   [older list: 500 ml irrigation water]
+tv-c-collar-adult-no-neck <- C-collar/adult-no-neck   [older list: C-collar/adult no-neck]
+tv-c-collar-adjustable-pedi <- C-collar-adjustable pedi   [older list: C-collar-adjustable pedi]
+tv-cardboard-splints-short <- Cardboard splints short   [older list: Cardboard splints short]
+tv-cardboard-splints-long <- Cardboard splints long   [older list: Cardboard splints long]
+tv-burn-sheets <- Burn sheets   [older list: Burn sheets]
+burn-gel-face-mask <- Burn Gel Face Mask   [older list: Burn Gel Face Mask]
+tv-burn-gel-4-x-4-dressing <- Burn Gel 4x4 Dressing   [older list: Burn Gel 4x4 Dressing]
+burn-gel-small-packet <- Burn Gel 3.5g Packets   [older list: Burn Gel 3.5g Packets]
+tape-1-2in <- 1/2" tape   [older list: 1/2" tape]
+tape-1in <- 1" tape   [older list: 1" tape]
+tape-3in <- 3" tape   [older list: 3" tape]
+ace-bandage-4in <- 4" ace bandage   [older list: 4" ace bandage]
+ace-bandage-6in <- 6" ace bandage   [older list: 6" ace bandage]
+tv-t-bandages <- T-bandages   [older list: T-bandages]
+cat-tourniquet <- Combat App. Tourniquet CAT ( MCI BAG)   [older list: Combat App. Tourniquet CAT]
+kling-2in <- Kling 2"   [older list: Kling 2"]
+kling-4in <- Kling 4"   [older list: Kling 4"]
+kling-6in <- Kling 6"   [older list: Kling 6"]
+steri-pad-2x2 <- Steri pads 2x2"   [older list: Steri pads 2x2"]
+steri-pad-4x4 <- Steri pads 4x4"   [older list: Steri pads 4x4"]
+tv-surgi-pads-5-x-9 <- Surgi pads 5x9"   [older list: Surgi pads 5x9"]
+tv-trauma-dressing-12-x-30 <- Trauma dressing 12x30"   [older list: Trauma dressing 12x30"]
+tv-band-aids-1-x-3 <- Band aids 1 x 3" small   [older list: Band aids 1 x 3"]
+tv-band-aids-4-1-2-x-2 <- Band aids 4 1/2" x 2" large   [older list: Band aids 4 1/2" x 2"]
+quikclot-gauze <- Quick-clot   [older list: Quick-clot]
+asherman-chest-seal <- Ascherman chest seals   [older list: Ascherman chest seals]
+tv-cold-packs <- Cold packs   [older list: Cold packs]
+tv-tyvek-suits-2xl <- Tyvek suits 2XL   [older list: Tyvek suits 2XL]
+tv-tyvek-suits-xl <- Tyvek suits XL   [older list: Tyvek suits XL]
+tv-shoe-covers <- Shoe covers   [older list: Shoe covers]
+tv-tyvek-sleeves <- Tyvek sleeves   [older list: Tyvek sleeves]
+n95-respirator <- N95 Masks   [older list: N95 Masks]
+tv-3-4-face-shields <- 3/4 Face shields   [older list: 3/4 Face shields]
+safety-glasses <- Safety Glasses (Clear)   [older list: Safety Glasses (Clear)]
+tv-convenience-bags <- Convenience bags(VOMEX)   [older list: Convenience bags]
+tv-peroxide-bottle <- Peroxide bottle   [older list: Peroxide bottle]
+tv-alcohol-bottle <- Alcohol bottle   [older list: Alcohol bottle]
+tv-cida-hand-gel <- Cida hand gel   [older list: Cida hand gel]
+tv-sharps-container-small <- Sharps container Small   [older list: Sharps container Small]
+sharps-shuttle <- Sharps shuttle   [older list: Sharps shuttle]
+stethoscope <- Stethescope | Stethoscope   [older list: STETHOSCOPE]
+tv-ekg-electrodes <- EKG electrodes | EKG Electrodes   [older list: EKG electrodes]
+tv-combi-pads-adult <- Combi pads-adult | Combi Pads ADULT   [older list: Combi pads-adult]
+tv-combi-pads-pedi <- Combi pads-pedi | Combi Pads PEDI   [older list: Combi pads-pedi]
+tv-ekg-paper-lifepak-15 <- EKG paper lifepack 15 | EKG Lifepack 15 Paper   [older list: EKG paper lifepack 15]
+tv-disposable-razors <- Disposable razors | Disposable Razors   [older list: Disposable razors]
+pen-light <- Pen Lights   [older list: Pen Lights]
+tv-yellow-foam-blanket <- Yellow foam blanket   [older list: Yellow foam blanket]
+foil-rescue-blanket <- Foil rescue blanket   [older list: Foil rescue blanket]
+tv-ob-kit <- OB kit   [older list: OB kit]
+tv-disposable-straps <- Disposable Straps   [older list: Disposable straps]
+ammonia-inhalants-als-bag <- Ammonia inhalants   [older list: Ammonia inhalants]
+tv-auto-bp-cuff-adult-xl <- Auto BP Cuffs XL, L, REG,, PEDI, INFANT   [older list: Auto BP cuff adult XL]
+tv-auto-bp-cuff-adult-lg <- Auto BP Cuffs XL, L, REG,, PEDI, INFANT   [older list: Auto BP cuff adult LG]
+tv-auto-bp-cuff-adult-reg <- Auto BP Cuffs XL, L, REG,, PEDI, INFANT   [older list: Auto BP cuff adult REG]
+tv-auto-bp-cuff-pedi <- Auto BP Cuffs XL, L, REG,, PEDI, INFANT   [older list: Auto BP cuff PEDI]
+tv-auto-bp-cuff-infant <- Auto BP Cuffs XL, L, REG,, PEDI, INFANT   [older list: Auto BP cuff INFANT]
+```
+
+New keys: `ars-decomp-14ga-3in`, `needle-18ga-1-5in-filtered`, `needle-22ga-1-5in-admin`, `iv-tourniquet-latex-free`, `curaplex-bvm-manometer`, `bvm-co-capnoline`, `curaplex-infant-bvm`, `c-collar-adult-regular`, `burn-gel-4x16-dressing`, `tpod-pelvic-device`, `carry-all`, `speedy-cleans`, `ocular-eye-patch`, `latex-gloves-xxl`, `latex-gloves-xl`, `latex-gloves-large`, `latex-gloves-medium`, `latex-gloves-small`, `purple-nitrile-gloves-xl`, `purple-nitrile-gloves-lg`, `purple-nitrile-gloves-med`, `purple-nitrile-gloves-sm`, `sanizide-32oz-with-sprayer`, `sanizide-1-gallon`, `red-biohazard-bags-lg`, `red-biohazard-bags-sm`, `wipes`, `manual-bp-cuff-adult`, `manual-bp-cuff-pedi`, `disp-thermometer-strips`, `ammonia-inhalants-wipes`, `vinegar`, `backboard-with-disposable-straps`, `manual-bp-cuff-infant`, `lifepak-modem`, `lifepak-spo2-pulseox-sensor`, `lifepak-co2-rainbow-sensor`, `spo2-pediatric-sensor`, `spo2-infant-sensor`, `lifepak-4-lead-cable`, `lifepak-12-lead-cable`, `lifepak-therapy-cable`, `glucometer-with-lancets-and-strips`.
+
+Reuse decisions worth a second look (each is the same product by its printed words, not by similarity, but a person who knows the stock may disagree): `Zofran Oral` / `Zofran IV` use the ALS bag's split keys `zofran-oral` / `zofran-iv`; `Syringe 10/12cc` uses `syringe-10-12cc` (the ALS bag's "10 or 12cc"); `Combat App. Tourniquet CAT ( MCI BAG)` and `Tourniquet CAT` use `cat-tourniquet`; `Band aids 1 x 3" small` / `4 1/2" x 2" large` use the transport sheet's dimension keys; `Convenience bags(VOMEX)` uses `tv-convenience-bags`; `Disp. Thermometer Strips` has its own key `disp-thermometer-strips` (it could be `tv-disposable-thermometer` or `thermometer-strip`); `ARS Decomp 14ga 3"` has its own key (the transport sheet prints "Decomp 14ga 3"" and the ALS bag "ARS Decomp 14ga Needle"); `Auto BP Cuffs` reuse the transport sheet's five cuff keys (same five sizes).
+
+### 8c. Fire Boat 6 ALS (`fire_boat_6_als_inventory.json`, key `fire-boat-6-als`)
+
+Source: `fire_boat_6_medical_inventory.pdf`, one page (1176.9 x 1523.1 points), printed header `Date: / / M.B.F.D. FIRE BOAT ALS INVENTORY Unit# FB# 4 & 5 Revised 7-2025`. Same table layout as the non-transport sheet.
+
+| Section key | Printed heading | Printed rows | Items |
+|---|---|---|---|
+| `fb6-meds-red-bag` | MEDS RED BAG | 27 | 27 |
+| `fb6-iv-needles` | I.V./NEEDLES | 32 | 32 |
+| `fb6-airway-green-bag-left` | AIRWAY GREEN BAG | 17 | 17 |
+| `fb6-airway` | AIRWAY | 12 | 12 |
+| `fb6-airway-green-bag-middle` | AIRWAY GREEN BAG | 51 | 51 |
+| `fb6-trauma-1-box` | TRAUMA #1 BOX (continued as TRAUMA #1 BOX ( CONT )) | 24 | 24 |
+| `fb6-trauma-2-box` | TRAUMA #2 BOX | 14 | 14 |
+| `fb6-miscellaneous-on-boat` | MISCELLANEOUS ON BOAT | 12 | 12 |
+| `fb6-life-pack-inventory` | LIFE PACK INVENTORY | 22 | 26 |
+| **Total** | | **211** | **215** |
+
+Cross-check from the table borders: left 87 table rows = 3 headings + 76 rows + 8 empty; middle 88 = 3 headings + 1 italic note + 84 rows; right 88 = 4 headings + 51 rows + 33 empty. 211 named rows (headings, the note and the empty rows excluded); 215 items, the 211 rows plus 4 extra because the one `Auto BP Cuffs XL, L, REG,, PEDI, INFANT` row is five items. No row prints numbers without a name.
+
+**Header conflict (recorded, no data change).** The header prints `Unit# FB# 4 & 5` while three item rows say `FIREBOAT 6` (`Portable suction with container (FIREBOAT 6)`, `Cardboard splints short (FIREBOAT 6)`, `Cardboard splints long  (FIREBOAT 6)`). The header is kept verbatim in `source.printed_header`, the conflict is the first entry of `source.review_notes`, the list's key is `fire-boat-6-als` and no title, label, source label, flag or note refers to FB4 or FB5 as its unit (`FireBoat6AlsSheetTest` enforces this). The three FIREBOAT 6 rows carry `qualifier_text` "FIREBOAT 6".
+
+How the tricky cells were read:
+
+- Same reading rules as the non-transport sheet for `1 in bag`, `2 IN BOX`, `5 each`, `2 pair` / `1 pair`, `1 box`, `1 bag`, `1 each`, the five yellow BVM rows (AMOUNT blank, `1 in bag` under Fill if <, flagged), the italic BVM note (the note of the second `AIRWAY GREEN BAG` section), `Syringe 10/12cc` as one item, and the five-size `Auto BP Cuffs` row.
+- The boat's numbers differ from the non-transport sheet and are kept as printed: N. Saline 1000cc 4 / 4 (non-transport 2 / 2), `Tourniquet CAT` 6 / 6 (the non-transport sheet has `Combat App. Tourniquet CAT ( MCI BAG)` 10 / 10), 1" tape and 3" tape 2 / 2, 4" and 6" ace bandage 5 / 5, Armboards 4 / 4, Red biohazard bags 3 / 3, `Disposable Straps` 2 pair / 1 pair, Foil rescue blanket 2 / 2, Quick-clot 2 / 2, Safety Glasses (Clear) 4 / 4, no Tyvek or purple nitrile or Sanizide rows, latex gloves XL, Large and medium only. The boat sheet has `Manual Suction in Airway-Bag`, `Spare O2 Bottle`, `Vinegar 1 Gallon` and `Carry all` (singular) that the non-transport sheet does not; the boat prints no HANDTEVY rows, no `-IN HANDTEVY-` text and no yes/no check.
+- Two headings are both printed `AIRWAY GREEN BAG` (bottom of the left column with OPA and NPA; second heading in the middle column above the BVM rows) and are kept as two sections. `TRAUMA #1 BOX ( CONT )` (top of the right column) is merged into `TRAUMA #1 BOX`. `Adult Manual BP Cuff`, `Pedi Manual BP Cuff` and `Convenience bags(VOMEX)` sit under I.V./NEEDLES; `Safety Glasses (Clear)` is its first row.
+- `color_band`: the headings `MEDS RED BAG` (red band) and `AIRWAY GREEN BAG` (green band) print their color; the `I.V./NEEDLES` heading is on a red band and the `AIRWAY` heading on a green band, so those carry Red and Green too. The TRAUMA boxes are amber, MISCELLANEOUS ON BOAT blue and LIFE PACK INVENTORY light green; they print no color name and carry no `color_band`. Blank table rows between sections carry nothing.
+- Boat machinery, electronics, SCBA and fire gear are not on this sheet and were not added anywhere.
+
+Flagged `needs_review` (5): `fb6.airway-green-middle.et-tube-extension`, `fb6.airway-green-middle.bvm-co-capnoline`, `fb6.airway-green-middle.i-gel-5`, `fb6.airway-green-middle.i-gel-4`, `fb6.airway-green-middle.i-gel-3`. Reason for all five: AMOUNT is blank and "1 in bag" is printed under Fill if <.
+
+Rows with numbers but no label: none.
+
+Catalog: 181 keys reused from the older lists, 34 new. The reuse decisions are the same as for the non-transport sheet for every label the two sheets share; the reused keys that only this sheet uses (printed row <- key):
+
+```
+tv-bvm-infant <- Infant BVM   [older list: BVM Infant]
+```
+
+New keys: `needle-18ga-1-5in-filtered`, `needle-22ga-1-5in-admin`, `iv-tourniquet-latex-free`, `manual-bp-cuff-adult`, `manual-bp-cuff-pedi`, `curaplex-bvm-manometer`, `bvm-co-capnoline`, `manual-suction-in-airway-bag`, `portable-suction-with-container`, `ars-decomp-14ga-3in`, `ocular-eye-patch`, `c-collar-adult-regular`, `burn-gel-4x16-dressing`, `tpod-pelvic-device`, `carry-all`, `vinegar-1-gallon`, `backboard-with-disposable-straps`, `red-biohazard-bags-lg`, `red-biohazard-bags-sm`, `latex-gloves-xl`, `latex-gloves-large`, `latex-gloves-medium`, `spare-o2-bottle`, `disp-thermometer-strips`, `lifepak-modem`, `lifepak-spo2-pulseox-sensor`, `lifepak-co2-rainbow-sensor`, `spo2-pediatric-sensor`, `spo2-infant-sensor`, `lifepak-4-lead-cable`, `lifepak-12-lead-cable`, `lifepak-therapy-cable`, `glucometer-with-lancets-and-strips`, `ammonia-inhalants-wipes`. `Infant BVM` uses `tv-bvm-infant` (the transport sheet's `BVM Infant`); `Tourniquet CAT` uses `cat-tourniquet`.
+
+**Cross-check against the FIRE BOAT 6 Daily apparatus checkout** (`fb6_apparatus_daily_checkout.pdf`, sha256 `ecddfa5463544c20e72a3c8769f4c1816b7f788f4285dcb85e3dd40413c2975c`, "8/2026 Version 4"). Only the medical equipment group was compared; nothing from that sheet was transcribed into any list, and no boat machinery, electronics, SCBA or fire gear field was added. The checkout's group is `Medical Inventory`: Airway Bag, Med Box/Boo Boo-Bag, LifePak 15, Spare O2 Bottle (upper storage), LSU Suction, Gloves SM-XXL (1BXea), Sleeves (1BX), Backboards (2) (lower storage, cubby), plus the Tuesday task "(Medical Inventory)". What the boat ALS sheet covers:
+
+| Daily checkout line | Boat ALS sheet |
+|---|---|
+| Airway Bag | Not an item. The sheet lists the bag's contents under AIRWAY and AIRWAY GREEN BAG (and `Manual Suction in Airway-Bag`). |
+| Med Box/Boo Boo-Bag | Not an item. The contents are under MEDS RED BAG and I.V./NEEDLES. |
+| LifePak 15 | Not an item. LIFE PACK INVENTORY lists its supplies (paper, electrodes, pads, cables, sensors, modem). |
+| Spare O2 Bottle | Covered: `Spare O2 Bottle` 1 / 1 under MISCELLANEOUS ON BOAT. |
+| LSU Suction | Not named. `Portable suction with container (FIREBOAT 6)` 1 / 1 may be the same unit; the sheets do not say. |
+| Gloves SM-XXL (1BXea) | Partly: `Latex gloves XL`, `Latex gloves Large`, `Latex gloves medium`, `1 box` each. No small and no XXL on the ALS sheet. |
+| Sleeves (1BX) | Not covered. No sleeves row on the ALS sheet. |
+| Backboards (2) | Partly: `Backboard with Disposable Straps` 1 / 1 (the checkout says 2). |
+
+### 8d. BLS Detail Bag (`bls_detail_bag_inventory.json`, key `bls-detail-bag`)
+
+Source: `bls_detail_bag_medical_inventory.pdf`, one page, title `BLS DETAIL BAG`, `REV 2020`. Two printed columns (item, one unlabeled quantity cell); the left column is read top to bottom, then the right column. The sheet prints no `Fill if <` and no NEED column.
+
+| Section key | Printed heading | Printed rows | Items |
+|---|---|---|---|
+| `bls-front-pouch` | FRONT POUCH | 3 | 3 |
+| `bls-left-side` | LEFT SIDE (6) | 4 | 4 |
+| `bls-right-side` | RIGHT SIDE (5) | 4 | 4 |
+| `bls-pouch-4` | POUCH 4 | 8 | 8 |
+| `bls-pouch-3` | POUCH 3 | 3 | 3 |
+| `bls-pouch-2` | POUCH 2 | 5 | 5 |
+| `bls-compartment-1` | COMPARTMENT 1 | 9 | 9 |
+| `bls-main-compartment` | MAIN COMPARTMENT | 8 | 8 |
+| **Total** | | **44** | **44** |
+
+Cross-check from the table borders: the left column has 35 table rows = 6 headings + 27 item rows + 2 empty rows (under ADULT PADS and under BURN GEL 4X4); the right column has 2 headings + 17 item rows. 44 item rows, 44 items (no row lists several variants).
+
+How the tricky cells were read:
+
+- `1 BOX` (BAND AIDES 1X3") is kept as printed (`min_text` "1 BOX", `min_qty` 1, `min_unit` box). Every other quantity is a plain number.
+- `LEFT SIDE (6)` and `RIGHT SIDE (5)`: the number in brackets is part of the printed heading and is kept in the section label. It is not a row count (4 and 4 rows follow); it may be a pouch number.
+- Misspellings stay in `source_label` and are corrected only in `label`: TRAMUA SHEARS (Trauma shears), ORAL GLUCTOSE (Oral glucose), TYVEX SLEEVES (Tyvek sleeves), STETHESCOPE (Stethoscope), BAND AIDES (Band aids), ASHERMAN CHEST SEALS (Asherman chest seals). `MADDETT` is not an obvious spelling of another product and is kept (label "Maddett"). The printed spellings are search terms.
+- `OPAS 2 ADULT`, `OPAS 1 CHILD`, `OPAS 1 INF` print no OPA sizes; quantities 2, 1, 1.
+
+Flagged `needs_review`: none. Rows with numbers but no label: none.
+
+Catalog: 26 keys reused from the older lists, 18 new. Reused (this sheet's printed row <- key):
+
+```
+ice-pack <- ICE PACKS   [older list: ICE PACKS]
+tv-band-aids-1-x-3 <- BAND AIDES 1X3"   [older list: Band aids 1 x 3"]
+vomex-bag <- VOMEX BAG   [older list: VOMEX BAG]
+n95-respirator <- N95 MASKS   [older list: N95 Masks]
+tv-tyvek-sleeves <- TYVEX SLEEVES   [older list: Tyvek sleeves]
+ace-bandage-4in <- ACE BANDAGE 4"   [older list: 4" ace bandage]
+ace-bandage-6in <- ACE BANDAGE 6"   [older list: 6" ace bandage]
+kling-6in <- KLING 6"   [older list: Kling 6"]
+kling-4in <- KLING 4"   [older list: Kling 4"]
+kling-2in <- KLING 2"   [older list: Kling 2"]
+triangle-bandage <- TRIANGLE BANDAGE   [older list: TRIANGLE BANDAGE]
+tv-burn-gel-2-x-6-dressing <- BURN GEL 2X6"   [older list: Burn Gel 2x6 Dressing]
+tv-burn-gel-4-x-4-dressing <- BURN GEL 4X4   [older list: Burn Gel 4x4 Dressing]
+tv-bvm-pedi <- BVM PEDI   [older list: BVM Pedi]
+cat-tourniquet <- CAT TOURNIQUET   [older list: Combat App. Tourniquet CAT]
+trauma-shears <- TRAMUA SHEARS   [older list: TRAUMA SHEARS]
+pen-light <- PEN LIGHT   [older list: Pen Lights]
+peroxide <- PEROXIDE   [older list: PEROXIDE]
+tape-1in <- TAPE 1"   [older list: 1" tape]
+tape-3in <- TAPE 3"   [older list: 3" tape]
+asherman-chest-seal <- ASHERMAN CHEST SEALS   [older list: Ascherman chest seals]
+quikclot-gauze <- QUICK CLOT   [older list: Quick-clot]
+stethoscope <- STETHESCOPE   [older list: STETHOSCOPE]
+red-bag-als-bag <- RED BAG   [older list: RED BAG]
+glucometer <- GLUCOMETER   [older list: Glucometer]
+narcan <- NARCAN   [older list: Narcan]
+```
+
+New keys: `aed`, `aed-pads-pedi`, `aed-pads-adult`, `band-aids-2x3`, `gloves-bls-detail-bag`, `goggles`, `combi-pad-5x9`, `gauze-4x4`, `burn-gel-small`, `bvm-adult`, `opas-adult`, `opas-child`, `opas-infant`, `oral-glucose`, `arm-board-long`, `arm-board-short`, `bp-cuff`, `maddett`. Not matched on purpose (printed differently): `GLOVES` (5, unit unknown; the bags print `GLOVES 3 SETS` and `GLOVES 2 PAIR`), `GOGGLES` (the ALS bag says SAFETY GOGGLES), `BURN GEL SMALL` (the ALS bag says BURN GEL SMALL PACKET), `ORAL GLUCTOSE` (the lists say glucose gel), `BP CUFF` (the bags say BP CUFF (ADULT)), `COMBI PAD 5X9"` (not the defibrillator combi pads).
+
+### 8e. Verification run
+
+`tests/Feature/Ems/{HandtevySheetTest,NonTransportSheetTest,FireBoat6AlsSheetTest,BlsDetailBagSheetTest}.php` hold each sheet row by row (printed text, label, AMOUNT, Fill if <, flags, response type, catalog key), the section order, row totals, unique item refs, the sha256, the printed header and review notes, and import through `SourceImporter`.

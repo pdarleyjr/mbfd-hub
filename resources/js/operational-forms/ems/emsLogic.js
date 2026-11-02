@@ -16,13 +16,21 @@
 /** @typedef {import('./emsTypes').StoredDraft} StoredDraft */
 /** @typedef {import('./emsTypes').EmsUnit} EmsUnit */
 
-export const FORM_KEY = 'medical-inventory-request';
+import {
+    DEFAULT_FAMILY, GENERIC_FORM_TITLE, LEGACY_FORM_KEY, familyFromFormKey, familyOfDefinition, formKeyForFamily, formName, isFamilyKey, resolveFamily,
+} from './emsFamilies.js';
+
+// The four forms (family keys, draft keys, list names) and finding a supply live in their own modules; they are part of this API.
+export * from './emsFamilies.js';
+export * from './emsSearch.js';
+export * from './emsRequests.js';
+
+export const FORM_KEY = LEGACY_FORM_KEY;
 export const DEFAULT_MAX_QUANTITY = 999;
 export const STORED_DRAFT_VERSION = 1;
 
 /** Upper bound on retired entries read back from a stored draft (a corrupt row cannot grow without limit). */
 const RETIRED_LIMIT = 600;
-export const TIME_ZONE = 'America/New_York';
 
 /** Record types that are a read-only PDF copy in the member's Forms records. */
 export const DOCUMENT_RECORD_TYPES = ['uploaded_file', 'medical_inventory_request'];
@@ -70,9 +78,9 @@ export function lineKey(form, itemKey) {
     return `${form}|${itemKey}`;
 }
 
-/** @param {string} [clientSubmissionId] @returns {EmsDraft} */
-export function blankDraft(clientSubmissionId = newSubmissionId()) {
-    return { clientSubmissionId, targetChoice: '', eventAssignment: '', note: '', quantities: {}, answers: {} };
+/** @param {string} [clientSubmissionId] @param {string} [family] the form this request is for; ALS Transport when not given @returns {EmsDraft} */
+export function blankDraft(clientSubmissionId = newSubmissionId(), family = DEFAULT_FAMILY) {
+    return { clientSubmissionId, family, targetChoice: '', eventAssignment: '', note: '', quantities: {}, answers: {} };
 }
 
 /**
@@ -154,9 +162,13 @@ export function retiredEntries(draft) {
     ];
 }
 
-/** Anything the member would have to redo if the page went away: entries, unit, note, event text, retired entries. @param {EmsDraft} draft */
-export function hasUnsavedWork(draft) {
-    return hasContent(draft) || draft.targetChoice !== '' || draft.eventAssignment.trim() !== '' || retiredCount(draft) > 0;
+/**
+ * Anything the member would have to redo if the page went away: entries, unit, note, event text, retired entries.
+ * A unit the family preselected is not work. @param {EmsDraft} draft @param {EmsFormDefinition} [definition]
+ */
+export function hasUnsavedWork(draft, definition = undefined) {
+    const chosenUnit = draft.targetChoice !== '' && draft.targetChoice !== defaultTargetChoice(definition);
+    return hasContent(draft) || chosenUnit || draft.eventAssignment.trim() !== '' || retiredCount(draft) > 0;
 }
 
 /** Requested items in a list of sections. @param {EmsDraft} draft @param {string} formKey @param {EmsFormSection[]} sections */
@@ -206,6 +218,24 @@ export function unitForChoice(choice, units) {
 /** @param {EmsUnit} unit */
 export function choiceForUnit(unit) {
     return unit.kind === 'detail_event' || unit.id === null ? 'detail' : `unit:${unit.id}`;
+}
+
+/**
+ * The unit a family preselects (`detail` or `unit:<id>`), only when that unit is on the picker; '' otherwise.
+ * It is a starting point: the member can change it.
+ * @param {EmsFormDefinition | undefined | null} definition
+ */
+export function defaultTargetChoice(definition) {
+    const choice = definition?.family?.default_target;
+    if (typeof choice !== 'string' || choice === '') return '';
+    return unitForChoice(choice, definition?.units ?? []) ? choice : '';
+}
+
+/** A draft with no unit chosen starts on the family's default unit, when it has one. @param {EmsDraft} draft @param {EmsFormDefinition} definition @returns {EmsDraft} */
+export function withDefaultTarget(draft, definition) {
+    if (draft.targetChoice !== '') return draft;
+    const preset = defaultTargetChoice(definition);
+    return preset === '' ? draft : { ...draft, targetChoice: preset };
 }
 
 /**
@@ -284,8 +314,9 @@ export function buildPayload(draft, definition) {
     const event = draft.eventAssignment.trim();
     if (unit.kind === 'detail_event' && event !== '') target.event_assignment = event;
 
+    // The family is the form the lines came from (every line's `form` is one of its lists); a queued send without one is ALS Transport.
     /** @type {EmsSubmitPayload} */
-    const payload = { client_submission_id: draft.clientSubmissionId, ...(isUuid(draft.revises) ? { revises: draft.revises } : {}), target, lines };
+    const payload = { client_submission_id: draft.clientSubmissionId, family: familyOfDefinition(definition), ...(isUuid(draft.revises) ? { revises: draft.revises } : {}), target, lines };
     const note = draft.note.trim();
     if (note !== '') payload.member_note = note;
     return payload;
@@ -303,7 +334,7 @@ export function payloadItemCount(payload) {
  */
 export function draftFromPayload(payload, definition, revision = undefined) {
     const keys = validKeys(definition);
-    let draft = blankDraft(payload.client_submission_id);
+    let draft = blankDraft(payload.client_submission_id, familyOfDefinition(definition));
     const retired = { quantities: /** @type {Record<string, number>} */ ({}), answers: /** @type {Record<string, boolean>} */ ({}) };
     for (const line of payload.lines) {
         const key = lineKey(line.form, line.item_key);
@@ -371,7 +402,7 @@ function choiceForRequest(request, units) {
 export function draftFromRequest(request, definition, clientSubmissionId = newSubmissionId()) {
     const keys = validKeys(definition);
     const max = definition.limits.max_quantity;
-    let draft = blankDraft(clientSubmissionId);
+    let draft = blankDraft(clientSubmissionId, familyOfDefinition(definition));
     const retired = { quantities: /** @type {Record<string, number>} */ ({}), answers: /** @type {Record<string, boolean>} */ ({}) };
     /** @type {Record<string, string>} */
     const labels = {};
@@ -516,11 +547,15 @@ function entryLabels(draft, definition) {
  */
 export function serializeDraft(draft, savedAt = new Date().toISOString(), definition = undefined) {
     const hasEntries = Object.keys(draft.quantities).length > 0 || Object.keys(draft.answers).length > 0 || retiredCount(draft) > 0;
+    // A unit the family preselected is not the member's work; a unit the member changed to is.
+    const untouchedUnit = draft.targetChoice === '' || draft.targetChoice === defaultTargetChoice(definition);
     // A correction is always worth keeping, even when emptied: reopening it must not bring the sent copy back over the member's edit.
-    if (!hasEntries && draft.targetChoice === '' && !isUuid(draft.revises)) return null;
+    if (!hasEntries && untouchedUnit && !isUuid(draft.revises)) return null;
     return {
         v: STORED_DRAFT_VERSION,
         clientSubmissionId: draft.clientSubmissionId,
+        // Additive and optional like the fields below: a build that does not know it reads the row as ALS Transport, which is what it is.
+        family: draft.family ?? familyOfDefinition(definition),
         targetChoice: draft.targetChoice,
         quantities: { ...draft.quantities },
         answers: { ...draft.answers },
@@ -540,10 +575,13 @@ export function restoreDraft(stored, definition) {
     if (!stored || typeof stored !== 'object') return null;
     const data = /** @type {Record<string, any>} */ (stored);
     if (data.v !== STORED_DRAFT_VERSION || !isUuid(data.clientSubmissionId)) return null;
+    // A row without a family was typed before the four forms: it is ALS Transport. A row for another family is never opened here.
+    const family = familyOfDefinition(definition);
+    if ((isFamilyKey(data.family) ? data.family : DEFAULT_FAMILY) !== family) return null;
     const keys = validKeys(definition);
     const max = definition.limits.max_quantity;
 
-    let draft = blankDraft(data.clientSubmissionId);
+    let draft = blankDraft(data.clientSubmissionId, family);
     // Merge by key: what the form lists goes back into it; what it does not list is retired, never dropped.
     const retired = { quantities: /** @type {Record<string, number>} */ ({}), answers: /** @type {Record<string, boolean>} */ ({}) };
     const place = (/** @type {'quantities' | 'answers'} */ kind, /** @type {unknown} */ entries) => {
@@ -580,45 +618,7 @@ export function restoreDraft(stored, definition) {
     return { ...restored, retired, labels };
 }
 
-// ---------------------------------------------------------------- search and grouping
-
-/** @param {string} query @returns {string[]} */
-export function searchTokens(query) {
-    return query.toLowerCase().split(/[\s,]+/).map((token) => token.trim()).filter(Boolean);
-}
-
-/** @param {EmsFormItem} item @param {EmsFormSection} section @param {EmsForm} form */
-function haystack(item, section, form) {
-    return [item.label, item.variant_label, item.min_text, ...(item.aliases ?? []), section.label, form.title]
-        .filter(Boolean).join(' ').toLowerCase();
-}
-
-/**
- * Items that match every word of the query, across every form. A match on a section name keeps its items.
- * @param {EmsForm[]} forms @param {string} query
- * @returns {{forms: EmsForm[], matches: number}}
- */
-export function filterForms(forms, query) {
-    const tokens = searchTokens(query);
-    if (tokens.length === 0) return { forms, matches: forms.reduce((n, form) => n + form.sections.reduce((m, s) => m + s.items.length, 0), 0) };
-    let matches = 0;
-    const result = [];
-    for (const form of forms) {
-        const sections = [];
-        for (const section of form.sections) {
-            const items = section.items.filter((item) => {
-                const text = haystack(item, section, form);
-                return tokens.every((token) => text.includes(token));
-            });
-            if (items.length > 0) {
-                matches += items.length;
-                sections.push({ ...section, items });
-            }
-        }
-        if (sections.length > 0) result.push({ ...form, sections });
-    }
-    return { forms: result, matches };
-}
+// ---------------------------------------------------------------- grouping and labels (search is in emsSearch.js)
 
 /**
  * Top-level categories with their sub-sections (BVM Bag Set Up under Main, Rescue Only under Miscellaneous).
@@ -640,46 +640,62 @@ export function groupSections(sections) {
         .map((section) => ({ section, children: children.get(section.key) ?? [] }));
 }
 
-const FORM_NAMES = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag/Box', 'als-transport-vehicle': 'ALS Transport Vehicle' };
-
-/** A short name for a bag form. @param {EmsForm} form */
-export function formName(form) {
-    return /** @type {Record<string, string>} */ (FORM_NAMES)[form.key] ?? form.title;
-}
-
 /**
- * What will be sent, grouped by form, for the review sheet. Only items with a quantity or an answer.
+ * What will be sent, grouped by list and then by section, for the review sheet. Only items with a quantity or an answer.
+ * `rows` is the same lines flat; each row says where it lives so "Edit" can take the member back to that exact item.
  * @param {EmsDraft} draft @param {EmsFormDefinition} definition
- * @returns {{key: string, name: string, rows: {itemKey: string, label: string, detail: string, answered: boolean}[]}[]}
+ * @returns {{key: string, name: string, rows: ReviewRow[], sections: {key: string, label: string, rows: ReviewRow[]}[]}[]}
  */
 export function reviewGroups(draft, definition) {
     const groups = [];
     for (const form of definition.forms) {
+        const known = new Set(form.sections.map((section) => section.key));
         const rows = [];
+        const sections = [];
         for (const section of form.sections) {
+            const sectionRows = [];
             for (const item of section.items) {
                 const key = lineKey(form.key, item.item_key);
+                /** @type {Omit<ReviewRow, 'detail' | 'answered'>} */
+                const where = { itemKey: key, label: item.label, formKey: form.key, itemId: item.item_key, sectionKey: section.key, panelKey: section.parent_key && known.has(section.parent_key) ? section.parent_key : section.key };
                 if (item.response_type === 'yes_no') {
-                    if (typeof draft.answers[key] === 'boolean') rows.push({ itemKey: key, label: item.label, detail: draft.answers[key] ? 'Yes' : 'No', answered: true });
+                    if (typeof draft.answers[key] === 'boolean') sectionRows.push({ ...where, detail: draft.answers[key] ? 'Yes' : 'No', answered: true });
                 } else if (draft.quantities[key] !== undefined) {
-                    rows.push({ itemKey: key, label: item.label, detail: String(draft.quantities[key]), answered: false });
+                    sectionRows.push({ ...where, detail: String(draft.quantities[key]), answered: false });
                 }
             }
+            rows.push(...sectionRows);
+            if (sectionRows.length > 0) sections.push({ key: section.key, label: section.label, rows: sectionRows });
         }
-        if (rows.length > 0) groups.push({ key: form.key, name: formName(form), rows });
+        if (rows.length > 0) groups.push({ key: form.key, name: formName(form), rows, sections });
     }
     return groups;
 }
 
+/** @typedef {{itemKey: string, label: string, formKey: string, itemId: string, sectionKey: string, panelKey: string, detail: string, answered: boolean}} ReviewRow */
+
 /**
  * "Min 2 each", exactly as the paper form gives it; the transport vehicle sheet reads "Par 4, refill under 2".
- * Yes/No items have no minimum. @param {EmsFormItem} item
+ * Yes/No items have no minimum. Kept for the printed-form wording; the form rows use amountLabel and refillLabel.
+ * @param {EmsFormItem} item
  */
 export function minLabel(item) {
     const text = (item.min_text ?? '').trim();
     if (item.response_type === 'yes_no' || text === '') return '';
     const fillIf = String(item.flags?.fill_if_text ?? '').trim();
     return fillIf === '' ? `Min ${text}` : `Par ${text}, refill under ${fillIf}`;
+}
+
+/** AMOUNT, the printed amount to carry: "Carry 4". Yes/No items have none. @param {EmsFormItem} item */
+export function amountLabel(item) {
+    const text = (item.min_text ?? '').trim();
+    return item.response_type === 'yes_no' || text === '' ? '' : `Carry ${text}`;
+}
+
+/** "Fill if <", the printed level to refill at: "Refill under 2". Shown beside the amount, never mixed into it. @param {EmsFormItem} item */
+export function refillLabel(item) {
+    const text = String(item.flags?.fill_if_text ?? '').trim();
+    return item.response_type === 'yes_no' || text === '' ? '' : `Refill under ${text}`;
 }
 
 const FLAG_LABELS = /** @type {const} */ ([
@@ -694,6 +710,49 @@ export function flagTags(flags) {
     return FLAG_LABELS.filter(([key]) => Boolean(flags && flags[key])).map(([, label]) => label);
 }
 
+const CADENCE_TEXT = /** @type {Record<string, string>} */ ({ monthly_first_tuesday: 'Checked monthly, on the first Tuesday' });
+
+/** The printed cadence in words, or '' (a cadence this build does not know is not guessed at). @param {unknown} cadence */
+export function cadenceText(cadence) {
+    return typeof cadence === 'string' ? (CADENCE_TEXT[cadence] ?? '') : '';
+}
+
+/**
+ * The small chips on a row, in the order a person looks for them: where it is kept, the printed condition, the color or age group,
+ * then the flags. A flag whose words are already a chip is not repeated.
+ * @param {EmsFormItem} item @returns {{kind: 'place' | 'condition' | 'color' | 'flag' | 'cadence', text: string}[]}
+ */
+export function itemChips(item) {
+    const flags = item.flags ?? {};
+    /** @type {{kind: 'place' | 'condition' | 'color' | 'flag' | 'cadence', text: string}[]} */
+    const chips = [];
+    const seen = new Set();
+    /** @param {'place' | 'condition' | 'color' | 'flag' | 'cadence'} kind @param {unknown} text */
+    const add = (kind, text) => {
+        const value = typeof text === 'string' ? text.trim() : '';
+        const same = value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+        if (value === '' || seen.has(same)) return;
+        seen.add(same);
+        chips.push({ kind, text: value });
+    };
+    add('color', flags.color_band);
+    add('place', flags.location_text);
+    add('condition', flags.qualifier_text);
+    for (const tag of flagTags(flags)) add('flag', tag);
+    add('cadence', cadenceText(flags.cadence));
+    return chips;
+}
+
+/** What is printed under a section heading: its note and its cadence. @param {EmsFormSection} section @returns {string[]} */
+export function sectionNotes(section) {
+    return [section.note, cadenceText(section.cadence)].filter((text) => typeof text === 'string' && text.trim() !== '').map((text) => /** @type {string} */ (text).trim());
+}
+
+/** The id of an item's row on the page, so the review can take the member back to it. @param {string} formKey @param {string} itemKey */
+export function itemDomId(formKey, itemKey) {
+    return `ems-${formKey}-${itemKey}`.replace(/[^a-zA-Z0-9-]/g, '-');
+}
+
 /** The first item of a run that shares a variant group gets the group caption. @param {EmsFormItem[]} items @param {number} index */
 export function variantCaption(items, index) {
     const item = items[index];
@@ -701,93 +760,24 @@ export function variantCaption(items, index) {
     return index > 0 && items[index - 1].variant_group === item.variant_group ? '' : item.variant_group;
 }
 
-// ---------------------------------------------------------------- requests (member views)
-
-const STATUS_LABELS = {
-    submitted: 'Submitted',
-    reviewed: 'Reviewed',
-    prepared: 'Being prepared',
-    partially_issued: 'Partly issued',
-    issued: 'Issued',
-    closed: 'Closed',
-    cancelled: 'Cancelled',
-    returned: 'Returned',
-};
-
-/** Plain language for the member. A status this build does not list (reconciled, superseded) uses the server's own label. @param {string} status @param {unknown} [serverLabel] */
-export function statusLabel(status, serverLabel = undefined) {
-    const known = /** @type {Record<string, string>} */ (STATUS_LABELS)[status];
-    if (known) return known;
-    return typeof serverLabel === 'string' && serverLabel.trim() !== '' ? serverLabel.trim() : status;
-}
-
-/** @param {string} status @returns {'info' | 'progress' | 'done' | 'muted' | 'attention'} */
-export function statusTone(status) {
-    if (status === 'returned') return 'attention';
-    if (status === 'issued' || status === 'reconciled') return 'done';
-    if (status === 'superseded') return 'muted';
-    if (status === 'closed' || status === 'cancelled') return 'muted';
-    if (status === 'prepared' || status === 'partially_issued') return 'progress';
-    return 'info';
-}
-
-const EVENT_LABELS = {
-    submitted: 'Request submitted',
-    reviewed: 'Reviewed',
-    prepared: 'Being prepared',
-    issued: 'Issued',
-    issue_corrected: 'Issued quantity corrected',
-    not_issued: 'Marked not issued',
-    closed: 'Closed',
-    reopened: 'Reopened',
-    cancelled: 'Cancelled',
-    rejected: 'Returned for correction',
-    reconciled: 'Reconciled',
-    revised: 'Corrected and resent',
-    status_changed: 'Status changed',
-};
-
-/** @param {string} action */
-export function eventLabel(action) {
-    return /** @type {Record<string, string>} */ (EVENT_LABELS)[action] ?? action.replace(/_/g, ' ');
-}
-
-/** "Gauze: 4" style detail for a history row, from the member-safe payload. @param {{quantity?: number, reason?: string, label?: string}} payload */
-export function eventDetail(payload) {
-    const parts = [];
-    if (payload.label) parts.push(payload.quantity !== undefined ? `${payload.label}: ${payload.quantity}` : payload.label);
-    else if (payload.quantity !== undefined) parts.push(`Quantity ${payload.quantity}`);
-    if (payload.reason) parts.push(`Reason: ${payload.reason}`);
-    return parts.join('. ');
-}
-
-/** Submitted time as Eastern time. @param {string | null | undefined} iso */
-export function formatEastern(iso) {
-    if (!iso) return '';
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat('en-US', {
-        timeZone: TIME_ZONE, month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
-    }).format(date);
-}
-
-/** @param {{requested_qty: number | null, requested_flag: boolean | null, response_type: string}} line */
-export function requestedText(line) {
-    if (line.response_type === 'yes_no') return line.requested_flag === true ? 'Yes' : line.requested_flag === false ? 'No' : '';
-    return line.requested_qty === null ? '' : String(line.requested_qty);
-}
-
 // ---------------------------------------------------------------- deep links
 
-/** The view a Forms URL asks for, or null for the plain library. @param {string} search @returns {import('./emsTypes').EmsView | null} */
-export function viewFromSearch(search) {
+/**
+ * The view a Forms URL asks for, or null for the plain library. `?form=` is a family's form key (the legacy key means ALS Transport),
+ * so a form view names its family unless it came from the legacy key. @param {string} search @param {import('./emsTypes').EmsFamilySummary[]} [families] @returns {import('./emsTypes').EmsView | null}
+ */
+export function viewFromSearch(search, families = []) {
     const params = new URLSearchParams(search);
     const request = (params.get('ems_request') ?? '').toLowerCase();
     if (isUuid(request)) return { name: 'detail', id: request };
-    if (params.get('form') === FORM_KEY) {
+    const formParam = params.get('form');
+    const family = familyFromFormKey(formParam, families);
+    if (family !== null) {
         if (params.get('view') === 'mine') return { name: 'mine' };
+        // The legacy key names no family: a view without one is ALS Transport, and it goes back to the same address.
+        const named = formParam === LEGACY_FORM_KEY ? {} : { family };
         const revises = revisesFromSearch(search);
-        return revises ? { name: 'form', revises } : { name: 'form' };
+        return revises ? { name: 'form', ...named, revises } : { name: 'form', ...named };
     }
     return null;
 }
@@ -796,43 +786,37 @@ export function viewFromSearch(search) {
 export function searchForView(view) {
     if (!view) return '';
     if (view.name === 'detail') return `?ems_request=${view.id}`;
-    if (view.name === 'form' && view.revises) return `?form=${FORM_KEY}&revises=${view.revises}`;
-    return view.name === 'mine' ? `?form=${FORM_KEY}&view=mine` : `?form=${FORM_KEY}`;
+    if (view.name === 'form' && view.revises) return `?form=${formKeyForFamily(view.family)}&revises=${view.revises}`;
+    if (view.name === 'form') return `?form=${formKeyForFamily(view.family)}`;
+    return `?form=${FORM_KEY}&view=mine`;
 }
 
-/** @param {import('./emsTypes').EmsDeepLink | undefined} link @returns {import('./emsTypes').EmsView | null} */
-export function viewFromDeepLink(link) {
+/**
+ * The bootstrap's deep link (`family` is a family key or its form key; absent means ALS Transport).
+ * @param {import('./emsTypes').EmsDeepLink | undefined} link @param {import('./emsTypes').EmsFamilySummary[]} [families] @returns {import('./emsTypes').EmsView | null}
+ */
+export function viewFromDeepLink(link, families = []) {
     if (!link || !link.view) return null;
     if (link.view === 'detail') return link.request && isUuid(link.request) ? { name: 'detail', id: link.request } : null;
+    if (link.view === 'form') return { name: 'form', family: resolveFamily(link.family, families) };
     return { name: link.view };
 }
 
-// ---------------------------------------------------------------- failures
-
 /**
- * What to do with a failed send. `queue`: keep it on the device and retry with the same submission id.
- * `auth`: sign in again (the draft is kept). `message`: show the server's own friendly message.
- * @param {{status: number, code?: string | null, network?: boolean}} failure
- * @returns {'queue' | 'auth' | 'message'}
+ * The form a Forms library card opens. The server's card names it as `family` (a family key or its form key) or by its link
+ * (`?form=<form key>`); a card that names neither opens ALS Transport.
+ * @param {{key?: string, href?: string, family?: string | null}} link @param {import('./emsTypes').EmsFamilySummary[]} [families]
  */
-export function classifyFailure(failure) {
-    if (failure.network) return 'queue';
-    if (failure.status === 401 || failure.status === 419) return 'auth';
-    if (failure.status === 429) return 'queue';
-    if (failure.status >= 500 && !failure.code) return 'queue';
-    return 'message';
+export function familyFromLibraryLink(link, families = []) {
+    if (typeof link.family === 'string' && link.family !== '') return resolveFamily(link.family, families);
+    try {
+        const fromHref = familyFromFormKey(new URL(link.href ?? '', 'https://hub.invalid').searchParams.get('form'), families);
+        if (fromHref !== null) return fromHref;
+    } catch { /* a link that is not a URL falls through to its key */ }
+    return familyFromFormKey(link.key, families) ?? (isFamilyKey(link.key) ? /** @type {string} */ (link.key) : DEFAULT_FAMILY);
 }
 
-/**
- * Which control a server refusal belongs next to.
- * @param {string | null | undefined} code @param {Record<string, unknown> | null | undefined} fields
- * @returns {'target' | 'event' | 'note' | 'items' | 'general'}
- */
-export function fieldForError(code, fields) {
-    const names = Object.keys(fields ?? {});
-    if (code === 'invalid_unit' || code === 'unit_mismatch' || names.some((name) => name === 'target' || name === 'target.kind' || name === 'target.apparatus_id')) return 'target';
-    if (names.includes('target.event_assignment')) return 'event';
-    if (names.includes('member_note')) return 'note';
-    if (code === 'empty_request' || names.includes('lines') || ['unknown_item', 'invalid_quantity', 'invalid_answer', 'duplicate_item'].includes(code ?? '')) return 'items';
-    return 'general';
+/** The family a form view opens; a view that names none is ALS Transport. @param {import('./emsTypes').EmsView} view */
+export function familyOfView(view) {
+    return view.name === 'form' && view.family ? view.family : DEFAULT_FAMILY;
 }

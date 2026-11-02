@@ -19,6 +19,13 @@
     font-family: var(--hub-font-sans);
 }
 
+.ems {
+    /* Where the sticky search bar parks: just under the Hub shell bar (and the phone's top inset in the installed app). */
+    --ems-stick-top: var(--hub-bar-total, calc(var(--hub-shell-bar-height, 56px) + env(safe-area-inset-top, 0px)));
+}
+/* .of-app clips with overflow:hidden, which would stop anything inside it from sticking to the screen. clip does not make a scroll container. */
+.of-app:has(.ems-searchbar) { overflow: clip; }
+
 .ems-app {
     display: flex;
     flex-direction: column;
@@ -35,7 +42,14 @@
 .ems-head { display: grid; gap: 6px; }
 .ems-head h1 { font-size: 24px; line-height: 1.2; font-weight: 650; letter-spacing: -0.01em; color: var(--ems-heading); }
 .ems-head p:not(.of-eyebrow) { color: var(--ems-muted); font-size: 14px; line-height: 1.5; }
-.ems-head-actions { display: flex; gap: 8px; }
+.ems-head-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ems-head-actions .fui-Button { min-height: 44px; }
+.ems-new-forms { display: grid; gap: 6px; }
+.ems-new-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 8px; }
+.ems-new-grid .fui-Button { min-height: 44px; justify-content: flex-start; }
+.ems-head p.ems-head-unit:not(.of-eyebrow) { font-size: 17px; line-height: 1.3; color: var(--ems-ink); }
+.ems-head p.ems-head-unit strong { font-size: 22px; letter-spacing: 0.01em; color: var(--ems-heading); overflow-wrap: anywhere; }
+.ems-head p.ems-head-unit.is-empty:not(.of-eyebrow) { font-size: 15px; color: rgb(var(--hub-warning-strong)); }
 .ems-detail-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .ems-loading, .ems-empty { padding: 28px 12px; text-align: center; color: var(--ems-muted); }
 .ems-empty { display: grid; gap: 8px; justify-items: center; background: var(--ems-surface); border: 1px solid var(--ems-line); border-radius: var(--hub-radius-card); }
@@ -73,8 +87,29 @@
 .ems-select[aria-invalid="true"], .ems-text[aria-invalid="true"], .ems-textarea[aria-invalid="true"] { border-color: var(--ems-danger); }
 .ems-event { display: grid; gap: 6px; margin-top: 6px; }
 
-/* Search */
-.ems-searchbar { gap: 4px; }
+/* Search: stays on screen while the member scrolls the list. */
+.ems-searchbar { position: sticky; top: var(--ems-stick-top); z-index: 20; gap: 2px; padding: 8px 10px; box-shadow: 0 2px 8px rgb(var(--hub-n-900) / 0.08); }
+.ems-search-line { display: flex; align-items: center; gap: 8px; }
+.ems-search-line .ems-search { flex: 1 1 auto; min-width: 0; }
+.ems-toggle {
+    box-sizing: border-box;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 14px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 650;
+    color: var(--ems-ink);
+    background: var(--ems-well);
+    border: 1px solid var(--ems-edge);
+    border-radius: var(--hub-radius-pill);
+    cursor: pointer;
+}
+.ems-toggle[aria-pressed="true"] { color: rgb(var(--hub-n-0)); background: var(--ems-accent); border-color: var(--ems-accent); }
+.ems-toggle-count { font-variant-numeric: tabular-nums; }
 .ems-search { position: relative; display: flex; align-items: center; }
 .ems-search > svg { position: absolute; left: 12px; color: var(--ems-muted); pointer-events: none; }
 .ems-search-input { padding-left: 40px; padding-right: 44px; }
@@ -113,7 +148,13 @@
 .ems-category-count { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: none; }
 .ems-count-chip { padding: 2px 10px; font-size: 12.5px; font-weight: 650; color: var(--ems-accent); background: var(--ems-tint); border: 1px solid rgb(var(--hub-blue) / 0.3); border-radius: var(--hub-radius-pill); }
 .ems-count-total { font-size: 12.5px; font-weight: 500; color: var(--ems-muted); }
+.ems-category { scroll-margin-top: calc(var(--ems-stick-top) + 132px); }
 .ems-category-body { border-top: 1px solid var(--ems-line); }
+.ems-section-note { padding: 8px 14px; font-size: 13px; line-height: 1.4; color: var(--ems-ink); background: var(--ems-tint); border-bottom: 1px solid var(--ems-line-soft); }
+.ems-results { overflow: hidden; background: var(--ems-surface); border: 1px solid var(--ems-line); border-radius: var(--hub-radius-card); }
+.ems-results-empty { padding: 4px 2px; }
+.ems-results .ems-more { padding: 10px; border-top: 1px solid var(--ems-line-soft); }
+.ems-results .ems-more .fui-Button { min-height: 44px; }
 .ems-subhead { padding: 8px 14px; font-size: 13px; font-weight: 650; color: var(--ems-muted); background: rgb(var(--hub-n-50)); border-top: 1px solid var(--ems-line); border-bottom: 1px solid var(--ems-line); }
 
 /* Items */
@@ -125,7 +166,15 @@
 .ems-item-text { display: grid; gap: 4px; min-width: 0; }
 .ems-item-label { font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
 .ems-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 12.5px; color: var(--ems-muted); }
+.ems-item-meta:empty { display: none; }
+.ems-item-context { flex-basis: 100%; font-size: 12px; font-weight: 600; color: var(--ems-muted); }
 .ems-min { font-variant-numeric: tabular-nums; }
+/* AMOUNT and "Fill if <" side by side but never confused: the amount is plain bold, the refill level is a tinted tag. */
+.ems-amount { font-size: 13px; font-weight: 700; color: var(--ems-ink); font-variant-numeric: tabular-nums; }
+.ems-refill { padding: 0 7px; font-size: 12.5px; font-weight: 650; color: rgb(var(--hub-warning-strong)); background: rgb(var(--hub-warning-bg)); border: 1px solid rgb(var(--hub-warning-border)); border-radius: var(--hub-radius-tag); font-variant-numeric: tabular-nums; }
+.ems-chip { display: inline-block; padding: 1px 7px; font-size: 11.5px; font-weight: 600; color: var(--ems-muted); background: var(--ems-well); border: 1px solid var(--ems-edge); border-radius: var(--hub-radius-tag); overflow-wrap: anywhere; }
+.ems-chip.is-condition { color: rgb(var(--hub-warning-strong)); border-color: rgb(var(--hub-warning-border)); }
+.ems-chip.is-color { color: var(--ems-ink); }
 .ems-tag { display: inline-block; padding: 1px 7px; font-size: 11.5px; font-weight: 600; color: var(--ems-muted); background: var(--ems-well); border: 1px solid var(--ems-edge); border-radius: var(--hub-radius-tag); }
 .ems-item-note { margin-top: 6px; font-size: 12.5px; line-height: 1.4; color: var(--ems-muted); }
 
@@ -194,7 +243,11 @@
 .ems-sheet-actions { position: sticky; bottom: 0; padding-top: 10px; background: var(--ems-surface); }
 .ems-review { display: grid; gap: 14px; }
 .ems-review h3 { margin-bottom: 4px; font-size: 14px; font-weight: 650; color: var(--ems-heading); }
-.ems-review-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--ems-line-soft); }
+.ems-review-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 4px 10px; padding: 3px 0; border-bottom: 1px solid var(--ems-line-soft); }
+.ems-review-list { margin: 0; padding: 0; list-style: none; } /* the sheet is portaled outside .ems-app, which resets lists */
+.ems-review-label { overflow-wrap: anywhere; }
+.ems-review-section h4 { margin: 8px 0 2px; font-size: 13px; font-weight: 650; color: var(--ems-muted); }
+.ems-review-edit.fui-Button { min-width: 44px; min-height: 44px; }
 .ems-review-list strong { flex: none; font-variant-numeric: tabular-nums; }
 .ems-review-empty, .ems-review-note { font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ems-review-facts { display: grid; gap: 6px; }
@@ -332,7 +385,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .ems-chevron { transition: none; }
+    .ems *, .ems *::before, .ems *::after { transition: none !important; scroll-behavior: auto !important; animation-duration: 0.01ms !important; }
 }
 
 .ems-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
@@ -342,7 +395,7 @@
 }
 
 .ems-search-input::-webkit-search-cancel-button { display: none; }
-.ems-search-count:empty { min-height: 0; margin-top: -8px; } /* stays in the page so the live region announces the first result */
+.ems-search-count:empty { min-height: 0; margin-top: -2px; } /* stays in the page (not display:none) so the live region announces the first result */
 
 /* Choosing a list: Airway Bag, ALS Med Bag/Box, ALS Transport Vehicle. Wraps on a phone, never scrolls sideways. */
 .ems-bags { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 8px; scroll-margin-top: 12px; }
@@ -410,3 +463,17 @@
 .ems-unit-banner strong { font-size: 22px; letter-spacing: 0.01em; color: var(--ems-heading); overflow-wrap: anywhere; }
 .ems-bar-unit { font-size: 13.5px; color: var(--ems-ink); }
 .ems-bar-unit strong { font-weight: 700; }
+
+/* The form a request was made on, next to its number */
+.ems-family-tag { display: inline-flex; align-items: center; padding: 2px 8px; font-size: 12px; font-weight: 600; color: var(--ems-muted); background: var(--ems-well); border: 1px solid var(--ems-edge); border-radius: var(--hub-radius-pill); }
+
+/* A unit the form preselected is one line with "Change unit" */
+.ems-unit-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 16px; }
+.ems-unit-summary strong { font-size: 18px; color: var(--ems-heading); overflow-wrap: anywhere; }
+.ems-unit-summary .fui-Button { min-height: 44px; }
+
+/* Jump to a section: a native menu, so the phone shows its own picker */
+.ems-form-tools { align-items: center; }
+.ems-form-tools .ems-jump { width: auto; flex: 1 1 200px; min-width: 0; }
+
+.ems :is(button, select, input, textarea):focus-visible { outline: 3px solid rgb(var(--hub-focus, 29 78 216)); outline-offset: 2px; }

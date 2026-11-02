@@ -21,7 +21,7 @@ async function signIn(page: Page) {
   await page.getByLabel('Employee ID').fill(employeeId);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page.getByRole('heading', { name: 'Medical Inventory Request', level: 1 })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'ALS Transport Inventory Form', level: 1 })).toBeVisible({ timeout: 30_000 });
 }
 
 const radio = (page: Page, name: string) => page.getByRole('radio', { name, exact: true });

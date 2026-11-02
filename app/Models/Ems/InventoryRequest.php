@@ -6,6 +6,7 @@ namespace App\Models\Ems;
 
 use App\Models\Apparatus;
 use App\Models\User;
+use App\Services\Ems\FormFamilies;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -57,6 +58,7 @@ use LogicException;
  * @property int|null $reconciled_by_user_id
  * @property string|null $reconciled_by_name
  * @property string|null $reconciliation_batch
+ * @property string|null $form_family
  * @property-read int|null $lines_count
  * @property-read int|string|null $qty_requested
  * @property-read int|string|null $qty_issued
@@ -112,7 +114,7 @@ class InventoryRequest extends Model
     private const FROZEN = [
         'uuid', 'number', 'submitted_by_user_id', 'submitted_by_employee_id', 'submitter_name', 'submitter_rank',
         'submitted_at', 'target_kind', 'apparatus_id', 'target_label', 'event_assignment', 'member_note',
-        'client_submission_id', 'source_form_versions', 'snapshot', 'snapshot_sha256', 'revision_of_request_id', 'revision_number',
+        'client_submission_id', 'source_form_versions', 'snapshot', 'snapshot_sha256', 'revision_of_request_id', 'revision_number', 'form_family',
     ];
 
     protected $table = 'ems_inventory_requests';
@@ -123,7 +125,7 @@ class InventoryRequest extends Model
         'snapshot', 'snapshot_sha256', 'operational_form_record_id', 'reviewed_at', 'reviewed_by_user_id', 'closed_at', 'closed_by_user_id',
         'close_reason', 'cancelled_at', 'cancelled_by_user_id', 'cancel_reason', 'last_activity_at', 'reviewed_by_name', 'revision_of_request_id',
         'revision_number', 'returned_at', 'returned_by_user_id', 'returned_by_name', 'return_reason', 'reconciled_at', 'reconciled_by_user_id',
-        'reconciled_by_name', 'reconciliation_batch',
+        'reconciled_by_name', 'reconciliation_batch', 'form_family',
     ];
 
     protected static function booted(): void
@@ -159,6 +161,17 @@ class InventoryRequest extends Model
     public function getRouteKeyName(): string
     {
         return 'uuid';
+    }
+
+    /**
+     * The form this request came from. A row with no family (written before the four forms, or by a rolled-back image)
+     * is ALS Transport. Never derived from the number, the title or a label.
+     *
+     * @return array{key: string, title: string, short_title: string, form_key: string, description: string, bag_keys: list<string>}
+     */
+    public function family(): array
+    {
+        return FormFamilies::resolve($this->form_family);
     }
 
     public function isOpen(): bool
