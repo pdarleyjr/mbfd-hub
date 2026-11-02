@@ -3,6 +3,7 @@
 @import './hub-components.css';
 @import './hub-install.css';
 @import './hub-shell.css';
+@import './hub-tables.css';
 @import './filament/hub-portals-v2.css';
 @import './report-deck.css';
 
@@ -138,8 +139,6 @@
 
     .hub-report .hub-report-table {
         max-width: 100%;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
         margin-block: 1rem;
     }
 

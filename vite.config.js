@@ -12,6 +12,7 @@ export default defineConfig({
                 'resources/css/pulse-font.css',
                 'resources/js/app.js',
                 'resources/js/hub-shell.js',
+                'resources/js/hub-tables.js',
                 'resources/js/hub-support/blade.js',
                 'resources/js/pump-simulator/main.tsx',
                 // "This device" block of Notification settings (loaded only on that page).
@@ -36,6 +37,8 @@ export default defineConfig({
                 'resources/js/take-home-inspection.js',
                 'resources/css/daily-roster.css',
                 'resources/js/daily-roster.js',
+                // The Home greeting block's refresh (loaded only on Home).
+                'resources/js/home-duty.js',
             ],
             refresh: true,
         }),

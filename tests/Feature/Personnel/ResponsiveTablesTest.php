@@ -92,9 +92,9 @@ final class ResponsiveTablesTest extends TestCase
         self::assertSame(MaxWidth::Full, (new MasterPersonnelDirectory)->getMaxContentWidth());
         self::assertSame(MaxWidth::Full, (new ListUnitMasterVehicles)->getMaxContentWidth());
         foreach (['/admin/master-personnel-directory', '/admin/unit-master-vehicles'] as $url) {
-            $this->get($url)->assertOk()->assertSee('--mbfd-rt-surface', false)->assertSee('prefers-reduced-motion', false);
+            $this->get($url)->assertOk()->assertSee('Dense pages keep the phone gutter', false)->assertDontSee('position: sticky', false);
         }
-        $this->get('/admin/custom-personnel-tables')->assertDontSee('--mbfd-rt-surface', false);
+        $this->get('/admin/custom-personnel-tables')->assertDontSee('Dense pages keep the phone gutter', false);
     }
 
     public function test_every_vehicle_column_is_still_available_with_its_sorting_and_search(): void

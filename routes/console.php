@@ -95,7 +95,7 @@ Schedule::command('projects:milestone-reminders')
 
 // Clean up old notification tracking records (older than 90 days)
 Schedule::command('model:prune', [
-    '--model' => [\App\Models\NotificationTracking::class],
+    '--model' => [\App\Models\NotificationTracking::class, \App\Models\Training\TrainingCrewPlanDraft::class],
 ])->daily();
 
 // Unsubmitted Take Home Vehicle Inspection uploads (drafts are kept on the device for 72h).

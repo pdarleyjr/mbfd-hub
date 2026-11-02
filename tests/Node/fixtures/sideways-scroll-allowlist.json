@@ -1,0 +1,62 @@
+{
+  "resources/css/filament/admin/dashboards.css": {
+    "count": 1,
+    "kind": "not-a-table",
+    "reason": "Dashboard filter chip strip on phones, not a table."
+  },
+  "resources/css/filament/admin/pages/equipment-intake.css": {
+    "count": 1,
+    "kind": "not-a-table",
+    "reason": "Equipment intake tab strip, not a table."
+  },
+  "resources/css/filament/email-center.css": {
+    "count": 1,
+    "kind": "not-a-table",
+    "reason": "Rich text editor toolbar in the compose form."
+  },
+  "resources/js/daily-checkout/src/components/forms/EquipmentRequestWizard.tsx": {
+    "count": 1,
+    "kind": "not-a-table",
+    "reason": "Wizard progress navigation strip."
+  },
+  "resources/js/daily-checkout/src/components/forms/StationInspectionWizard.tsx": {
+    "count": 1,
+    "kind": "not-a-table",
+    "reason": "Wizard progress navigation strip."
+  },
+  "resources/js/daily-checkout/src/components/inspection-workspace.css": {
+    "count": 3,
+    "kind": "not-a-table",
+    "reason": "Blueprint view switcher, inspection section nav and rescue area rail are carousels of controls, not tables."
+  },
+  "resources/js/daily-checkout/src/components/TrtInventoryWizard.tsx": {
+    "count": 1,
+    "kind": "not-a-table",
+    "reason": "Wizard progress navigation strip."
+  },
+  "resources/js/daily-checkout/src/components/ui/Tabs.tsx": {
+    "count": 1,
+    "kind": "not-a-table",
+    "reason": "Shared Daily tab list."
+  },
+  "resources/js/operational-forms/operational-forms.css": {
+    "count": 3,
+    "kind": "not-a-table",
+    "reason": "Operational forms evidence spine, context navigation and preview toolbar are strips of controls, not tables. The record and entry tables are size containers that become cards instead of scrolling."
+  },
+  "resources/js/video-conferencing/video-conferencing.css": {
+    "count": 1,
+    "kind": "not-a-table",
+    "reason": "Video filmstrip of participant tiles."
+  },
+  "resources/views/vendor/filament-forms/components/rich-editor.blade.php": {
+    "count": 2,
+    "kind": "not-a-table",
+    "reason": "Rich text editor toolbar and its keyboard-reachable toolbar region."
+  },
+  "resources/views/vendor/filament-forms/components/wizard.blade.php": {
+    "count": 1,
+    "kind": "not-a-table",
+    "reason": "Filament wizard step header."
+  }
+}

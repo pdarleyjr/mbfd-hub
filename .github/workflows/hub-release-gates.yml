@@ -591,6 +591,16 @@ jobs:
           name: operational-forms-lifecycle-evidence
           path: test-results/operational-forms-lifecycle
           retention-days: 7
+      - name: Verify Operational Forms tables never scroll sideways
+        id: operational-forms-tables
+        if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
+        run: >-
+          npx playwright test tests/e2e/operational-forms.spec.ts
+          --config=playwright.operational-forms.config.ts
+          --project=desktop
+          --grep 'record and entry tables turn into cards'
+          --output=test-results/operational-forms-tables
+          --reporter=list
       - name: Verify PWA worker core and service-worker drift
         id: pwa-worker-core
         if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
@@ -743,6 +753,87 @@ jobs:
             !test-results/daily-checkout-e2e-build
           if-no-files-found: ignore
           retention-days: 3
+
+  # Responsive tables (no operational table scrolls sideways at 320-1440px) and the Home duty greeting block.
+  # Both need only the root Vite build, PHP dependencies and Chromium, and a candidate that touches only
+  # documentation or the separate apps cannot change what they measure, so the first step decides that from the
+  # candidate diff (failing open) and every later step is skipped when it does not apply. The job itself always
+  # reports success or failure, so the aggregate gate never sees a skipped required job.
+  ui-browser-suites:
+    name: Responsive tables and Home duty browsers
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Decide whether the UI browser suites apply to this candidate
+        id: scope
+        env:
+          GATE_BASE_SHA: ${{ inputs.pint_base_sha }}
+          GATE_HEAD_SHA: ${{ github.sha }}
+        run: node scripts/ci/ui-browser-scope.mjs
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        if: ${{ steps.scope.outputs.relevant == 'true' }}
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo, sqlite3, pdo_sqlite
+          coverage: none
+      - name: Install PHP dependencies
+        id: php-dependencies
+        if: ${{ steps.scope.outputs.relevant == 'true' }}
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Install root browser test dependencies
+        if: ${{ steps.scope.outputs.relevant == 'true' }}
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Build Hub assets for the UI browser suites
+        id: hub-assets
+        if: ${{ steps.scope.outputs.relevant == 'true' && steps.php-dependencies.outcome == 'success' }}
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: |
+          npx vite build
+          php artisan filament:assets
+      - name: Install Chromium for the UI browser suites
+        if: ${{ steps.scope.outputs.relevant == 'true' }}
+        run: |
+          bash scripts/ci/prepare-ubuntu-apt-mirror.sh
+          npx playwright install --with-deps chromium
+      - name: Verify responsive tables at every supported width
+        id: responsive-tables
+        if: ${{ !cancelled() && steps.scope.outputs.relevant == 'true' && steps.hub-assets.outcome == 'success' }}
+        run: npx playwright test --config=playwright.responsive-tables.config.ts
+      - name: Retain responsive tables browser evidence
+        if: ${{ always() && steps.responsive-tables.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: responsive-tables-browser-evidence
+          path: test-results/responsive-tables
+          retention-days: 7
+      - name: Verify Home duty greeting at every supported width
+        id: home-duty
+        if: ${{ !cancelled() && steps.scope.outputs.relevant == 'true' && steps.hub-assets.outcome == 'success' }}
+        run: npx playwright test --config=playwright.home-duty.config.ts
+      - name: Retain Home duty browser evidence
+        if: ${{ always() && steps.home-duty.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: home-duty-browser-evidence
+          path: test-results/home-duty
+          retention-days: 7
 
   generated-assets:
     name: Generated deployment assets
@@ -1100,6 +1191,7 @@ jobs:
       - daily-authenticated-shell
       - daily-authenticated-lifecycles
       - daily-checkout-browser
+      - ui-browser-suites
       - generated-assets
       - security-dependencies
       - security-secrets
@@ -1120,7 +1212,7 @@ jobs:
         env:
           GATE_RESULTS: ${{ toJSON(needs) }}
           PROOF_VERIFIED: ${{ needs.reuse-proof.outputs.verified }}
-          REUSABLE_GATES: '["php-quality","static-analysis","phpunit-postgres","daily-contract-integrity","daily-authenticated-shell","daily-authenticated-lifecycles","daily-checkout-browser","generated-assets","php-85-compatibility","ai-gateway-source"]'
+          REUSABLE_GATES: '["php-quality","static-analysis","phpunit-postgres","daily-contract-integrity","daily-authenticated-shell","daily-authenticated-lifecycles","daily-checkout-browser","ui-browser-suites","generated-assets","php-85-compatibility","ai-gateway-source"]'
         # A gate may be skipped only when reuse-proof verified a prior
         # successful run for the identical tree, and only if it is listed in
         # REUSABLE_GATES. Without verified proof every gate must succeed.

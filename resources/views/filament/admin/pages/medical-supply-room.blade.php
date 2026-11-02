@@ -151,7 +151,7 @@
                         </label>
 
                         <div class="ems-tablewrap">
-                            <table class="ems-wide w-full text-left text-sm">
+                            <table data-hub-table class="ems-wide w-full text-left text-sm">
                                 <caption class="sr-only">Reconciliation preview</caption>
                                 <thead class="border-b border-gray-200 text-xs text-gray-600 dark:border-white/10 dark:text-gray-400">
                                     <tr>
@@ -214,7 +214,7 @@
                     <p class="text-sm text-gray-600 dark:text-gray-400" data-testid="no-advisories">Nothing is below its threshold right now.</p>
                 @else
                     <div class="ems-tablewrap">
-                        <table class="ems-wide w-full text-left text-sm" data-testid="advisories">
+                        <table data-hub-table class="ems-wide w-full text-left text-sm" data-testid="advisories">
                             <caption class="sr-only">Items below their reorder threshold</caption>
                             <thead class="border-b border-gray-200 text-xs text-gray-600 dark:border-white/10 dark:text-gray-400">
                                 <tr>
@@ -288,7 +288,7 @@
                     <p class="text-sm text-gray-600 dark:text-gray-400" data-testid="no-orders">No orders to show.</p>
                 @else
                     <div class="ems-tablewrap">
-                        <table class="ems-medium w-full text-left text-sm" data-testid="orders">
+                        <table data-hub-table class="ems-medium w-full text-left text-sm" data-testid="orders">
                             <caption class="sr-only">Supply orders</caption>
                             <thead class="border-b border-gray-200 text-xs text-gray-600 dark:border-white/10 dark:text-gray-400">
                                 <tr>
@@ -341,7 +341,7 @@
                     <p class="text-sm text-gray-600 dark:text-gray-400" data-testid="no-movements">No stock movements yet. They appear when supplies are issued or received.</p>
                 @else
                     <div class="ems-tablewrap">
-                        <table class="ems-medium w-full text-left text-sm" data-testid="movements">
+                        <table data-hub-table class="ems-medium w-full text-left text-sm" data-testid="movements">
                             <caption class="sr-only">Stock movements, newest first</caption>
                             <thead class="border-b border-gray-200 text-xs text-gray-600 dark:border-white/10 dark:text-gray-400">
                                 <tr>
@@ -411,7 +411,7 @@
                         </div>
                     </x-slot>
                     <div class="ems-tablewrap">
-                        <table class="ems-narrow w-full text-left text-sm" data-testid="snapshot-lines">
+                        <table data-hub-table class="ems-narrow w-full text-left text-sm" data-testid="snapshot-lines">
                             <caption class="sr-only">Snapshot lines</caption>
                             <thead class="border-b border-gray-200 text-xs text-gray-600 dark:border-white/10 dark:text-gray-400">
                                 <tr>

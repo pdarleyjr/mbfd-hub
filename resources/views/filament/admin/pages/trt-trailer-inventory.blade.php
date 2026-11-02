@@ -69,7 +69,7 @@
         {{-- Inventory Table --}}
         @if(count($aggregatedItems) > 0)
             <div class="trt-table-wrap">
-                <table class="trt-table">
+                <table data-hub-table class="trt-table">
                     <thead>
                         <tr>
                             <th class="trt-th trt-th--item">Item</th>

@@ -67,7 +67,7 @@
 .of-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 10px; }
 .of-section-heading h2 { margin: 0; }
 .of-section-heading p, .of-section-heading span { margin: 2px 0 0; color: var(--of-slate); font-size: 12px; }
-.of-table-wrap { background: white; border: 1px solid var(--of-border); border-radius: 4px; overflow-x: auto; }
+.of-table-wrap { background: white; border: 1px solid var(--of-border); border-radius: 4px; container: of-table / inline-size; }
 .of-record-table, .of-edit-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
 .of-record-table th, .of-edit-table th { background: #eef2f6; color: #405066; font-size: 11px; text-transform: uppercase; letter-spacing: .045em; padding: 9px 10px; border-bottom: 1px solid var(--of-border-strong); white-space: nowrap; }
 .of-record-table td, .of-edit-table td { padding: 10px; border-bottom: 1px solid #e4e8ed; vertical-align: middle; }
@@ -231,7 +231,9 @@
     .of-main { padding: 14px 12px 28px; }
     .of-employee small, .of-commandbar .of-command-divider, .of-save-state { display: none; }
     .of-commandbar { position: fixed; inset: auto 0 0; z-index: 50; min-height: 64px; padding: 8px max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); justify-content: space-around; border-width: 1px 0 0; box-shadow: 0 -3px 12px #14233a1f; }
-    .of-commandbar button { min-width: 48px; min-height: 48px; font-size: 0; }
+    /* The id restates the height: `#operational-forms-root .fui-Button { min-height: 40px }` otherwise wins. */
+    #operational-forms-root .of-commandbar button { min-height: 48px; }
+    .of-commandbar button { min-width: 48px; font-size: 0; }
     .of-commandbar button[aria-label="Generate PDF"] { min-width: 56px; }
     .of-context-nav { top: 0; }
     .of-form-canvas { padding: 10px 0; }
@@ -336,4 +338,43 @@
 @media (prefers-reduced-motion: reduce) {
     .spin { animation: none; }
     .of-form-card, .of-rail *, .of-context-nav * { transition: none !important; }
+}
+
+/*
+ * Record and entry tables never scroll sideways. Their wrapper is a size container, so the table turns into
+ * cards whenever the room it is given is too small for its columns, whatever the screen or sidebar. The
+ * viewport rules above stay as the fallback for browsers without container queries.
+ */
+@container of-table (max-width: 900px) {
+    .of-edit-table { min-width: 0; }
+    .of-edit-table thead { display: none; }
+    .of-edit-table, .of-edit-table tbody { display: block; }
+    .of-edit-table tr { display: grid; grid-template-columns: 1fr; padding: 10px; border-bottom: 1px solid var(--of-border-strong); }
+    .of-edit-table tr:last-child { border-bottom: 0; }
+    .of-edit-table td { display: grid; grid-template-columns: minmax(92px, 34%) minmax(0, 1fr); align-items: center; gap: 8px; border: 0; padding: 5px 0; text-align: left !important; width: auto !important; }
+    .of-edit-table td::before { content: attr(data-label); color: #52606d; font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .035em; }
+    .of-edit-table td[data-label="Row"] { grid-template-columns: 1fr; color: var(--of-blue); font-weight: 700; }
+    .of-edit-table td[data-label="Row"]::before { content: "Entry " attr(data-label); display: none; }
+    .of-edit-table td[data-label="Actions"] { justify-items: end; }
+    .of-edit-table td[data-label="Actions"] button { min-width: 44px; min-height: 44px; }
+}
+@container of-table (max-width: 360px) {
+    .of-edit-table td { grid-template-columns: 1fr; gap: 4px; align-items: stretch; }
+    .of-edit-table td[data-label="Actions"] { grid-template-columns: 1fr auto; align-items: center; }
+}
+@container of-table (max-width: 640px) {
+    .of-record-table thead { display: none; }
+    .of-record-table, .of-record-table tbody { display: block; }
+    .of-record-table tr { display: grid; grid-template-columns: 1fr auto; padding: 12px; border-bottom: 1px solid var(--of-border-strong); }
+    .of-record-table tr:last-child { border-bottom: 0; }
+    .of-record-table td { display: grid; grid-template-columns: 86px minmax(0, 1fr); align-items: center; gap: 8px; border: 0; padding: 5px 0; }
+    .of-record-table td::before { content: attr(data-label); color: #52606d; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .of-record-table td[data-label="Record"] { grid-column: 1 / -1; display: block; padding-bottom: 9px; }
+    .of-record-table td[data-label="Record"]::before { display: none; }
+    .of-record-table td[data-label="Status"], .of-record-table td[data-label="Last saved"], .of-record-table td[data-label="Document"] { grid-column: 1; }
+    .of-record-table td[data-label="Open"] { grid-column: 2; grid-row: 2 / 5; display: grid; grid-template-columns: 1fr; align-self: stretch; padding-left: 8px; }
+    .of-record-table td[data-label="Open"]::before { display: none; }
+    .of-record-table td[data-label="Open"] button { min-width: 48px; min-height: 48px; align-self: center; }
+    .of-record-table .of-empty { display: block; }
+    .of-record-table .of-empty::before { display: none; }
 }

@@ -170,6 +170,7 @@ test("production activation is manual, main-only, and blocked by every Hub relea
     "daily-authenticated-shell",
     "daily-authenticated-lifecycles",
     "daily-checkout-browser",
+    "ui-browser-suites",
     "generated-assets",
     "security-dependencies",
     "security-secrets",
@@ -1170,4 +1171,38 @@ test("the PHP server makes every unhashed service worker always revalidate", () 
   assert.ok(server.includes("in_array($uri, $serviceWorkers, true)"));
   assert.ok(server.includes("header('Cache-Control: no-cache, must-revalidate');"));
   assert.ok(server.includes("header('Content-Type: text/javascript; charset=UTF-8');"));
+});
+
+test("responsive tables and Home duty browsers are a required, path-aware gate that fails open", () => {
+  const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
+  const job = workflowJob(gates, "ui-browser-suites");
+
+  assert.match(job, /fetch-depth:\s*0/, "the scope step diffs the candidate against its base");
+  const scope = workflowStep(job, "Decide whether the UI browser suites apply to this candidate");
+  assert.match(scope, /id: scope\b/);
+  assert.match(scope, /GATE_BASE_SHA: \$\{\{ inputs\.pint_base_sha \}\}/);
+  assert.match(scope, /run: node scripts\/ci\/ui-browser-scope\.mjs\r?$/m);
+  assert.doesNotMatch(job, /continue-on-error|\|\|\s*true\b|--pass-with-no-tests/);
+
+  for (const [stepName, uploadName, id, config, artifact, path] of [
+    ["Verify responsive tables at every supported width", "Retain responsive tables browser evidence", "responsive-tables", "playwright.responsive-tables.config.ts", "responsive-tables-browser-evidence", "test-results/responsive-tables"],
+    ["Verify Home duty greeting at every supported width", "Retain Home duty browser evidence", "home-duty", "playwright.home-duty.config.ts", "home-duty-browser-evidence", "test-results/home-duty"],
+  ]) {
+    const step = workflowStep(job, stepName);
+    assert.match(step, new RegExp(`id: ${id}\\b`));
+    assert.match(step, new RegExp(`npx playwright test --config=${escapeRegExp(config)}\\r?$`, "m"));
+    assert.match(step, /if: \$\{\{ !cancelled\(\) && steps\.scope\.outputs\.relevant == 'true' && steps\.hub-assets\.outcome == 'success' \}\}/);
+    const upload = workflowStep(job, uploadName);
+    assert.match(upload, new RegExp(`if: \\$\\{\\{ always\\(\\) && steps\\.${id}\\.outcome != 'skipped' \\}\\}`));
+    assert.match(upload, new RegExp(`name: ${artifact}\\r?$`, "m"));
+    assert.match(upload, new RegExp(`path: ${escapeRegExp(path)}\\r?$`, "m"));
+  }
+  // The install, build and browser download are skipped together with the suites, never run for nothing.
+  for (const name of ["Install PHP dependencies", "Install root browser test dependencies", "Build Hub assets for the UI browser suites", "Install Chromium for the UI browser suites"]) {
+    assert.match(workflowStep(job, name), /steps\.scope\.outputs\.relevant == 'true'/, name);
+  }
+  const install = workflowStep(job, "Install PHP dependencies");
+  assert.match(install, /github-oauth/);
+  assert.match(install, /github\.token/);
+  assert.doesNotMatch(job, /\$\{\{\s*secrets\./i);
 });

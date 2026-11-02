@@ -30,7 +30,7 @@
                     <span class="ep-category-count">{{ $items->count() }}</span>
                 </div>
                 <div class="ep-eq-table-wrap">
-                    <table class="ep-eq-table" role="table">
+                    <table data-hub-table class="ep-eq-table" role="table">
                         <caption class="hub-visually-hidden">Assigned {{ $category }} equipment</caption>
                         <thead role="rowgroup">
                             <tr role="row">

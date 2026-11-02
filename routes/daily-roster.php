@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\DailyRoster\DailyRosterController;
+use App\Http\Controllers\HomeDutyController;
 use App\Http\Middleware\CanonicalHostRedirect;
+use App\Http\Middleware\PreventPreviousUrlStorage;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -31,3 +33,12 @@ Route::get('/daily-roster/members/{employeeId}', [DailyRosterController::class, 
 Route::get('/daily-roster/pdf', [DailyRosterController::class, 'pdf'])
     ->middleware(['auth:web', 'throttle:daily-roster-pdf'])
     ->name('daily-roster.pdf');
+
+/*
+| The Home greeting block (shift on duty and the 300) for a page left open. The same read model as the page,
+| personal and uncached, in this file because it shows what the roster says. DailyRosterAccess decides what
+| it returns; a member it does not admit gets the greeting and the date only.
+*/
+Route::get('/home/duty', [HomeDutyController::class, 'show'])
+    ->middleware(['auth:web', PreventPreviousUrlStorage::class, 'throttle:30,1,home-duty'])
+    ->name('home.duty');

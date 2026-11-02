@@ -74,7 +74,7 @@
                         <p class="text-sm text-gray-600 dark:text-gray-400">Nothing to show for this range.</p>
                     @else
                         <div class="ems-tablewrap">
-                            <table class="w-full text-left text-sm" data-testid="stats-{{ \Illuminate\Support\Str::slug($section->heading) }}">
+                            <table data-hub-table class="w-full text-left text-sm" data-testid="stats-{{ \Illuminate\Support\Str::slug($section->heading) }}">
                                 <caption class="sr-only">{{ $section->heading }}</caption>
                                 <thead class="border-b border-gray-200 text-xs text-gray-600 dark:border-white/10 dark:text-gray-400">
                                     <tr>

@@ -33,8 +33,8 @@
             @if ($docs->isEmpty())
                 <p class="text-sm text-gray-500 dark:text-gray-400">No admin-uploaded documents yet. (Apparatus manuals &amp; the SOG ingested earlier are part of the base knowledge and not listed here.)</p>
             @else
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
+                <div>
+                    <table data-hub-table class="w-full text-sm">
                         <thead>
                             <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
                                 <th class="py-2 pr-4 font-medium">Document</th>

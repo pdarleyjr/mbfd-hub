@@ -9,7 +9,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>MBFD Training Attendance Personnel Request</title>
+    <title>MBFD Proposed Class Roster</title>
     <style>
         @page { margin: 0.45in 0.55in 0.6in 0.55in; }
         body { font-family: DejaVu Sans, sans-serif; font-size: 9.5pt; color: #1b2a36; line-height: 1.25; }
@@ -49,11 +49,11 @@
         </tr>
     </table>
 
-    <p class="intro">{{ $report['intro'] }}</p>
+    <p class="intro"><strong>{{ $report['qualifier'] }}</strong> {{ $report['intro'] }}</p>
 
     <table class="details">
         <tr>
-            <td class="k">Course</td><td style="width: 38%;">{{ $dash($report['course_name']) }}</td>
+            <td class="k">Class</td><td style="width: 38%;">{{ $dash($report['course_name']) }}</td>
             <td class="k2">Training date</td><td>{{ $dash($report['date_long']) }}</td>
         </tr>
         <tr>
@@ -61,16 +61,20 @@
             <td class="k2">Shift</td><td>{{ $dash($report['shift_label']) }}</td>
         </tr>
         <tr>
-            <td class="k" rowspan="2">Session times</td>
-            <td rowspan="2">
+            <td class="k" rowspan="3">Sessions</td>
+            <td rowspan="3">
                 @foreach ($sessions as $i => $session)
-                    {{ $session['label'] !== '' ? $session['label'] : 'Session '.($i + 1) }}: {{ $session['time'] }}@if (! $loop->last)<br>@endif
+                    {{ $session['label'] !== '' ? $session['label'] : 'Session '.($i + 1) }}: {{ $session['time'] }}{{ $session['location'] !== '' ? ' · '.$session['location'] : '' }}@if (! $loop->last)<br>@endif
                 @endforeach
+                @if ($sessions === [])One class list; no session times set.@endif
             </td>
             <td class="k2">Generated</td><td>{{ $dash($report['generated_display']) }}</td>
         </tr>
         <tr>
             <td class="k2">Prepared by</td><td>{{ $dash($report['author']) }}</td>
+        </tr>
+        <tr>
+            <td class="k2">Roster source</td><td>{{ $dash($report['source_label']) }}</td>
         </tr>
     </table>
 
@@ -78,7 +82,7 @@
         <div class="{{ $group['kind'] === 'review' ? 'review' : '' }}">
             @php
                 $heading = $group['kind'] === 'session'
-                    ? mb_strtoupper($group['label'] !== '' ? $group['label'] : 'Session').' — '.$group['time']
+                    ? mb_strtoupper($group['label'] !== '' ? $group['label'] : 'Session').' — '.$group['time'].($group['location'] !== '' ? ' — '.$group['location'] : '')
                     : mb_strtoupper($group['label']);
             @endphp
             <h2>{{ $heading }} &nbsp;<span style="font-weight: normal; color: #5b6872;">({{ count($group['rows']) }})</span></h2>
@@ -98,7 +102,7 @@
                 <tbody>
                     @foreach ($group['rows'] as $row)
                         <tr>
-                            <td>{{ $dash($row['name']) }}</td>
+                            <td>{{ $dash($row['name']) }}@if ($row['status'] === 'Added by planner') <em>(added by planner)</em>@endif</td>
                             <td>{{ $dash($row['rank']) }}</td>
                             <td>{{ $dash($row['employee_id']) }}</td>
                             <td>{{ $dash($row['station']) }}</td>

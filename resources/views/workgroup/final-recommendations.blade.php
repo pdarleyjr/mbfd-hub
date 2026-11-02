@@ -58,7 +58,7 @@
             <!-- Final Selections Summary -->
             <div class="selections-summary">
                 <div class="selections-summary-title">Final Equipment Selections at a Glance</div>
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table fr-u2">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table fr-u2">
                     <thead>
                         <tr>
                             <th scope="col">Category</th>
@@ -180,7 +180,7 @@
                     <div class="selection-card-body">
                         <img class="report-image" src="/workgroup-report/images/Holmatro Pentheon Series USA-1_p10_i1.png"
                              alt="Extrication Tool System" onerror="this.style.display='none'">
-                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table fr-u6">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table fr-u6">
                             <thead><tr><th scope="col">Tool</th><th scope="col">Model</th><th scope="col">Role</th><th scope="col" class="right">Score</th></tr></thead>
                             <tbody>
                                 <tr><td>Spreader</td><td><strong>SP 777 E3 Connect</strong></td><td>Primary spreading</td><td class="right"><span class="score-badge score-elite">90.99</span></td></tr>
@@ -207,7 +207,7 @@
                             <div class="callout-label">Trial Status</div>
                             Authorized for trial deployment as a <strong>potential replacement candidate for the Rabbit tool</strong>. Final determination pending operational trial results.
                         </div>
-                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table fr-u6">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="spec-table fr-u6">
                             <tbody>
                                 <tr><td>Composite Score</td><td>82.23</td></tr>
                                 <tr><td>Weight</td><td>17.0 lbs (7.7 kg)</td></tr>
@@ -274,7 +274,7 @@
                         <div class="tier-badge">Primary Response</div>
                     </div>
                     <div class="tier-body">
-                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table fr-u9">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table fr-u9">
                             <thead><tr><th scope="col">Equipment</th><th scope="col">Deployment Role</th></tr></thead>
                             <tbody>
                                 <tr><td><strong>Hurst SP 777 E3 Connect Spreader</strong></td><td>Primary extrication spreading</td></tr>
@@ -300,7 +300,7 @@
                         <div class="tier-badge">Command Augmentation</div>
                     </div>
                     <div class="tier-body">
-                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table fr-u9">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table fr-u9">
                             <thead><tr><th scope="col">Equipment</th><th scope="col">Deployment Role</th></tr></thead>
                             <tbody>
                                 <tr><td><strong>Hurst M40 40" Spreader</strong></td><td>Heavy extrication capability</td></tr>
@@ -380,7 +380,7 @@
                     All training components must be completed <strong>before</strong> the apparatus is placed into service.
                 </div>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead><tr><th scope="col">Training Component</th><th scope="col">Requirement</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Driving Operations</strong></td><td>Full certification on mid-mount ladder configuration</td></tr>
@@ -394,7 +394,7 @@
 
                 <p>The Mid-Mount Ladder Workgroup remains <strong>active through full implementation</strong> of the selected equipment.</p>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead><tr><th scope="col">Function</th><th scope="col">Description</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Procurement Tracking</strong></td><td>Monitor status of all equipment orders</td></tr>
@@ -413,7 +413,7 @@
                 <h3 class="subsection-title">Evaluation Framework</h3>
                 <p>The workgroup evaluation employed a standardized scoring model across all 14 products. Four scoring dimensions were applied consistently:</p>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead><tr><th scope="col">Dimension</th><th scope="col">Description</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Capability</strong></td><td>Raw performance metrics — force output, cutting capacity, spreading distance</td></tr>
@@ -433,7 +433,7 @@
                     <p id="recommendations-brand-description" class="hub-chart-description">Average composite scores across the report's evaluated products: DeWalt 91.25, Holmatro 87.93, Hurst 84.60, Paratech 76.13, Makita 64.83, and Husqvarna 61.78. The chart axis runs from 50 to 100.</p>
                 </div>
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Brand average chart data">
-                    <table class="data-table">
+                    <table data-hub-table class="data-table">
                         <caption>Brand average composite scores shown in the chart</caption>
                         <thead><tr><th scope="col">Brand</th><th scope="col" class="right">Average composite score</th></tr></thead>
                         <tbody>
@@ -457,7 +457,7 @@
                     <p id="recommendations-dimensions-description" class="hub-chart-description">Holmatro Pentheon has higher scores than Hurst E3 in all four dimensions; the largest difference is Usability, 93.99 compared with 85.76. The chart axis runs from 75 to 100. <a href="#recommendations-dimensions-data">Read every dimension score in the table.</a></p>
                 </div>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <caption id="recommendations-dimensions-data">Holmatro Pentheon and Hurst E3 dimension scores shown in the chart</caption>
                     <thead><tr><th scope="col">Dimension</th><th scope="col" class="right">Holmatro</th><th scope="col" class="right">Hurst</th><th scope="col" class="right">Δ Delta</th></tr></thead>
                     <tbody>
@@ -478,7 +478,7 @@
                     <p id="recommendations-frontline-description" class="hub-chart-description">Holmatro and Hurst composite scores are compared for spreaders, cutters, and rams. The chart axis runs from 78 to 95; all six scores appear in the table below.</p>
                 </div>
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Frontline tool chart data">
-                    <table class="data-table">
+                    <table data-hub-table class="data-table">
                         <caption>Frontline tool composite scores shown in the chart</caption>
                         <thead><tr><th scope="col">Tool category</th><th scope="col" class="right">Holmatro</th><th scope="col" class="right">Hurst</th></tr></thead>
                         <tbody>
@@ -509,7 +509,7 @@
 
                 <h3 class="subsection-title">Final Selected Equipment — Per Category</h3>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr><th scope="col">Category</th><th scope="col">Selected Tool</th><th scope="col">Manufacturer</th><th scope="col" class="right">Score</th></tr>
                     </thead>
@@ -528,7 +528,7 @@
 
                 <h3 class="subsection-title">Cross-Category Insights</h3>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead><tr><th scope="col">Category</th><th scope="col">Key Differentiator</th><th scope="col" class="right">Advantage</th></tr></thead>
                     <tbody>
                         <tr><td>Saws</td><td>Gear-driven instant-start + 3-second electric brake (DeWalt)</td><td class="right fr-u13">+26.42 to +29.47 pts</td></tr>
@@ -550,7 +550,7 @@
                 <h3 class="subsection-title">T1 Tool — Rabbit Tool Trial</h3>
                 <p>The Holmatro T1 (score: <strong>82.23</strong>) is authorized on trial as a potential replacement for the traditional rabbit tool. Key comparisons:</p>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="spec-table">
                     <tbody>
                         <tr><td>Door Forcing</td><td>T1 hydraulic wedging (3.4 ton) vs. manual prying — single operator vs. 2-person team</td></tr>
                         <tr><td>Cutting Added</td><td>T1 adds hydraulic cutting (14.2 tons) — rabbit tool provides none</td></tr>
@@ -577,7 +577,7 @@
                     All numerical values sourced directly from <strong>Product_Data_Master.csv</strong> (14 rows, 31 columns). No values interpolated, estimated, or sourced from external references.
                 </div>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead><tr><th scope="col">Row</th><th scope="col">Product</th><th scope="col">Category</th><th scope="col">Manufacturer</th><th scope="col" class="right">Score</th></tr></thead>
                     <tbody>
                         <tr><td>2</td><td>Holmatro PSP40 (32-inch Spreader)</td><td>Hydraulic Tool</td><td><span class="brand-pill">Holmatro</span></td><td class="right"><span class="score-badge score-elite">92.02</span></td></tr>
