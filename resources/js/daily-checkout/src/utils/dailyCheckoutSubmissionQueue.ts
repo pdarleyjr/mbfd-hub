@@ -261,6 +261,17 @@ const normalizeLegacySubmission = (
   };
 };
 
+/** An integer owner id: the record was captured by a signed-in member (it may still be quarantined). */
+const hasProvenOwner = (submission: DailyCheckoutQueuedSubmission): boolean => Number.isInteger(submission.ownerUserId);
+
+/** Quarantined by an earlier release only because a different member was signed in; never sent or changed. */
+const isHeldForAnotherMember = (submission: DailyCheckoutQueuedSubmission): boolean => (
+  submission.status === 'requires_attention'
+  && submission.ownershipState === 'identity_mismatch'
+  && submission.lastErrorCode === 'OFFLINE_QUEUE_OWNER_MISMATCH'
+  && hasProvenOwner(submission)
+);
+
 const hasSamePersistedPayload = (
   existing: DailyCheckoutQueuedSubmission,
   incoming: DailyCheckoutQueuedSubmission,
@@ -320,9 +331,11 @@ const migrateLegacyQueue = async (): Promise<void> => {
   try {
     await db.transaction('rw', db.dailyCheckoutSubmissions, db.cachedData, async () => {
       for (const submission of submissions) {
+        // Legacy records have no owner; only another unowned record can be this one again.
         const existingByChecklistVersion = await db.dailyCheckoutSubmissions
           .where('[apparatusId+checklistVersion]')
           .equals([submission.apparatusId, submission.checklistVersion])
+          .filter((existing) => !hasProvenOwner(existing))
           .first();
         const existingById = await db.dailyCheckoutSubmissions.get(submission.id);
 
@@ -369,9 +382,10 @@ export const ensureDailyCheckoutQueueReady = (): Promise<void> => {
 };
 
 /**
- * The browser owns one unresolved inspection per apparatus and checklist
- * version. A newer source version may queue separately while an older immutable
- * payload remains retained for officer review. Every retry uses its exact
+ * The browser owns one unresolved inspection per apparatus, checklist version
+ * and member (a shared station device serves many members). A newer source
+ * version may queue separately while an older immutable payload remains
+ * retained for officer review. Every retry uses its exact
  * payload and UUID until the server accepts it or an operator resolves it.
  */
 export const queueSubmission = async (
@@ -414,10 +428,10 @@ export const queueSubmission = async (
     throw new Error('A Daily Checkout submission ID is already saved with different data. This inspection was not submitted.');
   }
 
-  const existingByChecklistVersion = await db.dailyCheckoutSubmissions
-    .where('[apparatusId+checklistVersion]')
-    .equals([apparatusId, queuedSubmission.checklistVersion])
-    .first() ?? await queuedForInventoryRevision(apparatusId, checklistBaseVersion);
+  // Only this member's own unresolved record blocks a second checkout (their own
+  // duplicate). Another member's record on a shared device never does.
+  const existingByChecklistVersion = await ownQueuedForChecklistVersion(apparatusId, queuedSubmission.checklistVersion, owner.userId)
+    ?? await queuedForInventoryRevision(apparatusId, checklistBaseVersion, owner.userId);
   if (existingByChecklistVersion) {
     if (hasSamePersistedPayload(existingByChecklistVersion, queuedSubmission)) {
       return existingByChecklistVersion.id;
@@ -440,10 +454,11 @@ export const queueSubmission = async (
       throw new Error('A Daily Checkout submission ID is already saved with different data. This inspection was not submitted.');
     }
 
-    const concurrentlyQueuedByChecklistVersion = await db.dailyCheckoutSubmissions
-      .where('[apparatusId+checklistVersion]')
-      .equals([apparatusId, queuedSubmission.checklistVersion])
-      .first();
+    const concurrentlyQueuedByChecklistVersion = await ownQueuedForChecklistVersion(
+      apparatusId,
+      queuedSubmission.checklistVersion,
+      owner.userId,
+    );
     if (concurrentlyQueuedByChecklistVersion) {
       if (hasSamePersistedPayload(concurrentlyQueuedByChecklistVersion, queuedSubmission)) {
         return concurrentlyQueuedByChecklistVersion.id;
@@ -474,27 +489,85 @@ export const getQueuedSubmission = async (id: string): Promise<DailyCheckoutQueu
 const queuedForInventoryRevision = async (
   apparatusId: number,
   checklistBaseVersion: string | undefined,
+  ownerUserId: number,
 ): Promise<DailyCheckoutQueuedSubmission | undefined> => {
   if (!isChecklistVersion(checklistBaseVersion)) return undefined;
 
   return db.dailyCheckoutSubmissions
     .where('apparatusId')
     .equals(apparatusId)
-    .filter((submission) => submission.checklistBaseVersion === checklistBaseVersion)
+    .filter((submission) => submission.checklistBaseVersion === checklistBaseVersion && submission.ownerUserId === ownerUserId)
     .first();
 };
 
+/** This member's own record for one apparatus and checklist version (the per-owner unique index). */
+const ownQueuedForChecklistVersion = (
+  apparatusId: number,
+  checklistVersion: string,
+  ownerUserId: number,
+): Promise<DailyCheckoutQueuedSubmission | undefined> => db.dailyCheckoutSubmissions
+  .where('[apparatusId+checklistVersion+ownerUserId]')
+  .equals([apparatusId, checklistVersion, ownerUserId])
+  .first();
+
+/**
+ * The signed-in member's own unresolved record for this apparatus and checklist
+ * version, which blocks them from starting a duplicate. A record saved on this
+ * device by another member (or one with no proven owner) never blocks; see
+ * getOtherMembersQueuedCheckout for the notice about it.
+ */
 export const getQueuedSubmissionForApparatusAndChecklistVersion = async (
   apparatusId: number,
   checklistVersion: string,
-  checklistBaseVersion?: string,
+  checklistBaseVersion: string | undefined,
+  ownerUserId: number | undefined,
 ): Promise<DailyCheckoutQueuedSubmission | null> => {
   await ensureDailyCheckoutQueueReady();
+  if (ownerUserId === undefined || !Number.isInteger(ownerUserId)) return null;
 
-  return (await db.dailyCheckoutSubmissions
-    .where('[apparatusId+checklistVersion]')
-    .equals([apparatusId, checklistVersion])
-    .first()) ?? (await queuedForInventoryRevision(apparatusId, checklistBaseVersion)) ?? null;
+  return (await ownQueuedForChecklistVersion(apparatusId, checklistVersion, ownerUserId))
+    ?? (await queuedForInventoryRevision(apparatusId, checklistBaseVersion, ownerUserId)) ?? null;
+};
+
+/** A checkout another member saved on this device, without its payload. */
+export interface OtherMemberQueuedCheckout {
+  id: string;
+  operatorName?: string;
+  createdAt: Date;
+  status: DailyCheckoutQueuedSubmission['status'];
+  /** False for legacy work with no proven owner: no sign-in will send it. */
+  hasOwner: boolean;
+}
+
+/**
+ * The newest unresolved checkout for this apparatus saved on this device by a
+ * different member (or by no proven member). Informational only: the signed-in
+ * member may start and submit their own checkout. The record itself is never
+ * changed here.
+ */
+export const getOtherMembersQueuedCheckout = async (
+  apparatusId: number,
+  currentUserId: number | undefined,
+): Promise<OtherMemberQueuedCheckout | null> => {
+  await ensureDailyCheckoutQueueReady();
+  const others = await db.dailyCheckoutSubmissions
+    .where('apparatusId')
+    .equals(apparatusId)
+    .filter((submission) => submission.ownerUserId === undefined || submission.ownerUserId !== currentUserId)
+    .toArray();
+  const newest = others.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+  if (!newest) return null;
+
+  return {
+    id: newest.id,
+    operatorName: typeof newest.data?.operator_name === 'string' && newest.data.operator_name.trim() !== ''
+      ? newest.data.operator_name.trim()
+      : undefined,
+    createdAt: new Date(newest.createdAt),
+    // A record an earlier release held only because someone else signed in goes back to pending for its owner.
+    status: isHeldForAnotherMember(newest) ? 'pending' : newest.status,
+    hasOwner: hasProvenOwner(newest),
+  };
 };
 
 export const getSubmissionQueue = async (): Promise<DailyCheckoutQueuedSubmission[]> => {
@@ -723,6 +796,8 @@ const recordSubmissionFailure = async (id: string, error: unknown): Promise<void
   notifyQueueChanged();
 };
 
+type OwnershipDecision = 'send' | 'other_member' | 'quarantined';
+
 /**
  * Submit the durable payload, never a freshly reconstructed duplicate. The
  * module-level promise also prevents an app-level reconnect and an open
@@ -731,7 +806,7 @@ const recordSubmissionFailure = async (id: string, error: unknown): Promise<void
 const quarantineOwnerMismatch = async (
   submission: DailyCheckoutQueuedSubmission,
   identity: OfflineIdentity,
-): Promise<boolean> => {
+): Promise<OwnershipDecision> => {
   const now = new Date();
   if (submission.ownershipState !== 'owned'
     || !Number.isInteger(submission.ownerUserId)
@@ -744,18 +819,12 @@ const quarantineOwnerMismatch = async (
       lastErrorAt: now,
       updatedAt: now,
     });
-    return true;
+    return 'quarantined';
   }
   if (submission.ownerUserId !== identity.userId) {
-    await db.dailyCheckoutSubmissions.update(submission.id, {
-      status: 'requires_attention',
-      ownershipState: 'identity_mismatch',
-      lastError: 'This saved Daily Checkout belongs to a different signed-in member and was not submitted.',
-      lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
-      lastErrorAt: now,
-      updatedAt: now,
-    });
-    return true;
+    // Another member's checkout on a shared device: not sent under this
+    // account, and left exactly as it is so it sends when its owner signs in.
+    return 'other_member';
   }
   if (submission.ownerSecurityVersion !== identity.securityVersion) {
     await db.dailyCheckoutSubmissions.update(submission.id, {
@@ -766,9 +835,35 @@ const quarantineOwnerMismatch = async (
       lastErrorAt: now,
       updatedAt: now,
     });
-    return true;
+    return 'quarantined';
   }
-  return false;
+  return 'send';
+};
+
+/**
+ * Earlier releases moved another member's pending checkout to "needs review"
+ * (identity_mismatch) whenever someone else was signed in on a shared device.
+ * The payload was never sent or changed, so when its owner signs in again with
+ * the same security context it simply goes back to waiting to send.
+ */
+const reclaimOwnRecordsHeldForAnotherMember = async (identity: OfflineIdentity): Promise<number> => {
+  const now = new Date();
+  const reclaimed = await db.dailyCheckoutSubmissions
+    .where('ownerUserId')
+    .equals(identity.userId)
+    .filter((submission) => isHeldForAnotherMember(submission) && submission.ownerSecurityVersion === identity.securityVersion)
+    .modify({
+      status: 'pending',
+      ownershipState: 'owned',
+      lastError: undefined,
+      lastErrorCode: undefined,
+      lastErrorStatus: undefined,
+      lastErrorAt: undefined,
+      updatedAt: now,
+    });
+  if (reclaimed > 0) notifyQueueChanged();
+
+  return reclaimed;
 };
 
 export const submitQueuedInspection = (
@@ -792,8 +887,9 @@ export const submitQueuedInspection = (
     }
 
     const identity = currentIdentity ?? await refreshIdentityWithDeadline();
-    if (await quarantineOwnerMismatch(queuedSubmission, identity)) {
-      notifyQueueChanged();
+    const decision = await quarantineOwnerMismatch(queuedSubmission, identity);
+    if (decision !== 'send') {
+      if (decision === 'quarantined') notifyQueueChanged();
       return 'not_found' as const;
     }
 
@@ -869,6 +965,7 @@ export const synchronizeDailyCheckoutQueue = (currentIdentity?: OfflineIdentity)
 
     const identity = currentIdentity ?? await refreshIdentityWithDeadline();
     await ensureDailyCheckoutQueueReady();
+    await reclaimOwnRecordsHeldForAnotherMember(identity);
     // Only pending records are replayed; records awaiting review (and their
     // photos) are not read on every automatic pass.
     const pendingSubmissions = await db.dailyCheckoutSubmissions.where('status').equals('pending').sortBy('createdAt');
@@ -877,7 +974,9 @@ export const synchronizeDailyCheckoutQueue = (currentIdentity?: OfflineIdentity)
         break;
       }
 
-      if (queuedSubmission.status !== 'pending') {
+      // Another member's checkout waits, untouched, for that member to sign in.
+      if (queuedSubmission.status !== 'pending'
+        || (hasProvenOwner(queuedSubmission) && queuedSubmission.ownerUserId !== identity.userId)) {
         continue;
       }
 

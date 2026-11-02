@@ -26,14 +26,21 @@ use Throwable;
  * (docs/daily-inspection-continuity.md section 2).
  *
  * Findings are facts and are always recorded. A routine inspection is accepted
- * automatically; it is held for a reviewer only for a meter rollback, a member
- * review flag, or new significant damage.
+ * automatically; it is held for a reviewer only for a meter rollback, a
+ * physically impossible meter increase, a member review flag, or new
+ * significant damage.
  */
 final class ApparatusInspectionProcessingService
 {
     public const STATUS_ACCEPTED = 'accepted';
 
     public const STATUS_HELD = 'held_for_review';
+
+    /** Engine hours may exceed the elapsed clock hours by this much (meter rounding, clock and entry timing). */
+    public const ENGINE_HOURS_ALLOWANCE = 24.0;
+
+    /** More miles than this per elapsed day (minimum one day) is not a drive any truck can make. */
+    public const MILES_PER_DAY = 1500.0;
 
     /**
      * Called inside the submission transaction with the apparatus locked.
@@ -146,9 +153,11 @@ final class ApparatusInspectionProcessingService
     }
 
     /**
-     * Meter rules (contract section 2.2). A reading never produces an exception
-     * unless it is below the fleet reading and was not simply overtaken while
-     * the member filled in the form.
+     * Meter rules (contract section 2.2). A reading produces a hold only when it
+     * is below the fleet reading and was not simply overtaken while the member
+     * filled in the form (a rollback), or when it rose more than is physically
+     * possible since the truck's previous accepted reading. A held reading never
+     * changes the truck's meter until a reviewer accepts it.
      *
      * @param  array{engine_hours: mixed, miles: mixed}|null  $baseline  the readings the member's form loaded with
      * @return array{changed: bool, outcomes: array<string, string>}
@@ -166,6 +175,10 @@ final class ApparatusInspectionProcessingService
             $initial = $baseline[$field] ?? null;
 
             if ($authoritative === null || (float) $submitted >= (float) $authoritative) {
+                if ($authoritative !== null && $this->holdImplausibleIncrease($inspection, $apparatus, $field, $submitted, $initial, $authoritative)) {
+                    // Held like a rollback: the truck keeps its meter until a reviewer accepts the reading.
+                    continue;
+                }
                 if ($authoritative === null || (float) $submitted > (float) $authoritative) {
                     $apparatus->setAttribute($attribute, $submitted);
                     $changed = true;
@@ -204,6 +217,58 @@ final class ApparatusInspectionProcessingService
                 'previous_value' => $previous?->getAttribute($field),
             ],
         ]);
+    }
+
+    /**
+     * Hold only a physically impossible increase (contract section 2.2). Engine hours cannot rise
+     * faster than the clock: more than the hours elapsed since the previous accepted reading of this
+     * truck plus a 24-hour allowance is impossible. Miles: more than 1,500 per elapsed day (at least
+     * one day). Without a previous accepted reading there is nothing to compare with and nothing is
+     * held. Returns true when a hold was created.
+     */
+    private function holdImplausibleIncrease(ApparatusInspection $inspection, Apparatus $apparatus, string $field, mixed $submitted, mixed $initial, mixed $authoritative): bool
+    {
+        $increase = (float) $submitted - (float) $authoritative;
+        if ($increase <= 0) {
+            return false;
+        }
+        $previous = $this->latestAcceptedReading($inspection, $apparatus, $field);
+        if ($previous === null) {
+            return false;
+        }
+        $previousAt = $previous->completed_at ?? $previous->created_at;
+        if ($previousAt === null) {
+            return false;
+        }
+        $readingAt = $inspection->completed_at ?? $inspection->created_at ?? now();
+        $elapsedHours = max(0.0, ($readingAt->getTimestamp() - $previousAt->getTimestamp()) / 3600);
+        $allowed = $field === 'engine_hours'
+            ? $elapsedHours + self::ENGINE_HOURS_ALLOWANCE
+            : self::MILES_PER_DAY * max(1.0, $elapsedHours / 24);
+        if ($increase <= $allowed) {
+            return false;
+        }
+
+        ApparatusInspectionException::query()->create([
+            'apparatus_inspection_id' => $inspection->id,
+            'apparatus_id' => $apparatus->id,
+            'field' => $field,
+            'reason' => InspectionHold::REASON_IMPLAUSIBLE_INCREASE,
+            'blocks_acceptance' => true,
+            'submitted_value' => $submitted,
+            'baseline_value' => $initial,
+            'authoritative_value' => $authoritative,
+            'metadata' => [
+                'previous_inspection_id' => $previous->id,
+                'previous_reading_at' => $previousAt->toIso8601String(),
+                'previous_value' => $previous->getAttribute($field),
+                'elapsed_hours' => round($elapsedHours, 2),
+                'increase' => round($increase, 2),
+                'allowed_increase' => round($allowed, 2),
+            ],
+        ]);
+
+        return true;
     }
 
     /** The latest accepted inspection of this physical vehicle that recorded the reading. */

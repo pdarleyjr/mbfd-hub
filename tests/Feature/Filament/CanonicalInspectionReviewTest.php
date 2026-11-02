@@ -172,6 +172,38 @@ final class CanonicalInspectionReviewTest extends TestCase
         $this->assertTrue((bool) ($event->metadata['meter_reset'] ?? false));
     }
 
+    public function test_accepting_a_held_implausible_increase_raises_the_meter_without_a_reset_confirmation(): void
+    {
+        $jump = $this->heldInspection('2026-10-20 09:00:00');
+        $hold = $this->hold($jump, ['field' => 'miles', 'reason' => 'implausible_increase', 'submitted_value' => 45000, 'baseline_value' => 1000, 'authoritative_value' => 1000]);
+
+        $this->pageFor($jump)
+            ->assertSee('Mileage rose more than a truck can drive since the last reading')
+            ->mountAction('acceptMeterReading', ['exception' => $hold->id])
+            ->assertSee('Accept and raise the meter')
+            ->assertDontSee('I confirm the vehicle meter was reset or replaced');
+
+        $this->pageFor($jump)
+            ->callAction('acceptMeterReading', ['expected_current_value' => 1000, 'reason' => 'Checked the dash: it reads 45,000.'], ['exception' => $hold->id])
+            ->assertHasNoActionErrors();
+
+        $this->assertSame(45000, (int) $this->rig->fresh()->current_miles);
+        $this->assertSame('resolved', $hold->fresh()->status);
+    }
+
+    public function test_keeping_the_current_reading_on_an_implausible_increase_leaves_the_meter(): void
+    {
+        $jump = $this->heldInspection('2026-10-20 09:00:00');
+        $hold = $this->hold($jump, ['field' => 'miles', 'reason' => 'implausible_increase', 'submitted_value' => 45000, 'baseline_value' => 1000, 'authoritative_value' => 1000]);
+
+        $this->pageFor($jump)
+            ->callAction('keepCurrentReading', ['expected_current_value' => 1000, 'reason' => 'Another truck\'s readings.'], ['exception' => $hold->id])
+            ->assertHasNoActionErrors();
+
+        $this->assertSame(1000, (int) $this->rig->fresh()->current_miles);
+        $this->assertSame('dismissed', $hold->fresh()->status);
+    }
+
     public function test_a_verified_reading_that_is_higher_needs_no_confirmation_but_a_lower_one_does(): void
     {
         $this->page()

@@ -8,6 +8,8 @@ import {
   acceptedOutcomeFor,
   describeSubmissionFailure,
   getQueuedSubmission,
+  discardDailyCheckoutAttentionRecord,
+  getOtherMembersQueuedCheckout,
   getQueuedSubmissionForApparatusAndChecklistVersion,
   isPermanentSubmissionFailure,
   onDailyCheckoutQueueChanged,
@@ -19,11 +21,13 @@ import {
   type DailyCheckoutQueueSyncResult,
   type InspectionReceiptOutcome,
   type InspectionReceiptState,
+  type OtherMemberQueuedCheckout,
 } from '../utils/dailyCheckoutSubmissionQueue';
 import type { DailyCheckoutQueuedSubmission } from '../lib/db';
 import { clearInspectionProgress, clearInspectionSessionAbandonKey, clearInspectionSessionStartKey, createClientSubmissionId, createDraftAutosaver, getOrCreateInspectionSessionAbandonKey, getOrCreateInspectionSessionStartKey, loadInspectionProgress, type DraftAutosaver } from '../utils/storage';
 import { safeContextualPath } from '../utils/contextualBack';
 import { canMigrateInventoryDraft, inventoryMigrationMessage, mergeDraftAnswers } from '../utils/inventoryDraftMigration';
+import { otherMembersCheckoutNotice } from '../utils/sharedDeviceNotice';
 import { useInventoryMarkers } from '../hooks/useInventoryMarkers';
 import { useLiveFindings } from '../hooks/useLiveFindings';
 import { useOffline } from '../hooks/useOffline';
@@ -195,6 +199,10 @@ export default function InspectionWizard() {
   const [serviceNotices, setServiceNotices] = useState<ApparatusServiceTicketSummary[]>([]);
   const [serviceNoticesUnavailable, setServiceNoticesUnavailable] = useState(false);
   const [queuedSubmissionBlocker, setQueuedSubmissionBlocker] = useState<DailyCheckoutQueuedSubmission | null>(null);
+  // Another member's unsent checkout for this truck on a shared device: a notice, never a block.
+  const [otherMembersCheckout, setOtherMembersCheckout] = useState<OtherMemberQueuedCheckout | null>(null);
+  const [confirmingBlockerDiscard, setConfirmingBlockerDiscard] = useState(false);
+  const [blockerDiscardMessage, setBlockerDiscardMessage] = useState<string | null>(null);
   const [queueRevision, setQueueRevision] = useState(0);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [retryingQueued, setRetryingQueued] = useState(false);
@@ -317,6 +325,15 @@ export default function InspectionWizard() {
     // A superseded load (remount, queue change) must not issue a session or
     // overwrite the state of the load that replaced it.
     let superseded = false;
+    const refreshOtherMembersCheckout = async (apparatusId: number, userId: number | undefined) => {
+      try {
+        const other = await getOtherMembersQueuedCheckout(apparatusId, userId);
+        if (!superseded) setOtherMembersCheckout(other);
+      } catch {
+        // A notice only: a read failure must never stop this member's checkout.
+        if (!superseded) setOtherMembersCheckout(null);
+      }
+    };
     const fetchData = async () => {
       if (!slug) return;
 
@@ -327,7 +344,9 @@ export default function InspectionWizard() {
             loadedContract.apparatus.id,
             loadedContract.checklist.checklist_version,
             loadedContract.checklist.checklist_base_version,
+            memberIdentity?.userId,
           );
+          await refreshOtherMembersCheckout(loadedContract.apparatus.id, memberIdentity?.userId);
           const previousBlockerId = blockerIdRef.current;
           blockerIdRef.current = blocker?.id ?? null;
           setQueuedSubmissionBlocker(blocker);
@@ -469,7 +488,9 @@ export default function InspectionWizard() {
           foundApparatus.id,
           checklistData.checklist_version,
           checklistData.checklist_base_version,
+          identity.userId,
         );
+        await refreshOtherMembersCheckout(foundApparatus.id, identity.userId);
         if (queuedSubmission) {
           blockerIdRef.current = queuedSubmission.id;
           setQueuedSubmissionBlocker(queuedSubmission);
@@ -932,6 +953,26 @@ export default function InspectionWizard() {
     }
   };
 
+  /**
+   * Discard this member's own rejected inspection from the blocking screen,
+   * after explicit confirmation. The queue refuses anything that is not the
+   * signed-in owner's own "needs review" record; once it is gone the queue
+   * change restarts the form from the saved draft with a new submission id.
+   */
+  const handleDiscardBlocker = async () => {
+    const blocker = queuedSubmissionBlocker;
+    if (!blocker || memberIdentity === null) return;
+    setBlockerDiscardMessage(null);
+    try {
+      const removed = await discardDailyCheckoutAttentionRecord(blocker.id, memberIdentity.userId);
+      if (!removed) setBlockerDiscardMessage('That saved inspection could not be discarded. It is still on this device.');
+    } catch {
+      setBlockerDiscardMessage('That saved inspection could not be discarded. It is still on this device.');
+    } finally {
+      if (mountedRef.current) setConfirmingBlockerDiscard(false);
+    }
+  };
+
   const retryLoad = () => {
     loadedContractRef.current = null;
     setError(null);
@@ -980,6 +1021,11 @@ export default function InspectionWizard() {
   if (queuedSubmissionBlocker !== null && apparatus !== null && checklist !== null) {
     const requiresOfficerReview = queuedSubmissionBlocker.status === 'requires_attention';
     const lastError = queuedRetryMessage ?? queuedSubmissionBlocker.lastError;
+    // Same rule as the saved-inspections list: only the signed-in owner's own rejected record.
+    const canDiscardBlocker = requiresOfficerReview
+      && memberIdentity !== null
+      && queuedSubmissionBlocker.ownershipState === 'owned'
+      && queuedSubmissionBlocker.ownerUserId === memberIdentity.userId;
 
     return (
       <section className="mx-auto max-w-md rounded-xl border border-hub-warning/40 bg-hub-warning/5 p-6 text-hub-ink sm:p-8" aria-labelledby="queued-inspection-heading">
@@ -1023,7 +1069,39 @@ export default function InspectionWizard() {
         {!requiresOfficerReview && isOffline && (
           <p className="mt-3 text-sm text-hub-ink-secondary">This device is offline. Retry becomes available when the connection returns.</p>
         )}
-        {requiresOfficerReview && (
+        {canDiscardBlocker && !confirmingBlockerDiscard && (
+          <button
+            type="button"
+            className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-hub-border px-4 font-semibold text-hub-danger hover:bg-hub-danger/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus touch-manipulation"
+            onClick={() => { setBlockerDiscardMessage(null); setConfirmingBlockerDiscard(true); }}
+          >
+            Discard this saved inspection…
+          </button>
+        )}
+        {canDiscardBlocker && confirmingBlockerDiscard && (
+          <div className="mt-4 rounded-lg border border-hub-danger/40 bg-hub-danger/5 p-3 text-sm" role="group" aria-label="Confirm discard">
+            <p className="font-semibold text-hub-danger">Discard permanently?</p>
+            <p className="mt-1 text-hub-ink-secondary">The server did not accept this inspection. Discarding deletes it from this device and it cannot be recovered. Your answers come back in a new checkout so you can correct them and submit again.</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center rounded-lg border border-hub-border bg-hub-surface px-3 font-semibold text-hub-ink hover:bg-hub-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+                onClick={() => setConfirmingBlockerDiscard(false)}
+              >
+                Keep it
+              </button>
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center rounded-lg bg-hub-danger px-3 font-semibold text-white hover:bg-hub-danger/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+                onClick={() => { void handleDiscardBlocker(); }}
+              >
+                Discard permanently
+              </button>
+            </div>
+          </div>
+        )}
+        {blockerDiscardMessage && <p role="status" className="mt-3 text-sm text-hub-ink-secondary">{blockerDiscardMessage}</p>}
+        {requiresOfficerReview && !canDiscardBlocker && (
           <p className="mt-3 text-sm text-hub-ink-secondary">Use Review saved inspections at the top of the page to see every saved inspection that needs review.</p>
         )}
       </section>
@@ -1085,6 +1163,11 @@ export default function InspectionWizard() {
         </div>
         <div className="inspection-save" data-save-state={autosaveState === 'idle' ? 'saving' : autosaveState}><div><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong>{/* Announced politely and only when a write finishes or fails, not on every edit. */}<small role="status" aria-live="polite">{saveStatusText}</small></div><div className="inspection-progress"><small>{progress.completed} / {progress.total} inspected</small><progress value={progress.completed} max={progress.total || 1} aria-label="Inspection progress" /></div></div>
       </header>
+      {otherMembersCheckout && (
+        <p className="mt-3 rounded-lg border border-hub-border bg-hub-surface p-3 text-sm text-hub-ink-secondary" role="note" data-testid="other-member-saved-checkout">
+          {otherMembersCheckoutNotice(otherMembersCheckout, apparatus.name)}
+        </p>
+      )}
       <div className="inspection-readiness">
         {/* The PM cycle follows a truck's one engine-hour meter. A boat has none, so it says nothing rather than "unavailable". */}
         {(apparatus.pm_health || usesVehicleId) && <span>{apparatus.pm_health ? apparatus.pm_health.status === 'red' ? 'PM due' : apparatus.pm_health.status === 'yellow' ? 'PM due soon' : 'PM current' : 'PM baseline unavailable'}</span>}

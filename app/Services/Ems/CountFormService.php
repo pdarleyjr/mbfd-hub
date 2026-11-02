@@ -169,9 +169,8 @@ final class CountFormService
     public function submit(string $uuid, User $user, string $key, array $input): array
     {
         $this->authorize($user);
-        $data = EmsValidator::validate($input, ['expected_uncounted' => ['required', 'integer', 'min:0']], [
-            'expected_uncounted.required' => 'Review the missing items before you submit.',
-        ]);
+        // Nothing on the form is mandatory. The number of items left blank is only a guard when the screen sends it.
+        $data = EmsValidator::validate($input, ['expected_uncounted' => ['nullable', 'integer', 'min:0']]);
         $id = (int) $this->draftByUuid($uuid)->getKey();
 
         return $this->idempotency->run($user, "ems.countform.submit.{$id}", $key, function () use ($id, $user, $data): array {
@@ -179,7 +178,7 @@ final class CountFormService
             $snapshot = $this->counts->lockDraft($id);
             $counted = $snapshot->lines()->whereNotNull('quantity_base')->pluck('supply_item_id')->map(fn ($itemId): int => (int) $itemId);
             $missing = $this->inScope()->reject(fn (SupplyItem $item): bool => $counted->contains((int) $item->getKey()))->count();
-            if ($missing !== (int) $data['expected_uncounted']) {
+            if (isset($data['expected_uncounted']) && $missing !== (int) $data['expected_uncounted']) {
                 throw EmsException::conflict('The list of items not yet counted changed. Check the review and submit again.', 'uncounted_changed');
             }
             $this->counts->close($snapshot, $user);

@@ -137,7 +137,7 @@ final class MedicalSupplyDataPageTest extends TestCase
         $this->assertNotContains('Medical Data / Statistics', $labels);
         $this->assertSame([], array_values(array_filter($labels, fn (string $label): bool => stripos($label, 'statistic') !== false)));
         $this->assertCount(1, array_filter($labels, fn (string $label): bool => $label === 'Medical Supply Data'));
-        $this->assertCount(4, $labels, 'Submitted forms, submitted supply room inventory, supply room and Medical Supply Data: one entry each.');
+        $this->assertCount(5, $labels, 'Submitted forms, master inventory, submitted supply room inventory, supply room and Medical Supply Data: one entry each.');
         $this->assertSame('/admin/medical-statistics', parse_url(MedicalDataStatistics::getUrl(), PHP_URL_PATH));
     }
 

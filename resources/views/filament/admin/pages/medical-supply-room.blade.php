@@ -245,10 +245,10 @@
                                         <td class="px-3 py-2">
                                             <x-filament::badge color="warning">Reorder recommended</x-filament::badge>
                                             @foreach ($row['open_orders'] as $open)
-                                                <x-filament::badge color="info" class="mt-1">Order placed: {{ $open['packages'] }} {{ $open['packages'] === 1 ? 'package' : 'packages' }}</x-filament::badge>
+                                                <x-filament::badge color="info" class="mt-1">On order: {{ $open['packages'] }}</x-filament::badge>
                                             @endforeach
                                         </td>
-                                        <td class="py-2 pl-3 text-right">{{ ($this->recordOrderAction)(['item' => $row['supply_item_id']]) }}</td>
+                                        <td class="py-2 pl-3 text-right">@if ($row['open_orders'] === []){{ ($this->recordOrderAction)(['item' => $row['supply_item_id']]) }}@endif</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -277,8 +277,11 @@
                     <label for="order-status" class="block text-xs font-medium text-gray-600 dark:text-gray-400">Show</label>
                     <x-filament::input.wrapper>
                         <x-filament::input.select id="order-status" wire:model.live="orderStatus">
-                            <option value="placed">Open orders (placed)</option>
-                            <option value="received">Received</option>
+                            <option value="open">Open orders</option>
+                            <option value="pending">Pending</option>
+                            <option value="placed">Ordered</option>
+                            <option value="backordered">Back ordered</option>
+                            <option value="received">Arrived</option>
                             <option value="cancelled">Cancelled</option>
                             <option value="">All</option>
                         </x-filament::input.select>
@@ -305,10 +308,11 @@
                                         <th scope="row" class="py-2 pr-3 font-medium text-gray-950 dark:text-white">{{ $order['item_name'] }}@if ($order['notes'])<span class="block text-xs font-normal text-gray-600 dark:text-gray-400">{{ $order['notes'] }}</span>@endif</th>
                                         <td class="px-3 py-2 text-right">{{ $order['packages'] }}@if ($order['quantity_base'])<span class="block text-xs text-gray-600 dark:text-gray-400">{{ $order['quantity_base'] }} units</span>@endif</td>
                                         <td class="px-3 py-2">{{ $order['placed_text'] }}@if ($order['placed_by_name'])<span class="block text-xs text-gray-600 dark:text-gray-400">{{ $order['placed_by_name'] }}</span>@endif</td>
-                                        <td class="px-3 py-2"><x-filament::badge :color="$order['status'] === 'placed' ? 'info' : ($order['status'] === 'received' ? 'success' : 'gray')">{{ $order['status_text'] }}</x-filament::badge>@if ($order['received_text'])<span class="block text-xs text-gray-600 dark:text-gray-400">{{ $order['received_text'] }}</span>@endif</td>
+                                        <td class="px-3 py-2"><x-filament::badge :color="match ($order['status']) { 'placed' => 'info', 'pending' => 'gray', 'backordered' => 'warning', 'received' => 'success', default => 'gray' }">{{ $order['status_text'] }}</x-filament::badge>@if ($order['expected_on'])<span class="block text-xs text-gray-600 dark:text-gray-400">Expected {{ $order['expected_on'] }}</span>@endif @if ($order['received_text'])<span class="block text-xs text-gray-600 dark:text-gray-400">{{ $order['received_text'] }}</span>@endif</td>
                                         <td class="py-2 pl-3 text-right">
-                                            @if ($order['status'] === 'placed' && $canAct)
+                                            @if ($order['open'] && $canAct)
                                                 <div class="flex flex-wrap justify-end gap-2">
+                                                    {{ ($this->orderStatusAction)(['order' => $order['id']]) }}
                                                     {{ ($this->receiveOrderAction)(['order' => $order['id']]) }}
                                                     {{ ($this->cancelOrderAction)(['order' => $order['id']]) }}
                                                 </div>

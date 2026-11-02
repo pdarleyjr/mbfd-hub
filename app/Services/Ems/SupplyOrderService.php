@@ -7,6 +7,7 @@ namespace App\Services\Ems;
 use App\Models\Ems\StockMovement;
 use App\Models\Ems\SupplyItem;
 use App\Models\Ems\SupplyOrder;
+use App\Models\Ems\SupplyOrderEvent;
 use App\Models\User;
 
 /**
@@ -39,7 +40,12 @@ final class SupplyOrderService
         ], ['packages.required' => 'Enter how many packages were ordered.', 'packages.min' => 'Enter how many packages were ordered.']);
 
         return $this->idempotency->run($user, 'ems.order.place', $key, function () use ($user, $data, $key): array {
+            // Same rule as the master list: one open order per item, checked under the stock lock.
+            $this->ledger->lock();
             $item = $this->trackedItem((int) $data['supply_item_id']);
+            if (SupplyOrder::query()->where('supply_item_id', $item->getKey())->whereIn('status', SupplyOrder::OPEN)->exists()) {
+                throw EmsException::conflict("\"{$item->name}\" is already on order. Update that order instead.", 'order_open');
+            }
             if ($item->units_per_package !== null) {
                 StockLedger::assertWithinLimit((int) $data['packages'] * $item->units_per_package);
             }
@@ -50,7 +56,9 @@ final class SupplyOrderService
                 'supplier_code' => $data['supplier_code'] ?? null, 'item_number' => $data['item_number'] ?? null,
                 'placed_by_user_id' => $user->getKey(), 'placed_by_name' => $actor->name, 'placed_at' => now(),
                 'notes' => $data['notes'] ?? null, 'idempotency_key' => 'place:'.$user->getKey().':'.$key,
+                'order_unit' => $item->package_unit, 'status_changed_at' => now(), 'status_changed_by_name' => $actor->name,
             ]);
+            $this->event($order, null, SupplyOrder::PLACED, $order->quantity_base, $actor);
 
             return $this->query->order($order->load('supplyItem:id,name'));
         });
@@ -68,9 +76,10 @@ final class SupplyOrderService
         return $this->idempotency->run($user, "ems.order.receive.{$orderId}", $key, function () use ($orderId, $user, $data): array {
             $this->ledger->lock();
             $order = SupplyOrder::query()->whereKey($orderId)->lockForUpdate()->first() ?? throw EmsException::notFound('order');
-            if ($order->status !== SupplyOrder::PLACED) {
+            if (! $order->isOpen()) {
                 throw EmsException::conflict($order->status === SupplyOrder::RECEIVED ? 'This order was already received.' : 'This order was cancelled.', 'order_not_open');
             }
+            $from = $order->status;
             $quantity = isset($data['quantity_base']) ? (int) $data['quantity_base'] : $order->quantity_base;
             if ($quantity === null) {
                 throw new EmsException('The package size for this item is not known, so enter how many individual units were received.', 'quantity_needed', 422, ['quantity_base' => ['Enter how many individual units were received.']]);
@@ -79,7 +88,8 @@ final class SupplyOrderService
             $actor = EmsActor::forUser($user, 'captain5');
 
             $this->ledger->record($item, StockMovement::RECEIVED, $quantity, $actor, 'receive:order:'.$order->getKey(), 'Order received', ['supply_order_id' => $order->getKey()]);
-            $order->update(['status' => SupplyOrder::RECEIVED, 'received_by_user_id' => $user->getKey(), 'received_at' => now(), 'quantity_base' => $order->quantity_base ?? $quantity]);
+            $order->update(['status' => SupplyOrder::RECEIVED, 'received_by_user_id' => $user->getKey(), 'received_at' => now(), 'quantity_base' => $order->quantity_base ?? $quantity, 'status_changed_at' => now(), 'status_changed_by_name' => $actor->name]);
+            $this->event($order, $from, SupplyOrder::RECEIVED, $quantity, $actor);
 
             return $this->query->order($order->load('supplyItem:id,name'));
         });
@@ -92,10 +102,13 @@ final class SupplyOrderService
 
         return $this->idempotency->run($user, "ems.order.cancel.{$orderId}", $key, function () use ($orderId, $user): array {
             $order = SupplyOrder::query()->whereKey($orderId)->lockForUpdate()->first() ?? throw EmsException::notFound('order');
-            if ($order->status !== SupplyOrder::PLACED) {
+            if (! $order->isOpen()) {
                 throw EmsException::conflict('Only an order that is still open can be cancelled.', 'order_not_open');
             }
-            $order->update(['status' => SupplyOrder::CANCELLED, 'cancelled_by_user_id' => $user->getKey(), 'cancelled_at' => now()]);
+            $from = $order->status;
+            $actor = EmsActor::forUser($user, 'captain5');
+            $order->update(['status' => SupplyOrder::CANCELLED, 'cancelled_by_user_id' => $user->getKey(), 'cancelled_at' => now(), 'status_changed_at' => now(), 'status_changed_by_name' => $actor->name]);
+            $this->event($order, $from, SupplyOrder::CANCELLED, $order->quantity_base, $actor);
 
             return $this->query->order($order->load('supplyItem:id,name'));
         });
@@ -126,6 +139,14 @@ final class SupplyOrderService
 
             return ['movement_id' => $movement->getKey(), 'supply_item_id' => $item->getKey(), 'quantity_base' => $movement->quantity_base];
         });
+    }
+
+    private function event(SupplyOrder $order, ?string $from, string $to, ?int $quantityBase, EmsActor $actor): void
+    {
+        SupplyOrderEvent::query()->create([
+            'supply_order_id' => $order->getKey(), 'from_status' => $from, 'to_status' => $to, 'quantity_base' => $quantityBase,
+            'actor_user_id' => $actor->userId, 'actor_name' => $actor->name, 'created_at' => now(),
+        ]);
     }
 
     private function trackedItem(int $id): SupplyItem

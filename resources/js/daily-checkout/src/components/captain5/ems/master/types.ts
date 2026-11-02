@@ -1,6 +1,33 @@
 /** Shapes of the Master Supply Room Inventory API (docs/ems/captain5-medical-inventory-workflow.md, section 6). */
 
-export type CountUnit = 'each' | 'box' | 'case' | 'pack' | 'bag';
+/** Every way an item can be counted, in the order the server lists them (`units`). Anything but `each` needs a size. */
+export type CountUnit =
+  | 'each' | 'box' | 'case' | 'pack' | 'bag' | 'bottle' | 'vial' | 'kit'
+  | 'roll' | 'pair' | 'tube' | 'carton' | 'can' | 'set' | 'sleeve' | 'tray';
+
+export interface UnitOption { value: CountUnit; label: string; plural: string }
+
+/** Where an item stands for ordering. An open order wins over the computed state. */
+export type OrderState = 'ok' | 'needs_order' | 'pending' | 'ordered' | 'backordered' | 'no_level' | 'not_counted';
+
+export type OpenOrderStatus = 'pending' | 'ordered' | 'backordered';
+
+export interface OpenOrder {
+  id: number;
+  status: OpenOrderStatus;
+  /** Whole count units. */
+  quantity: number;
+  unit_label: string;
+  /** YYYY-MM-DD */
+  expected_on: string | null;
+  note: string | null;
+  placed_at: string | null;
+  placed_by: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+export interface OrderSummary { needs_order: number; pending: number; ordered: number; backordered: number }
 
 /** One shelf. `code` is null for the "No shelf assigned" group. */
 export interface MasterSection {
@@ -41,6 +68,12 @@ export interface MasterItem {
   needs_review: boolean;
   review_reasons: string[];
   config_problem: string | null;
+  /** Expected on hand in the count unit (may carry one decimal); null when no level is set. */
+  expected: number | null;
+  /** Whole count units to order: ceil(max(0, expected - on hand)). Null when either side is unknown. */
+  to_order: number | null;
+  order_state: OrderState;
+  open_order: OpenOrder | null;
 }
 
 export interface InactiveItem { id: number; name: string; location_code: string | null }
@@ -56,10 +89,12 @@ export interface MasterData {
   draft: DraftSummary | null;
   last_count: LastCount | null;
   can_edit: boolean;
+  summary: OrderSummary;
+  units: UnitOption[];
 }
 
-/** What `orderFor` needs from an item. */
-export type OrderBasis = Pick<MasterItem, 'units_per_count_unit' | 'required_base'>;
+/** What `orderFor` needs from an item. `expected` (count units) wins over `required_base` when the server sends it. */
+export type OrderBasis = Pick<MasterItem, 'units_per_count_unit' | 'required_base'> & { expected?: number | null };
 
 export type OrderResult =
   | { kind: 'none-set' }
@@ -87,6 +122,26 @@ export interface ItemChanges {
   threshold?: number | null;
   active?: boolean;
 }
+
+/** One row of the Edit mode batch save. Only the fields that changed are present. */
+export interface BatchChange {
+  id: number;
+  name?: string;
+  location_code?: string | null;
+  new_location_label?: string;
+  count_unit?: CountUnit;
+  units_per_package?: number;
+  /** Whole count units; null clears the expected level. */
+  expected?: number | null;
+  /** Whole count units. Counts as a physical count of the item. */
+  on_hand?: number;
+}
+
+export interface OrderInput { status: OpenOrderStatus; quantity: number; expected_on?: string; note?: string }
+
+export interface OrderUpdate { status?: OpenOrderStatus | 'cancelled'; quantity?: number; expected_on?: string | null; note?: string | null }
+
+export interface ArrivedInput { quantity: number; note?: string }
 
 // ---------------------------------------------------------------- count form
 
