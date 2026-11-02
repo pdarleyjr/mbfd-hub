@@ -200,7 +200,7 @@ final class CountFormService
 
     private function authorize(User $user): void
     {
-        if (! $this->access->canAct($user)) {
+        if (! $this->access->canEditInventory($user)) {
             throw EmsException::forbidden();
         }
     }

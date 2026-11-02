@@ -37,7 +37,7 @@ const isEmsTab = (value: string | null): boolean => value === 'rescue' || value 
 const positiveInt = (value: string | null): number | null => (value !== null && /^\d{1,12}$/.test(value) && Number(value) > 0 ? Number(value) : null);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-interface EmsTabs { show: boolean; openRequests: number }
+interface EmsTabs { show: boolean; showForms: boolean; openRequests: number }
 interface NarcoticsTabState { show: boolean; pending: number }
 
 function tabsFor(workspace: Workspace, unread: number, ems: EmsTabs, narcotics: NarcoticsTabState): Array<TabItem<TabId>> {
@@ -45,10 +45,8 @@ function tabsFor(workspace: Workspace, unread: number, ems: EmsTabs, narcotics: 
     { id: 'today', label: 'Today' },
     { id: 'issues', label: 'Issues', badge: workspace.counts.open, badgeLabel: 'open issues' },
     { id: 'trucks', label: 'Truck Changes', badge: workspace.rescue_truck_changes.filter((change) => change.recent).length, badgeLabel: 'Rescue truck changes in the last 24 hours' },
-    ...(ems.show ? [
-      { id: 'rescue' as const, label: 'Submitted Inventory Forms', badge: ems.openRequests, badgeLabel: 'forms waiting' },
-      { id: 'supply' as const, label: 'Master Supply Room Inventory' },
-    ] : []),
+    ...(ems.show && ems.showForms ? [{ id: 'rescue' as const, label: 'Submitted Inventory Forms', badge: ems.openRequests, badgeLabel: 'forms waiting' }] : []),
+    ...(ems.show ? [{ id: 'supply' as const, label: 'Master Supply Room Inventory' }] : []),
     ...(narcotics.show ? [{ id: 'narcotics' as const, label: 'Narcotics Checks', badge: narcotics.pending, badgeLabel: 'checks to review' }] : []),
     { id: 'messages', label: 'Messages', badge: unread, badgeLabel: 'unread messages' },
     { id: 'updates', label: 'Department Updates' },
@@ -85,7 +83,9 @@ export default function Captain5Page() {
   const issueId = positiveInt(searchParams.get('issue'));
   // The EMS tabs exist only for people the EMS API admits. A deep link keeps its tab while that is being checked.
   const emsShown = ems.status === 'ready' || ((ems.status === 'loading' || ems.status === 'error') && isEmsTab(requestedTab));
-  const openRequests = useOpenRequestCount(ems.status === 'ready');
+  // Any administrator may keep the master inventory, but the forms stay with the people who hold EMS view.
+  const formsShown = ems.status !== 'ready' || ems.meta.permissions.view === true;
+  const openRequests = useOpenRequestCount(ems.status === 'ready' && formsShown);
   // The Narcotics Checks tab exists only for the people the narcotics API admits (Captain 5). A deep link keeps its tab while that is checked.
   const narcoticsShown = narcotics.status === 'ready' || ((narcotics.status === 'loading' || narcotics.status === 'error') && requestedTab === 'narcotics');
   const checkParam = searchParams.get('check');
@@ -140,7 +140,7 @@ export default function Captain5Page() {
   }
 
   const { access } = data;
-  const tabs = tabsFor(data, ws.unread, { show: emsShown, openRequests: openRequests.count }, { show: narcoticsShown, pending: narcotics.pending });
+  const tabs = tabsFor(data, ws.unread, { show: emsShown, showForms: formsShown, openRequests: openRequests.count }, { show: narcoticsShown, pending: narcotics.pending });
   const active: TabId = isTab(requestedTab) && tabs.some((tab) => tab.id === requestedTab) ? requestedTab : 'today';
   const refreshLabel = isOffline ? 'Refresh unavailable while offline' : ws.refreshing ? 'Refreshing Captain 5' : 'Refresh Captain 5';
 

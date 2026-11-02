@@ -19,6 +19,9 @@ use App\Services\Security\Captain5AccessDecision;
  * The Admin -> EMS grants only count together with the direct `admin.access` permission (the
  * same rule AdminCapabilityGate applies to every other admin.* capability). Super administrators
  * pass everything. Members who are not staff have no EMS staff access at all.
+ *
+ * The Master Supply Room Inventory and its count are wider: inventory_read and inventory_edit also admit any
+ * administrator (direct `admin.access`), unless that person was deliberately given the read-only `admin.ems.view`.
  */
 final class EmsAccess
 {
@@ -36,6 +39,8 @@ final class EmsAccess
             'view' => $this->canView($user),
             'act' => $this->canAct($user),
             'configure' => $this->canConfigure($user),
+            'inventory_read' => $this->canReadInventory($user),
+            'inventory_edit' => $this->canEditInventory($user),
             default => false,
         };
     }
@@ -56,6 +61,16 @@ final class EmsAccess
     {
         return $this->usable($user)
             && ($this->captain5->decide($user)->canConfigure || $this->hasAdminGrant($user, [self::MANAGE]));
+    }
+
+    public function canReadInventory(?User $user): bool
+    {
+        return $this->canView($user) || $this->isInventoryAdministrator($user);
+    }
+
+    public function canEditInventory(?User $user): bool
+    {
+        return $this->canAct($user) || $this->isInventoryAdministrator($user);
     }
 
     /** Captain 5 when the person qualifies for the Captain 5 page, otherwise EMS Admin. */
@@ -91,6 +106,14 @@ final class EmsAccess
             'act' => $this->canAct($user),
             'configure' => $this->canConfigure($user),
         ];
+    }
+
+    private function isInventoryAdministrator(?User $user): bool
+    {
+        return $this->usable($user)
+            && ! $this->captain5->decide($user)->denied
+            && $user->hasDirectWebPermission('admin.access')
+            && ! $user->hasDirectWebPermission(self::VIEW);
     }
 
     private function usable(?User $user): bool

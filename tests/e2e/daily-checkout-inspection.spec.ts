@@ -1125,6 +1125,43 @@ test('SCBA and radio numbers come filled in, one box each, and only a change or 
   ]);
 });
 
+test('notes and numbers are one tap away from the first screen, before anything is answered, and go in with the inspection', async ({ page }) => {
+  const api = await mockFireBoatInspectionApi(page, { equipmentNumbers: true });
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await expect(page.locator('.inspection-readiness')).not.toContainText('unavailable');
+  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Notes and numbers' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Concerns, Damage & Additional Notes' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'SCBA & Radio Numbers' })).toBeVisible();
+  await expect(page.getByLabel('Radio # - DE')).toHaveValue('1741');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Add a concern or note' }).click();
+  await page.getByLabel('What did you notice?').fill('Port rail scratched at the stern');
+  await page.getByRole('radio', { name: 'Note for the record: no action needed' }).check();
+  await page.getByLabel('Radio # - DE').fill('1999');
+
+  // Moving away and finishing the rest later loses nothing.
+  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Checklist details' }).click();
+  await page.locator('#fb6-shift').selectOption('A');
+  await page.getByLabel('High Low Tide').fill('High');
+  await page.getByLabel('Port Engine Hours').fill('45.5');
+  await page.getByRole('button', { name: 'Mark all duties completed' }).click();
+  await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
+
+  await expect(page.getByLabel('What did you notice?')).toHaveValue('Port rail scratched at the stern');
+  await expect(page.getByLabel('Radio # - DE')).toHaveValue('1999');
+  await drawInspectionSignature(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+
+  const submitted = api.submissions[0] as { concerns: Array<{ kind: string; description: string }>; field_values: Array<{ id: string; value: unknown }> };
+  expect(submitted.concerns.map((concern) => [concern.kind, concern.description])).toEqual([['note', 'Port rail scratched at the stern']]);
+  expect(submitted.field_values.find((field) => field.id === 'radio_de')?.value).toBe('1999');
+});
+
 test('a draft saved before numbers carried over picks them up instead of clearing them', async ({ page }) => {
   const api = await mockFireBoatInspectionApi(page, { equipmentNumbers: true });
 

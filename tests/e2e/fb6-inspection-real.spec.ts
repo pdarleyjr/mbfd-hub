@@ -99,6 +99,31 @@ test('a member completes Fire Boat 6 with no vehicle ID and the server records i
   expect(state.changeouts).toEqual([]);
 });
 
+test('a note written from the first screen, before any area is done, reaches the server with the inspection', async ({ browser }, info) => {
+  fixture('fb6');
+  const { page, problems } = await member(browser, info, 'member');
+
+  await page.goto('/daily/vehicle-inspections/fb6');
+  await expect(page.getByRole('heading', { name: 'FB6', exact: true, level: 1 })).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('.inspection-readiness')).not.toContainText('unavailable');
+  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Notes and numbers' }).click();
+  await page.getByRole('button', { name: 'Add a concern or note' }).click();
+  await page.getByLabel('What did you notice?').fill('Starboard cleat loose, noted from the first screen');
+  await page.getByRole('radio', { name: 'Note for the record: no action needed' }).check();
+  await page.getByLabel('Deckhand radio number').fill('6107');
+
+  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Apparatus', exact: true }).click();
+  await completeTheBoat(page);
+  await expect(page.getByLabel('What did you notice?')).toHaveValue('Starboard cleat loose, noted from the first screen');
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+
+  expect(problems).toEqual([]);
+  const evidence = fixture<Fb6State>('fb6-state').inspections.at(-1)?.checklist_evidence;
+  const recorded = Object.fromEntries((JSON.parse(evidence ?? '[]') as Array<{ id: string; value: unknown }>).map((field) => [field.id, field.value]));
+  expect(recorded['fb6-deck-hand-radio-number']).toBe('6107');
+});
+
 test('Station 6 opens the boat, the daily readings are on screen, and they are saved', async ({ browser }, info) => {
   const { page, problems } = await member(browser, info, 'member');
   const { station_id: station } = fixture<{ station_id: number }>('fb6');
@@ -225,7 +250,7 @@ test('a concern is reported, the next member sees it live with its history, and 
   await expect(card).toContainText('Awaiting verification');
   await expect(card).toContainText(/Reported by .+ on /);
   await next.page.getByText(/^Recent notes/).click();
-  await expect(next.page.locator('.findings-note')).toContainText('Tide was unusually low');
+  await expect(next.page.locator('.findings-note').filter({ hasText: 'Tide was unusually low' })).toBeVisible();
 
   // This member has started: the answer on screen has to survive Logistics acting on the issue.
   await next.page.getByRole('button', { name: 'Confirm all present' }).click();

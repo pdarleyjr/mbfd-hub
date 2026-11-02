@@ -32,6 +32,8 @@ export interface MasterItem {
   deducted: number;
   counted_at: string | null;
   counted_by: string | null;
+  /** The number is a best guess, not a physical count. The next real count clears this. */
+  estimated?: boolean;
   /** The "order when fewer than" level in base units; null when none is set. */
   required_base: number | null;
   order_rule_text: string | null;

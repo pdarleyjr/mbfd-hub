@@ -14,6 +14,7 @@ use App\Services\DailyCheckoutChecklistResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class DailyCheckoutInspectionSessionContractTest extends TestCase
@@ -495,6 +496,55 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
             ->assertJsonPath('code', 'DAILY_CHECKOUT_INSPECTION_SESSION_EXPIRED');
 
         $this->assertDatabaseCount('apparatus_inspections', 0);
+    }
+
+    /**
+     * The contract used to be saved as Eastern clock time and read back as UTC, so it expired 4 or 5 hours early. From then
+     * until its stored time a member could neither submit it nor be given a new one.
+     *
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function latestTimesInsideTwelveHours(): array
+    {
+        return [
+            'summer' => ['2026-08-31 07:05:00', '2026-08-31 19:00:00'],
+            'winter' => ['2026-12-15 07:05:00', '2026-12-15 19:00:00'],
+        ];
+    }
+
+    #[DataProvider('latestTimesInsideTwelveHours')]
+    public function test_a_contract_lasts_its_full_twelve_hours_in_real_time(string $started, string $submitted): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime($started);
+        $contract = $this->startInspectionSession($apparatus);
+
+        $this->assertTrue(CarbonImmutable::parse($contract['issued_at'])->equalTo(CarbonImmutable::parse($started, self::TIMEZONE)));
+        $this->assertTrue(CarbonImmutable::parse($contract['expires_at'])->equalTo(CarbonImmutable::parse($started, self::TIMEZONE)->addHours(12)));
+
+        $this->setTestTime($submitted);
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->fireBoatSubmission($apparatus, $contract, '77777777-7777-4777-8777-77777777aaaa'),
+        )->assertCreated();
+    }
+
+    public function test_a_member_is_never_handed_back_a_contract_that_has_already_expired(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-12-15 07:05:00');
+        $first = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")->assertCreated();
+        $cookie = $this->browserBindingCookieFrom($first);
+
+        foreach (['2026-12-15 15:00:00', '2026-12-15 19:04:59', '2026-12-15 19:05:01'] as $later) {
+            $this->setTestTime($later);
+            $again = $this->withCredentials()->withUnencryptedCookie($cookie->getName(), $cookie->getValue())
+                ->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")
+                ->assertSuccessful();
+
+            $this->assertTrue(CarbonImmutable::parse($again->json('inspection_session.expires_at'))->isFuture(), $later);
+        }
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
     }
 
     public function test_unbound_offline_draft_cannot_be_silently_backdated_or_submitted(): void

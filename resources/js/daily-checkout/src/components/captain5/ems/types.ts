@@ -18,6 +18,8 @@ export interface EmsUnitOption {
 
 export interface EmsMeta {
   permissions: EmsPermissions;
+  /** The master inventory also admits any administrator, who may have no other EMS access. */
+  inventory?: { read: boolean; edit: boolean };
   statuses: RequestStatus[];
   target_kinds: TargetKind[];
   units: EmsUnitOption[];
