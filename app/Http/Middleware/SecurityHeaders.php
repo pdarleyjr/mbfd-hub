@@ -28,19 +28,25 @@ class SecurityHeaders
             'member-onboarding', 'member-onboarding/*', 'account/city-email', 'account/city-email/*',
             'auth/*', 'oauth/*',
         );
-        $response->headers->set('Referrer-Policy', $identityPage ? 'no-referrer' : 'strict-origin-when-cross-origin');
+        // A response that already carries its own policy keeps it (the same rule as the CSP below); the default
+        // only fills the gap. Identity pages are always forced to no-referrer.
+        if ($identityPage || ! $response->headers->has('Referrer-Policy')) {
+            $response->headers->set('Referrer-Policy', $identityPage ? 'no-referrer' : 'strict-origin-when-cross-origin');
+        }
         if ($identityPage) {
             $response->headers->set('Cache-Control', 'no-store, private');
         }
         $conferencePath = $request->is('video-conferencing/*')
             || $request->is('employee/video-conferencing')
             || $request->is('employee/video-conferencing/*');
-        $response->headers->set(
-            'Permissions-Policy',
-            $conferencePath
-                ? 'camera=(self), microphone=(self), geolocation=()'
-                : 'camera=(), microphone=(), geolocation=()',
-        );
+        if (! $response->headers->has('Permissions-Policy')) {
+            $response->headers->set(
+                'Permissions-Policy',
+                $conferencePath
+                    ? 'camera=(self), microphone=(self), geolocation=()'
+                    : 'camera=(), microphone=(), geolocation=()',
+            );
+        }
         $response->headers->set('X-XSS-Protection', '1; mode=block');
 
         if ($request->secure()) {

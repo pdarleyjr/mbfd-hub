@@ -58,19 +58,27 @@ test('entitled home exposes the exact unified Quick Access destinations', async 
   await expect(page.locator('[data-home-daily-roster]')).toHaveCount(rosterPublishing ? 1 : 0);
   await expect(page.getByRole('link', { name: /ICS Forms/i })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Take Home Vehicle Inspection/i })).toHaveCount(0);
+  const training = page.locator('[data-training-tools]');
+  await expect(training).not.toHaveAttribute('open', '');
+  await training.locator('summary').click();
+  await expect(training.locator('[data-training-tool-link]')).toHaveText([
+    /Command Board Sandbox/,
+    /Vehicle Placement Simulator/,
+    /Pump Panel/,
+  ]);
   const additional = page.locator('[data-additional-links]');
   await expect(additional).not.toHaveAttribute('open', '');
   await additional.locator('summary').click();
   await expect(additional.locator('[data-additional-link]')).toHaveText([
     /Fleet operations/,
     /Workgroup Dashboard/,
-    /Pump Panel/,
     /Videos/,
     /Media Control/,
   ]);
   await expect(page.getByRole('link', { name: /Station \/ Vehicles \/ Equipment/i })).toHaveAttribute('href', /\/daily\/stations$/);
   await expect(page.getByRole('link', { name: /Workgroup Dashboard/i })).toHaveAttribute('href', /\/workgroups$/);
-  await expect(page.getByRole('link', { name: /Pump Panel/i })).toHaveAttribute('href', 'https://pdarleyjr.github.io/puc-sim-manual-ui/');
+  await expect(page.getByRole('link', { name: /Pump Panel/i })).toHaveAttribute('href', 'https://pump-panel.pages.dev/');
+  await expect(page.getByRole('link', { name: /Command Board Sandbox/i })).toHaveAttribute('href', /\/training-tools\/command-board$/);
   await expect(page.getByRole('link', { name: /Videos/i })).toHaveAttribute('href', 'https://videos.mbfdhub.com');
   await expect(page.getByRole('link', { name: /Media Control/i })).toHaveAttribute('href', 'https://media.mbfdhub.com/api/auth/hub/start');
   await expect(page.getByText('MBFD Support Assistant')).toHaveCount(0);
