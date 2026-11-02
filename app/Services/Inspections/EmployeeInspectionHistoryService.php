@@ -590,8 +590,7 @@ final class EmployeeInspectionHistoryService
         return match (true) {
             $reason === 'member_flagged' => 'You flagged this for review',
             $reason === 'new_significant_damage' => 'New significant damage',
-            $reason === 'rollback' && $field === 'engine_hours' => 'Engine hours lower than last reading',
-            $reason === 'rollback' => 'Mileage lower than last reading',
+            InspectionHold::meterReasonLabel($field, $reason) !== null => (string) InspectionHold::meterReasonLabel($field, $reason),
             default => 'A reviewer needs to look at this',
         };
     }

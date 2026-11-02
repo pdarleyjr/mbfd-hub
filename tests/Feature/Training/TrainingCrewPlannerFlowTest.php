@@ -120,10 +120,10 @@ final class TrainingCrewPlannerFlowTest extends TestCase
         $id = $component->get('draftId');
         $first = $this->employees['90001']->id;
         self::assertSame([], $this->draft($id)['selections'], 'Nobody is selected automatically.');
-        $component->assertSeeHtml('aria-label="Select Synthetic 90001"')->assertSee('3 eligible · 0 selected');
+        $component->assertSeeHtml('aria-label="Select Synthetic 90001"')->assertSee('3 on duty')->assertSee('0 selected');
         $component->call('toggleMember', $first)->assertHasNoErrors();
         self::assertArrayHasKey($first, $this->draft($id)['selections']);
-        $component->assertSee('3 eligible · 1 selected')->assertSeeHtml('aria-label="Select Synthetic 90001"');
+        $component->assertSee('3 on duty')->assertSee('1 selected')->assertSeeHtml('aria-label="Select Synthetic 90001"');
         $component->call('toggleMember', $first);
         self::assertSame([], $this->draft($id)['selections']);
         $component->assertSeeHtml('aria-label="Select Synthetic 90001"');

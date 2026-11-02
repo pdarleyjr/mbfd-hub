@@ -76,8 +76,7 @@ class MBFDDatabase extends Dexie {
 
     // Keep Daily Checkout records separate from the generic form-sync queue.
     // IndexedDB handles the signature/photo payloads that exceed localStorage's
-    // practical quota, and the unique apparatus index preserves one unresolved
-    // inspection per apparatus.
+    // practical quota. (Version 7 makes the duplicate guard per member.)
     this.version(3).stores({
       pendingSubmissions: '++id, type, status, createdAt, retryCount',
       cachedData: 'key, updatedAt',
@@ -123,6 +122,23 @@ class MBFDDatabase extends Dexie {
 
     this.version(6).stores({
       dailyCheckoutDrafts: '&key, apparatusSlug, timestamp',
+    });
+
+    // A shared station device: one member's unsent or rejected checkout must
+    // never stop another member from inspecting the same truck. The duplicate
+    // guard is per owner: one unresolved record per apparatus, checklist
+    // version and member. The server accepts several checkouts per truck per
+    // day (idempotent per client_submission_id), so nothing is lost.
+    //
+    // No upgrade step: every existing record is kept exactly as it is (no
+    // deletion, no status change). Version 6 already held at most one record
+    // per apparatus and checklist version, so adding the owner keeps them
+    // unique. A record without an owner (legacy work saved before account-bound
+    // queues) has no valid key for the owner index, so IndexedDB leaves it out
+    // of that index: two legacy records can never collide, and no member's
+    // checkout ever collides with a legacy one.
+    this.version(7).stores({
+      dailyCheckoutSubmissions: '&id, &[apparatusId+checklistVersion+ownerUserId], [apparatusId+checklistVersion], apparatusId, checklistVersion, status, createdAt, updatedAt, retentionExpiresAt, ownerUserId, ownershipState',
     });
   }
 }

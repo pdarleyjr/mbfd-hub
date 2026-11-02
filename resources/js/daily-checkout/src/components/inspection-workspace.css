@@ -257,7 +257,8 @@
 @media (min-width: 380px) and (max-width: 767px) {
   .apparatus-inspection > nav { overflow: visible; }
   .apparatus-inspection > nav button { flex: 1 1 0; min-width: 0; justify-content: center; gap: 4px; padding: 8px 2px; font-size: 12px; line-height: 16px; }
-  .apparatus-inspection > nav button svg { width: 16px; height: 16px; flex-shrink: 0; }
+  /* Five tabs on a truck (Apparatus, Member, Readings, Details, SCBA): the words fit only without the icons. */
+  .apparatus-inspection > nav button svg { display: none; }
 }
 @media (prefers-reduced-motion: no-preference) { .equipment-pass, .equipment-status button, .blueprint-zone rect { transition: background-color var(--hub-duration-fast) ease, fill var(--hub-duration-fast) ease, stroke var(--hub-duration-fast) ease; } }
 

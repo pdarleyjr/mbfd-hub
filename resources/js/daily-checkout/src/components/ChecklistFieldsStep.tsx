@@ -95,7 +95,7 @@ export default function ChecklistFieldsStep({
   const editableFields = checklist.fields.filter(field => !knownFields.includes(field));
   // Shift is separately required by the processing contract, even on Fire Boat.
   const requiredFields = editableFields.filter(field => field.required || field.id === 'fb6-shift');
-  // SCBA and radio numbers are on the review step's card, the one place every member passes. A required one stays here.
+  // SCBA and radio numbers are on their own card, opened from the box above this step. A required one stays here.
   const onCard = equipmentFieldIds(checklist.equipment_numbers);
   const shownFields = editableFields.filter(field => !requiredFields.includes(field) && !onCard.has(field.id));
   // Fields with a heading are everyday readings, so they stay on screen. Only the rest are tucked away.
