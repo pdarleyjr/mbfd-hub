@@ -10,3 +10,8 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+
+# Vendored Command Board sandbox build (scripts/training/vendor-command-board-sandbox.mjs): byte-exact so the sha256 values in
+# SANDBOX_SOURCE.json hold on every checkout, and kept out of diffs and language statistics.
+/public/training-tools/command-board/assets/** -text -diff linguist-generated
+/resources/training-tools/command-board/** -text -diff linguist-generated

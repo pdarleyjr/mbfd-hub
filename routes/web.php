@@ -70,6 +70,7 @@ use Illuminate\Support\Facades\Route;
 
 require __DIR__.'/training-roster.php';
 require __DIR__.'/training-paper.php';
+require __DIR__.'/training-tools.php';
 require __DIR__.'/take-home-inspections.php';
 require __DIR__.'/daily-roster.php';
 require __DIR__.'/vehicle-documents.php';
