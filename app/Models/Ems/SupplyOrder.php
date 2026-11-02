@@ -24,6 +24,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $received_at
  * @property int|null $cancelled_by_user_id
  * @property \Illuminate\Support\Carbon|null $cancelled_at
+ * @property string|null $order_unit
+ * @property \Illuminate\Support\Carbon|null $expected_on
+ * @property \Illuminate\Support\Carbon|null $status_changed_at
+ * @property string|null $status_changed_by_name
  * @property string|null $notes
  * @property string|null $idempotency_key
  * @property \Illuminate\Support\Carbon|null $created_at
@@ -31,11 +35,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class SupplyOrder extends Model
 {
+    /** Wanted, not yet placed with the supplier. */
+    public const PENDING = 'pending';
+
+    /** Shown as "Ordered". */
     public const PLACED = 'placed';
 
+    public const BACKORDERED = 'backordered';
+
+    /** Shown as "Arrived": the amount that came in was added to stock. */
     public const RECEIVED = 'received';
 
     public const CANCELLED = 'cancelled';
+
+    /** Still waiting on something; an item has at most one of these. */
+    public const OPEN = [self::PENDING, self::PLACED, self::BACKORDERED];
 
     protected $table = 'ems_supply_orders';
 
@@ -49,7 +63,20 @@ class SupplyOrder extends Model
             'placed_at' => 'datetime',
             'received_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'expected_on' => 'date',
+            'status_changed_at' => 'datetime',
         ];
+    }
+
+    public function isOpen(): bool
+    {
+        return in_array($this->status, self::OPEN, true);
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<SupplyOrderEvent, $this> */
+    public function events(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SupplyOrderEvent::class, 'supply_order_id');
     }
 
     /** @return BelongsTo<SupplyItem, $this> */

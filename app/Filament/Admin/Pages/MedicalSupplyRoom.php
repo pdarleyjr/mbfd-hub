@@ -22,6 +22,7 @@ use App\Services\Ems\Exports\SnapshotExporter;
 use App\Services\Ems\ReconciliationService;
 use App\Services\Ems\ReorderAdvisor;
 use App\Services\Ems\SnapshotPresenter;
+use App\Services\Ems\SupplyItemOrders;
 use App\Services\Ems\SupplyOrderService;
 use App\Services\Ems\SupplyRoomQuery;
 use App\Services\Exports\ExportableTable;
@@ -93,7 +94,7 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
 
     public int $movementsPage = 1;
 
-    public string $orderStatus = 'placed';
+    public string $orderStatus = 'open';
 
     #[Locked]
     public ?string $snapshotUuid = null;
@@ -199,7 +200,7 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
     private function reorderData(): array
     {
         $advice = app(ReorderAdvisor::class)->advise();
-        $status = array_key_exists($this->orderStatus, EmsLabels::ORDER_STATUS) ? $this->orderStatus : '';
+        $status = $this->orderStatus === 'open' || array_key_exists($this->orderStatus, EmsLabels::ORDER_STATUS) ? $this->orderStatus : '';
 
         return [
             'advice' => $advice,
@@ -372,7 +373,7 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
 
     public function receiveOrderAction(): Action
     {
-        return Action::make('receiveOrder')->label('Mark received')->icon('heroicon-o-inbox-arrow-down')->color('success')->size('sm')
+        return Action::make('receiveOrder')->label('Mark arrived')->icon('heroicon-o-inbox-arrow-down')->color('success')->size('sm')
             ->visible(fn (): bool => $this->emsCan('act'))
             ->requiresConfirmation()
             ->modalHeading('Mark this order received?')
@@ -393,6 +394,33 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
                 $input = filled($data['quantity_base'] ?? null) ? ['quantity_base' => (int) $data['quantity_base']] : [];
                 $this->emsRun($action, 'act', fn (User $user) => app(SupplyOrderService::class)->receive((int) ($arguments['order'] ?? 0), $user, $this->emsKey($data), $input), 'Order received', 'The received amount is now in stock.');
                 $this->forgetCurrentStock();
+            });
+    }
+
+    public function orderStatusAction(): Action
+    {
+        return Action::make('orderStatus')->label('Change status')->icon('heroicon-o-arrow-path')->color('gray')->size('sm')->outlined()
+            ->visible(fn (): bool => $this->emsCan('act'))
+            ->modalHeading('Change this order')
+            ->modalSubmitActionLabel('Save')
+            ->fillForm(function (array $arguments): array {
+                $order = SupplyOrder::query()->find((int) ($arguments['order'] ?? 0));
+
+                return ['idempotency_key' => (string) Str::uuid(), 'status' => match ($order?->status) {
+                    SupplyOrder::PENDING => 'pending', SupplyOrder::BACKORDERED => 'backordered', default => 'ordered',
+                }, 'expected_on' => $order?->expected_on?->toDateString()];
+            })
+            ->form([
+                Hidden::make('idempotency_key')->default(fn (): string => (string) Str::uuid()),
+                \Filament\Forms\Components\Select::make('status')->label('Status')->required()->native(false)
+                    ->options(['pending' => 'Pending', 'ordered' => 'Ordered', 'backordered' => 'Back ordered']),
+                \Filament\Forms\Components\DatePicker::make('expected_on')->label('Expected by')->native(false),
+                Textarea::make('note')->label('Note')->rows(2)->maxLength(1000),
+            ])
+            ->action(function (array $data, array $arguments, Action $action): void {
+                $input = ['status' => (string) $data['status'], 'expected_on' => filled($data['expected_on'] ?? null) ? (string) $data['expected_on'] : null]
+                    + (filled($data['note'] ?? null) ? ['note' => trim((string) $data['note'])] : []);
+                $this->emsRun($action, 'act', fn (User $user) => app(SupplyItemOrders::class)->update((int) ($arguments['order'] ?? 0), $user, $this->emsKey($data), $input), 'Order updated');
             });
     }
 

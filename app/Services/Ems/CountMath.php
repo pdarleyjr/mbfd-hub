@@ -19,7 +19,24 @@ final class CountMath
         'case' => ['case', 'cases'],
         'pack' => ['pack', 'packs'],
         'bag' => ['bag', 'bags'],
+        'bottle' => ['bottle', 'bottles'],
+        'vial' => ['vial', 'vials'],
+        'kit' => ['kit', 'kits'],
+        'roll' => ['roll', 'rolls'],
+        'pair' => ['pair', 'pairs'],
+        'tube' => ['tube', 'tubes'],
+        'carton' => ['carton', 'cartons'],
+        'can' => ['can', 'cans'],
+        'set' => ['set', 'sets'],
+        'sleeve' => ['sleeve', 'sleeves'],
+        'tray' => ['tray', 'trays'],
     ];
+
+    /** @return list<array{value: string, label: string, plural: string}> */
+    public static function units(): array
+    {
+        return array_map(fn (string $unit): array => ['value' => $unit, 'label' => self::LABELS[$unit][0], 'plural' => self::LABELS[$unit][1]], SupplyItem::COUNT_UNITS);
+    }
 
     /** How many base units one count unit holds. */
     public static function perCountUnit(SupplyItem $item): int

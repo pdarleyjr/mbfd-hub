@@ -201,6 +201,13 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-cube')
                     ->group('Logistics')
                     ->sort(10),
+                // The same Master Supply Room Inventory Captain 5 uses, so admins and Captain 5 see and edit one list.
+                NavigationItem::make('Master Supply Room Inventory')
+                    ->url('/daily/supply-room')
+                    ->icon('heroicon-o-clipboard-document-list')
+                    ->group('EMS')
+                    ->sort(15)
+                    ->visible(fn (): bool => app(\App\Services\Ems\EmsAccess::class)->canReadInventory(auth()->user())),
                 NavigationItem::make('Laravel Pulse')
                     ->url(fn (): string => PulseDashboard::getUrl(panel: 'admin'))
                     ->icon('heroicon-o-bolt')

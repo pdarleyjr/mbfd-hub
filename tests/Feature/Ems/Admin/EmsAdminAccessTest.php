@@ -82,7 +82,7 @@ final class EmsAdminAccessTest extends TestCase
 
     public function test_the_ems_group_shows_the_four_screens_only_to_people_who_may_read_them(): void
     {
-        $expected = ['Submitted Inventory Forms', 'Submitted Medical Supply Room Inventory', 'Medical Supply Room', 'Medical Data / Statistics'];
+        $expected = ['Submitted Inventory Forms', 'Master Supply Room Inventory', 'Submitted Medical Supply Room Inventory', 'Medical Supply Room', 'Medical Data / Statistics'];
         foreach ([$this->emsSuperAdmin(), $this->emsAdmin(['admin.ems.view']), $this->emsAdmin(['admin.ems.manage'])] as $user) {
             $this->as($user);
             $this->assertEqualsCanonicalizing($expected, $this->navigationItems());
@@ -90,7 +90,7 @@ final class EmsAdminAccessTest extends TestCase
         }
 
         $this->as($this->emsAdmin([], 'Plain Admin'));
-        $this->assertSame([], $this->navigationItems(), 'No EMS group for an administrator without EMS access.');
+        $this->assertSame(['Master Supply Room Inventory'], array_values($this->navigationItems()), 'Any administrator keeps the master inventory, and sees nothing else of EMS.');
         $this->assertFalse(InventoryRequestResource::canViewAny());
         $this->assertFalse(MedicalSupplyRoom::canAccess());
         $this->assertFalse(SubmittedMedicalSupplyRoomInventory::canAccess());

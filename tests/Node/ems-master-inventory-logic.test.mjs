@@ -5,6 +5,8 @@ import test from 'node:test';
 const dir = '../../resources/js/daily-checkout/src/components/captain5/ems/master';
 const logic = await import(`${dir}/logic.ts`);
 const edit = await import(`${dir}/editLogic.ts`);
+const orders = await import(`${dir}/orderLogic.ts`);
+const batch = await import(`${dir}/batchLogic.ts`);
 
 const item = (overrides = {}) => ({
   id: 1, name: 'Gauze 4x4', aliases: [], location_code: 'A2', location_label: 'A2 Wound care', section_key: 'wound', section_label: 'Wound care',
@@ -46,12 +48,18 @@ test('no order level, or an unusable unit size, is "none set", never a guess', (
   assert.deepEqual(logic.orderFor(0, item({ required_base: 10, units_per_count_unit: 0 })), { kind: 'none-set' });
 });
 
+test('the expected amount, when sent, is the order level; null means none set', () => {
+  assert.deepEqual(logic.orderFor(3, box({ required_base: 250, expected: 4 })), { kind: 'order', quantity: 1 });
+  assert.deepEqual(logic.orderFor(3, item({ required_base: 10, expected: null })), { kind: 'none-set' });
+  assert.deepEqual(logic.orderFor(2.5, box({ expected: 2.5 })), { kind: 'no-order' });
+});
+
 test('order wording carries the unit when it is not each', () => {
   const rule = box({ required_base: 500 });
   assert.equal(logic.orderText(logic.orderFor(0, rule), rule), 'Order 2 boxes');
   assert.equal(logic.orderText(logic.orderFor(1, rule), rule), 'Order 1 box');
   assert.equal(logic.orderText(logic.orderFor(2, rule), rule), 'No order needed');
-  assert.equal(logic.orderText(logic.orderFor(2, box()), box()), 'No order level set');
+  assert.equal(logic.orderText(logic.orderFor(2, box()), box()), 'No expected amount set');
   assert.equal(logic.orderText(logic.orderFor(5, item({ required_base: 10 })), item({ required_base: 10 })), 'Order 5');
 });
 
@@ -265,47 +273,11 @@ test('missing items are grouped under their shelf in shelf order', () => {
   assert.deepEqual(groups.map((group) => [group.label, group.items.map((entry) => entry.id)]), [
     ['A2 Wound care', [3, 4]], ['B1 IV supplies', [1]], ['No shelf assigned', [6]],
   ]);
-  assert.equal(logic.missingNote(1), 'Submit with 1 item not counted');
-  assert.equal(logic.missingNote(3), 'Submit with 3 items not counted');
+  assert.equal(logic.missingNote(1), '1 item left blank keeps its current number (or stays Not counted)');
+  assert.equal(logic.missingNote(3), '3 items left blank keep their current number (or stay Not counted)');
 });
 
-// -------------------------------------------------------------------------- edit rules
-
-test('the starting form shows the order level in the unit people count in', () => {
-  const form = edit.initialForm(box({ required_base: 500, on_hand: 2.5 }));
-  assert.equal(form.threshold, '2');
-  assert.equal(form.onHand, '2.5');
-  assert.equal(form.countUnit, 'box');
-  assert.equal(form.perPackage, '250');
-});
-
-test('an untouched form changes nothing', () => {
-  const target = box({ required_base: 500, on_hand: 3 });
-  const plan = edit.planEdit(target, edit.initialForm(target));
-  assert.equal(plan.nothingChanged, true);
-  assert.deepEqual(plan.errors, {});
-});
-
-test('only changed fields are sent; the on-hand number is a count, not a field', () => {
-  const target = item({ on_hand: 4, required_base: 10 });
-  const form = { ...edit.initialForm(target), name: 'Gauze 4x4 sterile', shelf: 'B1', onHand: '9', threshold: '' };
-  const plan = edit.planEdit(target, form);
-  assert.deepEqual(plan.changes, { name: 'Gauze 4x4 sterile', location_code: 'B1', threshold: null });
-  assert.equal(plan.count, 9);
-});
-
-test('a typed new shelf is sent as a label, and switching to a package unit sends the size too', () => {
-  const target = item({ on_hand: 4 });
-  const plan = edit.planEdit(target, { ...edit.initialForm(target), shelf: edit.NEW_SHELF, newShelf: ' Bay 7 ', countUnit: 'box', perPackage: '50' });
-  assert.deepEqual(plan.changes, { new_location_label: 'Bay 7', count_unit: 'box', units_per_package: 50 });
-  assert.equal(plan.count, null);
-});
-
-test('edits that cannot be saved say why', () => {
-  const target = item({ on_hand: 4 });
-  const plan = edit.planEdit(target, { ...edit.initialForm(target), name: '  ', shelf: edit.NEW_SHELF, newShelf: '', countUnit: 'case', perPackage: '', threshold: 'abc' });
-  assert.deepEqual(Object.keys(plan.errors).sort(), ['name', 'perPackage', 'shelf', 'threshold']);
-});
+// ---------------------------------------------------------------------------- Add item
 
 test('a new item needs a name and, when counted in packages, the package size', () => {
   assert.equal(edit.planNewItem({ ...edit.EMPTY_NEW_ITEM }).input, null);
@@ -313,13 +285,214 @@ test('a new item needs a name and, when counted in packages, the package size', 
   assert.deepEqual(ok.input, { name: 'Splint', count_unit: 'box', location_code: 'A2', units_per_package: 12, threshold: 2.5, on_hand: 3 });
 });
 
-test('unit choices are each plus the item\'s own package unit; an item with none may choose any', () => {
-  assert.deepEqual(edit.unitChoices(box()), ['each', 'box']);
-  assert.deepEqual(edit.unitChoices(item()), ['each', 'box', 'case', 'pack', 'bag']);
+test('a new item that cannot be saved says why', () => {
+  const plan = edit.planNewItem({ ...edit.EMPTY_NEW_ITEM, name: '  ', shelf: edit.NEW_SHELF, newShelf: '', countUnit: 'case', perPackage: '', threshold: 'abc' });
+  assert.equal(plan.input, null);
+  assert.deepEqual(Object.keys(plan.errors).sort(), ['name', 'perPackage', 'shelf', 'threshold']);
 });
 
 test('number fields keep digits, and the level keeps one decimal', () => {
   assert.equal(edit.wholeText('1a2,3'), '123');
   assert.equal(edit.levelText('2.55.1'), '2.5');
   assert.equal(edit.levelText('x7'), '7');
+});
+
+// ------------------------------------------------------------------------------ orders
+
+const withOrder = (overrides = {}) => orders.normalizeItem(item(overrides));
+const openOrder = (status, quantity = 3) => ({ id: 9, status, quantity, unit_label: 'boxes', expected_on: null, note: null, placed_at: null, placed_by: null, updated_at: null, updated_by: null });
+
+test('to order is ceil(max(0, expected - on hand)), and unknown when either side is', () => {
+  assert.equal(orders.toOrderFor(2, 5), 3);
+  assert.equal(orders.toOrderFor(2, 2.5), 1);
+  assert.equal(orders.toOrderFor(6, 5), 0);
+  assert.equal(orders.toOrderFor(null, 5), null);
+  assert.equal(orders.toOrderFor(2, null), null);
+});
+
+test('an older answer without order fields is filled the way the server works them out', () => {
+  const short = withOrder({ on_hand: 2, required_base: 10 });
+  assert.equal(short.expected, 10);
+  assert.equal(short.to_order, 8);
+  assert.equal(short.order_state, 'needs_order');
+  assert.equal(short.open_order, null);
+  assert.equal(withOrder({ on_hand: 12, required_base: 10 }).order_state, 'ok');
+  assert.equal(withOrder({ on_hand: 1, required_base: null }).order_state, 'no_level');
+  assert.equal(withOrder({ on_hand: null, required_base: 10 }).order_state, 'not_counted');
+  assert.equal(orders.normalizeItem(box({ on_hand: 1, required_base: 500 })).expected, 2);
+});
+
+test('the server state is kept, and an open order wins', () => {
+  assert.equal(withOrder({ on_hand: 2, expected: 5, to_order: 3, order_state: 'ordered', open_order: openOrder('ordered') }).order_state, 'ordered');
+  assert.equal(withOrder({ on_hand: 2, expected: 5, open_order: openOrder('backordered') }).order_state, 'backordered');
+  assert.equal(withOrder({ open_order: { ...openOrder('ordered'), status: 'arrived' } }).open_order, null);
+});
+
+test('the badge says what matters, with the quantity and the unit', () => {
+  const short = orders.normalizeItem(box({ on_hand: 1, expected: 4, to_order: 3, order_state: 'needs_order' }));
+  assert.deepEqual(orders.orderBadge(short), { text: 'Order 3 boxes', tone: 'danger' });
+  assert.deepEqual(orders.orderBadge({ ...short, order_state: 'ordered', open_order: openOrder('ordered') }), { text: 'Ordered 3 boxes', tone: 'info' });
+  assert.deepEqual(orders.orderBadge({ ...short, order_state: 'backordered', open_order: openOrder('backordered', 1) }), { text: 'Back ordered 1 box', tone: 'warning' });
+  assert.deepEqual(orders.orderBadge({ ...short, order_state: 'pending', open_order: openOrder('pending', 2) }), { text: 'Pending 2 boxes', tone: 'neutral' });
+  assert.deepEqual(orders.orderBadge(withOrder({ on_hand: 1, expected: 6, to_order: 5, order_state: 'needs_order' })), { text: 'Order 5', tone: 'danger' });
+  assert.equal(orders.orderBadge(withOrder({ on_hand: 9, expected: 6, to_order: 0, order_state: 'ok' })), null);
+  assert.equal(orders.orderBadge(withOrder({ order_state: 'no_level', expected: null })), null);
+});
+
+test('the summary counts items by state and the filter keeps only that state', () => {
+  const list = [{ order_state: 'needs_order' }, { order_state: 'needs_order' }, { order_state: 'ordered' }, { order_state: 'ok' }, { order_state: 'backordered' }];
+  assert.deepEqual(orders.summarize(list), { needs_order: 2, pending: 0, ordered: 1, backordered: 1 });
+  assert.equal(orders.applyFilter(list, 'needs_order').length, 2);
+  assert.equal(orders.applyFilter(list, null).length, 5);
+  assert.equal(orders.summaryLabel('backordered', 1), '1 back ordered');
+  assert.equal(orders.filterHeading('needs_order', 1), '1 item to order');
+});
+
+test('order quantities are whole numbers of 1 or more, and start at what is short', () => {
+  assert.equal(orders.orderQuantity('3'), 3);
+  assert.equal(orders.orderQuantity('0'), null);
+  assert.equal(orders.orderQuantity(''), null);
+  assert.equal(orders.suggestedQuantity({ to_order: 4 }), 4);
+  assert.equal(orders.suggestedQuantity({ to_order: 0 }), 1);
+  assert.equal(orders.suggestedQuantity({ to_order: null }), 1);
+  assert.equal(orders.dayText('2026-11-05'), 'Nov 5, 2026');
+});
+
+test('units come from the server list, with a fallback for one it does not name', () => {
+  assert.equal(orders.unitOption([], 'vial').plural, 'vials');
+  assert.equal(orders.unitPlural([], 'each'), 'single units');
+  assert.equal(orders.ALL_COUNT_UNITS.length, 16);
+});
+
+// --------------------------------------------------------------------------- Edit mode
+
+const editable = (overrides = {}) => orders.normalizeItem(item({ on_hand: 4, on_hand_base: 4, required_base: 10, ...overrides }));
+
+test('an untouched row sends nothing', () => {
+  const target = editable();
+  assert.deepEqual(batch.planRow(target, batch.startDraft(target)), { change: null, errors: {} });
+});
+
+test('only the fields that changed are sent, as whole numbers in the row unit', () => {
+  const target = editable();
+  const draft = { ...batch.startDraft(target), name: ' Gauze 4x4 sterile ', shelf: 'B1', onHand: '9', onHandTouched: true, expected: '12', expectedTouched: true };
+  assert.deepEqual(batch.planRow(target, draft).change, { id: 1, name: 'Gauze 4x4 sterile', location_code: 'B1', on_hand: 9, expected: 12 });
+});
+
+test('a typed number equal to the current one is not a change', () => {
+  const target = editable({ on_hand: 2.5, expected: 4 });
+  const draft = { ...batch.startDraft(target), onHand: '2.5', onHandTouched: true, expected: '4', expectedTouched: true };
+  assert.equal(batch.planRow(target, draft).change, null);
+});
+
+test('switching to boxes sends the unit and size; untouched numbers follow in the new unit and are not sent', () => {
+  const target = editable({ on_hand: 100, on_hand_base: 100, required_base: 200 });
+  const draft = { ...batch.startDraft(target), countUnit: 'box', perPackage: '50' };
+  assert.deepEqual(batch.planRow(target, draft).change, { id: 1, count_unit: 'box', units_per_package: 50 });
+  assert.equal(batch.shownOnHand(target, draft), '2');
+  assert.equal(batch.shownExpected(target, draft), '4');
+  assert.equal(batch.liveToOrder(target, draft), 2);
+});
+
+test('a new shelf is sent as a label; clearing the expected amount sends null', () => {
+  const target = editable();
+  const draft = { ...batch.startDraft(target), shelf: edit.NEW_SHELF, newShelf: ' Bay 7 ', expected: '', expectedTouched: true };
+  assert.deepEqual(batch.planRow(target, draft).change, { id: 1, new_location_label: 'Bay 7', expected: null });
+});
+
+test('rows that cannot be saved say why', () => {
+  const target = editable();
+  const draft = { ...batch.startDraft(target), name: ' ', countUnit: 'case', perPackage: '0', onHand: '2.5', onHandTouched: true, expected: '1.5', expectedTouched: true };
+  assert.deepEqual(Object.keys(batch.planRow(target, draft).errors).sort(), ['expected', 'name', 'onHand', 'perPackage']);
+});
+
+test('an emptied on-hand box means no change, not an error', () => {
+  const target = editable();
+  const cleared = batch.withNumber(batch.startDraft(target), 'onHand', '');
+  assert.deepEqual(batch.planRow(target, cleared), { change: null, errors: {} });
+  assert.equal(batch.rowChanged(target, cleared), false);
+  assert.equal(batch.liveToOrder(target, cleared), 6);
+});
+
+test('live to order follows what is typed', () => {
+  const target = editable({ on_hand: 4, expected: 10 });
+  assert.equal(batch.liveToOrder(target, batch.startDraft(target)), 6);
+  assert.equal(batch.liveToOrder(target, { ...batch.startDraft(target), onHand: '12', onHandTouched: true }), 0);
+  assert.equal(batch.liveToOrder(target, { ...batch.startDraft(target), expected: '', expectedTouched: true }), null);
+});
+
+test('the batch keeps list order, and counts rows that changed or need fixing', () => {
+  const first = editable({ id: 1 });
+  const second = editable({ id: 2, name: 'Tape' });
+  const third = editable({ id: 3, name: 'Splint' });
+  const drafts = {
+    3: { ...batch.startDraft(third), name: 'Splint large' },
+    1: { ...batch.startDraft(first), onHand: '7', onHandTouched: true },
+    2: { ...batch.startDraft(second), name: '' },
+  };
+  const plan = batch.planBatch([first, second, third], drafts);
+  assert.deepEqual(plan.changes, [{ id: 1, on_hand: 7 }, { id: 3, name: 'Splint large' }]);
+  assert.deepEqual(Object.keys(plan.errors), ['2']);
+  assert.deepEqual(plan.dirtyIds, [1, 2, 3]);
+  assert.equal(batch.saveLabel(1), 'Save 1 change');
+  assert.equal(batch.saveLabel(3), 'Save 3 changes');
+});
+
+test('server field errors land on the row that was sent at that index', () => {
+  const sent = [{ id: 4, name: 'A' }, { id: 7, units_per_package: 0 }];
+  const fields = { 'changes.1.units_per_package': 'Too small.', 'changes.0.location_code': 'No such shelf.', 'changes.0': 'Row problem.', changes: 'Too many.' };
+  const placed = batch.placeServerErrors(fields, sent);
+  assert.deepEqual(placed.rows, { 7: { perPackage: 'Too small.' }, 4: { shelf: 'No such shelf.', row: 'Row problem.' } });
+  assert.deepEqual(placed.general, ['Too many.']);
+});
+
+
+// ------------------------------------------------------------ review fixes: unit changes and to order
+
+const boxOf250 = () => orders.normalizeItem(box({ on_hand: 10, on_hand_base: 2500, required_base: 3000, to_order: 2 }));
+
+test('a number typed in the old unit is never sent after the unit changes (10 boxes of 250, typed 12 then 10, then each)', () => {
+  const target = boxOf250();
+  let draft = batch.withNumber(batch.startDraft(target), 'onHand', '12');
+  draft = batch.withNumber(draft, 'onHand', '10');
+  draft = batch.withCounting(draft, { countUnit: 'each' });
+  const plan = batch.planRow(target, draft);
+  assert.deepEqual(plan.change, { id: 1, count_unit: 'each' });
+  assert.equal(draft.onHandTouched, false);
+  assert.equal(draft.numbersReset, true);
+  assert.equal(batch.shownOnHand(target, draft), '2500');
+  assert.equal(batch.liveToOrder(target, draft), 500);
+});
+
+test('a size change clears typed numbers too; a number typed afterwards is sent in the new unit', () => {
+  const target = boxOf250();
+  let draft = batch.withNumber(batch.startDraft(target), 'expected', '20');
+  draft = batch.withCounting(draft, { perPackage: '100' });
+  assert.deepEqual(batch.planRow(target, draft).change, { id: 1, units_per_package: 100 });
+  assert.equal(batch.shownOnHand(target, draft), '25');
+  draft = batch.withNumber(draft, 'onHand', '24');
+  assert.equal(draft.numbersReset, false);
+  assert.deepEqual(batch.planRow(target, draft).change, { id: 1, units_per_package: 100, on_hand: 24 });
+  assert.equal(batch.liveToOrder(target, draft), 6);
+});
+
+test('the same unit chosen again keeps what was typed', () => {
+  const target = boxOf250();
+  const draft = batch.withCounting(batch.withNumber(batch.startDraft(target), 'onHand', '9'), { countUnit: 'box' });
+  assert.deepEqual(batch.planRow(target, draft).change, { id: 1, on_hand: 9 });
+});
+
+test('to order with nothing typed is the server number, so it always matches the badge', () => {
+  const target = orders.normalizeItem(box({ on_hand: 2.5, on_hand_base: 625, expected: 4, required_base: 1000, to_order: 2, order_state: 'needs_order' }));
+  assert.equal(batch.liveToOrder(target, batch.startDraft(target)), 2);
+  const odd = orders.normalizeItem(item({ on_hand: 1, expected: 1, to_order: 7 }));
+  assert.equal(batch.liveToOrder(odd, batch.startDraft(odd)), 7);
+});
+
+test('to order after typing is worked out in base units, not rounded display numbers', () => {
+  // 3 bottles of 30 = 90 units on hand; expected 101 units. Shown as 3.4 bottles, but the shortfall is 11 units: 1 bottle.
+  const target = orders.normalizeItem(item({ count_unit: 'bottle', count_unit_label: 'bottle', count_unit_label_plural: 'bottles', units_per_count_unit: 30, units_per_package: 30, package_unit: 'bottle', on_hand: 3, on_hand_base: 90, required_base: 101, expected: 3.4, to_order: 1 }));
+  const draft = batch.withNumber(batch.startDraft(target), 'onHand', '3');
+  assert.equal(batch.liveToOrder(target, draft), 1);
+  assert.equal(batch.liveToOrder(target, batch.withNumber(draft, 'onHand', '4')), 0);
 });

@@ -10,6 +10,8 @@ use App\Models\Ems\InventorySnapshotLine;
 use App\Models\Ems\StorageLocation;
 use App\Models\Ems\SupplyItem;
 use App\Models\Ems\SupplyItemEvent;
+use App\Models\Ems\SupplyOrder;
+use App\Models\Ems\SupplyOrderEvent;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -22,6 +24,9 @@ use Illuminate\Support\Str;
 final class MasterInventoryService
 {
     private const EDIT_REASON = 'Edited on the Captain 5 page';
+
+    /** Stored order status => what the master list calls it. */
+    public const ORDER_STATES = [SupplyOrder::PENDING => 'pending', SupplyOrder::PLACED => 'ordered', SupplyOrder::BACKORDERED => 'backordered'];
 
     private const SECTION_LABELS = [
         'supplies' => 'Supplies',
@@ -53,9 +58,16 @@ final class MasterInventoryService
             ->where(fn ($query) => $query->whereNull('origin')->orWhere('origin', InventorySnapshot::ORIGIN_COUNT_FORM))
             ->orderByDesc('version')->first();
 
+        $states = array_count_values(array_column($rows, 'order_state'));
+
         return [
             'sections' => $this->sections($locations, $items),
             'items' => $rows,
+            'summary' => [
+                'needs_order' => $states['needs_order'] ?? 0, 'pending' => $states['pending'] ?? 0,
+                'ordered' => $states['ordered'] ?? 0, 'backordered' => $states['backordered'] ?? 0,
+            ],
+            'units' => CountMath::units(),
             'inactive' => SupplyItem::query()->with('location:id,code')->where('active', false)->where('controlled_substance', false)->orderBy('name')->get()
                 ->map(fn (SupplyItem $item): array => ['id' => $item->getKey(), 'name' => $item->name, 'location_code' => $item->location?->code])->all(),
             'draft' => $draft === null ? null : [
@@ -123,23 +135,140 @@ final class MasterInventoryService
 
         return $this->idempotency->run($user, "ems.master.update.{$itemId}", $key, function () use ($itemId, $user, $data): array {
             $this->ledger->lock();
-            $item = SupplyItem::query()->whereKey($itemId)->lockForUpdate()->first() ?? throw EmsException::notFound('supply item');
-            if ($item->controlled_substance) {
-                throw new EmsException('Controlled substances are handled through the narcotics procedure, not here.', 'controlled_not_tracked', 422);
-            }
-            $actor = EmsActor::forUser($user, 'captain5');
-            foreach ($this->changes($item, $data) as $field => $after) {
-                $before = $item->getAttribute($field);
-                if ($before === $after || ($before !== null && $after !== null && $before == $after)) {
-                    continue;
-                }
-                $this->audit($item, $field, $before, $after, $actor);
-                $item->setAttribute($field, $after);
-            }
-            $item->save();
+            $item = $this->lockedItem($itemId);
+            $this->applyFields($item, $data, EmsActor::forUser($user, 'captain5'));
 
             return $this->one($item);
         });
+    }
+
+    /**
+     * The Edit mode save: several items at once, all or nothing. `expected` is the expected on hand in the item's
+     * count unit (as changed in the same row); `on_hand` is a physical count of that item.
+     *
+     * @param  array<string, mixed>  $input  {changes: [{id, name?, location_code?, new_location_label?, count_unit?, units_per_package?, expected?, on_hand?}]}
+     * @return array{result: array<string, mixed>, replayed: bool}
+     */
+    public function batch(User $user, string $key, array $input): array
+    {
+        $this->authorize($user);
+        $rules = ['changes' => ['required', 'array', 'min:1', 'max:500'], 'changes.*.id' => ['required', 'integer', 'distinct']];
+        foreach ($this->rules() + ['expected' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000'], 'on_hand' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:999999']] as $field => $fieldRules) {
+            $rules["changes.*.{$field}"] = $fieldRules;
+        }
+        $messages = ['changes.required' => 'There is nothing to save.', 'changes.*.id.distinct' => 'An item appears twice in this save.'];
+        foreach ($this->messages() + ['expected.integer' => 'Enter a whole number.', 'expected.min' => 'The expected amount cannot be negative.', 'on_hand.integer' => 'Enter a whole number.', 'on_hand.min' => 'A count cannot be negative.'] as $rule => $message) {
+            $messages["changes.*.{$rule}"] = $message;
+        }
+        $data = EmsValidator::validate($input, $rules, $messages);
+
+        return $this->idempotency->run($user, 'ems.master.batch', $key, function () use ($user, $data): array {
+            $this->ledger->lock();
+            $actor = EmsActor::forUser($user, 'captain5');
+            $ids = [];
+            foreach (array_values($data['changes']) as $index => $row) {
+                try {
+                    $item = $this->lockedItem((int) $row['id']);
+                    $fields = array_diff_key($row, array_flip(['id', 'expected', 'on_hand']));
+                    if (array_key_exists('expected', $row)) {
+                        $fields['threshold'] = $row['expected'];
+                    }
+                    $this->applyFields($item, $fields, $actor);
+                    if (($row['on_hand'] ?? null) !== null) {
+                        $this->counts->recordDirectCount($item, (int) $row['on_hand'], $user);
+                    }
+                    $ids[] = (int) $item->getKey();
+                } catch (EmsException $exception) {
+                    throw $this->forRow($exception, $index, $row);
+                }
+            }
+            $rows = collect($this->present(SupplyItem::query()->with(['location:id,code,label', 'catalogItem:id,name,aliases'])->whereIn('id', $ids)->get()))->keyBy('id');
+
+            return ['items' => array_map(fn (int $id): array => $rows->get($id), $ids)];
+        });
+    }
+
+    /** One item as the master list shows it, for callers that changed something about it. */
+    public function row(int $itemId): array
+    {
+        return $this->one(SupplyItem::query()->findOrFail($itemId));
+    }
+
+    private function lockedItem(int $itemId): SupplyItem
+    {
+        $item = SupplyItem::query()->whereKey($itemId)->lockForUpdate()->first() ?? throw EmsException::notFound('supply item');
+        if ($item->controlled_substance) {
+            throw new EmsException('Controlled substances are handled through the narcotics procedure, not here.', 'controlled_not_tracked', 422);
+        }
+
+        return $item;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function applyFields(SupplyItem $item, array $data, EmsActor $actor): void
+    {
+        foreach ($this->changes($item, $data) as $field => $after) {
+            $before = $item->getAttribute($field);
+            if ($before === $after || ($before !== null && $after !== null && $before == $after)) {
+                continue;
+            }
+            $this->audit($item, $field, $before, $after, $actor);
+            $item->setAttribute($field, $after);
+        }
+        $resized = $item->isDirty(['count_unit', 'units_per_package']);
+        $item->save();
+        if ($resized) {
+            $this->resizeOpenOrder($item, $actor);
+        }
+    }
+
+    /**
+     * An open order is kept in the item's count unit, so when that unit or its size changes the order follows:
+     * the same number of the same package at its new size, or the same single units in a different unit.
+     * Otherwise "Mark arrived" from the admin Reorder tab would add the old amount.
+     */
+    private function resizeOpenOrder(SupplyItem $item, EmsActor $actor): void
+    {
+        $order = SupplyOrder::query()->where('supply_item_id', $item->getKey())->whereIn('status', SupplyOrder::OPEN)->lockForUpdate()->first();
+        if ($order === null || ($item->count_unit !== 'each' && (int) $item->units_per_package < 1)) {
+            return;
+        }
+        $per = CountMath::perCountUnit($item);
+        $packages = $order->order_unit === $item->count_unit || $order->quantity_base === null
+            ? $order->packages
+            : max(1, (int) ceil($order->quantity_base / $per));
+        $base = $packages * $per;
+        StockLedger::assertWithinLimit($base);
+        if ($packages === $order->packages && $base === $order->quantity_base && $order->order_unit === $item->count_unit) {
+            return;
+        }
+        $order->update(['packages' => $packages, 'quantity_base' => $base, 'order_unit' => $item->count_unit]);
+        SupplyOrderEvent::query()->create([
+            'supply_order_id' => $order->getKey(), 'from_status' => $order->status, 'to_status' => $order->status, 'quantity_base' => $base,
+            'actor_user_id' => $actor->userId, 'actor_name' => $actor->name, 'note' => 'The item\'s unit or size changed, so the order was restated as '.$packages.' '.CountMath::label($item->count_unit, $packages).'.', 'created_at' => now(),
+        ]);
+    }
+
+    /** A refusal about one row of a batch, with its field errors keyed the way the form sent them. */
+    /** @param array<string, mixed> $row */
+    private function forRow(EmsException $exception, int $index, array $row = []): EmsException
+    {
+        $fields = [];
+        foreach ($exception->fields as $field => $messages) {
+            $fields["changes.{$index}.".($field === 'threshold' ? 'expected' : $field)] = $messages;
+        }
+        if ($fields === []) {
+            // Refusals that carry no field name the box the person would change to fix them.
+            $field = match ($exception->errorCode) {
+                'quantity_too_large' => $row === [] || array_key_exists('expected', $row) && ! array_key_exists('on_hand', $row) ? 'expected' : 'on_hand',
+                'package_size_needed' => 'units_per_package',
+                'item_in_open_count' => 'count_unit',
+                default => 'id',
+            };
+            $fields["changes.{$index}.{$field}"] = [$exception->getMessage()];
+        }
+
+        return new EmsException($exception->getMessage(), $exception->errorCode, $exception->status, $fields);
     }
 
     /**
@@ -180,10 +309,14 @@ final class MasterInventoryService
         $current = $this->ledger->current($items->filter->tracksStock()->values());
         $counts = $this->ledger->lastCounts($items->pluck('id')->map(fn ($id): int => (int) $id)->all());
         $deducted = $this->ledger->deductionsSinceCount($counts);
+        $orders = SupplyOrder::query()->whereIn('supply_item_id', $items->pluck('id')->all())->whereIn('status', SupplyOrder::OPEN)
+            ->orderByDesc('id')->get()->unique('supply_item_id')->keyBy('supply_item_id');
 
-        return $items->map(function (SupplyItem $item) use ($current, $counts, $deducted): array {
+        return $items->map(function (SupplyItem $item) use ($current, $counts, $deducted, $orders): array {
             $per = CountMath::perCountUnit($item);
             $base = $current[$item->getKey()]['quantity'] ?? null;
+            $toOrder = $base === null ? null : CountMath::orderInCountUnits(CountMath::orderBase($item->threshold_qty_base, $base), $per);
+            $order = $orders->get($item->getKey());
             $taken = $deducted[$item->getKey()] ?? 0;
             $count = $counts[$item->getKey()] ?? null;
             $labels = CountMath::LABELS[$item->count_unit] ?? [$item->count_unit, $item->count_unit];
@@ -211,6 +344,16 @@ final class MasterInventoryService
                 'counted_by' => $count['counted_by'] ?? null,
                 'estimated' => $count['estimated'] ?? false,
                 'required_base' => $item->threshold_qty_base,
+                'expected' => CountMath::display($item->threshold_qty_base, $per),
+                'to_order' => $toOrder,
+                'order_state' => match (true) {
+                    $order !== null => self::ORDER_STATES[$order->status],
+                    $base === null => 'not_counted',
+                    $item->threshold_qty_base === null => 'no_level',
+                    $toOrder > 0 => 'needs_order',
+                    default => 'ok',
+                },
+                'open_order' => $order === null ? null : $this->openOrder($order, $item, $per),
                 'order_rule_text' => CountMath::orderRuleText($item),
                 'refrigerated' => $item->refrigerated,
                 'needs_review' => $item->needs_review,
@@ -218,6 +361,24 @@ final class MasterInventoryService
                 'config_problem' => CountMath::configProblem($item),
             ];
         })->values()->all();
+    }
+
+    /** @return array<string, mixed> */
+    private function openOrder(SupplyOrder $order, SupplyItem $item, int $per): array
+    {
+        // Shown in the item's count unit today, even if the item was counted differently when the order was made.
+        $quantity = $order->order_unit === $item->count_unit || $order->quantity_base === null
+            ? $order->packages
+            : (int) ceil($order->quantity_base / $per);
+
+        return [
+            'id' => $order->getKey(), 'status' => self::ORDER_STATES[$order->status], 'quantity' => $quantity,
+            'unit_label' => CountMath::label($item->count_unit, $quantity), 'quantity_base' => $order->quantity_base,
+            'expected_on' => $order->expected_on?->toDateString(), 'note' => $order->notes,
+            'placed_at' => $order->placed_at->toIso8601String(), 'placed_by' => $order->placed_by_name,
+            'updated_at' => ($order->status_changed_at ?? $order->placed_at)->toIso8601String(),
+            'updated_by' => $order->status_changed_by_name ?? $order->placed_by_name,
+        ];
     }
 
     /**
@@ -385,7 +546,7 @@ final class MasterInventoryService
     {
         return [
             'name.max' => 'Keep the name to 160 characters or fewer.',
-            'count_unit.in' => 'Choose units, boxes, cases, packs or bags.',
+            'count_unit.in' => 'Choose how this item is counted from the list.',
             'units_per_package.integer' => 'Enter a whole number of units.', 'units_per_package.min' => 'A package holds at least 1 unit.',
             'threshold.integer' => 'Enter a whole number.', 'threshold.min' => 'The order level cannot be negative.',
         ];
