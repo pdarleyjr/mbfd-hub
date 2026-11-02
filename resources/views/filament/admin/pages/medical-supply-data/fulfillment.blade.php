@@ -8,8 +8,8 @@
         ['corrected', 'Corrected', 'Requests the member re-sent with a correction.'],
         ['reconciled', 'Reconciled', 'Requests deducted from the supply room and filed.'],
         ['open', 'Still open', 'Requests with work left to do.'],
-        ['qty_requested', 'Quantity requested', 'Total asked for on counted requests, in each supply\'s count unit.'],
-        ['qty_distributed', 'Quantity distributed', 'Total issued for those requests. '.$distributionNote.'.'],
+        ['qty_requested', 'Quantity requested', 'Total asked for on counted requests, in each request\'s own units.'],
+        ['qty_recorded_issued', 'Recorded as issued on requests', 'What the request forms record as issued, in each request\'s own units. It is not the stock ledger: only a supply\'s own distributed figure is.'],
     ];
     $median = $fulfillment['median_hours_to_reconcile'] ?? null;
 @endphp

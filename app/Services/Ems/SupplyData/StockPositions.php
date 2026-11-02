@@ -59,6 +59,9 @@ final class StockPositions
             $id = (int) $item->getKey();
             $row = $this->row($item, $current[$id], $origins, $lastCounts[$id] ?? null, $deductions[$id] ?? null, $advice->get($id), $distributed[$id] ?? null, $filters);
             $rows[] = $row['row'];
+            if (! $row['row']['active']) {
+                continue; // a retired item is shown when asked for, but it is not part of today's attention or quality counts
+            }
 
             $counters['below_minimum'] += $row['row']['status'] === 'below_minimum' ? 1 : 0;
             $counters['zero_stock'] += $row['row']['status'] === 'zero' ? 1 : 0;
@@ -92,12 +95,14 @@ final class StockPositions
         return SupplyItem::query()
             ->leftJoin('ems_storage_locations as sl', 'sl.id', '=', 'ems_supply_items.location_id')
             ->leftJoin('ems_catalog_items as ci', 'ci.id', '=', 'ems_supply_items.catalog_item_id')
-            ->where('ems_supply_items.active', true)->where('ems_supply_items.controlled_substance', false)
+            ->where('ems_supply_items.controlled_substance', false)
+            // The list is the active catalogue; an item asked for by id is shown even when retired, labelled inactive.
+            ->when($filters->item === null, fn ($query) => $query->where('ems_supply_items.active', true))
             ->when($filters->item !== null, fn ($query) => $query->where('ems_supply_items.id', $filters->item))
             ->when($filters->category !== null, fn ($query) => $query->where('ci.category', $filters->category))
             ->orderBy('ems_supply_items.name')->orderBy('ems_supply_items.id')
             ->get(['ems_supply_items.id', 'ems_supply_items.name', 'ems_supply_items.count_unit', 'ems_supply_items.package_unit', 'ems_supply_items.units_per_package',
-                'ems_supply_items.threshold_qty_base', 'sl.code as location_code', 'ci.category as category']);
+                'ems_supply_items.threshold_qty_base', 'ems_supply_items.active', 'sl.code as location_code', 'ci.category as category']);
     }
 
     /**
@@ -160,6 +165,7 @@ final class StockPositions
                 ? round($quantity / $perDay, 1) : null,
             'estimated' => $estimated,
             'units_resolved' => $convertible,
+            'active' => (bool) $item->active,
         ];
 
         $suspect = $estimated && $threshold !== null && $threshold > 0 && $quantity / $threshold >= self::SUSPECT_ESTIMATE_RATIO

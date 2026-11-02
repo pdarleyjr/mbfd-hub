@@ -45,7 +45,7 @@ final class SupplyDataController extends Controller
     public function unit(Request $request, string $unitKey): JsonResponse
     {
         return $this->guarded(function () use ($request, $unitKey): JsonResponse {
-            if (preg_match('/^(unit:[1-9][0-9]{0,17}|detail|unassigned)$/', $unitKey) !== 1) {
+            if (preg_match('/^(unit:[1-9][0-9]{0,17}|detail|unassigned)\z/', $unitKey) !== 1) {
                 throw EmsException::notFound('unit');
             }
 
@@ -56,8 +56,8 @@ final class SupplyDataController extends Controller
     public function export(Request $request): Response
     {
         try {
-            // The file lists as many supplies as the page may ask for unless the caller chose a smaller number.
-            $filters = SupplyDataFilters::fromArray(['limit' => SupplyDataFilters::MAX_LIMIT, ...$request->query()]);
+            // The file lists EVERY supply distributed in the period (bounded by the catalogue), whatever limit a page uses.
+            $filters = SupplyDataFilters::fromArray($request->query())->withLimit(PHP_INT_MAX);
             $overview = $this->report->overview($filters);
             $at = CarbonImmutable::now(EmsLabels::TIMEZONE);
             $bytes = $this->exporter->xlsx($overview, $filters, $at);

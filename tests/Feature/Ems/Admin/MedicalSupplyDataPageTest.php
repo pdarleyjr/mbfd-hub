@@ -307,6 +307,18 @@ final class MedicalSupplyDataPageTest extends TestCase
         $this->assertStringNotContainsString('+0%', $html);
     }
 
+    public function test_review_fix_wording_for_never_counted_reorder_and_the_request_side_quantity(): void
+    {
+        $this->useOverview(FakeSupplyDataReport::overviewFixture());
+        $this->actAs($this->viewer);
+
+        $this->page()
+            ->assertSee('Cannot tell (not counted)')
+            ->assertSee('Recorded as issued on requests')
+            ->assertDontSee('Total issued for those requests')
+            ->assertSee('below their order level');
+    }
+
     public function test_every_empty_state_explains_itself(): void
     {
         $overview = FakeSupplyDataReport::overviewFixture();

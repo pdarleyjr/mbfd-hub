@@ -51,7 +51,7 @@ final class SupplyDataReportTest extends TestCase
         $o = $this->overview();
 
         $this->assertSame(10, $o['fulfillment']['qty_requested']);
-        $this->assertSame(8, $o['fulfillment']['qty_distributed']);
+        $this->assertSame(8, $o['fulfillment']['qty_recorded_issued']);
         $this->assertSame(8, $this->row($o, 'top_items', 'Gloves, nitrile (L)')['distributed'], 'distributed comes from the ledger: 8 left the room although 10 were asked for');
         $this->assertSame(1, $o['headline']['distribution_events']);
         $this->assertSame(1, $o['headline']['requests_reconciled']);

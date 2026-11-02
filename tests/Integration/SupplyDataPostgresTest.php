@@ -63,6 +63,30 @@ final class SupplyDataPostgresTest extends TestCase
         $this->assertSame(4, $o['headline']['requests_submitted']);
     }
 
+    public function test_postgresql_answers_do_not_depend_on_the_session_time_zone(): void
+    {
+        $truck = $this->sdApparatus('Rescue PG', 'PG'.strtoupper(substr(uniqid(), -6)));
+        $item = $this->sdItem('PG zone');
+        foreach (['2026-11-01 03:59:00', '2026-11-01 04:00:00', '2026-11-08 04:59:00', '2026-11-08 05:00:00'] as $utc) {
+            $request = $this->sdRequest($truck, InventoryRequest::RECONCILED, '2026-10-30 08:00:00', [['x', 1, 1]]);
+            $this->sdMovement($item, StockMovement::ISSUED, -1, $request, '2026-11-01 00:00:00', ['occurred_at' => CarbonImmutable::parse($utc, 'UTC')]);
+        }
+        $input = ['period' => 'custom', 'from' => '2026-10-26', 'to' => '2026-11-09'];
+
+        DB::statement("SET TIME ZONE 'UTC'");
+        $utc = $this->overview($input);
+        DB::statement("SET TIME ZONE 'Asia/Tokyo'");
+        $tokyo = $this->overview($input);
+        DB::statement("SET TIME ZONE 'America/Los_Angeles'");
+        $pacific = $this->overview($input);
+
+        $this->assertSame([1, 2, 1], array_column($utc['trend'], 'distribution_events'));
+        $this->assertSame($utc['trend'], $tokyo['trend']);
+        $this->assertSame($utc['trend'], $pacific['trend']);
+        $this->assertSame($utc['headline'], $tokyo['headline']);
+        $this->assertSame($utc['top_items'][0]['last_distributed_at'], $tokyo['top_items'][0]['last_distributed_at'], 'the Eastern time shown does not change either');
+    }
+
     public function test_postgresql_nets_a_reversed_issuance_to_zero_and_a_correction_to_its_issuance_period(): void
     {
         $truck = $this->sdApparatus('Rescue PG', 'PG'.strtoupper(substr(uniqid(), -6)));

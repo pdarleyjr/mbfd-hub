@@ -14,9 +14,9 @@ interface Indicator {
 
 const INDICATORS: Indicator[] = [
   { key: 'below_minimum', label: 'Below minimum', explain: 'Under the level the supply room wants to keep.', filter: 'below_minimum', tone: 'warning' },
-  { key: 'zero_stock', label: 'Zero on hand', explain: 'Counted or calculated as none left.', filter: 'zero', tone: 'danger' },
+  { key: 'zero_stock', label: 'Zero on hand', explain: 'Nothing left by the books: counted, calculated or estimated at zero, or below zero.', filter: 'zero', tone: 'danger' },
   { key: 'estimated', label: 'Estimated — not yet counted', explain: 'Best-guess numbers until someone counts the shelf.', filter: 'estimated', tone: 'info' },
-  { key: 'needs_reorder', label: 'Needs reorder', explain: 'At or under the order level.', filter: 'reorder', tone: 'warning' },
+  { key: 'needs_reorder', label: 'Needs reorder', explain: 'Below the order level, so the advisor suggests an order. Exactly at the level is not flagged.', filter: 'reorder', tone: 'warning' },
 ];
 
 const TONE_TEXT = { danger: 'text-hub-danger', warning: 'text-hub-warning', info: 'text-hub-info' } as const;

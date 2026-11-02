@@ -59,7 +59,7 @@ final class SupplyDataFilters
             'period' => ['nullable', Rule::in(self::PERIODS)],
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d'],
-            'unit' => ['nullable', 'string', 'regex:/^(unit:[1-9][0-9]{0,17}|detail|unassigned)$/'],
+            'unit' => ['nullable', 'string', 'regex:/^(unit:[1-9][0-9]{0,17}|detail|unassigned)\z/'],
             'item' => ['nullable', 'bail', 'integer', 'min:1', Rule::exists('ems_supply_items', 'id')->where(fn ($query) => $query->where('controlled_substance', false))],
             'category' => ['nullable', 'string', 'max:80'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_LIMIT],
@@ -122,6 +122,40 @@ final class SupplyDataFilters
     public function forItem(int $itemId): self
     {
         return new self($this->period, $this->from, $this->to, $this->days, $this->unit, $itemId, $this->category, $this->limit, $this->now);
+    }
+
+    /** The same question for the whole department: used for stock rows, which are room-wide whatever unit is chosen. */
+    public function withoutUnit(): self
+    {
+        return $this->unit === null ? $this : new self($this->period, $this->from, $this->to, $this->days, null, $this->item, $this->category, $this->limit, $this->now);
+    }
+
+    /** The same question listing up to $limit rows (the export lists every supply, so it asks for more than a page may). */
+    public function withLimit(int $limit): self
+    {
+        return new self($this->period, $this->from, $this->to, $this->days, $this->unit, $this->item, $this->category, $limit, $this->now);
+    }
+
+    /**
+     * Indexes of the weekly buckets that cover a whole Sunday-to-Saturday week inside the period. The first and last
+     * week are usually clipped by the period's own edges and say nothing about a typical week. Empty for monthly trends.
+     *
+     * @return list<int>
+     */
+    public function completeBucketIndexes(): array
+    {
+        if ($this->isMonthly()) {
+            return [];
+        }
+        $complete = [];
+        foreach ($this->buckets() as $index => $bucket) {
+            $sunday = CarbonImmutable::parse($bucket['label'], HubTimezone::NAME)->startOfDay();
+            if ($sunday->greaterThanOrEqualTo($this->from) && $sunday->addDays(6)->lessThanOrEqualTo($this->to)) {
+                $complete[] = $index;
+            }
+        }
+
+        return $complete;
     }
 
     /** First instant of the period (UTC). */

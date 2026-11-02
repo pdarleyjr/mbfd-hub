@@ -15,7 +15,7 @@ a unit. Nothing in the data says a crew used them on a patient.
 | `distributed` (per item, per unit) | `ems_stock_movements` (`supply_item_id`, `movement_type`, `quantity_base`, `request_id`, `corrects_movement_id`, `occurred_at`) joined to `ems_inventory_requests` (`apparatus_id`, `target_kind`, `target_label`) and `ems_supply_items` (`controlled_substance`) | `request_id` is set and `movement_type` is `issued` or `adjusted`; summed per (request, item); the pair counts when the sum is below zero (stock left) | The ledger is the record of stock leaving the room. `issued` is the deduction (negative). `adjusted` with a request id is only ever written by a correction (`RequestWorkflowService::correctOne`, links at line 703). The same rule is how `StockLedger::deductionsSinceCount` (lines 227-246) decides what is a deduction, so the two agree. |
 | `distribution_events` | same query | the number of (request, item) pairs above, by effective time | Different items have different units, so ranking uses events, not quantities. |
 | `requested` / `qty_requested` | `ems_inventory_request_lines` (`requested_qty`, `response_type`, `catalog_item_id`) of counted requests | `response_type = quantity`, `requested_qty > 0`, catalog item not controlled | A Yes/No answer (the narcotics box) is not a quantity. Same rule as `EmsStatistics` (`wantedQty()`). |
-| `qty_distributed` (fulfillment block only) | the same lines' `issued_qty` | same lines | A request-side number in the request's own units, so it can sit beside `qty_requested`. It is **not** the ledger figure (see finding F11). |
+| `qty_recorded_issued` (fulfillment block only) | the same lines' `issued_qty` | same lines | A request-side number in the request's own units, so it can sit beside `qty_requested`. It is **not** the ledger figure (see finding F11). |
 | `received` | `ems_stock_movements` | `movement_type = received` | Shown on the item page's replenishment list only. Never part of distributed. |
 | `adjusted` (manual) | `ems_stock_movements` | `movement_type = adjusted` and `request_id IS NULL` | Written by `SupplyOrderService` (line 123). Never request-linked, so it can never be mistaken for a reversal. |
 | `on_hand`, `basis`, `deductions_since_count` | `StockLedger::current()`, `lastCounts()`, `deductionsSinceCount()` | the ledger's own rule | Never recomputed. The only addition is the snapshot's `origin` (one query) to label an estimate. |
@@ -196,7 +196,7 @@ Statuses (`InventoryRequest`): `submitted`, `reviewed`, `prepared`, `partially_i
 - **F10. `qty_issued` on request lines is not ledger quantity.** `applyReconciledLine` (lines 477-479) adds the quantity to the line's
   `issued_qty` whether or not the line moved stock (`not_stocked`, `no_stock_effect`, controlled). `EmsStatistics` sums it as "issued". Supply Data's
   per-item distributed comes from the ledger; the fulfillment block labels the request-side sum separately.
-- **F11. Request-line units are mixed.** `qty_requested` and `qty_distributed` in the fulfillment block add different units of measure (bags, boxes,
+- **F11. Request-line units are mixed.** `qty_requested` and `qty_recorded_issued` in the fulfillment block add different units of measure (bags, boxes,
   each). They are totals of counts, not a quantity of anything, and the export says so.
 - No other defect was found in reversal, correction or timezone handling: `EmsStatistics` weekly arithmetic is calendar-day exact across the
   daylight-saving change (`CarbonImmutable::diffInDays` between Eastern midnights).
@@ -220,3 +220,13 @@ Statuses (`InventoryRequest`): `submitted`, `reviewed`, `prepared`, `partially_i
   grows to millions of rows, an index on `(request_id)` and on `(movement_type, occurred_at)` would be the first thing to add (additive migration,
   no permissions in migrations).
 - No cache. There is no measured need at this size, and a stale number in a stock report is worse than a slow one.
+
+## 11. Review fixes (2026-11-02, after the independent audit)
+
+- **Unit keys.** The distribution query now groups by unit key (`UnitKey::ordinalSql`), so one `unassigned` row covers every request whose truck is gone, whether it named a rescue or an other unit. Previously two target kinds produced two partial rows that overwrote each other.
+- **Stock is room-wide.** The pace behind `avg_daily_distributed` and `days_of_supply` is always the whole department's distribution; a unit filter narrows only the request, distribution and trend sections.
+- **Retired items.** The stock query bypasses the active filter only for an item asked for by id, and such a row is excluded from the attention and data-quality counters.
+- **Time zone independence.** `Instant` binds every instant as UTC. On PostgreSQL the placeholder is `CAST(? AS timestamptz)` with an ISO-8601 string ending `+00:00`, so a comparison never depends on the session `TimeZone`. Week and month boundaries are Eastern midnights computed in PHP and compared as exact instants, which is the same result `AT TIME ZONE 'America/New_York'` would give and also works on SQLite. `tests/Integration/SupplyDataPostgresTest.php` runs the same period under UTC, Tokyo and Pacific session zones and asserts identical output. `config/database.php` is untouched.
+- **Whole weeks.** `SupplyDataFilters::completeBucketIndexes()` marks the weekly buckets that are not clipped by the period; only those feed `median_weekly`.
+- **Correction chains.** `corrected` counts counted requests with `revision_number > 1`.
+- **Out of scope, noted:** `/ems/api/supply/items/{item}` (the older SupplyRoomController route) uses `whereNumber('item')` with an `int` action parameter, so a 20-digit id probably overflows the same way the Supply Data route did before F6. It was not changed.

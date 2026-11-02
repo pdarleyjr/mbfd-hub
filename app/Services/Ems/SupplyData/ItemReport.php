@@ -7,6 +7,7 @@ namespace App\Services\Ems\SupplyData;
 use App\Models\Ems\StockMovement;
 use App\Models\Ems\SupplyItem;
 use App\Support\HubTimezone;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use stdClass;
@@ -36,11 +37,14 @@ final class ItemReport
         $previous = $this->distribution->byItem($f->previousFromUtc(), $f->previousToUtc(), $f)->first();
         $byUnit = $this->distribution->byUnit($f->fromUtc(), $f->toUtc(), $f);
         $byBucket = $this->distribution->byBucket($f->fromUtc(), $f->toUtc(), $f, $buckets);
-        $position = $this->stock->build($f, $current === null ? [] : [(int) $item->getKey() => $current])['rows'][0] ?? null;
+        // Stock is room-wide, so its pace is the whole department's, whatever unit this page is narrowed to.
+        $room = $f->unit === null ? $current : $this->distribution->byItem($f->fromUtc(), $f->toUtc(), $f->withoutUnit())->first();
+        $position = $this->stock->build($f->withoutUnit(), $room === null ? [] : [(int) $item->getKey() => $room])['rows'][0] ?? null;
 
         $netBase = (int) ($current->net_base ?? 0);
         $events = (int) ($current->events ?? 0);
-        $weekly = $f->isMonthly() ? [] : array_map(fn (int $index): float => (float) (Support::amount($byBucket[$index]['net_base'] ?? 0, $units['per']) ?? 0), array_keys($buckets));
+        // Only whole weeks (not clipped by the period start or end) say anything about a typical week.
+        $weekly = array_map(fn (int $index): float => (float) (Support::amount($byBucket[$index]['net_base'] ?? 0, $units['per']) ?? 0), $f->completeBucketIndexes());
         $movements = $this->movements($item, $f, $units['per']);
 
         return [
@@ -59,13 +63,14 @@ final class ItemReport
             ])),
             'period' => $f->periodSummary(),
             'filters' => $f->filterSummary(),
+            'scope_notes' => $f->unit === null ? [] : ['Stock, days of supply and average per day are for the whole supply room. Distribution, trend, units and movements are narrowed to the chosen unit.'],
             'distribution' => [
                 'distributed' => Support::amount($netBase, $units['per']) ?? 0,
                 'distribution_events' => $events,
                 'previous_distribution_events' => (int) ($previous->events ?? 0),
                 'change_pct' => Support::changePct($events, (int) ($previous->events ?? 0)),
                 'avg_weekly' => round($netBase / $units['per'] / ($f->days / 7), 1),
-                'median_weekly' => $f->isMonthly() ? null : Support::median($weekly),
+                'median_weekly' => Support::median($weekly),
                 'last_distributed_at' => Support::at($current->last_at ?? null),
             ],
             'trend' => $this->trend($f, $buckets, $byBucket, $units['per']),
@@ -133,7 +138,7 @@ final class ItemReport
     {
         return DB::table('ems_stock_movements as m')
             ->where('m.supply_item_id', $item->getKey())
-            ->where('m.occurred_at', '>=', $f->fromUtc()->format('Y-m-d H:i:s'))->where('m.occurred_at', '<', $f->toUtc()->format('Y-m-d H:i:s'))
+            ->tap(fn (Builder $q) => Instant::where(Instant::where($q, 'm.occurred_at', '>=', $f->fromUtc()), 'm.occurred_at', '<', $f->toUtc()))
             ->where(fn ($q) => $q->where('m.movement_type', StockMovement::RECEIVED)->orWhere(fn ($q2) => $q2->where('m.movement_type', StockMovement::ADJUSTED)->whereNull('m.request_id')))
             ->orderByDesc('m.occurred_at')->orderByDesc('m.id')->limit(self::MOVEMENT_LIMIT)
             ->get(['m.occurred_at', 'm.movement_type', 'm.quantity_base', 'm.reason'])
@@ -152,7 +157,7 @@ final class ItemReport
         return DB::table('ems_stock_movements as m')
             ->leftJoin('ems_inventory_requests as r', 'r.id', '=', 'm.request_id')
             ->where('m.supply_item_id', $item->getKey())
-            ->where('m.occurred_at', '>=', $f->fromUtc()->format('Y-m-d H:i:s'))->where('m.occurred_at', '<', $f->toUtc()->format('Y-m-d H:i:s'))
+            ->tap(fn (Builder $q) => Instant::where(Instant::where($q, 'm.occurred_at', '>=', $f->fromUtc()), 'm.occurred_at', '<', $f->toUtc()))
             ->when($f->unit !== null, fn ($q) => UnitKey::restrict($q, (string) $f->unit, 'r'))
             ->orderByDesc('m.occurred_at')->orderByDesc('m.id')->limit(self::MOVEMENT_LIMIT + 1)
             ->selectRaw('m.id AS id, m.occurred_at AS occurred_at, m.movement_type AS movement_type, m.quantity_base AS quantity_base, m.reason AS reason,

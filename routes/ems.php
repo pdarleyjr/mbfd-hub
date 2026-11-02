@@ -62,7 +62,8 @@ Route::prefix('ems/api')
             Route::middleware('throttle:60,1,ems-supply-data')->prefix('supply-data')->name('supply-data.')->group(function (): void {
                 Route::get('/', [SupplyDataController::class, 'overview'])->name('overview');
                 Route::get('/export.xlsx', [SupplyDataController::class, 'export'])->name('export');
-                Route::get('/items/{item}', [SupplyDataController::class, 'item'])->whereNumber('item')->name('items.show');
+                // 1 to 18 digits: a longer number cannot be an id, so it is a plain 404 instead of an integer overflow.
+                Route::get('/items/{item}', [SupplyDataController::class, 'item'])->where('item', '[0-9]{1,18}')->name('items.show');
                 Route::get('/units/{unitKey}', [SupplyDataController::class, 'unit'])->where('unitKey', '[^/]+')->name('units.show');
             });
 

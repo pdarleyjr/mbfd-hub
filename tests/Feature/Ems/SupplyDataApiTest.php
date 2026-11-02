@@ -359,7 +359,7 @@ final class SupplyDataApiTest extends TestCase
         $itemData = $this->asUser($viewer, "/ems/api/supply-data/items/{$item}")->assertOk()->json('data');
         $unitData = $this->asUser($viewer, "/ems/api/supply-data/units/unit:{$truck}")->assertOk()->json('data');
 
-        $this->assertSame(['label', 'generated_at', 'timezone', 'item', 'balance', 'period', 'filters', 'distribution', 'trend', 'units', 'replenishment', 'counts', 'movements', 'movements_truncated'], array_keys($itemData));
+        $this->assertSame(['label', 'generated_at', 'timezone', 'item', 'balance', 'period', 'filters', 'scope_notes', 'distribution', 'trend', 'units', 'replenishment', 'counts', 'movements', 'movements_truncated'], array_keys($itemData));
         $this->assertSame(9, $itemData['distribution']['distributed']);
         $this->assertSame(3, $itemData['distribution']['distribution_events']);
         $this->assertSame(100.0, (float) array_sum(array_column($itemData['units'], 'share_pct')));

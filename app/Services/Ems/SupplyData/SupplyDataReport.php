@@ -18,6 +18,7 @@ final class SupplyDataReport
 
     public const DEFINITIONS = [
         'requested' => 'Quantity asked for on counted requests. A request is counted unless it was cancelled, sent back, or replaced by its correction, so a corrected request is never counted twice. Yes/No answers and controlled items are not quantities.',
+        'recorded_issued' => 'Quantity recorded as issued on the counted requests, in each request\'s own units, after corrections. It is what the request forms say, not what the stock ledger says left the room, and it adds different units together.',
         'distributed' => 'Net quantity that left the supply room for a unit: issued stock movements linked to a request, minus the correction movements that reverse them. An issuance that was fully reversed counts as zero. Shown in the item\'s count unit. This is not what crews used.',
         'distribution_events' => 'The number of distinct request-and-item pairs whose net distributed quantity is above zero. Used to rank items, because quantities of different items are not comparable.',
         'received' => 'Stock received from orders. Not part of distributed.',
@@ -57,7 +58,9 @@ final class SupplyDataReport
         $unitQuantities = $this->requests->quantitiesByUnit($filters);
         $hours = $this->requests->hoursToReconcile($filters);
         $integrity = $this->distribution->integrity($filters->fromUtc(), $filters->toUtc());
-        $stock = $this->stock->build($filters, $current->keyBy('item_id')->all());
+        // Stock rows are room-wide, so their pace must be the department's even when a unit is chosen.
+        $room = $filters->unit === null ? $current : $this->distribution->byItem($filters->fromUtc(), $filters->toUtc(), $filters->withoutUnit());
+        $stock = $this->stock->build($filters, $room->keyBy('item_id')->all());
         $summary = $this->counts->summary($filters->fromUtc(), $filters->toUtc(), $filters->item, $filters->category);
         $largest = $this->counts->largest($filters->fromUtc(), $filters->toUtc(), $filters->item, $filters->category, 25);
 
@@ -119,7 +122,7 @@ final class SupplyDataReport
             $notes[] = 'The item and category filters narrow supplies, stock and counts. Request totals and fulfillment follow the period and unit only.';
         }
         if ($filters->unit !== null) {
-            $notes[] = 'The unit filter narrows requests and distribution. Stock and counts are for the whole supply room.';
+            $notes[] = 'The unit filter narrows requests, distribution and the trend. Stock, days of supply, average per day and counts are for the whole supply room.';
         }
 
         return $notes;

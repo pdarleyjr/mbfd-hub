@@ -104,6 +104,8 @@ ull\ for an estimate: an estimate is not a count. */
   days_of_supply: number | null;
   estimated: boolean;
   units_resolved: boolean;
+  /** False for a retired item that was asked for by id; it is shown, labelled, but not counted in "What matters now". */
+  active: boolean;
 }
 
 export interface Fulfillment {
@@ -120,7 +122,7 @@ export interface Fulfillment {
   all_submissions: number;
   median_hours_to_reconcile: number | null;
   qty_requested: number;
-  qty_distributed: number;
+  qty_recorded_issued: number;
 }
 
 export interface CountAccuracyItem {
@@ -259,6 +261,8 @@ export interface ItemReport {
   balance: ItemBalance;
   period: PeriodInfo;
   filters: Filters;
+  /** Present when a unit narrows the page: stock and pace stay room-wide. */
+  scope_notes: string[];
   distribution: ItemDistribution;
   trend: TrendBucket[];
   units: ItemUnitShare[];

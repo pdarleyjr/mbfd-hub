@@ -127,7 +127,7 @@ export default function UnitDetail({ unitKey, selection, canOpenRequests, onOpen
             )}
           </Section>
 
-          <Section title="Weekly pattern" testId="unit-pattern">
+          <Section title={report.trend[0]?.month_start !== undefined ? 'Monthly pattern' : 'Weekly pattern'} testId="unit-pattern">
             {report.trend.some((bucket) => bucket.distribution_events > 0 || (bucket.requests ?? 0) > 0) ? (
               <TrendChart
                 title={report.trend[0]?.month_start !== undefined ? 'Distribution events by month' : 'Distribution events by week'}

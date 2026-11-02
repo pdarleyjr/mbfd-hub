@@ -34,8 +34,6 @@ final class CountVarianceQuery
 
     public const NOTE_BASELINE_ROW = 'Starting balance loaded from the supply room workbook.';
 
-    private const UTC_FORMAT = 'Y-m-d H:i:s';
-
     /** Count units in one SQL expression: the size frozen on the count line, else the item's current size. */
     private const PER_SQL = 'COALESCE(NULLIF(x.line_per, 0), CASE WHEN x.count_unit = \'each\' OR x.units_per_package IS NULL OR x.units_per_package < 1 THEN 1 ELSE x.units_per_package END)';
 
@@ -97,8 +95,8 @@ final class CountVarianceQuery
             $where[] = "cs.kind IN ('physical_count', 'baseline')";
         }
         if ($from !== null && $to !== null) {
-            $where[] = 'cs.finalized_at >= ? AND cs.finalized_at < ?';
-            array_push($bindings, $from->utc()->format(self::UTC_FORMAT), $to->utc()->format(self::UTC_FORMAT));
+            $where[] = 'cs.finalized_at >= '.Instant::placeholder().' AND cs.finalized_at < '.Instant::placeholder();
+            array_push($bindings, Instant::bind($from), Instant::bind($to));
         }
         if ($itemId !== null) {
             $where[] = 'cl.supply_item_id = ?';

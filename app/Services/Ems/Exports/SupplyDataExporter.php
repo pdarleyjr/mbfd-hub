@@ -35,6 +35,8 @@ final class SupplyDataExporter
             ['Generated (ET)', EmsLabels::et($generatedAt, 'M j, Y g:i A T')],
             ['Estimates', 'Rows marked Estimated are best guesses, not physical counts. They are never used for variance or days of supply.'],
             ['Provenance', self::PROVENANCE],
+            ['Supplies', 'All '.$overview['headline']['items_distributed'].' supplies distributed in the period are listed on the Supplies sheet (none left out).'],
+            ['Count accuracy', $this->accuracyScope($overview['count_accuracy'])],
         ];
         foreach ((array) $overview['scope_notes'] as $note) {
             $facts[] = ['Scope', (string) $note];
@@ -130,10 +132,10 @@ final class SupplyDataExporter
             ['Corrected (revisions)', $f['corrected']], ['Reconciled', $f['reconciled']], ['Open', $f['open']],
             ['Completed under the older process', $f['completed_other_workflow']], ['All submissions, any status', $f['all_submissions']],
             ['Median hours to reconcile', $f['median_hours_to_reconcile']], ['Quantity requested (request units)', $f['qty_requested']],
-            ['Quantity issued on requests (request units)', $f['qty_distributed']],
+            ['Quantity recorded as issued on requests (request units)', $f['qty_recorded_issued']],
         ];
 
-        return new ReportSection('Fulfillment', ['Measure', 'Value'], $rows, [1], 'Quantities add up different units of measure; use the per-item figures to decide.', [44, 14]);
+        return new ReportSection('Fulfillment', ['Measure', 'Value'], $rows, [1], 'Quantities add up different units of measure; use the per-item figures to decide. Recorded as issued is what the request forms say, not what the stock ledger says was distributed.', [44, 14]);
     }
 
     /** @param  array<string, mixed>  $o */
@@ -142,7 +144,17 @@ final class SupplyDataExporter
         $c = $o['count_accuracy'];
         $rows = array_map(fn (array $r): array => [$r['name'], (string) $r['counted_at'], $r['expected'], $r['counted'], $r['variance'], $r['variance_pct']], $c['items']);
 
-        return new ReportSection('Count accuracy', ['Item', 'Counted at', 'Expected', 'Counted', 'Variance', 'Variance (%)'], $rows, [2, 3, 4, 5], $c['note'] ?? 'Counts compared with what the books expected at the count.', [40, 28, 10, 10, 10, 12]);
+        return new ReportSection('Count accuracy', ['Item', 'Counted at', 'Expected', 'Counted', 'Variance', 'Variance (%)'], $rows, [2, 3, 4, 5], $c['note'] ?? $this->accuracyScope($c), [40, 28, 10, 10, 10, 12]);
+    }
+
+    /** @param  array<string, mixed>  $c */
+    private function accuracyScope(array $c): string
+    {
+        $shown = count($c['items']);
+
+        return $c['comparable_counts'] > $shown
+            ? "Showing the {$shown} largest differences of {$c['comparable_counts']} counts that could be compared with what the books expected."
+            : 'Every count that could be compared with what the books expected is listed.';
     }
 
     /** @param  array{unit: string|null, item: int|null, category: string|null}  $filters */

@@ -24,14 +24,12 @@ final class RequestCohortQuery
     /** @var list<string> */
     public const NOT_COUNTED = [InventoryRequest::CANCELLED, InventoryRequest::RETURNED, InventoryRequest::SUPERSEDED];
 
-    private const UTC_FORMAT = 'Y-m-d H:i:s';
-
     /** Requests submitted in [from, to), for the unit filter. */
     private function cohort(CarbonImmutable $from, CarbonImmutable $to, SupplyDataFilters $filters): Builder
     {
-        $query = DB::table('ems_inventory_requests as r')
-            ->where('r.submitted_at', '>=', $from->utc()->format(self::UTC_FORMAT))
-            ->where('r.submitted_at', '<', $to->utc()->format(self::UTC_FORMAT));
+        $query = DB::table('ems_inventory_requests as r');
+        Instant::where($query, 'r.submitted_at', '>=', $from);
+        Instant::where($query, 'r.submitted_at', '<', $to);
         if ($filters->unit !== null) {
             UnitKey::restrict($query, $filters->unit, 'r');
         }
@@ -63,7 +61,7 @@ final class RequestCohortQuery
                 SUM(CASE WHEN r.status = 'reconciled' THEN 1 ELSE 0 END) AS reconciled,
                 SUM(CASE WHEN r.status IN ({$active}) THEN 1 ELSE 0 END) AS open_count,
                 SUM(CASE WHEN r.returned_at IS NOT NULL THEN 1 ELSE 0 END) AS rejected,
-                SUM(CASE WHEN r.revision_number > 1 THEN 1 ELSE 0 END) AS corrected,
+                SUM(CASE WHEN {$counted} AND r.revision_number > 1 THEN 1 ELSE 0 END) AS corrected,
                 MAX(CASE WHEN {$counted} THEN r.submitted_at END) AS last_submitted_at")
             ->get();
     }
@@ -77,7 +75,7 @@ final class RequestCohortQuery
     {
         return $this->quantityLines($filters)
             ->groupBy('r.apparatus_id', 'r.target_kind')
-            ->selectRaw('r.apparatus_id AS apparatus_id, r.target_kind AS target_kind, COUNT(*) AS lines, SUM(l.requested_qty) AS qty_requested, SUM(CASE WHEN l.issued_qty > 0 THEN l.issued_qty ELSE 0 END) AS qty_distributed')
+            ->selectRaw('r.apparatus_id AS apparatus_id, r.target_kind AS target_kind, COUNT(*) AS lines, SUM(l.requested_qty) AS qty_requested, SUM(CASE WHEN l.issued_qty > 0 THEN l.issued_qty ELSE 0 END) AS qty_recorded_issued')
             ->get();
     }
 
@@ -165,11 +163,13 @@ final class RequestCohortQuery
     /** Quantity lines (never Yes/No answers or controlled items) of counted requests submitted in the period. */
     private function quantityLines(SupplyDataFilters $filters): Builder
     {
-        return DB::table('ems_inventory_request_lines as l')
+        $query = DB::table('ems_inventory_request_lines as l')
             ->join('ems_inventory_requests as r', 'r.id', '=', 'l.request_id')
-            ->leftJoin('ems_catalog_items as ci', 'ci.id', '=', 'l.catalog_item_id')
-            ->where('r.submitted_at', '>=', $filters->fromUtc()->format(self::UTC_FORMAT))
-            ->where('r.submitted_at', '<', $filters->toUtc()->format(self::UTC_FORMAT))
+            ->leftJoin('ems_catalog_items as ci', 'ci.id', '=', 'l.catalog_item_id');
+        Instant::where($query, 'r.submitted_at', '>=', $filters->fromUtc());
+        Instant::where($query, 'r.submitted_at', '<', $filters->toUtc());
+
+        return $query
             ->whereNotIn('r.status', self::NOT_COUNTED)
             ->where('l.response_type', 'quantity')->where('l.requested_qty', '>', 0)
             ->where(fn ($q) => $q->whereNull('ci.controlled_substance')->orWhere('ci.controlled_substance', false))

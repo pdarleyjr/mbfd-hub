@@ -1,9 +1,25 @@
-# Supply Data: analytics contract (v2)
+# Supply Data: analytics contract (v2.1)
 
 Status: v1 was agreed before implementation (2026-11-02). v2 is what the backend actually returns; the backend owner (Agents E+F) keeps this
 file current, and any shape change must be made here first and mirrored in
 `resources/js/daily-checkout/src/components/captain5/ems/supplyData/types.ts`. How each figure is derived, and the data defects found,
 is in `docs/ems/supply-data-provenance.md`.
+
+## Changes in v2.1 (independent review fixes)
+
+Read these first if you built against v2.
+
+- **`fulfillment.qty_distributed` is renamed `qty_recorded_issued`.** It means "recorded as issued on the counted requests' lines, in each request's own units". The word "distributed" now means only the stock ledger. A new definition `recorded_issued` says so, and the export row is "Quantity recorded as issued on requests".
+- **Stock rows are always room-wide, including their pace.** With a `unit` filter, `avg_daily_distributed` and `days_of_supply` are still the whole department's (overview and item page). `scope_notes` says so; the item page now has `scope_notes` too (empty unless a unit narrows it).
+- **Stock rows add `active`.** An item asked for by id (`?item=` or the item page) is shown even when retired, with its real balance and `active: false`, and is never counted in `attention` or `data_quality`. The unfiltered stock list is still active items only.
+- **`units[]` has exactly one row per unit key.** Rescue-unit and other-unit requests that lost their truck share the single `unassigned` row; `headline.units_supplied` counts unit keys, and the unit rows add up to the headline events.
+- **`fulfillment.corrected` counts a correction chain once** (counted requests with `revision_number > 1`, the live revision). A chain R1, R2, R3 is 1; a correction that was then cancelled is 0. `rejected` still counts every form sent back.
+- **`distribution.median_weekly` uses whole weeks only** (Sunday to Saturday, not clipped by the period's start or end). It is `null` when no whole week fits and always `null` for monthly trends. `avg_weekly` is total / days x 7.
+- **The export lists every supply distributed in the period**, whatever `limit` is sent. The About sheet says "All N supplies" and, when the accuracy sheet is a selection, "Showing the 25 largest differences of N".
+- **Routes:** the item id is 1 to 18 digits (a longer number is a plain 404, not an overflow); a unit key must match `unit:{id}`, `detail` or `unassigned` exactly, with no trailing newline.
+- `data_quality.unattributed_movements` and `movements_on_uncounted_requests` ignore controlled items.
+- Instants are bound with an explicit UTC offset on PostgreSQL, so no answer depends on the database session time zone.
+- UI wording: the reorder advisor fires strictly below the order level; "zero on hand" includes estimates and negative balances; a never-counted item reads "Cannot tell (not counted)" for reorder; monthly periods say "Monthly pattern".
 
 ## Changes from v1 (read this first, Agents G and H)
 
@@ -24,7 +40,7 @@ Keys that existed in v1 keep their names and meaning unless listed here. Additio
    `on_hand` and `deductions_since_count` are `null` when the item was never counted (a real 0 stays 0).
    `recommended_order` is the reorder advisor's `suggested_packages` in `recommended_order_unit` (null when the package size is unknown).
 6. **`fulfillment.submitted` is the number of COUNTED requests** (not cancelled, sent back, or replaced), so a corrected request is one.
-   New: `completed_other_workflow` (counted, neither open nor reconciled), `all_submissions` (every status). `qty_requested` and `qty_distributed` add
+   New: `completed_other_workflow` (counted, neither open nor reconciled), `all_submissions` (every status). `qty_requested` and `qty_recorded_issued` add
    request-line units of measure and are shown as totals of counts only; per-item `distributed` comes from the ledger and can differ.
 7. **`count_accuracy`** adds `counted_lines`, `exact_matches` (null when nothing is comparable) and `items_compared`; `items[]` has a fixed shape (below).
 8. **`data_quality`** adds `movements_on_uncounted_requests`, `uncounted_items`, `negative_balances`, `items_without_minimum`, `requests_without_unit`,
@@ -86,7 +102,7 @@ Common query parameters (validated server-side; invalid gives 422 naming the fie
 - `unit`: `unit:{apparatus_id}`, `detail` or `unassigned` (optional). On the unit page the unit comes from the path and this parameter is ignored.
 - `item`: supply item id (optional; must be an active or inactive non-controlled item). On the item page the item comes from the path.
 - `category`: supply item category (optional, at most 80 characters).
-- `limit`: 1 to 50, default 10.
+- `limit`: 1 to 50, default 10 (pages only; the export lists every supply).
 
 Scope of the filters: `unit` narrows requests and distribution; `item` and `category` narrow supplies, stock and counts. Request totals and fulfillment follow the
 period and unit only (`scope_notes` says so).
@@ -118,10 +134,10 @@ period and unit only (`scope_notes` says so).
                "last_counted_at": "2026-10-27T08:00:00-04:00", "deductions_since_count": 3,
                "minimum": 10, "order_level": 10, "status": "zero|below_minimum|ok|unknown",
                "needs_reorder": true, "recommended_order": 6, "recommended_order_unit": "case", "recommended_order_basis": "rounded_up_to_packages",
-               "avg_daily_distributed": 0.3, "days_of_supply": 46.7, "estimated": false, "units_resolved": true } ],
+               "avg_daily_distributed": 0.3, "days_of_supply": 46.7, "estimated": false, "units_resolved": true, "active": true } ],
   "fulfillment": { "submitted": 6, "acknowledged": 5, "rejected": 1, "corrected": 0, "reconciled": 5, "open": 1,
                    "completed_other_workflow": 0, "all_submissions": 7, "median_hours_to_reconcile": 70.5,
-                   "qty_requested": 40, "qty_distributed": 36 },
+                   "qty_requested": 40, "qty_recorded_issued": 36 },
   "count_accuracy": { "counted_lines": 0, "comparable_counts": 0, "exact_matches": null, "items_compared": 0, "coverage_pct": null,
                       "items": [ { "item_id": 12, "name": "…", "counted_at": "…", "counted": 85, "expected": 90, "variance": -5, "variance_pct": -5.6 } ],
                       "note": "No physical count has a verified baseline to compare against yet." },
@@ -158,6 +174,7 @@ Notes:
                "recommended_order": null, "recommended_order_unit": null, "recommended_order_basis": null,
                "days_of_supply": 46.7, "avg_daily_distributed": 0.3 },
   "period": { "…": "as overview" }, "filters": { "…": "as overview" },
+  "scope_notes": [],
   "distribution": { "distributed": 9, "distribution_events": 5, "previous_distribution_events": 2, "change_pct": 150.0,
                     "avg_weekly": 2.1, "median_weekly": 2.0, "last_distributed_at": "…" },
   "trend": [ { "week_start": "2026-10-04", "distributed": 3, "distribution_events": 2 } ],
@@ -170,7 +187,7 @@ Notes:
 }
 ```
 
-`median_weekly` is `null` for monthly periods. `movements` are the newest 50 in the period, `quantity` in count units, signed as in the ledger. `replenishment` has
+`median_weekly` is the median of whole weeks only, and `null` for monthly periods or when no whole week fits. `movements` are the newest 50 in the period, `quantity` in count units, signed as in the ledger. `replenishment` has
 receipts and manual adjustments only (corrections on a request are not replenishment). `counts` is the item's numbered history (newest 20, estimates and workbook
 baselines included and labelled); an estimate appears in `estimated`, never in `verified`. No member or staff names appear on this page.
 
@@ -222,6 +239,8 @@ final class SupplyDataReport {              // resolve with app(SupplyDataReport
 }
 // App\Services\Ems\Exports\SupplyDataExporter: spec(array $overview, SupplyDataFilters, CarbonInterface): ReportSpec, xlsx(...), filename(CarbonInterface).
 ```
+
+Route constraint: the item id is 1 to 18 digits (anything longer is a 404, not an overflow). The existing `/ems/api/supply/items/{item}` route still uses `whereNumber` and is out of scope here.
 
 The Filament page should call the report and exporter directly rather than the HTTP API. Query budget: the overview runs 21 queries with one stock cut-off among the
 current baselines and 3 more for each further distinct cut-off; the item page about 15; the unit page about 7.

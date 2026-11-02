@@ -25,8 +25,6 @@ final class DistributionQuery
 {
     private const EFFECTIVE_AT = "CASE WHEN m.movement_type = 'adjusted' THEN COALESCE(c.occurred_at, m.occurred_at) ELSE m.occurred_at END";
 
-    private const UTC_FORMAT = 'Y-m-d H:i:s';
-
     /** The (request, item) pairs with a positive net distribution whose effective time is in [from, to). */
     public function pairs(CarbonImmutable $from, CarbonImmutable $to, SupplyDataFilters $filters): Builder
     {
@@ -36,8 +34,8 @@ final class DistributionQuery
             ->leftJoin('ems_stock_movements as c', 'c.id', '=', 'm.corrects_movement_id')
             ->where('i.controlled_substance', false)
             ->whereIn('m.movement_type', [StockMovement::ISSUED, StockMovement::ADJUSTED])
-            ->whereRaw(self::EFFECTIVE_AT.' >= ?', [$from->utc()->format(self::UTC_FORMAT)])
-            ->whereRaw(self::EFFECTIVE_AT.' < ?', [$to->utc()->format(self::UTC_FORMAT)])
+            ->whereRaw(self::EFFECTIVE_AT.' >= '.Instant::placeholder(), [Instant::bind($from)])
+            ->whereRaw(self::EFFECTIVE_AT.' < '.Instant::placeholder(), [Instant::bind($to)])
             ->groupBy('m.request_id', 'm.supply_item_id', 'r.apparatus_id', 'r.target_kind', 'r.target_label')
             ->havingRaw('SUM(m.quantity_base) < 0')
             ->selectRaw('m.request_id AS request_id, m.supply_item_id AS supply_item_id, r.apparatus_id AS apparatus_id, r.target_kind AS target_kind, r.target_label AS target_label, -SUM(m.quantity_base) AS net_base, MIN('.self::EFFECTIVE_AT.') AS eff_at');
@@ -71,15 +69,16 @@ final class DistributionQuery
     }
 
     /**
-     * One row per unit with events.
+     * One row per unit KEY with events: each truck row, Detail, and a single `unassigned` row however many target kinds
+     * (rescue and other unit) lost their truck. Items are counted distinctly within each unit key.
      *
      * @return Collection<int, stdClass>
      */
     public function byUnit(CarbonImmutable $from, CarbonImmutable $to, SupplyDataFilters $filters): Collection
     {
         return DB::query()->fromSub($this->pairs($from, $to, $filters), 'p')
-            ->groupBy('p.apparatus_id', 'p.target_kind')
-            ->selectRaw('p.apparatus_id AS apparatus_id, p.target_kind AS target_kind, COUNT(*) AS events, COUNT(DISTINCT p.supply_item_id) AS items, SUM(p.net_base) AS net_base, MAX(p.eff_at) AS last_at, MAX(p.target_label) AS label')
+            ->groupByRaw(UnitKey::ordinalSql('p.apparatus_id', 'p.target_kind'))
+            ->selectRaw('MAX(p.apparatus_id) AS apparatus_id, MAX(p.target_kind) AS target_kind, COUNT(*) AS events, COUNT(DISTINCT p.supply_item_id) AS items, SUM(p.net_base) AS net_base, MAX(p.eff_at) AS last_at, MAX(p.target_label) AS label')
             ->get();
     }
 
@@ -120,21 +119,24 @@ final class DistributionQuery
         $sql = 'CASE';
         $bindings = [];
         foreach (array_slice($buckets, 1) as $index => $bucket) {
-            $sql .= " WHEN {$column} < ? THEN {$index}";
-            $bindings[] = $bucket['start']->utc()->format(self::UTC_FORMAT);
+            $sql .= " WHEN {$column} < ".Instant::placeholder()." THEN {$index}";
+            $bindings[] = Instant::bind($bucket['start']);
         }
 
         return [$sql.' ELSE '.(count($buckets) - 1).' END', $bindings];
     }
 
-    /** Request-linked `issued` movements in the period, plus those on requests that are not counted (cancelled, returned, superseded). */
+    /** Issued movements of non-controlled items in the period that have no request, and those on requests that are not counted (cancelled, returned, superseded). */
     public function integrity(CarbonImmutable $from, CarbonImmutable $to): stdClass
     {
-        $row = DB::table('ems_stock_movements as m')
+        $query = DB::table('ems_stock_movements as m')
+            ->join('ems_supply_items as i', 'i.id', '=', 'm.supply_item_id')
             ->leftJoin('ems_inventory_requests as r', 'r.id', '=', 'm.request_id')
-            ->where('m.movement_type', StockMovement::ISSUED)
-            ->where('m.occurred_at', '>=', $from->utc()->format(self::UTC_FORMAT))
-            ->where('m.occurred_at', '<', $to->utc()->format(self::UTC_FORMAT))
+            ->where('i.controlled_substance', false)
+            ->where('m.movement_type', StockMovement::ISSUED);
+        Instant::where($query, 'm.occurred_at', '>=', $from);
+        Instant::where($query, 'm.occurred_at', '<', $to);
+        $row = $query
             ->selectRaw('COALESCE(SUM(CASE WHEN m.request_id IS NULL THEN 1 ELSE 0 END), 0) AS unattributed,
                 COALESCE(SUM(CASE WHEN r.status IN (\'cancelled\', \'returned\', \'superseded\') THEN 1 ELSE 0 END), 0) AS on_uncounted_requests')
             ->first();

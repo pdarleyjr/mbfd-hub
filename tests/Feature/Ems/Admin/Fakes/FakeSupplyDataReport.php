@@ -88,7 +88,7 @@ final class FakeSupplyDataReport
                 self::stockRow(14, 'Gauze 4x4', 'calculated', 3, 'below_minimum', daysOfSupply: 6.5, reorder: true),
                 self::stockRow(15, 'Stethoscope', 'none', null, 'unknown', daysOfSupply: null),
             ],
-            'fulfillment' => ['submitted' => 6, 'acknowledged' => 5, 'rejected' => 1, 'corrected' => 0, 'reconciled' => 5, 'open' => 1, 'completed_other_workflow' => 0, 'all_submissions' => 7, 'median_hours_to_reconcile' => 70.5, 'qty_requested' => 40, 'qty_distributed' => 36],
+            'fulfillment' => ['submitted' => 6, 'acknowledged' => 5, 'rejected' => 1, 'corrected' => 0, 'reconciled' => 5, 'open' => 1, 'completed_other_workflow' => 0, 'all_submissions' => 7, 'median_hours_to_reconcile' => 70.5, 'qty_requested' => 40, 'qty_recorded_issued' => 36],
             'count_accuracy' => ['counted_lines' => 12, 'comparable_counts' => 0, 'exact_matches' => null, 'items_compared' => 0, 'coverage_pct' => null, 'items' => [], 'note' => 'No physical count has a verified baseline to compare against yet.'],
             'data_quality' => [
                 'unattributed_movements' => 0, 'movements_on_uncounted_requests' => 0, 'estimated_items' => 44, 'uncounted_items' => 2, 'unresolved_conversions' => 0, 'negative_balances' => 0,
@@ -108,7 +108,7 @@ final class FakeSupplyDataReport
             'baseline_origin' => $basis === 'estimate' ? 'estimate' : null, 'last_counted_at' => $basis === 'counted' ? '2026-10-27T09:00:00-04:00' : null,
             'deductions_since_count' => $basis === 'counted' ? 3 : null, 'minimum' => 10, 'order_level' => 10, 'status' => $status, 'needs_reorder' => $reorder,
             'recommended_order' => $reorder ? 6 : null, 'recommended_order_unit' => $reorder ? 'case' : null, 'recommended_order_basis' => null,
-            'avg_daily_distributed' => 0.3, 'days_of_supply' => $daysOfSupply, 'estimated' => $basis === 'estimate', 'units_resolved' => true,
+            'avg_daily_distributed' => 0.3, 'days_of_supply' => $daysOfSupply, 'estimated' => $basis === 'estimate', 'units_resolved' => true, 'active' => true,
         ];
     }
 

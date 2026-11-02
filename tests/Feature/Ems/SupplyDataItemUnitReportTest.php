@@ -60,7 +60,7 @@ final class SupplyDataItemUnitReportTest extends TestCase
         $this->assertSame(10, $page['distribution']['distributed']);
         $this->assertSame(3, $page['distribution']['distribution_events']);
         $this->assertSame(2.3, $page['distribution']['avg_weekly']);
-        $this->assertSame(0.0, $page['distribution']['median_weekly']);
+        $this->assertSame(2.5, $page['distribution']['median_weekly'], 'whole weeks only: 5, 5, 0, 0 (the clipped week of Nov 1 is left out)');
         $this->assertSame([5, 5, 0, 0, 0], array_column($page['trend'], 'distributed'));
         $this->assertSame([1, 2, 0, 0, 0], array_column($page['trend'], 'distribution_events'));
         $this->assertSame(['2026-10-04', '2026-10-11', '2026-10-18', '2026-10-25', '2026-11-01'], array_column($page['trend'], 'week_start'));

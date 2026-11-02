@@ -34,6 +34,8 @@ function Balance({ report }: { report: ItemReport }) {
           <StockStatusTag status={balance.status} />
           {balance.needs_reorder && <Tag tone="warning">Needs reorder</Tag>}
         </div>
+        {!item.active && <p className={`${HINT} mt-1`} data-testid="item-inactive-note">This supply is no longer in use. The number is what the books show for it.</p>}
+        {(report.scope_notes ?? []).map((note) => <p key={note} className={`${HINT} mt-1`} data-testid="item-scope-note">{note}</p>)}
         {balance.basis === 'estimate' && <p className={`${HINT} mt-1`} data-testid="item-estimate-note">This is a best-guess starting number that has not been counted yet. It is not a verified count.</p>}
         {!item.units_resolved && <p className={`${HINT} mt-1`} data-testid="item-units-note">The count per {item.package_unit ?? 'package'} is not on file, so quantities here are in single units.</p>}
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-hub-border-soft pt-3 sm:grid-cols-3">
@@ -61,7 +63,7 @@ function Distribution({ report }: { report: ItemReport }) {
         <Stat label="Distribution events" hint={changeSentence(d.change_pct, d.previous_distribution_events).text}>{formatNumber(d.distribution_events)}</Stat>
         <Stat label="Last distributed">{d.last_distributed_at ? etDate(d.last_distributed_at) : 'None yet'}</Stat>
         <Stat label="Average per week"><Figure value={d.avg_weekly}>{d.avg_weekly === null ? null : formatNumber(d.avg_weekly)}</Figure></Stat>
-        <Stat label="Typical week"><Figure value={d.median_weekly} why="Not worked out for monthly periods">{d.median_weekly === null ? null : formatNumber(d.median_weekly)}</Figure></Stat>
+        <Stat label="Typical week"><Figure value={d.median_weekly} why="Needs at least one whole week in a period of weeks">{d.median_weekly === null ? null : formatNumber(d.median_weekly)}</Figure></Stat>
       </dl>
       {report.trend.some((bucket) => bucket.distribution_events > 0) ? (
         <TrendChart

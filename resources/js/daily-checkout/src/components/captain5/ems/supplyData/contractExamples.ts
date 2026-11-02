@@ -30,11 +30,11 @@ export const CONTRACT_OVERVIEW: Overview = {
   stock: [{
     item_id: 12, name: 'Gloves, nitrile (L)', category: null, location: 'B4', count_unit: 'box', on_hand: 14, basis: 'counted', baseline_origin: 'count_form',
     last_counted_at: '2026-10-27T08:00:00-04:00', deductions_since_count: 3, minimum: 10, order_level: 10, status: 'ok', needs_reorder: true, recommended_order: 6,
-    recommended_order_unit: 'case', recommended_order_basis: 'rounded_up_to_packages', avg_daily_distributed: 0.3, days_of_supply: 46.7, estimated: false, units_resolved: true,
+    recommended_order_unit: 'case', recommended_order_basis: 'rounded_up_to_packages', avg_daily_distributed: 0.3, days_of_supply: 46.7, estimated: false, units_resolved: true, active: true,
   }],
   fulfillment: {
     submitted: 6, acknowledged: 5, rejected: 1, corrected: 0, reconciled: 5, open: 1, completed_other_workflow: 0, all_submissions: 7, median_hours_to_reconcile: 70.5,
-    qty_requested: 40, qty_distributed: 36,
+    qty_requested: 40, qty_recorded_issued: 36,
   },
   count_accuracy: {
     counted_lines: 0, comparable_counts: 0, exact_matches: null, items_compared: 0, coverage_pct: null,
@@ -64,6 +64,7 @@ export const CONTRACT_ITEM: ItemReport = {
   },
   period: PERIOD,
   filters: FILTERS,
+  scope_notes: [],
   distribution: { distributed: 9, distribution_events: 5, previous_distribution_events: 2, change_pct: 150.0, avg_weekly: 2.1, median_weekly: 2.0, last_distributed_at: '2026-10-30T10:12:00-04:00' },
   trend: [{ week_start: '2026-10-04', distributed: 3, distribution_events: 2 }],
   units: [{ unit_key: 'unit:45', label: 'Rescue 2', distribution_events: 3, distributed: 5, share_pct: 55.6 }],

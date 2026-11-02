@@ -23,9 +23,9 @@ function FulfillmentBody({ fulfillment }: { fulfillment: Fulfillment }) {
         {left > 0 ? ` ${fulfillment.all_submissions} ${plural(fulfillment.all_submissions, 'form was', 'forms were')} submitted in all.` : ''}
       </p>
       <p className="text-sm text-hub-ink">
-        In total, <strong className="tabular-nums">{formatNumber(fulfillment.qty_requested)}</strong> were asked for on those requests and <strong className="tabular-nums">{formatNumber(fulfillment.qty_distributed)}</strong> were distributed.
+        In total, <strong className="tabular-nums">{formatNumber(fulfillment.qty_requested)}</strong> were asked for on those requests and <strong className="tabular-nums">{formatNumber(fulfillment.qty_recorded_issued)}</strong> were recorded as issued on those requests.
       </p>
-      <p className={HINT}>These totals add up different supplies, so read them as a rough balance between asked and given. A supply's own distributed number comes from the stock ledger and can differ.</p>
+      <p className={HINT}>These totals add up different supplies, so read them as a rough balance between asked and given. Recorded as issued is what the request forms say. Only a supply's own distributed number comes from the stock ledger, and it can differ.</p>
     </div>
   );
 }

@@ -66,6 +66,8 @@ final class SupplyDataFiltersTest extends TestCase
             'impossible date' => [['period' => 'custom', 'from' => '2026-02-30', 'to' => '2026-10-10'], 'from'],
             'unit not a key' => [['unit' => 'rescue 2'], 'unit'],
             'unit zero' => [['unit' => 'unit:0'], 'unit'],
+            'unit trailing newline' => [['unit' => "detail\n"], 'unit'],
+            'unit key trailing newline' => [['unit' => "unit:12\n"], 'unit'],
             'unit injection' => [['unit' => "unit:1' OR 1=1"], 'unit'],
             'item not a number' => [['item' => 'abc'], 'item'],
             'item as array' => [['item' => [1, 2]], 'item'],

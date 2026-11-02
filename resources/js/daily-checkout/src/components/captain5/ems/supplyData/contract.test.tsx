@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -98,6 +98,44 @@ describe('the screen shows the contract examples', () => {
     expect(await screen.findByRole('heading', { name: 'Rescue 2', level: 2 })).toBeInTheDocument();
     expect(screen.getByTestId('unit-top-requested')).toHaveTextContent('Gloves, nitrile (L)');
     expect(screen.getByTestId('unit-top-requested')).toHaveTextContent('4 on 2 requests');
+  });
+
+  it('review fix: the request-side total is "recorded as issued", and "distributed" is left to the ledger', async () => {
+    const user = open('/daily/captain-5?tab=supply-data');
+    await user.click(await screen.findByRole('button', { name: /^Fulfillment/ }));
+    const region = screen.getByRole('region', { name: 'Fulfillment' });
+    expect(region).toHaveTextContent('were recorded as issued on those requests');
+    expect(region).toHaveTextContent('Recorded as issued is what the request forms say');
+    expect(region).not.toHaveTextContent('were distributed');
+  });
+
+  it('review fix: the reorder and zero-on-hand explanations match what the backend does', async () => {
+    open('/daily/captain-5?tab=supply-data');
+    const attention = await screen.findByTestId('supply-data-attention');
+    expect(attention).toHaveTextContent('Below the order level, so the advisor suggests an order');
+    expect(attention).not.toHaveTextContent('At or under the order level');
+    expect(attention).toHaveTextContent('counted, calculated or estimated at zero, or below zero');
+    expect(attention).not.toHaveTextContent('Counted or calculated as none left');
+  });
+
+  it('review fix: a monthly unit page says Monthly pattern, a weekly one Weekly pattern', async () => {
+    open('/daily/captain-5?tab=supply-data&unit=unit:45');
+    expect(await screen.findByTestId('unit-pattern')).toHaveTextContent('Weekly pattern');
+    callMock.mockImplementation(async (path: string) => path.startsWith('/supply-data/units/')
+      ? answer({ ...CONTRACT_UNIT, trend: [{ month_start: '2026-10-01', requests: 1, distribution_events: 2 }] })
+      : answer(CONTRACT_OVERVIEW));
+    cleanup();
+    open('/daily/captain-5?tab=supply-data&unit=unit:45');
+    expect(await screen.findByTestId('unit-pattern')).toHaveTextContent('Monthly pattern');
+  });
+
+  it('review fix: a retired supply and a unit-narrowed page say what they are', async () => {
+    callMock.mockImplementation(async (path: string) => path.startsWith('/supply-data/items/')
+      ? answer({ ...CONTRACT_ITEM, item: { ...CONTRACT_ITEM.item, active: false }, scope_notes: ['Stock, days of supply and average per day are for the whole supply room.'] })
+      : answer(CONTRACT_OVERVIEW));
+    open('/daily/captain-5?tab=supply-data&item=12');
+    expect(await screen.findByTestId('item-inactive-note')).toHaveTextContent('no longer in use');
+    expect(screen.getByTestId('item-scope-note')).toHaveTextContent('whole supply room');
   });
 
   it('an estimate in the count history is tagged, never shown as counted', async () => {

@@ -55,9 +55,9 @@ final class SupplyDataLabels
 
     /** @var array<string, array{0: string, 1: string}> key => [label, plain-language explanation] */
     public const ATTENTION = [
-        'zero_stock' => ['Out of stock', 'Supplies whose balance is zero.'],
+        'zero_stock' => ['Out of stock', 'Supplies counted, calculated or estimated at zero or below.'],
         'below_minimum' => ['Below minimum', 'Supplies under their minimum level.'],
-        'needs_reorder' => ['Need reordering', 'Supplies at or under their order level and not yet on order.'],
+        'needs_reorder' => ['Need reordering', 'Supplies below their order level, so the advisor suggests an order. Exactly at the level is not flagged.'],
         'estimated' => ['Estimated balances', 'Supplies whose balance is a best guess because nobody has counted the shelf.'],
         'not_counted_recently' => ['Not counted recently', 'Supplies with no physical count in the recent past.'],
     ];

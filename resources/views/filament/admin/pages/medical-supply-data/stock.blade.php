@@ -63,6 +63,8 @@
                             @if (($row['needs_reorder'] ?? false) === true)
                                 <x-filament::badge color="warning" size="sm">Reorder</x-filament::badge>
                                 @if (isset($row['recommended_order']))<span class="block text-xs text-gray-600 dark:text-gray-400">Suggested: {{ L::number($row['recommended_order']) }}{{ filled($row['recommended_order_unit'] ?? null) ? ' '.$row['recommended_order_unit'] : '' }}</span>@endif
+                            @elseif (($row['on_hand'] ?? null) === null)
+                                <span class="text-gray-600 dark:text-gray-400">Cannot tell (not counted)</span>
                             @else
                                 <span class="text-gray-600 dark:text-gray-400">Not needed</span>
                             @endif

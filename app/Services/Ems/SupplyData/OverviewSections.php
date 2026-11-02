@@ -60,8 +60,8 @@ final class OverviewSections
         foreach ($distributionRows as $row) {
             $key = UnitKey::of($row->apparatus_id === null ? null : (int) $row->apparatus_id, $row->target_kind);
             $units[$key] ??= $this->blank($key, $row->apparatus_id);
-            $units[$key]['distribution_events'] = (int) $row->events;
-            $units[$key]['items_distributed'] = (int) $row->items;
+            $units[$key]['distribution_events'] += (int) $row->events;
+            $units[$key]['items_distributed'] += (int) $row->items;
             $units[$key]['last_replenished_at'] = Support::at($row->last_at);
             $units[$key]['_labels'] += $units[$key]['_labels'] === [] ? [(string) $row->label => ''] : [];
         }
@@ -104,7 +104,7 @@ final class OverviewSections
             'all_submissions' => (int) $requestRows->sum('submitted'),
             'median_hours_to_reconcile' => $median === null ? null : round($median, 1),
             'qty_requested' => (int) $quantityRows->sum('qty_requested'),
-            'qty_distributed' => (int) $quantityRows->sum('qty_distributed'),
+            'qty_recorded_issued' => (int) $quantityRows->sum('qty_recorded_issued'),
         ];
     }
 
