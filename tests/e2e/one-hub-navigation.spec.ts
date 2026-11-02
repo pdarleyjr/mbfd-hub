@@ -178,36 +178,52 @@ test('the Command Board caption is hidden in a browser tab and has an installed-
   expect(shown).toBe(true);
 });
 
-test.describe('Home visit card', () => {
+test.describe('Home page visits on the Admin Overview', () => {
+  const CARD = '[data-home-activity]';
   const PAST = '[data-activity-past]';
   const TOTAL = '[data-activity-total]';
+  const adminOverview = (page: Page) => page.goto(`${PRIMARY_ORIGIN}/admin`);
+  const open = async (page: Page) => {
+    await page.locator(`${CARD} summary`).click();
+    // The test server answers one request at a time, and the dashboard behind this card loads many.
+    await expect(page.locator(`${CARD} [data-activity-caption]`)).toContainText(/Since [A-Z][a-z]{2} \d{1,2}, \d{4}|No visits recorded/, { timeout: 30_000 });
+  };
 
-  test('both numbers go up with each visit and an open page refreshes itself', async ({ page, context }) => {
+  test('it starts collapsed beside the title, and reads nothing until opened', async ({ page }) => {
+    await signIn(page, admin);
+    const reads: string[] = [];
+    page.on('request', (request) => { if (new URL(request.url()).pathname.startsWith('/home/activity')) reads.push(request.url()); });
+    await adminOverview(page);
+    const card = page.locator(CARD);
+    await expect(card).toBeVisible();
+    await expect(card).not.toHaveAttribute('open', /.*/);
+    await expect(page.locator(PAST)).toBeHidden();
+    const [title, toggle] = await Promise.all([page.locator('.mbfd-dash-header__title').boundingBox(), card.locator('summary').boundingBox()]);
+    expect(Math.abs((title!.y + title!.height / 2) - (toggle!.y + toggle!.height / 2)), 'on the same line as the title').toBeLessThan(12);
+    await page.waitForTimeout(1_500);
+    expect(reads, 'no reads while collapsed').toEqual([]);
+  });
+
+  test('Home has no card, and each Home visit raises what the administrator reads', async ({ page, context }) => {
     await signIn(page, admin);
     await home(page);
-    await expect(page.locator('[data-home-activity]')).toBeVisible();
+    await expect(page.locator(CARD)).toHaveCount(0);
+    await adminOverview(page);
+    await open(page);
     const firstPast = await number(page, PAST);
     const firstTotal = await number(page, TOTAL);
     expect(firstPast).toBeGreaterThan(0);
-    expect(firstTotal).toBeGreaterThanOrEqual(firstPast);
-    await expect(page.locator('[data-activity-caption]')).toContainText(/Home page visits since [A-Z][a-z]{2} \d{1,2}, \d{4}/);
 
-    await page.waitForTimeout(300);
-    await page.reload();
-    expect(await number(page, PAST), 'a reload is a visit').toBe(firstPast + 1);
-    expect(await number(page, TOTAL)).toBe(firstTotal + 1);
-
-    // A visit from another page reaches this open one through its own refresh, marked as a background request.
+    // A visit from another page reaches this open card through its own refresh, marked as a background request.
     const other = await context.newPage();
     await other.goto(`${PRIMARY_ORIGIN}/`);
     await other.waitForTimeout(300);
     await other.close();
-    await page.waitForTimeout(10_500);
     const refresh = page.waitForRequest((request) => new URL(request.url()).pathname === '/home/activity');
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     expect((await refresh).headers()['x-hub-background-refresh']).toBe('1');
-    await expect(page.locator(PAST)).toHaveText(String(firstPast + 2));
-    await expect(page.locator(TOTAL)).toHaveText(String(firstTotal + 2));
+    await expect(page.locator(PAST)).toHaveText(String(firstPast + 1));
+    await expect(page.locator(TOTAL)).toHaveText(String(firstTotal + 1));
   });
 
   test('Admin and other pages do not count', async ({ page }) => {
@@ -223,44 +239,58 @@ test.describe('Home visit card', () => {
     expect(await total()).toBe(settled);
   });
 
-  test('an administrator opens who signed in as a pop-up, not a page', async ({ page }) => {
+  test('who signed in opens as a pop-up, not a page, and the card folds away', async ({ page }) => {
     await signIn(page, admin);
-    await home(page);
+    await adminOverview(page);
+    await open(page);
     const url = page.url();
     const link = page.locator('[data-activity-open]');
     await expect(link).toContainText(/\d+ members? signed in/);
     await link.click();
     const dialog = page.locator('[data-activity-dialog]');
     await expect(dialog).toBeVisible();
-    await expect(dialog.locator('.home-activity-dialog__row').first()).toBeVisible();
+    await expect(dialog.locator('.mbfd-visits-dialog__row').first()).toBeVisible();
     await expect(dialog).toContainText(/Today \d{1,2}:\d{2} [AP]M/);
     expect(page.url()).toBe(url);
     await dialog.getByRole('button', { name: 'Close' }).click();
     await expect(dialog).toBeHidden();
     await expect(link).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.locator(PAST), 'Escape folds it').toBeHidden();
+    await open(page);
+    await page.locator('.mbfd-dash-header__sub, .mbfd-dash').first().click({ position: { x: 2, y: 2 } });
+    await expect(page.locator(PAST), 'a tap elsewhere folds it').toBeHidden();
   });
 
-  test('a member sees the counters but not the list', async ({ page }) => {
+  test('a member gets none of it', async ({ page }) => {
     await signIn(page, member);
     await home(page);
-    await expect(page.locator('[data-home-activity]')).toBeVisible();
-    await expect(page.locator('[data-activity-open]')).toHaveCount(0);
-    expect(await page.evaluate(async () => (await fetch('/home/activity/members', { headers: { Accept: 'application/json' } })).status)).toBe(403);
+    await expect(page.locator(CARD)).toHaveCount(0);
+    for (const feed of ['/home/activity', '/home/activity/members']) {
+      expect(await page.evaluate(async (url) => (await fetch(url, { headers: { Accept: 'application/json' } })).status, feed), feed).toBe(403);
+    }
   });
 
-  for (const [name, viewport] of [['desktop', { width: 1280, height: 800 }], ['phone', { width: 390, height: 844 }], ['small-phone', { width: 320, height: 640 }]] as const) {
-    test(`fits and matches the page at ${name} width`, async ({ page }) => {
+  for (const [name, viewport] of [['wide', { width: 1920, height: 1080 }], ['laptop', { width: 1366, height: 768 }], ['phone', { width: 390, height: 844 }], ['small-phone', { width: 320, height: 640 }]] as const) {
+    test(`it fits and leaves the page where it was at ${name} width`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await signIn(page, admin);
-      await home(page);
-      const card = page.locator('[data-home-activity]');
-      await card.scrollIntoViewIfNeeded();
+      await adminOverview(page);
+      const board = page.locator('.mbfd-dash').first();
+      const before = await board.boundingBox();
+      await page.screenshot({ path: `test-results/admin-visits/${name}-collapsed.png` });
+      await open(page);
+      const panel = page.locator('.mbfd-visits__panel');
+      await expect(panel).toBeVisible();
+      const box = await panel.boundingBox();
+      expect(box!.x, 'panel inside the window on the left').toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width, 'and on the right').toBeLessThanOrEqual(viewport.width);
+      expect((await board.boundingBox())!.y, 'opening it does not push the dashboard down').toBe(before!.y);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no sideways scroll').toBe(true);
-      await page.screenshot({ path: `test-results/one-hub/home-${name}.png`, fullPage: true });
-      await card.screenshot({ path: `test-results/one-hub/card-${name}.png` });
+      await page.screenshot({ path: `test-results/admin-visits/${name}-open.png` });
       await page.locator('[data-activity-open]').click();
-      await expect(page.locator('.home-activity-dialog__row').first()).toBeVisible();
-      await page.screenshot({ path: `test-results/one-hub/dialog-${name}.png` });
+      await expect(page.locator('.mbfd-visits-dialog__row').first()).toBeVisible();
+      await page.screenshot({ path: `test-results/admin-visits/${name}-dialog.png` });
     });
   }
 });
