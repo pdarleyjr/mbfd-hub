@@ -451,7 +451,7 @@ async function mockFireBoatInspectionApi(
         ...fireBoatChecklist,
         checklist: {
           ...fireBoatChecklist.checklist,
-          fields: [...fireBoatChecklist.checklist.fields, { id: 'radio_de', name: 'Radio # - DE', inputType: 'text', required: false }],
+          fields: [...fireBoatChecklist.checklist.fields, { id: 'radio_de', name: 'Radio # - DE', inputType: 'text', required: false }, { id: 'scba_5', name: 'SCBA #5', inputType: 'text', required: false }],
           compartments: fireBoatChecklist.checklist.compartments.map((compartment) => ({
             ...compartment,
             items: [...compartment.items, { id: 'fb6-cubby-scbas', name: 'SCBAs', inputType: 'text', expectedQuantity: 3 }],
@@ -461,6 +461,7 @@ async function mockFireBoatInspectionApi(
           slots: [
             { slot: 'item:fb6-cubby/fb6-cubby-scbas', kind: 'scba', label: 'SCBAs', field_id: null, compartment_id: 'fb6-cubby', item_id: 'fb6-cubby-scbas', boxes: 3, number: '2103 - 2161 - 2189' },
             { slot: 'field:radio_de', kind: 'radio', label: 'Radio # - DE', field_id: 'radio_de', compartment_id: null, item_id: null, boxes: 1, number: '1741' },
+            { slot: 'field:scba_5', kind: 'scba', label: 'SCBA #5', field_id: 'scba_5', compartment_id: null, item_id: null, boxes: 1, number: '', spare: true },
           ],
           extras: [{ client_id: '77777777-7777-4777-8777-777777777777', kind: 'radio', label: null, number: '1800' }],
         },
@@ -1107,16 +1108,21 @@ test('SCBA and radio numbers come filled in, one box each, and only a change or 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
   await page.getByLabel('SCBAs 2').fill('2999');
+  // The unit's fifth pack box waits until someone needs it; the next one after that is a new box.
+  await expect(page.getByLabel('SCBA #5')).toHaveCount(0);
   await page.getByRole('button', { name: 'Add another SCBA' }).click();
-  await page.getByLabel('Additional SCBA').fill('2200');
+  await page.getByLabel('SCBA #5').fill('2200');
+  await page.getByRole('button', { name: 'Add another SCBA' }).click();
+  await page.getByLabel('Additional SCBA').fill('2300');
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
   await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
 
   const submitted = api.submissions[0] as { field_values: Array<{ id: string; value: unknown }>; compartments: Array<{ items: Array<{ id: string; value?: unknown }> }>; extra_equipment_numbers: Array<Record<string, unknown>> };
   expect(submitted.field_values.find((field) => field.id === 'radio_de')?.value).toBe('1741');
+  expect(submitted.field_values.find((field) => field.id === 'scba_5')?.value).toBe('2200');
   expect(submitted.compartments[0].items.find((item) => item.id === 'fb6-cubby-scbas')?.value).toBe('2103, 2999, 2189');
-  expect(submitted.extra_equipment_numbers.map((extra) => [extra.kind, extra.number])).toEqual([['radio', '1800'], ['scba', '2200']]);
+  expect(submitted.extra_equipment_numbers.map((extra) => [extra.kind, extra.number])).toEqual([['radio', '1800'], ['scba', '2300']]);
   // What the member was shown, in the form the answers are sent, so the server applies only their changes.
   expect((api.submissions[0] as { equipment_numbers_seen: unknown }).equipment_numbers_seen).toEqual([
     { slot: 'item:fb6-cubby/fb6-cubby-scbas', number: '2103, 2161, 2189' },
@@ -1130,7 +1136,11 @@ test('notes and numbers are one tap away from the first screen, before anything 
 
   await page.goto('/daily/apparatus/fire-boat-6');
   await expect(page.locator('.inspection-readiness')).not.toContainText('unavailable');
-  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Notes and numbers' }).click();
+  // The first screen says how many numbers are in and opens them in one tap.
+  const prompt = page.getByRole('region', { name: 'SCBA & Radio Numbers' });
+  await expect(prompt).toContainText('5 of 5 entered');
+  await expect(page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'SCBA, radio numbers and notes' })).toBeVisible();
+  await prompt.getByRole('button', { name: 'Enter SCBA & radio numbers' }).click();
 
   await expect(page.getByRole('heading', { name: 'Concerns, Damage & Additional Notes' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'SCBA & Radio Numbers' })).toBeVisible();

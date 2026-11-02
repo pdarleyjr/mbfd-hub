@@ -176,6 +176,18 @@ export default function SubmitStep({
       </div>
 
       <div className="inspection-review-columns"><div>
+      {/* First on the page: members scroll straight to the signature, and these were missed at the bottom. */}
+      {checklist.equipment_numbers && <EquipmentNumbersCard
+        block={checklist.equipment_numbers}
+        fields={checklist.fields}
+        fieldValues={fieldValues}
+        compartments={compartments}
+        onFieldChange={onEquipmentFieldChange}
+        onItemChange={onEquipmentItemChange}
+        extras={equipmentExtras}
+        onExtrasChange={onEquipmentExtrasChange}
+      />}
+
       <section aria-label="Recorded readings and paper fields" className="inspection-review-details">
         <h3 className="mb-3 font-semibold">Readings and checkout details</h3>
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -260,17 +272,6 @@ export default function SubmitStep({
       </div>
 
       {scheduledTasks.length > 0 && <section className="inspection-review-details" aria-label="Recorded scheduled duties"><h3 className="mb-3 font-semibold">Scheduled duties</h3><dl>{scheduledTasks.map(task => <div key={task.id} className="inspection-review-area"><dt>{checklist.due_tasks.find(entry => entry.id === task.id)?.name}</dt><dd>{taskStatusLabel(task.status)}{task.notes ? ` · ${task.notes}` : ''}</dd></div>)}</dl></section>}
-
-      {checklist.equipment_numbers && <EquipmentNumbersCard
-        block={checklist.equipment_numbers}
-        fields={checklist.fields}
-        fieldValues={fieldValues}
-        compartments={compartments}
-        onFieldChange={onEquipmentFieldChange}
-        onItemChange={onEquipmentItemChange}
-        extras={equipmentExtras}
-        onExtrasChange={onEquipmentExtrasChange}
-      />}
 
       <div ref={concernsRef}>
         <ConcernsSection concerns={concerns} onChange={onConcernsChange} openIssues={openIssues} showErrors={showConcernErrors} />

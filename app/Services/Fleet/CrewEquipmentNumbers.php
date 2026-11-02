@@ -25,6 +25,11 @@ final class CrewEquipmentNumbers
 
     public const MAX_EXTRAS = 30;
 
+    /** Air packs carried on every apparatus; a rescue carries three. Radio entries are the unit's named crew seats. */
+    public const STANDARD_PACKS = 4;
+
+    public const RESCUE_PACKS = 3;
+
     private const EXTRA_PREFIX = 'extra:';
 
     private const NUMBER_LENGTH = 255;
@@ -34,6 +39,8 @@ final class CrewEquipmentNumbers
      *
      * @param  array<string, mixed>  $checklist
      * @return array{slots: list<array<string, mixed>>, extras: list<array{client_id: string, kind: string, label: string|null, number: string}>}
+     *
+     * Each slot also says whether it is a spare pack box, shown only once it holds a number or a member adds one.
      */
     public function block(Apparatus $apparatus, array $checklist): array
     {
@@ -44,6 +51,18 @@ final class CrewEquipmentNumbers
         if ($numbers === []) {
             $numbers = $this->numbersFrom($this->latestInspection($apparatus), $slots);
         }
+
+        // A pack box past the unit's standard count is a spare: the screen shows it once it holds a number or a member
+        // adds one. SCUBA is diving gear, never counted as a pack.
+        $standard = $this->standardPacks($apparatus);
+        $packs = 0;
+        $slots = array_map(function (array $slot) use (&$packs, $standard): array {
+            $isPack = $slot['kind'] === self::KIND_SCBA && preg_match('/scuba/i', $slot['label']) !== 1;
+            $spare = $isPack && $packs >= $standard;
+            $packs += $isPack ? $slot['boxes'] : 0;
+
+            return [...$slot, 'spare' => $spare];
+        }, $slots);
 
         return [
             'slots' => array_map(static fn (array $slot): array => [...$slot, 'number' => (string) ($numbers[$slot['slot']] ?? '')], $slots),
@@ -250,6 +269,14 @@ final class CrewEquipmentNumbers
         }
 
         return $numbers;
+    }
+
+    private function standardPacks(Apparatus $apparatus): int
+    {
+        // The stored template name, which a unit with no template leaves empty.
+        $template = (string) $apparatus->getRawOriginal('daily_checkout_template');
+
+        return str_starts_with($template, 'rescue') || strcasecmp((string) $apparatus->type, 'Rescue') === 0 ? self::RESCUE_PACKS : self::STANDARD_PACKS;
     }
 
     private function hasDigit(string $value): bool

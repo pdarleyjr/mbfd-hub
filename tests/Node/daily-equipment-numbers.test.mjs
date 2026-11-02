@@ -4,12 +4,14 @@ import {
   boxesFor,
   equipmentFieldIds,
   joinNumbers,
+  numbersProgress,
   parseEquipmentNumbers,
   prefillBlankCompartments,
   prefillBlankFieldValues,
   prefillCompartments,
   prefillFieldValues,
   seenNumbers,
+  slotIsShown,
   slotsOnChecklist,
   splitNumbers,
   toExtraSubmissions,
@@ -94,6 +96,25 @@ test('a draft from before the numbers carried gets them in its blanks and keeps 
   const blank = prefillBlankCompartments([{ ...compartments[0], items: [{ ...compartments[0].items[0], value: '' }] }], block);
   assert.equal(blank[0].items[0].value, '2103, 2161, 2189');
   assert.equal(blank[0].items[0].observed, undefined);
+});
+
+test('a spare pack box shows only once it holds a number or the member adds it', () => {
+  const spare = { ...fieldSlot, slot: 'field:scba_5', field_id: 'scba_5', label: 'SCBA #5', number: '', spare: true };
+  assert.equal(slotIsShown(spare, '', new Set()), false);
+  assert.equal(slotIsShown(spare, '2199', new Set()), true);
+  assert.equal(slotIsShown(spare, '', new Set(['field:scba_5'])), true);
+  assert.equal(slotIsShown(fieldSlot, '', new Set()), true);
+});
+
+test('the first screen counts each box, a box holding several numbers counting each one', () => {
+  const block = {
+    slots: [fieldSlot, itemSlot, { ...fieldSlot, slot: 'field:scba_5', field_id: 'scba_5', number: '', spare: true }],
+    extras: [{ client_id: 'a', kind: 'radio', label: null, number: '' }],
+  };
+  const fields = [{ id: 'scba_1' }, { id: 'scba_5' }];
+  const values = [{ id: 'scba_1', value: '2103' }, { id: 'scba_5', value: '' }];
+  const areas = [{ ...compartments[0], items: [{ ...compartments[0].items[0], value: '2103, 2161' }, compartments[0].items[1]] }];
+  assert.deepEqual(numbersProgress(block, fields, areas, values, block.extras), { entered: 3, total: 5 });
 });
 
 test('a bad row from the server is dropped and the rest still work', () => {

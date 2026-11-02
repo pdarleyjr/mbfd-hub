@@ -187,6 +187,24 @@ test('E2 readings are optional, entered readings validate, and shift stays requi
   expect(api.submissions).toEqual([]);
 });
 
+test('every workspace tab reads in full and none overlaps another, with five tabs on a truck', async ({ page }, testInfo) => {
+  test.skip(!requiredProjects.includes(testInfo.project.name), 'Uses the five requested viewport sizes.');
+  await mobileInspectionFixture(page, mobileApparatus[0]);
+  const tabs = page.getByRole('navigation', { name: 'Inspection workspace', exact: true }).getByRole('button');
+  await expect(tabs.getByText('SCBA', { exact: false })).toBeVisible();
+
+  const boxes = await tabs.evaluateAll((buttons) => buttons.map((button) => {
+    const box = button.getBoundingClientRect();
+    const cut = [...button.querySelectorAll('span, small')].some(part => part.scrollWidth > part.clientWidth + 1);
+    return { left: box.left, right: box.right, cut: cut || button.scrollWidth > button.clientWidth + 1 };
+  }));
+  expect(boxes.length).toBeGreaterThanOrEqual(5);
+  boxes.forEach((box, index) => {
+    expect(box.cut, `tab ${index + 1} is cut off`).toBe(false);
+    if (index > 0) expect(box.left, `tab ${index + 1} overlaps the one before`).toBeGreaterThanOrEqual(boxes[index - 1].right - 1);
+  });
+});
+
 test('invalid raw readings cannot be bypassed through workspace tabs', async ({ page }, testInfo) => {
   test.skip(!requiredProjects.includes(testInfo.project.name), 'Uses the five requested viewport sizes.');
   await mobileInspectionFixture(page, mobileApparatus[0]);
