@@ -27,6 +27,8 @@ const fingerprint = async (page: Page) => (await (await page.request.get('/__cre
 const course = (page: Page) => page.getByRole('combobox', { name: 'Course', exact: true });
 const candidate = (page: Page, member: string) => page.getByRole('checkbox', { name: `Select Synthetic ${member}`, exact: true });
 const members = (page: Page) => page.getByRole('checkbox', { name: /^Select Synthetic/ });
+const summary = (page: Page) => page.locator('[data-crew-summary]');
+const selectedBadge = (page: Page, count: number) => page.getByText(`${count} selected`, { exact: true }).first();
 const reviewList = (page: Page) => page.locator('.crew-planner section[aria-labelledby^="review-"]:not(#review-verify) li');
 
 async function waitForLivewire(page: Page) {
@@ -41,17 +43,17 @@ async function openBlankPlan(page: Page, path = '/training/crew-planner') {
     await waitForLivewire(page);
     page.once('dialog', dialog => dialog.accept());
     await clickButton(page, 'Start over');
-    await expect(page.getByText('Choose a course or enter a class title in step 1', { exact: false })).toBeVisible();
+    await expect(page.getByText('Choose a course in step 1.', { exact: true })).toBeVisible();
 }
 
 async function chooseCourse(page: Page, label: string) {
     await course(page).selectOption({ label });
     // Choosing a course applies it at once; wait for that before touching anything else.
-    await expect(page.getByText('Leaving out members who already attended', { exact: false })).toBeVisible();
+    await expect(summary(page)).toBeVisible();
 }
 
 async function planDate(page: Page): Promise<string> {
-    const value = await page.getByLabel('Class date', { exact: true }).inputValue();
+    const value = await page.getByRole('combobox', { name: 'Day', exact: true }).inputValue();
     expect(value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     return value;
 }
@@ -90,7 +92,7 @@ async function planWithTwoMembers(page: Page) {
     await openBlankPlan(page);
     await chooseCourse(page, 'Synthetic new course');
     await expect(members(page)).toHaveCount(3);
-    await expect(page.getByText('3 eligible · 0 selected', { exact: true })).toBeVisible();
+    await expect(summary(page)).toHaveText(/^3 on duty \w+, \w+ \d+ have not completed Synthetic new course$/);
     await candidate(page, '90001').check();
     await expect(reviewList(page)).toHaveCount(1);
     await candidate(page, '90002').check();
@@ -136,8 +138,10 @@ test('the roster loads by itself with its source line, there is no file input an
     await waitForLivewire(page);
     const source = page.locator('[data-roster-source="verified"]');
     await expect(source).toBeVisible();
-    await expect(source).toContainText('TeleStaff roster');
     await expect(source).toContainText('Shift');
+    // The day list holds only days with a TeleStaff roster on file; there is no free date box.
+    await expect(page.getByRole('combobox', { name: 'Day', exact: true }).locator('option:not([disabled])')).toHaveCount(1);
+    await expect(page.locator('.crew-planner input[type="date"]')).toHaveCount(0);
     await expect(page.locator('.crew-planner input[type="file"]')).toHaveCount(0);
     await expect(page.locator('.crew-planner form')).toHaveCount(0);
     await expect(page.locator('.crew-planner').getByText(/upload|daily report|PDF roster/i)).toHaveCount(0);
@@ -159,10 +163,13 @@ test('pick a course and members, review a simple list, add sessions at a station
 
     // 2 Personnel: nobody is selected for you, and unselecting never hides the person.
     await expect(members(page)).toHaveCount(3);
-    await expect(page.getByText('3 eligible · 0 selected', { exact: true })).toBeVisible();
+    await expect(summary(page)).toHaveText(/^3 on duty \w+, \w+ \d+ have not completed Synthetic new course$/);
+    await expect(page.locator('.crew-planner')).not.toContainText('next day');
+    await expect(page.locator('.crew-planner')).not.toContainText('On duty 0');
+    await expect(selectedBadge(page, 0)).toBeVisible();
     await candidate(page, '90001').check();
     await candidate(page, '90002').check();
-    await expect(page.getByText('3 eligible · 2 selected', { exact: true })).toBeVisible();
+    await expect(selectedBadge(page, 2)).toBeVisible();
     await candidate(page, '90002').uncheck();
     await expect(candidate(page, '90002')).toBeVisible();
     await candidate(page, '90002').check();
@@ -232,20 +239,26 @@ test('pick a course and members, review a simple list, add sessions at a station
     expect(await fingerprint(page)).toEqual(baseline);
 });
 
-test('filters, select all shown, remove and undo keep the list right', async ({ page }) => {
+test('rank checkboxes combine, select all shown, remove and undo keep the list right', async ({ page }) => {
     await login(page);
     await openBlankPlan(page);
     await chooseCourse(page, 'Synthetic new course');
-    await page.getByText('More filters', { exact: true }).click();
-    await page.getByRole('combobox', { name: 'Rank', exact: true }).selectOption('Captain');
+    const rank = (label: string) => page.getByRole('checkbox', { name: new RegExp(`^${label} \\(\\d+\\)$`) });
+    await expect(rank('Captains')).toBeVisible();
+    await expect(rank('Lieutenants')).toBeVisible();
+    await expect(rank('Firefighters')).toBeVisible();
+    await rank('Captains').check();
     await expect(members(page)).toHaveCount(1);
+    await expect(summary(page)).toHaveText(/^1 of 3 on duty /);
     await clickButton(page, 'Select all 1 shown');
     await expect(reviewList(page)).toHaveCount(1);
-    await page.getByRole('combobox', { name: 'Rank', exact: true }).selectOption('Firefighter');
-    await expect(members(page)).toHaveCount(1);
+    // A second rank adds to the first.
+    await rank('Firefighters').check();
+    await expect(members(page)).toHaveCount(2);
     await candidate(page, '90002').check();
     await expect(reviewList(page)).toHaveCount(2);
-    await page.getByRole('combobox', { name: 'Rank', exact: true }).selectOption('');
+    await rank('Captains').uncheck();
+    await rank('Firefighters').uncheck();
     await expect(members(page)).toHaveCount(3);
     const remove = reviewList(page).filter({ hasText: 'Synthetic 90001' }).getByRole('button', { name: 'Remove Synthetic 90001' });
     await remove.evaluate(el => el.scrollIntoView({ block: 'center' }));
@@ -258,15 +271,14 @@ test('filters, select all shown, remove and undo keep the list right', async ({ 
     await expect(reviewList(page)).toHaveCount(0);
 });
 
-test('module choice applies at once, excludes verified prior attendance and explains why', async ({ page }) => {
+test('module choice applies at once and leaves out who already completed that module', async ({ page }) => {
     await login(page);
     await openBlankPlan(page);
     await course(page).selectOption({ label: 'Synthetic modular course' });
     await page.getByRole('combobox', { name: 'Module', exact: true }).selectOption({ label: 'Synthetic Module 1' });
     await expect(candidate(page, '90001')).toHaveCount(0);
     await expect(members(page)).toHaveCount(2);
-    await page.getByText("Why isn't someone listed?", { exact: true }).click();
-    await expect(page.locator('details').filter({ hasText: "Why isn't someone listed?" })).toContainText('Already attended this module (verified record)');
+    await expect(summary(page)).toHaveText(/^2 on duty .* have not completed Synthetic Module 1$/);
     await page.getByRole('combobox', { name: 'Module', exact: true }).selectOption({ label: 'Synthetic Module 2' });
     await expect(candidate(page, '90001')).toBeEnabled();
 });
@@ -291,25 +303,18 @@ test('viewer cannot open the planner', async ({ page }) => {
     await expect(page.getByRole('combobox', { name: 'Course', exact: true })).toHaveCount(0);
 });
 
-test('results explain who is not listed and keep unmatched roster identities non-selectable', async ({ page }) => {
+test('only people the roster clearly places on duty are listed; unclear or unmatched entries never are', async ({ page }) => {
     await login(page);
     await openBlankPlan(page);
     await chooseCourse(page, 'Synthetic new course');
-    await expect(page.getByText(/Attendance is checked (as it stood when class begins|against current verified Hub records as of)/)).toBeVisible();
     await expect(candidate(page, '90004')).toHaveCount(0);
     await expect(page.getByRole('checkbox', { name: /90099/ })).toHaveCount(0);
     const before = await fingerprint(page);
-    // Searching for someone who is absent opens the explanation at once.
-    await page.getByLabel('Find a member', { exact: true }).fill('90004');
-    const why = page.locator('details').filter({ hasText: "Why isn't someone listed?" });
-    await expect(why).toContainText('Synthetic 90004');
-    await expect(why).toContainText('Duty needs verification');
-    await expect(why).not.toContainText('NO_PRIOR_ATTENDANCE');
-    await expect(why).not.toContainText('ZZZ');
-    await page.getByLabel('Find a member', { exact: true }).fill('90099');
-    await expect(why).toContainText('SYNTHETIC, 90099');
-    await expect(why).toContainText('Not matched to an active Hub employee (ID 90099)');
-    await page.getByLabel('Find a member', { exact: true }).fill('');
+    await page.getByLabel('Find a name', { exact: true }).fill('90004');
+    await expect(members(page)).toHaveCount(0);
+    await expect(page.getByText('No one matches. Untick a rank or clear the name.', { exact: true })).toBeVisible();
+    await page.getByLabel('Find a name', { exact: true }).fill('');
+    await expect(members(page)).toHaveCount(3);
     expect(await fingerprint(page)).toEqual(before);
 });
 
