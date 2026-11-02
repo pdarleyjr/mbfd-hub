@@ -21,9 +21,6 @@ final class InventoryCountService
 {
     private const ENTRY_MAX = 999999;
 
-    /** Package units that a typed "boxes" count can use with units_per_package. */
-    private const BOX_LIKE = ['box', 'pack', 'bag'];
-
     public function __construct(
         private readonly Idempotency $idempotency,
         private readonly StockLedger $ledger,
@@ -286,7 +283,7 @@ final class InventoryCountService
 
         if ((int) ($entry['boxes'] ?? 0) > 0) {
             // A "box" count needs a box-sized package. A case-packaged item has no explicit box factor.
-            in_array($item->package_unit, self::BOX_LIKE, true) && $perPackage !== null
+            $item->package_unit !== null && ! in_array($item->package_unit, ['each', 'case'], true) && $perPackage !== null
                 ? $total += (int) $entry['boxes'] * $perPackage
                 : $warnings[] = 'unknown_conversion';
         }

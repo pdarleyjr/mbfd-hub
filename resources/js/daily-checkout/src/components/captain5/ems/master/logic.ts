@@ -13,12 +13,14 @@ import type {
 
 /**
  * What to order for a typed count (contract section 5). Worked in base units and shown in the count unit, rounded
- * up to a whole count unit. No order level means "none set", never a guess.
+ * up to a whole count unit. No expected amount means "none set", never a guess.
  */
 export function orderFor(typedCountUnits: number, item: OrderBasis): OrderResult {
   const units = item.units_per_count_unit;
-  if (item.required_base === null || item.required_base === undefined || !(units > 0) || !Number.isFinite(typedCountUnits)) return { kind: 'none-set' };
-  const shortfall = item.required_base - typedCountUnits * units;
+  // The expected amount (count units) is the order level when the server sends it; older answers carry only required_base.
+  const required = item.expected !== undefined ? (item.expected === null ? null : item.expected * units) : item.required_base;
+  if (required === null || required === undefined || !(units > 0) || !Number.isFinite(typedCountUnits)) return { kind: 'none-set' };
+  const shortfall = required - typedCountUnits * units;
   if (shortfall <= 0) return { kind: 'no-order' };
   return { kind: 'order', quantity: Math.max(1, Math.ceil(shortfall / units - 1e-9)) };
 }
@@ -32,7 +34,7 @@ export function unitWord(item: Pick<MasterItem, 'count_unit' | 'count_unit_label
 }
 
 export function orderText(result: OrderResult, item: Pick<MasterItem, 'count_unit' | 'count_unit_label' | 'count_unit_label_plural'>): string {
-  if (result.kind === 'none-set') return 'No order level set';
+  if (result.kind === 'none-set') return 'No expected amount set';
   if (result.kind === 'no-order') return 'No order needed';
   const word = unitWord(item, result.quantity);
   return word === '' ? `Order ${result.quantity}` : `Order ${result.quantity} ${word}`;
@@ -299,4 +301,7 @@ export function groupMissing(missing: readonly ReviewMissing[], sections: readon
   return [...groups.values()].filter((group) => group.items.length > 0);
 }
 
-export const missingNote = (count: number): string => `Submit with ${count} ${count === 1 ? 'item' : 'items'} not counted`;
+/** Leaving an item blank is fine: it keeps its current number, or stays Not counted if it never had one. */
+export const missingNote = (count: number): string => (count === 1
+  ? '1 item left blank keeps its current number (or stays Not counted)'
+  : `${count} items left blank keep their current number (or stay Not counted)`);

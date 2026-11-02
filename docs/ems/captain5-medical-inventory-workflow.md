@@ -38,7 +38,7 @@ One transaction: request row locks in id order → stock lock (the same order th
 ## 4. Live quantity and the red indicator
 
 - Live quantity is the ledger's existing calculation, in base units.
-- `count_unit` (`each|box|case|pack|bag`) is what the person types. It is `each`, or equals `package_unit` with a known `units_per_package`. The API rejects anything else, so a count can always convert.
+- `count_unit` (`each|box|case|pack|bag|bottle|vial|kit|roll|pair|tube|carton|can|set|sleeve|tray`, `SupplyItem::COUNT_UNITS`) is what the person types. It is `each`, or equals `package_unit` with a known `units_per_package`. The API rejects anything else, so a count can always convert.
 - Display value = base ÷ factor in the count unit, one decimal at most when it does not divide evenly.
 - **Red indicator** = deductions since the item's newest **counted** snapshot line (`value_source = counted`, final): the sum of `issued` movements plus `adjusted` movements that belong to a request (corrections), both with `id >` that line's `through_movement_id`. Computed from the ledger, so it survives refreshes, devices and shifts, and a calculated reconciliation snapshot never resets it. Items never counted show no red number.
 - **Direct edit** of the on-hand number creates a one-line final `physical_count` snapshot with `origin = direct_edit`. It is a physical count, not a movement, so it resets the red number for that item only.
@@ -52,7 +52,7 @@ One transaction: request row locks in id order → stock lock (the same order th
 - Historical `order_amount_text` / `order_qty_packages` are not used for this number.
 - Blank stays uncounted and a typed 0 is a count of zero.
 - The draft is one room-wide `draft` snapshot, resumable by any Captain 5. The server is the source of truth; the device keeps unsent entries until the server confirms them.
-- Finalize stamps every in-scope active item: counted lines get their numbers and order; uncounted lines are `not_counted` with a null quantity and leave stock untouched. `counted_items`, `uncounted_items` and `order_items` are stored on the snapshot, and a report with uncounted items is labeled Partial. The submit call must state `expected_uncounted`, so the person has seen what was missed.
+- Finalize stamps every in-scope active item: counted lines get their numbers and order; uncounted lines are `not_counted` with a null quantity and leave stock untouched. `counted_items`, `uncounted_items` and `order_items` are stored on the snapshot, and a report with uncounted items is labeled Partial. Nothing is mandatory: the screen lists what was left blank, and `expected_uncounted` is a guard against a list that changed, sent when the screen has it.
 
 Test vectors (required, counted → order): 10, 5 → 5; 10, 8 → 2; 10, 10 → none; 10, 15 → none; 25, 0 → 25. Box item, 250 per box, required 500: 1 box → order 1 box; 0 boxes → order 2 boxes. Box item, 50 per box, required 25: 0 boxes → order 1 box.
 
@@ -94,13 +94,16 @@ Base `/ems/api`. `view` for reads, `act` for writes.
 - `POST /supply/master/items` `{name, location_code?, new_location_label?, count_unit, units_per_package?, threshold?, on_hand?}` returns one item in the master shape (201).
 - `PATCH /supply/master/items/{id}` any of `{name, location_code, new_location_label, count_unit, units_per_package, threshold, active}` returns one item. `threshold` is in count units; null clears it.
 - `POST /supply/master/items/{id}/count` `{on_hand:int}` (count units) returns one item.
+- Each item also carries `expected` (expected on hand in count units, from `threshold_qty_base`), `to_order` (`ceil(max(0, expected - on hand))` in count units, null when either is unknown), `order_state` (`ok|needs_order|pending|ordered|backordered|no_level|not_counted`, an open order wins) and `open_order` (`{id, status, quantity, unit_label, quantity_base, expected_on, note, placed_at, placed_by, updated_at, updated_by}` or null). The response adds `summary {needs_order, pending, ordered, backordered}` and `units [{value, label, plural}]`.
+- `PATCH /supply/master/items` `{changes: [{id, name?, location_code?, new_location_label?, count_unit?, units_per_package?, expected?, on_hand?}]}` is the Edit mode save: all rows or none, audited per field, `on_hand` is a physical count. A refusal names its field as `changes.{index}.{field}`. Returns `{items}`.
+- Orders: see section 11.
 
 ### Count form
 
 - `POST /supply/count-form/start` returns `{count: {id, started_at, started_by, entries: {"<itemId>": int}}, resumed}` plus the master `sections` and `items`.
 - `PUT /supply/count-form/{uuid}/entries` `{entries:[{supply_item_id, on_hand:int|null}]}` (null clears) returns `{saved, entries}`.
 - `GET /supply/count-form/{uuid}/review` returns `{counted, uncounted:[{id, name, location_code}], orders:[{supply_item_id, name, location_code, on_hand, order, unit_label}], config_problems:[{id, name, problem}]}`.
-- `POST /supply/count-form/{uuid}/submit` `{expected_uncounted:int}` returns `{id, finalized_at, counted_items, uncounted_items, order_items}`. A mismatch gives 409 `uncounted_changed`.
+- `POST /supply/count-form/{uuid}/submit` `{expected_uncounted?:int}` (optional since 2026-11-02; when sent it is a guard) returns `{id, finalized_at, counted_items, uncounted_items, order_items}`. A mismatch gives 409 `uncounted_changed`.
 - `DELETE /supply/counts/{uuid}` (existing) discards a draft.
 
 ### Who can edit
@@ -139,6 +142,16 @@ The first use was Friday, October 30, 2026, on the owner's instruction: MIR-0000
 ## 9. Workbook cutover
 
 `php artisan ems:apply-supply-workbook` is a dry run. `--apply` writes one final `baseline` snapshot (`origin = workbook`, `idempotency_key = workbook:<sha256>`) under the stock lock. Movements recorded before it stay in history and are not subtracted from the supplied count. Re-running is a no-op. An item that already has a counted line is never overwritten. See `docs/ems/supply-room-workbook-exceptions.md`.
+
+## 11. Expected on hand and ordering
+
+The owner asked on 2026-11-02 for one list that shows on hand, and in Edit mode everything else: expected on hand, what to order, and the order's state.
+
+- **Expected on hand** is the item's `threshold_qty_base`. To order = expected minus on hand, rounded up to whole count units, never below zero. The Monday count, a typed number, a deduction and an arrival all change on hand, so the to-order figure is always live. Nothing on the count form is mandatory: a blank keeps the item's last number, and `expected_uncounted` on submit is only a guard when the screen sends it.
+- **One open order per item**, in the item's count unit, stored in `ems_supply_orders` (`pending`, `placed` shown as Ordered, `backordered`), with `order_unit`, `expected_on` and a note. Every change is a row in `ems_supply_order_events`.
+- `POST /supply/master/items/{id}/order` `{status: pending|ordered|backordered, quantity, expected_on?, note?}` opens one (409 `order_open` when one is open). `PATCH /supply/orders/{order}` `{status?: pending|ordered|backordered|cancelled, quantity?, expected_on?, note?}` changes it. `POST /supply/orders/{order}/arrived` `{quantity, note?}` writes one `received` movement for what came in and closes the order. Each returns the item row.
+- **Reconciled** means on hand is at or above expected and no order is open. A partial arrival closes its order, and the remainder shows as To order again, so the list never hides a shortfall behind an old order.
+- Same access as the master list: Captain 5 and any administrator (`inventory_edit`). Admin, EMS, Master Supply Room Inventory opens the same screen at `/daily/supply-room`, and the Medical Supply Room Reorder tab lists the same orders with the same states.
 
 ### Estimates
 

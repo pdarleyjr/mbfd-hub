@@ -2,15 +2,16 @@ import { useState, type FormEvent } from 'react';
 import { Sheet } from '../../ui';
 import { BTN, BTN_PRIMARY, BTN_SECONDARY, FIELD, Field, HINT, LiveNote, useWrite } from '../shared';
 import { createMasterItem, updateMasterItem } from './api';
-import { ALL_UNITS, EMPTY_NEW_ITEM, planNewItem, type ItemForm } from './editLogic';
+import { EMPTY_NEW_ITEM, planNewItem, type ItemForm } from './editLogic';
 import { CountingFields, NameAndShelf, OnHandField } from './ItemFields';
-import type { InactiveItem, MasterItem, MasterSection } from './types';
+import type { InactiveItem, MasterItem, MasterSection, UnitOption } from './types';
 import { useUnsavedWork } from './useUnsavedWork';
 
 interface Props {
   open: boolean;
   sections: readonly MasterSection[];
   inactive: readonly InactiveItem[];
+  units: readonly UnitOption[];
   defaultShelf: string | null;
   onClose: () => void;
   onAdded: (item: MasterItem) => void;
@@ -46,7 +47,7 @@ function PutBack({ inactive, onAdded, onClose }: Pick<Props, 'inactive' | 'onAdd
   );
 }
 
-function AddForm({ sections, inactive, defaultShelf, onClose, onAdded }: Omit<Props, 'open'>) {
+function AddForm({ sections, inactive, units, defaultShelf, onClose, onAdded }: Omit<Props, 'open'>) {
   const [form, setForm] = useState<ItemForm>({ ...EMPTY_NEW_ITEM, shelf: defaultShelf ?? '' });
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
   const write = useWrite();
@@ -67,7 +68,7 @@ function AddForm({ sections, inactive, defaultShelf, onClose, onAdded }: Omit<Pr
       <PutBack inactive={inactive} onAdded={onAdded} onClose={onClose} />
       <form onSubmit={submit} noValidate className="space-y-4" data-testid="add-item-form" aria-label="Add item">
         <NameAndShelf form={form} onChange={setForm} errors={errors} disabled={write.busy} sections={sections} />
-        <CountingFields form={form} onChange={setForm} errors={errors} disabled={write.busy} units={ALL_UNITS} />
+        <CountingFields form={form} onChange={setForm} errors={errors} disabled={write.busy} units={units} />
         <OnHandField form={form} onChange={setForm} errors={errors} disabled={write.busy} label="On hand (optional)" unit=""
           hint="Fill this in if you have just counted it. Leave it blank to count it later." />
         <LiveNote tone="warning">{write.error}</LiveNote>
