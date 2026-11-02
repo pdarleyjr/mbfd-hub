@@ -143,11 +143,29 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   }
   await expect(page.getByRole('button', { name: 'Generate PDF' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath(`operational-forms-ics-editor-${testInfo.project.name}.png`), fullPage: true });
+});
 
-  // The entry table in the editor and the record table in the library turn into cards when narrow and never scroll sideways.
-  await expectTablesFitAtEveryWidth(page, '.of-edit-table');
+// Its own test, so a width problem is reported on its own and not behind the phone command bar checks above.
+test('record and entry tables turn into cards when narrow and never scroll sideways', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'The test resizes through every supported width itself.');
   await page.goto('/employee/forms');
-  await expect(page.locator('.of-record-table')).toBeVisible();
+  await page.getByLabel('Employee ID').fill(employeeId);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page.getByRole('heading', { name: 'Operational Forms' })).toBeVisible({ timeout: 60_000 });
+  await page.locator('.of-form-card').filter({ hasText: 'ICS 214' }).getByRole('button', { name: 'Create form' }).click();
+  await expect(page.getByText('Incident and operational period')).toBeVisible();
+
+  // The entry table lives in a later section of the editor: step through the sections until it shows.
+  const sections = page.locator('.of-context-nav button');
+  for (let index = 0; index < await sections.count() && await page.locator('.of-edit-table').count() === 0; index += 1) {
+    await sections.nth(index).click();
+  }
+  await expect(page.locator('.of-edit-table').first()).toBeVisible();
+  await expectTablesFitAtEveryWidth(page, '.of-edit-table');
+
+  await page.goto('/employee/forms');
+  await expect(page.locator('.of-record-table')).toBeVisible({ timeout: 60_000 });
   await expectTablesFitAtEveryWidth(page, '.of-record-table');
 });
 
