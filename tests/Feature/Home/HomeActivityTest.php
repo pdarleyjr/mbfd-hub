@@ -18,8 +18,8 @@ use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 /**
- * The Home visit card: what counts as a visit, the rolling past-24-hours and all-time numbers, the admin-only list of
- * recent sign-ins, and the promise that none of it can slow down or break Home.
+ * Home page visits: what counts as a visit, the rolling past-24-hours and all-time numbers, their place on the Admin
+ * Overview for administrators only, and the promise that none of it can slow down or break Home.
  */
 final class HomeActivityTest extends TestCase
 {
@@ -118,30 +118,85 @@ final class HomeActivityTest extends TestCase
         $this->assertSame(6, $summary['total']);
     }
 
-    public function test_the_page_already_includes_the_members_own_visit_and_the_numbers_go_up(): void
+    public function test_a_visit_to_home_raises_the_numbers_an_administrator_reads(): void
     {
-        $this->actingAsCanonicalFixture();
+        $this->admin();
 
-        $first = $this->get('/')->assertOk();
-        $this->assertSame(['1', '1'], $this->counters($first->getContent()));
-        $first->assertSee('Home page visits since Nov 1, 2026');
-
-        $this->assertSame(['2', '2'], $this->counters($this->get('/')->getContent()));
-
-        $this->getJson('/home/activity')->assertOk()->assertJson(['past_24_hours' => 2, 'total' => 2, 'since' => 'Nov 1, 2026']);
-        $this->get('/');
-        $this->getJson('/home/activity')->assertOk()->assertJson(['past_24_hours' => 3, 'total' => 3]);
+        $this->getJson('/home/activity')->assertOk()->assertExactJson(['past_24_hours' => 0, 'total' => 0, 'since' => null, 'signed_in' => 0]);
+        $this->get('/')->assertOk();
+        $this->getJson('/home/activity')->assertOk()->assertJson(['past_24_hours' => 1, 'total' => 1, 'since' => 'Nov 1, 2026']);
+        $this->get('/')->assertOk();
+        $this->getJson('/home/activity')->assertOk()->assertJson(['past_24_hours' => 2, 'total' => 2]);
     }
 
-    public function test_the_counters_endpoint_is_json_never_stored_and_for_signed_in_members_only(): void
+    public function test_the_counters_are_json_never_stored_and_for_administrators_only(): void
     {
         $this->getJson('/home/activity')->assertUnauthorized();
 
         $this->actingAsCanonicalFixture();
-        $response = $this->getJson('/home/activity', ['X-Hub-Background-Refresh' => '1'])
-            ->assertOk()
-            ->assertExactJson(['past_24_hours' => 0, 'total' => 0, 'since' => null]);
+        $this->getJson('/home/activity')->assertForbidden();
+
+        $this->admin();
+        $response = $this->getJson('/home/activity', ['X-Hub-Background-Refresh' => '1'])->assertOk();
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+    }
+
+    public function test_the_counters_say_how_many_members_signed_in(): void
+    {
+        $admin = $this->admin();
+        $admin->forceFill(['last_login_at' => CarbonImmutable::now()])->save();
+        $this->member('Bob Baker', null, CarbonImmutable::now()->subHour());
+        $this->member('Dan Day', null, CarbonImmutable::now()->subHours(25));
+
+        $this->getJson('/home/activity')->assertOk()->assertJson(['signed_in' => 2]);
+    }
+
+    // ---- Where it appears ------------------------------------------------------------------------
+
+    public function test_home_no_longer_shows_any_of_it_to_anyone(): void
+    {
+        $this->actingAsCanonicalFixture();
+        $this->get('/')->assertOk()->assertDontSee('data-home-activity', false)->assertDontSee('Past 24 hours');
+
+        $this->admin();
+        $this->get('/')->assertOk()->assertDontSee('data-home-activity', false)->assertDontSee('signed in');
+    }
+
+    public function test_the_admin_overview_has_it_collapsed_beside_the_title_and_reads_nothing_until_opened(): void
+    {
+        $this->admin();
+        DB::table(self::TABLE)->insert(['hour' => '2026-11-01 10:00:00', 'views' => 7, 'imported_views' => 0]);
+
+        $queries = [];
+        DB::listen(static function ($query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+        $html = $this->get('/admin')->assertOk()
+            ->assertSee('data-home-activity', false)
+            ->assertSee('Home page visits')
+            ->assertSee('data-members-url="/home/activity/members"', false)
+            ->assertSee('No one has signed in during the past 24 hours.')
+            ->getContent();
+
+        // Livewire leaves a marker comment around an @if.
+        $this->assertMatchesRegularExpression('#<h1 class="mbfd-dash-header__title">Admin Overview</h1>\s*(?:<!--\[if BLOCK\]><!\[endif\]-->)?\s*<details\s#', $html, 'right beside the title');
+        $this->assertDoesNotMatchRegularExpression('#<details[^>]*data-home-activity[^>]*\sopen#', $html, 'starts collapsed');
+        $this->assertSame([], array_values(array_filter($queries, static fn (string $sql): bool => str_contains($sql, self::TABLE))), 'the page itself reads no counts');
+    }
+
+    public function test_the_wall_display_does_not_show_it(): void
+    {
+        $this->admin();
+
+        $this->get('/admin?display=1')->assertDontSee('data-home-activity', false);
+    }
+
+    public function test_the_page_opening_it_needs_no_table_so_a_missing_table_cannot_break_the_admin_overview(): void
+    {
+        $this->admin();
+        Schema::drop(self::TABLE);
+
+        $this->get('/admin')->assertOk()->assertSee('data-home-activity', false);
     }
 
     // ---- Members who signed in -----------------------------------------------------------------
@@ -179,48 +234,18 @@ final class HomeActivityTest extends TestCase
         $this->getJson('/home/activity/members')->assertForbidden();
     }
 
-    public function test_other_members_see_the_counters_but_no_link_or_dialog(): void
-    {
-        $member = $this->actingAsCanonicalFixture();
-        $member->forceFill(['last_login_at' => CarbonImmutable::now()])->save();
-
-        $this->get('/')->assertOk()
-            ->assertSee('data-home-activity', false)
-            ->assertSee('Past 24 hours')
-            ->assertDontSee('data-activity-open', false)
-            ->assertDontSee('data-activity-dialog', false)
-            ->assertDontSee('data-members-url', false)
-            ->assertDontSee('signed in');
-    }
-
-    public function test_administrators_get_a_link_with_the_count_that_opens_the_dialog(): void
-    {
-        $admin = $this->admin();
-        $admin->forceFill(['last_login_at' => CarbonImmutable::now()])->save();
-        $this->member('Bob Baker', null, CarbonImmutable::now()->subHour());
-
-        $this->get('/')->assertOk()
-            ->assertSee('data-activity-open', false)
-            ->assertSee('2 members signed in')
-            ->assertSee('data-activity-dialog', false)
-            ->assertSee('No one has signed in during the past 24 hours.')
-            ->assertSee('data-members-url="/home/activity/members"', false);
-    }
-
     // ---- It can never break Home -----------------------------------------------------------------
 
-    public function test_home_renders_without_the_card_when_the_table_is_missing_and_the_failure_is_logged(): void
+    public function test_home_still_renders_when_the_table_is_missing_and_the_failure_is_logged(): void
     {
-        $this->actingAsCanonicalFixture();
+        $this->admin();
         Schema::drop(self::TABLE);
         $logged = [];
         $this->app['events']->listen(MessageLogged::class, function (MessageLogged $event) use (&$logged): void {
             $logged[] = [$event->level, $event->message];
         });
 
-        $this->get('/')->assertOk()
-            ->assertSee('Department Updates')
-            ->assertDontSee('data-home-activity', false);
+        $this->get('/')->assertOk()->assertSee('Department Updates');
         $this->getJson('/home/activity')->assertStatus(503);
 
         $this->assertContains(['warning', 'Home activity could not be read or written.'], $logged);
@@ -230,7 +255,7 @@ final class HomeActivityTest extends TestCase
 
     public function test_a_background_refresh_does_not_keep_the_session_alive_but_a_member_action_does(): void
     {
-        $member = $this->actingAsCanonicalFixture();
+        $member = $this->admin();
         $before = $this->activityOf($member);
 
         $this->getJson('/home/activity', ['X-Hub-Background-Refresh' => '1'])->assertOk();
@@ -246,7 +271,7 @@ final class HomeActivityTest extends TestCase
 
     public function test_the_feeds_leave_a_pending_flash_message_for_the_page_that_shows_it(): void
     {
-        $this->actingAsCanonicalFixture();
+        $this->admin();
         $this->withSession(['notice' => 'Saved.', '_flash' => ['old' => ['notice'], 'new' => []]]);
 
         $this->getJson('/home/activity', ['X-Hub-Background-Refresh' => '1'])->assertOk();
@@ -353,15 +378,6 @@ final class HomeActivityTest extends TestCase
     private function viewsIn(string $hour): int
     {
         return (int) DB::table(self::TABLE)->where('hour', $hour)->value('views');
-    }
-
-    /** @return array{0: string, 1: string} the two numbers on the card, as printed */
-    private function counters(string $html): array
-    {
-        preg_match('/data-activity-past>([\d,]+)</', $html, $past);
-        preg_match('/data-activity-total>([\d,]+)</', $html, $total);
-
-        return [$past[1] ?? '', $total[1] ?? ''];
     }
 
     /** @return array{0: mixed, 1: mixed} */

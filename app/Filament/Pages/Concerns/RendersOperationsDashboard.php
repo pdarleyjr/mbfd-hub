@@ -38,6 +38,13 @@ trait RendersOperationsDashboard
                 default => 'Good evening',
             }.($first !== '' ? ', '.$first : ''),
             'actions' => $this->getCachedHeaderActions(),
+            'homeVisits' => $this->showsHomeVisits(),
         ]);
+    }
+
+    /** The collapsed Home page visits control beside the title. Only the Admin Overview offers it. */
+    protected function showsHomeVisits(): bool
+    {
+        return false;
     }
 }

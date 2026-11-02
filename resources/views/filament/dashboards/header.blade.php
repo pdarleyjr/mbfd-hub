@@ -1,7 +1,12 @@
 {{-- Dashboard page heading: title + purpose on the left, today's date and greeting on the right. --}}
 <header class="mbfd-dash-header">
     <div class="mbfd-dash-header__text">
-        <h1 class="mbfd-dash-header__title">{{ $heading }}</h1>
+        <div class="mbfd-dash-header__title-row">
+            <h1 class="mbfd-dash-header__title">{{ $heading }}</h1>
+            @if ($homeVisits ?? false)
+                @include('filament.dashboards.partials.home-visits')
+            @endif
+        </div>
         @if (filled($subheading))
             <p class="mbfd-dash-header__sub">{{ $subheading }}</p>
         @endif

@@ -104,5 +104,5 @@ startDocumentViewer({ loadPdfRenderer: () => import('./pwa/document-viewer-pdf')
 // browser's error page, which an installed app cannot back out of. Daily has its own offline shell.
 startOfflineLinks();
 
-// The Home visit card refreshes its own numbers; no other page loads this.
+// Home page visits on the Admin Overview reads its own numbers when opened; no other page loads this.
 if (document.querySelector('[data-home-activity]')) import('./home-activity.js');
