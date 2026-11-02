@@ -75,6 +75,15 @@ switch ($command) {
         ]);
         $result = ['id' => $boat->id, 'station_id' => $boat->station_id];
         break;
+    case 'engine':
+        // An engine on the standard checklist, to see the SCBA and radio boxes a truck crew gets.
+        $station = App\Models\Station::query()->firstOrCreate(['station_number' => 7], ['name' => 'Station 7', 'address' => '7 Fixture Way', 'is_active' => true]);
+        $engine = App\Models\Apparatus::query()->firstOrCreate(['slug' => 'e77'], [
+            'station_id' => $station->id, 'unit_id' => 'E77', 'name' => 'Engine 77', 'designation' => 'E77', 'type' => 'Engine', 'status' => 'In Service',
+            'vehicle_number' => '27707', 'daily_checkout_requirement' => 'required', 'daily_checkout_template' => 'engine',
+        ]);
+        $result = ['id' => $engine->id, 'slug' => $engine->slug];
+        break;
     case 'fb6-issue-action':
         // Logistics acts on the boat's newest open issue through the real service, the way the admin screens do.
         $boatId = DB::table('apparatuses')->where('slug', 'fb6')->value('id');
