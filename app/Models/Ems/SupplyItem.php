@@ -43,7 +43,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class SupplyItem extends Model
 {
-    public const COUNT_UNITS = ['each', 'box', 'case', 'pack', 'bag'];
+    /** How a person can count an item. Everything but `each` is a package and needs its size in single units. */
+    public const COUNT_UNITS = ['each', 'box', 'case', 'pack', 'bag', 'bottle', 'vial', 'kit', 'roll', 'pair', 'tube', 'carton', 'can', 'set', 'sleeve', 'tray'];
 
     protected $table = 'ems_supply_items';
 

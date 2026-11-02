@@ -6,6 +6,7 @@ use App\Http\Controllers\Ems\MasterInventoryController;
 use App\Http\Controllers\Ems\MemberRequestController;
 use App\Http\Controllers\Ems\StaffRequestController;
 use App\Http\Controllers\Ems\StatisticsController;
+use App\Http\Controllers\Ems\SupplyDataController;
 use App\Http\Controllers\Ems\SupplyRoomController;
 use App\Http\Middleware\Ems\EnsureEmsAccess;
 use App\Http\Middleware\EnsureEmployeeAuthenticated;
@@ -57,6 +58,15 @@ Route::prefix('ems/api')
 
             Route::get('/statistics', StatisticsController::class)->name('statistics');
 
+            // Supply Data: what was distributed from the supply room. Read only, so view access is enough.
+            Route::middleware('throttle:60,1,ems-supply-data')->prefix('supply-data')->name('supply-data.')->group(function (): void {
+                Route::get('/', [SupplyDataController::class, 'overview'])->name('overview');
+                Route::get('/export.xlsx', [SupplyDataController::class, 'export'])->name('export');
+                // 1 to 18 digits: a longer number cannot be an id, so it is a plain 404 instead of an integer overflow.
+                Route::get('/items/{item}', [SupplyDataController::class, 'item'])->where('item', '[0-9]{1,18}')->name('items.show');
+                Route::get('/units/{unitKey}', [SupplyDataController::class, 'unit'])->where('unitKey', '[^/]+')->name('units.show');
+            });
+
             Route::get('/forms/reconcile/preview', [MasterInventoryController::class, 'reconcilePreview'])->name('forms.reconcile.preview');
         });
 
@@ -69,6 +79,10 @@ Route::prefix('ems/api')
 
         Route::middleware([EnsureEmsAccess::class.':inventory_edit', 'throttle:60,1,ems-staff-write'])->group(function (): void {
             Route::post('/supply/master/items', [MasterInventoryController::class, 'store'])->name('supply.master.items.store');
+            Route::patch('/supply/master/items', [MasterInventoryController::class, 'batch'])->name('supply.master.items.batch');
+            Route::post('/supply/master/items/{item}/order', [MasterInventoryController::class, 'order'])->whereNumber('item')->name('supply.master.items.order');
+            Route::patch('/supply/orders/{order}', [MasterInventoryController::class, 'updateOrder'])->whereNumber('order')->name('supply.orders.update');
+            Route::post('/supply/orders/{order}/arrived', [MasterInventoryController::class, 'orderArrived'])->whereNumber('order')->name('supply.orders.arrived');
             Route::patch('/supply/master/items/{item}', [MasterInventoryController::class, 'update'])->whereNumber('item')->name('supply.master.items.update');
             Route::post('/supply/master/items/{item}/count', [MasterInventoryController::class, 'count'])->whereNumber('item')->name('supply.master.items.count');
             Route::post('/supply/count-form/start', [MasterInventoryController::class, 'startCount'])->name('supply.count-form.start');

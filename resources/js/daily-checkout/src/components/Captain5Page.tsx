@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { RefreshCw } from 'lucide-react';
 import { CAPTAIN_5_IMAGE, type VehicleIdentification } from '../types';
@@ -17,6 +17,7 @@ import VehicleIdentificationPanel from './VehicleIdentificationPanel';
 import VehicleIdentificationCard from './VehicleIdentificationCard';
 import SubmittedFormsTab from './captain5/ems/forms/SubmittedFormsTab';
 import MasterInventoryTab from './captain5/ems/master/MasterInventoryTab';
+import { SUPPLY_DATA_CLEARED } from './captain5/ems/supplyData/params';
 import { useEmsAccess, useOpenRequestCount } from './captain5/ems/useEmsAccess';
 import NarcoticsTab from './captain5/narcotics/NarcoticsTab';
 import { useNarcoticsInbox } from './captain5/narcotics/useNarcoticsInbox';
@@ -29,11 +30,14 @@ import Tabs, { type TabItem } from './ui/Tabs';
 import Tag from './ui/Tag';
 import { LoadError, SkeletonRows } from './ui/StateViews';
 
-type TabId = 'today' | 'issues' | 'trucks' | 'rescue' | 'supply' | 'narcotics' | 'messages' | 'updates' | 'history';
+// Supply Data is opened by few people and carries its own chart and lists, so it loads only when its tab is opened.
+const SupplyDataTab = lazy(() => import('./captain5/ems/supplyData/SupplyDataTab'));
 
-const TAB_IDS: TabId[] = ['today', 'issues', 'trucks', 'rescue', 'supply', 'narcotics', 'messages', 'updates', 'history'];
+type TabId = 'today' | 'issues' | 'trucks' | 'rescue' | 'supply' | 'supply-data' | 'narcotics' | 'messages' | 'updates' | 'history';
+
+const TAB_IDS: TabId[] = ['today', 'issues', 'trucks', 'rescue', 'supply', 'supply-data', 'narcotics', 'messages', 'updates', 'history'];
 const isTab = (value: string | null): value is TabId => TAB_IDS.includes(value as TabId);
-const isEmsTab = (value: string | null): boolean => value === 'rescue' || value === 'supply';
+const isEmsTab = (value: string | null): boolean => value === 'rescue' || value === 'supply' || value === 'supply-data';
 const positiveInt = (value: string | null): number | null => (value !== null && /^\d{1,12}$/.test(value) && Number(value) > 0 ? Number(value) : null);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -47,6 +51,8 @@ function tabsFor(workspace: Workspace, unread: number, ems: EmsTabs, narcotics: 
     { id: 'trucks', label: 'Truck Changes', badge: workspace.rescue_truck_changes.filter((change) => change.recent).length, badgeLabel: 'Rescue truck changes in the last 24 hours' },
     ...(ems.show && ems.showForms ? [{ id: 'rescue' as const, label: 'Submitted Inventory Forms', badge: ems.openRequests, badgeLabel: 'forms waiting' }] : []),
     ...(ems.show ? [{ id: 'supply' as const, label: 'Master Supply Room Inventory' }] : []),
+    // Supply Data is read-only analytics behind EMS view (the same gate as the forms), so an administrator with only the master inventory does not get it.
+    ...(ems.show && ems.showForms ? [{ id: 'supply-data' as const, label: 'Supply Data' }] : []),
     ...(narcotics.show ? [{ id: 'narcotics' as const, label: 'Narcotics Checks', badge: narcotics.pending, badgeLabel: 'checks to review' }] : []),
     { id: 'messages', label: 'Messages', badge: unread, badgeLabel: 'unread messages' },
     { id: 'updates', label: 'Department Updates' },
@@ -144,10 +150,18 @@ export default function Captain5Page() {
   const active: TabId = isTab(requestedTab) && tabs.some((tab) => tab.id === requestedTab) ? requestedTab : 'today';
   const refreshLabel = isOffline ? 'Refresh unavailable while offline' : ws.refreshing ? 'Refreshing Captain 5' : 'Refresh Captain 5';
 
-  const renderEms = (id: 'rescue' | 'supply') => {
+  const emsErrorTitle = { rescue: 'Submitted Inventory Forms could not be loaded', supply: 'The Master Supply Room Inventory could not be loaded', 'supply-data': 'Supply Data could not be loaded' } as const;
+  const renderEms = (id: 'rescue' | 'supply' | 'supply-data') => {
     if (ems.status === 'loading') return <SkeletonRows rows={4} />;
-    if (ems.status === 'error') return <LoadError title={id === 'rescue' ? 'Submitted Inventory Forms could not be loaded' : 'The Master Supply Room Inventory could not be loaded'} message={ems.error} onRetry={ems.reload} />;
+    if (ems.status === 'error') return <LoadError title={emsErrorTitle[id]} message={ems.error} onRetry={ems.reload} />;
     if (ems.status !== 'ready') return null;
+    if (id === 'supply-data') {
+      return (
+        <Suspense fallback={<SkeletonRows rows={4} />}>
+          <SupplyDataTab canOpenRequests={ems.meta.permissions.view === true} onForbidden={ems.deny} />
+        </Suspense>
+      );
+    }
     return id === 'rescue'
       ? (
         <SubmittedFormsTab
@@ -173,6 +187,7 @@ export default function Captain5Page() {
         return <TruckChangesTab trucks={data.rescue_trucks} changes={data.rescue_truck_changes} />;
       case 'rescue':
       case 'supply':
+      case 'supply-data':
         return renderEms(id);
       case 'narcotics':
         if (narcotics.status === 'loading') return <SkeletonRows rows={3} />;
@@ -229,7 +244,7 @@ export default function Captain5Page() {
       {narcotics.status === 'ready' && narcotics.pending > 0 && active !== 'narcotics' && (
         <section className="hub-callout flex flex-wrap items-center justify-between gap-3 p-4" aria-label="Narcotics checks waiting" data-testid="narcotics-attention">
           <p className="text-sm font-semibold text-hub-ink">{narcotics.pending === 1 ? '1 narcotics check is waiting for your review.' : `${narcotics.pending} narcotics checks are waiting for your review.`}</p>
-          <button type="button" className="hub-btn hub-btn--primary !min-h-11" onClick={() => update({ tab: 'narcotics', filter: null, kind: null, request: null, check: null, view: null, section: null })}>Review now</button>
+          <button type="button" className="hub-btn hub-btn--primary !min-h-11" onClick={() => update({ tab: 'narcotics', filter: null, kind: null, request: null, check: null, view: null, section: null, ...SUPPLY_DATA_CLEARED })}>Review now</button>
         </section>
       )}
 
@@ -255,7 +270,7 @@ export default function Captain5Page() {
         <Tabs
           tabs={tabs}
           active={active}
-          onChange={(id) => update({ tab: id === 'today' ? null : id, filter: null, kind: null, request: null, check: null, view: null, section: null })}
+          onChange={(id) => update({ tab: id === 'today' ? null : id, filter: null, kind: null, request: null, check: null, view: null, section: null, ...SUPPLY_DATA_CLEARED })}
           label="Captain 5 workspace"
           idPrefix="captain5"
           panelClassName="p-4 sm:p-5"

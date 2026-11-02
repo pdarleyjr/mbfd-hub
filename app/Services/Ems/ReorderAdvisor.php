@@ -24,7 +24,7 @@ final class ReorderAdvisor
     {
         $items = SupplyItem::query()->with('location:id,code')->where('active', true)->where('controlled_substance', false)->orderBy('name')->get();
         $current = $this->ledger->current($items);
-        $openOrders = SupplyOrder::query()->where('status', SupplyOrder::PLACED)->get()->groupBy('supply_item_id');
+        $openOrders = SupplyOrder::query()->whereIn('status', SupplyOrder::OPEN)->get()->groupBy('supply_item_id');
 
         $advisories = [];
         $unknown = [];

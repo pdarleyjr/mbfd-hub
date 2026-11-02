@@ -200,7 +200,8 @@ final class HomeQuickActionsTest extends TestCase
             $this->signIn($user->fresh());
             $html = $this->get('/')->assertOk()->getContent();
             self::assertSame(0, $this->xpath($html)->query('//*[@data-home-command-board]')->length, $user->employee_id);
-            self::assertStringNotContainsString('Command Board', $html);
+            // Everyone sees the Command Board Sandbox in Training Tools; the live board's button stays absent outside it.
+            self::assertStringNotContainsString('Command Board', preg_replace('#<details[^>]*data-training-tools.*?</details>#s', '', $html));
             self::assertStringNotContainsString('href="'.self::BOARD, $html);
         }
 

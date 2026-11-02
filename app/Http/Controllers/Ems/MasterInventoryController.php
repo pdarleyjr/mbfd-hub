@@ -12,6 +12,7 @@ use App\Services\Ems\EmsException;
 use App\Services\Ems\EmsValidator;
 use App\Services\Ems\FormReconciliationService;
 use App\Services\Ems\MasterInventoryService;
+use App\Services\Ems\SupplyItemOrders;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,6 +25,7 @@ final class MasterInventoryController extends Controller
         private readonly MasterInventoryService $master,
         private readonly CountFormService $countForm,
         private readonly FormReconciliationService $reconciliation,
+        private readonly SupplyItemOrders $orders,
     ) {}
 
     // -------------------------------------------------------------- reconcile
@@ -60,6 +62,26 @@ final class MasterInventoryController extends Controller
     public function update(Request $request, int $item): JsonResponse
     {
         return $this->guarded(fn (): JsonResponse => $this->written($this->master->update($item, $this->user($request), $this->idempotencyKey($request), $request->all())));
+    }
+
+    public function batch(Request $request): JsonResponse
+    {
+        return $this->guarded(fn (): JsonResponse => $this->written($this->master->batch($this->user($request), $this->idempotencyKey($request), $request->all())));
+    }
+
+    public function order(Request $request, int $item): JsonResponse
+    {
+        return $this->guarded(fn (): JsonResponse => $this->written($this->orders->open($item, $this->user($request), $this->idempotencyKey($request), $request->all()), creates: true));
+    }
+
+    public function updateOrder(Request $request, int $order): JsonResponse
+    {
+        return $this->guarded(fn (): JsonResponse => $this->written($this->orders->update($order, $this->user($request), $this->idempotencyKey($request), $request->all())));
+    }
+
+    public function orderArrived(Request $request, int $order): JsonResponse
+    {
+        return $this->guarded(fn (): JsonResponse => $this->written($this->orders->arrived($order, $this->user($request), $this->idempotencyKey($request), $request->all())));
     }
 
     public function count(Request $request, int $item): JsonResponse

@@ -27,7 +27,10 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   );
 }
 
-/** Review and submit: what was counted, what was missed (tap to fix), what to order, and one way forward. */
+/**
+ * Review and submit: what was counted, what was not (for information only), what to order, and Submit. Nothing on this
+ * screen is required; `expected_uncounted` is still sent so the server can tell when the list changed underneath.
+ */
 export default function CountReview({ draft, onFix, onBack, onSubmitted, onDiscarded }: Props) {
   const [review, setReview] = useState<CountReviewData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -61,7 +64,7 @@ export default function CountReview({ draft, onFix, onBack, onSubmitted, onDisca
       onDone: (result) => { draft.finish(); onSubmitted(result); },
       onConflict: (error) => {
         if (error.code === 'uncounted_changed') {
-          setChangedNote('The list of items not counted changed while you were reviewing. It has been reloaded. Check it again before you submit.');
+          setChangedNote('Someone changed the count while you were reviewing, so the review has been reloaded. Submit again when you are ready.');
           void load();
         }
       },
@@ -83,8 +86,8 @@ export default function CountReview({ draft, onFix, onBack, onSubmitted, onDisca
       {changedNote && <LiveNote tone="warning" testId="review-changed">{changedNote}</LiveNote>}
 
       {missing.length > 0 && (
-        <Section title="Not counted" count={missing.length}>
-          <p className={HINT}>Tap an item to go back and count it.</p>
+        <Section title={missingNote(missing.length)}>
+          <p className={HINT}>That is fine. Nothing is ordered for them from this count. Tap one if you want to count it now.</p>
           {groups.map((group) => (
             <div key={group.code ?? 'none'} data-testid="missing-group">
               <h4 className="text-sm font-semibold text-hub-n-600">{group.label}</h4>
@@ -124,23 +127,13 @@ export default function CountReview({ draft, onFix, onBack, onSubmitted, onDisca
       )}
 
       <div className="space-y-3 border-t border-hub-border pt-4">
-        {missing.length === 0 ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <button type="button" className={`${BTN_PRIMARY} !min-h-12 w-full text-base sm:w-auto`} disabled={submit.busy} aria-busy={submit.busy} data-testid="submit-inventory" onClick={send}>
             {submit.busy ? 'Submitting…' : submit.retry ? 'Try again: Submit inventory' : 'Submit inventory'}
           </button>
-        ) : (
-          <>
-            <button type="button" className={`${BTN_PRIMARY} !min-h-12 w-full text-base sm:w-auto`} onClick={onBack} data-testid="keep-counting">Keep counting</button>
-            <div className="space-y-1">
-              <button type="button" className={`${BTN_SECONDARY} w-full sm:w-auto`} disabled={submit.busy} aria-busy={submit.busy} data-testid="submit-partial" onClick={send}>
-                {submit.busy ? 'Submitting…' : submit.retry ? `Try again: ${missingNote(missing.length)}` : missingNote(missing.length)}
-              </button>
-              <p className={HINT}>They keep their current numbers.</p>
-            </div>
-          </>
-        )}
+          <button type="button" className={`${BTN_SECONDARY} w-full sm:w-auto`} disabled={submit.busy} data-testid="back-to-counting" onClick={onBack}>Back to counting</button>
+        </div>
         <LiveNote tone="warning">{submit.error}</LiveNote>
-        {missing.length === 0 && <button type="button" className={`${BTN_SECONDARY} w-full sm:w-auto`} onClick={onBack}>Back to counting</button>}
       </div>
 
       <DiscardCount countId={countId} onDiscarded={() => { draft.finish(); onDiscarded(); }} />
