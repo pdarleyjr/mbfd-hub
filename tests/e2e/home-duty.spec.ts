@@ -19,7 +19,8 @@ test('the greeting block shows the greeting, the date, the verified shift and th
   await expect(page.locator('[data-home-shift]')).toHaveText(/^[ABC] Shift/);
   await expect(page.locator('[data-home-shift]')).not.toContainText('scheduled');
   await expect(page.locator('[data-home-command]')).toHaveText('300 is SAMPLE, BRETT');
-  await expect(page.locator('[data-home-as-of]')).toHaveText(/^As of \d{1,2}:\d{2} (AM|PM)/);
+  // Before 08:00 the duty day began yesterday, so the time carries its date ("As of Nov 1, 9:14 AM").
+  await expect(page.locator('[data-home-as-of]')).toHaveText(/^As of ([A-Z][a-z]{2} \d{1,2}, )?\d{1,2}:\d{2} (AM|PM)/);
   await expect(page.locator('[data-home-roster-link]')).toHaveAttribute('href', '/daily-roster');
 
   // The rest of the page is untouched.
