@@ -316,11 +316,6 @@
                             </details>
                         @endif
                     </div>
-
-                    {{-- Visit counters, and for administrators the list of recent sign-ins. Not drawn if the counts cannot be read. --}}
-                    @if($homeActivity ?? null)
-                        <x-hub.home-activity :summary="$homeActivity" :signed-in="$homeSignedIn ?? null" />
-                    @endif
                 </section>
             </aside>
         </div>

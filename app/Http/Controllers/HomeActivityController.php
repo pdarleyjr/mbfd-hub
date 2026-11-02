@@ -10,8 +10,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * The two small JSON feeds behind the Home visit card: the counters the open page refreshes, and the list of
- * members who signed in over the past day (admins only). Neither is cached by the browser or any proxy.
+ * The two small JSON feeds behind the collapsed Home page visits control on the Admin Overview: the counters, and the
+ * list of members who signed in over the past day. Administrators only, and never cached by the browser or any proxy.
  */
 final class HomeActivityController extends Controller
 {
@@ -19,6 +19,7 @@ final class HomeActivityController extends Controller
 
     public function summary(Request $request, HomeActivity $activity): JsonResponse
     {
+        $this->authorizeViewer($request, $activity);
         $this->leaveFlashAlone($request);
         $summary = $activity->summary();
 
@@ -29,15 +30,19 @@ final class HomeActivityController extends Controller
 
     public function members(Request $request, HomeActivity $activity): JsonResponse
     {
-        $user = $request->user('web');
-        abort_unless($user instanceof User && $activity->canSeeSignIns($user), 403);
-
+        $this->authorizeViewer($request, $activity);
         $this->leaveFlashAlone($request);
         $signedIn = $activity->signedIn();
 
         return $signedIn === null
             ? response()->json(['message' => 'Unavailable.'], 503, self::HEADERS)
             : response()->json($signedIn, 200, self::HEADERS);
+    }
+
+    private function authorizeViewer(Request $request, HomeActivity $activity): void
+    {
+        $user = $request->user('web');
+        abort_unless($user instanceof User && $activity->canSeeActivity($user), 403);
     }
 
     /**
