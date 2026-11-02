@@ -6,6 +6,7 @@ namespace Tests\Feature\Ems\Admin;
 
 use App\Filament\Admin\Pages\MedicalDataStatistics;
 use App\Filament\Admin\Pages\MedicalSupplyRoom;
+use App\Filament\Admin\Pages\SubmittedMedicalSupplyRoomInventory;
 use App\Filament\Resources\InventoryRequestResource;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -20,7 +21,7 @@ final class EmsAdminAccessTest extends TestCase
     use BuildsEmsWorld;
     use RefreshDatabase;
 
-    private const PAGES = ['/admin/rescue-inventory', '/admin/medical-supply-room', '/admin/medical-statistics'];
+    private const PAGES = ['/admin/rescue-inventory', '/admin/submitted-medical-supply-room-inventory', '/admin/medical-supply-room', '/admin/medical-statistics'];
 
     protected function setUp(): void
     {
@@ -79,19 +80,20 @@ final class EmsAdminAccessTest extends TestCase
         $this->assertNotSame(200, $this->get($uri)->getStatusCode(), 'Signed-out visitors are sent to sign in.');
     }
 
-    public function test_the_ems_group_shows_the_three_screens_only_to_people_who_may_read_them(): void
+    public function test_the_ems_group_shows_the_four_screens_only_to_people_who_may_read_them(): void
     {
-        $expected = ['Rescue Inventory', 'Medical Supply Room', 'Medical Data / Statistics'];
+        $expected = ['Submitted Inventory Forms', 'Submitted Medical Supply Room Inventory', 'Medical Supply Room', 'Medical Data / Statistics'];
         foreach ([$this->emsSuperAdmin(), $this->emsAdmin(['admin.ems.view']), $this->emsAdmin(['admin.ems.manage'])] as $user) {
             $this->as($user);
             $this->assertEqualsCanonicalizing($expected, $this->navigationItems());
-            $this->assertSame(['Rescue Inventory', 'Medical Supply Room', 'Medical Data / Statistics'], $this->navigationOrder());
+            $this->assertSame($expected, $this->navigationOrder());
         }
 
         $this->as($this->emsAdmin([], 'Plain Admin'));
         $this->assertSame([], $this->navigationItems(), 'No EMS group for an administrator without EMS access.');
         $this->assertFalse(InventoryRequestResource::canViewAny());
         $this->assertFalse(MedicalSupplyRoom::canAccess());
+        $this->assertFalse(SubmittedMedicalSupplyRoomInventory::canAccess());
         $this->assertFalse(MedicalDataStatistics::canAccess());
     }
 
@@ -125,6 +127,7 @@ final class EmsAdminAccessTest extends TestCase
         });
         InventoryRequestResource::canViewAny();
         MedicalSupplyRoom::canAccess();
+        SubmittedMedicalSupplyRoomInventory::canAccess();
         MedicalDataStatistics::canAccess();
 
         $this->assertSame(0, $queries, 'Admin pages have a 30-query budget, so the EMS sidebar checks must not add to it.');

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../../../utils/api';
 import { fetchEmsMeta, fetchRequestTotal, failureMessage, isForbidden } from '../../../utils/emsApi';
-import { OPEN_COUNT_QUERY } from './logic';
 import type { EmsMeta } from './types';
 
 export type EmsAccessState =
@@ -37,12 +36,15 @@ export function useEmsAccess(): EmsAccessState & { reload: () => void; deny: () 
   return { ...state, reload, deny };
 }
 
+/** The tab badge counts forms Captain 5 can act on; one sent back is waiting on the member. */
+const WAITING_COUNT_QUERY = 'status=submitted,reviewed,prepared&per_page=1';
+
 /** One refresh a minute while the page is visible, and one when it becomes visible or focused again. No other polling. */
 const REFRESH_MS = 60_000;
 
 /**
- * The open request count for the tab badge, read from `meta.total` of a one-row list. `tick` also tells the open Rescue
- * Inventory list to refresh quietly, so a visible page makes one request a minute for the count and one for the list.
+ * The waiting form count for the tab badge, read from `meta.total` of a one-row list. `tick` also tells the open Submitted
+ * Inventory Forms list to refresh quietly, so a visible page makes one request a minute for the count and one for the list.
  */
 export function useOpenRequestCount(enabled: boolean): { count: number; tick: number; refresh: () => void } {
   const [count, setCount] = useState(0);
@@ -70,7 +72,7 @@ export function useOpenRequestCount(enabled: boolean): { count: number; tick: nu
   useEffect(() => {
     if (!enabled) return;
     const mine = ++latest.current;
-    fetchRequestTotal(OPEN_COUNT_QUERY)
+    fetchRequestTotal(WAITING_COUNT_QUERY)
       .then((total) => { if (mine === latest.current) setCount(total); })
       .catch((failure) => { if (isApiAuthenticationError(failure)) redirectToLoginAfterSessionExpiry(); /* a failed count keeps the last one */ });
   }, [enabled, tick]);

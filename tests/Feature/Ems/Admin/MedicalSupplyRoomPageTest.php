@@ -250,6 +250,16 @@ final class MedicalSupplyRoomPageTest extends TestCase
 
     // ------------------------------------------------------------------- access
 
+    public function test_the_old_reconcile_tab_is_called_calculated_snapshot_and_points_to_the_captain_5_page(): void
+    {
+        $this->assertSame('Calculated snapshot', MedicalSupplyRoom::TABS['reconcile']);
+        $this->assertArrayNotHasKey('Reconcile', array_flip(MedicalSupplyRoom::TABS));
+        $this->actAs($this->manager);
+        $this->page('stock')->assertSee('Calculated snapshot');
+        $this->page('reconcile')->assertSee('This is a calculation, not a count. Reconciling submitted inventory forms is done on the Captain 5 page.')
+            ->assertSee('Calculated snapshot of supplies issued since the last inventory');
+    }
+
     public function test_a_read_only_viewer_can_read_every_tab_but_has_no_actions_and_the_server_refuses_them(): void
     {
         $this->finalizeCount($this->manager, ['sr.t.02' => 10]);

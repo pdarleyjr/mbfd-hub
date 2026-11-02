@@ -70,14 +70,3 @@ export function sortQueue(issues: IssueSummary[]): IssueSummary[] {
   const weight = (issue: IssueSummary) => (issue.overdue ? 0 : issue.severity === 'significant' ? 1 : issue.action_status === 'reported' ? 2 : 3);
   return [...issues].sort((a, b) => weight(a) - weight(b) || b.id - a.id);
 }
-
-/** Replacement tracking: overdue first, then ready for pickup, then soonest expected delivery. */
-export function sortReplacements(issues: IssueSummary[]): IssueSummary[] {
-  const rank = (issue: IssueSummary) => (issue.overdue ? 0 : issue.action_status === 'replacement_available' ? 1 : 2);
-  return [...issues].sort((a, b) => rank(a) - rank(b)
-    || (a.expected_delivery ?? '9999-12-31').localeCompare(b.expected_delivery ?? '9999-12-31')
-    || b.id - a.id);
-}
-
-export const isReplacementTracked = (issue: IssueSummary): boolean => issue.open
-  && (issue.action_status === 'action_pending' || issue.action_status === 'replacement_available' || issue.overdue);

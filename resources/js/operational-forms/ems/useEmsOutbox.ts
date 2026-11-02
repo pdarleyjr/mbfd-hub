@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EmsApiError, type EmsApi } from './emsApi';
-import { classifyFailure } from './emsLogic.js';
+import { CANNOT_REVISE_MESSAGE, classifyFailure, isCannotRevise } from './emsLogic.js';
 import { emsOutbox } from './emsStore';
 import type { EmsOutboxEntry } from './emsTypes';
 
@@ -20,11 +20,13 @@ export function useEmsOutbox(api: EmsApi | null, owner: string, onSent: () => vo
     const [entries, setEntries] = useState<EmsOutboxEntry[]>([]);
     const [sent, setSent] = useState<SentNotice[]>([]);
     const [flushing, setFlushing] = useState(false);
+    /** True once the queue on this device has been read, so a view can tell "nothing waiting" from "not looked yet". */
+    const [loaded, setLoaded] = useState(false);
     const busy = useRef(false);
     const onSentRef = useRef(onSent);
     useEffect(() => { onSentRef.current = onSent; }, [onSent]);
 
-    const reload = useCallback(async () => { setEntries(await emsOutbox.list(owner)); }, [owner]);
+    const reload = useCallback(async () => { setEntries(await emsOutbox.list(owner)); setLoaded(true); }, [owner]);
 
     const flush = useCallback(async () => {
         if (!api || busy.current) return;
@@ -41,7 +43,8 @@ export function useEmsOutbox(api: EmsApi | null, owner: string, onSent: () => vo
                 } catch (error) {
                     if (error instanceof EmsApiError && classifyFailure({ status: error.status, code: error.code, network: error.network }) === 'message') {
                         // The server refused it for good (for example an item left the form). Keep it so the member can fix it.
-                        await emsOutbox.put(owner, { ...entry, state: 'rejected', message: error.message });
+                        // A correction for a form that was already corrected or cancelled gets its own plain explanation.
+                        await emsOutbox.put(owner, { ...entry, state: 'rejected', message: isCannotRevise(error) ? CANNOT_REVISE_MESSAGE : error.message });
                         continue;
                     }
                     if (!(error instanceof EmsApiError)) console.error('A queued medical request could not be sent.', error);
@@ -86,7 +89,7 @@ export function useEmsOutbox(api: EmsApi | null, owner: string, onSent: () => vo
 
     const dismissSent = useCallback((id: string) => setSent((list) => list.filter((item) => item.id !== id)), []);
 
-    return { entries, sent, flushing, flush, enqueue, discard, dismissSent };
+    return { entries, sent, flushing, loaded, flush, enqueue, discard, dismissSent };
 }
 
 export type EmsOutbox = ReturnType<typeof useEmsOutbox>;

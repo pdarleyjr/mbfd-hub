@@ -1,0 +1,138 @@
+"""Reviewed mapping from medical inventory form items to supply room rows.
+
+A form item whose catalog identity is not shared with a supply room row has no link, so a reconciled form line
+cannot find its stock item by itself. Each entry below was read by eye against the form and the supply room list.
+
+Rule used: link only when the form item and exactly one supply room row name the same product and the same size
+(words on the two lists, plus the aliases printed on the supply list). No outside product knowledge is used to
+pick between candidates. When two or more rows could fit, or the product or size differs, the item is left open
+and a person chooses once at reconciliation (that choice is then remembered).
+
+Row keys: sr.* are rows of the printed supply room list; wb.c301 is Ondansetron, added from the workbook.
+"""
+
+from __future__ import annotations
+
+# catalog_ref -> (supply source_row_key, reason)
+LINKS: dict[str, tuple[str, str]] = {
+    "burn-dressing-4x16": ("sr.p1.r03", 'Same size (4" x 16") and the same burn gel dressing; the supply list calls it LG BURN GEL and it is the only 4 x 16 burn dressing.'),
+    "flush-10cc-als-bag": ("sr.p1.r57", "A 10 cc flush is the 10 ml saline flush syringe; it is the only flush syringe in the room."),
+    "foil-rescue-blanket": ("sr.p2.r14", "The only rescue blanket in the room (the metal one); the other blanket is the yellow foam blanket."),
+    "iv-tourniquet": ("sr.p1.r43", "The only IV tourniquet in the room. The Combat Application Tourniquet is a different product."),
+    "tv-tourniquet-latex-free": ("sr.p1.r43", "Same name: Latex-free Tourniquet."),
+    "extension-set-j-loop": ("sr.p1.r69", "The only extension set in the room (6 inch IV extension set)."),
+    "tv-extension-sets": ("sr.p1.r69", "The only extension set in the room."),
+    "et-lube": ("sr.p3.r11", "Lube is the sterile lubricating jelly; it is the only lubricant in the room."),
+    "tv-lubricating-gel": ("sr.p3.r11", "Lubricating gel is the sterile lubricating jelly; it is the only lubricant in the room."),
+    "manual-suction-device": ("sr.p3.r06", "The only manual suction device in the room (the pump; the canister is a separate row)."),
+    "nasal-capnoline-adult": ("sr.p2.r69", "Nasal Capnoline adult is the Smart Capnoline NC/O2 Adult (NC is the nasal cannula)."),
+    "nasal-capnoline-pedi": ("sr.p2.r70", "Nasal Capnoline pedi is the Smart Capnoline NC/O2 Pedi (NC is the nasal cannula)."),
+    "non-rebreather-mask-adult": ("sr.p2.r72", "The only adult non-rebreather in the room."),
+    "thermometer-strip": ("sr.p1.r07", "The only thermometer in the room; the probe covers are not thermometers."),
+    "tv-disposable-thermometer": ("sr.p1.r07", "The only thermometer in the room; the probe covers are not thermometers."),
+    "tracheostomy-mask-set": ("sr.p3.r10", "The only tracheostomy mask in the room."),
+    "tube-holder-adult": ("sr.p4.r07", "Tube holder is the E.T. Holder (adult), alias ENDOLOCK; same size."),
+    "tube-holder-pedi": ("sr.p4.r08", "Tube holder is the E.T. Holder (pedi), alias ENDOLOCK; same size."),
+    "tv-3-4-face-shields": ("sr.p3.r65", "Same name and size: 3/4 Face Shields."),
+    "tv-500-ml-irrigation-water": ("sr.p2.r03", "Same name and size: 500 ml Irrigation Water."),
+    "tv-adult-ez-io-blue": ("sr.p2.r45", "Adult EZ-IO is the EZ-IO (Adult)."),
+    "tv-pedi-ez-io-pink": ("sr.p2.r47", "Pedi EZ-IO is the EZ-IO (Pedi)."),
+    "tv-alcohol-bottle": ("sr.p2.r05", "The only bottled alcohol in the room is Rubbing Alcohol (the other alcohol item is prep wipes)."),
+    "tv-auto-bp-cuff-adult-lg": ("sr.p1.r40", "Same name and size: Auto BP Cuff, large adult."),
+    "tv-auto-bp-cuff-adult-reg": ("sr.p1.r39", "Same name and size: Auto BP Cuff, regular adult."),
+    "tv-auto-bp-cuff-adult-xl": ("sr.p1.r41", "Same name and size: Auto BP Cuff, XL adult."),
+    "tv-auto-bp-cuff-infant": ("sr.p1.r37", "Same name and size: Auto BP Cuff, infant."),
+    "tv-auto-bp-cuff-pedi": ("sr.p1.r38", "Same name and size: Auto BP Cuff, pediatric."),
+    "tv-baby-aspirin": ("sr.p2.r40", "Baby aspirin is the 81 mg chewable aspirin; it is the only aspirin in the room."),
+    "tv-band-aids-1-x-3": ("sr.p1.r20", 'Same size: Bandaids 1 x 3.'),
+    "tv-band-aids-4-1-2-x-2": ("sr.p1.r21", 'Same size: Bandaids 4 1/2 x 2.'),
+    "tv-burn-gel-4-x-4-dressing": ("sr.p1.r01", 'Same name and size: Burn Gel 4" x 4" Dressing.'),
+    "tv-burn-sheets": ("sr.p1.r27", "Same name: Burn Sheets."),
+    "tv-bvm-infant": ("sr.p3.r19", "Same name: BVM (Infant)."),
+    "tv-bvm-pedi": ("sr.p3.r18", "Same name: BVM (Pediatric)."),
+    "tv-c-collar-adjustable-pedi": ("sr.p2.r20", "Same name: Adjustable C-collar (pedi)."),
+    "tv-c-collar-adult-adjustable": ("sr.p2.r19", "Same name: Adjustable C-collar (adult)."),
+    "tv-c-collar-adult-no-neck": ("sr.p2.r21", "Same name: No-neck C-collar (adult)."),
+    "tv-cardboard-splints-long": ("sr.p2.r12", "Same name: Cardboard Splints (long)."),
+    "tv-cardboard-splints-short": ("sr.p2.r13", "Same name: Cardboard Splints (short)."),
+    "tv-carpujet": ("sr.p1.r22", "Same item; the form spells it Carpujet and the supply list Carpuject."),
+    "tv-cida-hand-gel": ("sr.p2.r23", "Same name: Cida Hand Gel."),
+    "tv-cold-packs": ("sr.p1.r30", "Same name: Cold Packs."),
+    "tv-combi-pads-adult": ("sr.p4.r19", "The only adult combi pads in the room."),
+    "tv-combi-pads-pedi": ("sr.p4.r18", "The form is the LifePak 15 supplies section, and the LP combi pads (pedi) are marked LIFEPACK ONLY; the other pedi pads are marked AED ONLY."),
+    "tv-convenience-bags": ("sr.p4.r06", "The supply list calls the barf bags CONVENIENCE BAGS."),
+    "tv-decompression-needle-14-ga-3": ("sr.p4.r22", "The only decompression needle in the room (14 ga. 3.25 inch, marked DECOMPRESS)."),
+    "tv-disposable-razors": ("sr.p1.r72", "Same name: Disposable Razors."),
+    "tv-ekg-electrodes": ("sr.p1.r73", "The only EKG electrodes in the room."),
+    "tv-ekg-paper-lifepak-15": ("sr.p2.r01", "Same item: LifePak 15 paper."),
+    "tv-face-shields-w-mask": ("sr.p3.r66", "Same name: Face Shields with masks."),
+    "tv-i-gel-size-1-0": ("sr.p3.r31", "Same name and size: i-gel 1.0."),
+    "tv-i-gel-size-1-5": ("sr.p3.r32", "Same name and size: i-gel 1.5."),
+    "tv-i-gel-size-2-0": ("sr.p3.r33", "Same name and size: i-gel 2.0."),
+    "tv-i-gel-size-2-5": ("sr.p3.r34", "Same name and size: i-gel 2.5."),
+    "tv-infant-pulse-ox-sensor": ("sr.p4.r41", "The only infant pulse ox sensor in the room."),
+    "tv-nasal-madd": ("sr.p2.r55", "Nasal MADD is the Nasal Drug Delivery Device (alias MADDET); the ET MADD is a separate row."),
+    "tv-ob-kit": ("sr.p4.r05", "Same item: Obstetrical Kits."),
+    "tv-padded-restraints": ("sr.p1.r36", "Same item: Padded Patient Restraints."),
+    "tv-peroxide-bottle": ("sr.p2.r04", "Same item: Peroxide."),
+    "tv-portable-suction-tubing": ("sr.p3.r05", "The only suction tubing in the room."),
+    "tv-pressure-infuser": ("sr.p1.r42", "Same name: Pressure Infuser."),
+    "tv-sanizide": ("sr.p2.r02", "Same name: SANIZIDE (the wipes are a separate row)."),
+    "tv-sharps-container-large": ("sr.p2.r17", "Same name and size: Sharps Container Large."),
+    "tv-sharps-container-small": ("sr.p2.r18", "Same name and size: Sharps Container Small."),
+    "tv-suction-yankauer": ("sr.p2.r68", "Same item: Yankauer Suction Handle."),
+    "tv-surgi-pads-5-x-9": ("sr.p1.r26", "Same size, 5 x 9, and the only 5 x 9 pad in the room."),
+    "tv-syringe-10-cc": ("sr.p1.r53", "The room row is the 10-12 cc syringe, which covers 10 cc."),
+    "tv-syringe-12-cc": ("sr.p1.r53", "The room row is the 10-12 cc syringe, which covers 12 cc."),
+    "tv-t-bandages": ("sr.p1.r28", "The only triangular (T) bandage in the room."),
+    "tv-trauma-dressing-12-x-30": ("sr.p1.r29", "Same size: 12 x 30 Multi-Trauma Dressing."),
+    "tv-tyvek-sleeves": ("sr.p4.r27", "Same name: Tyvek Sleeves."),
+    "tv-tyvek-suits-2xl": ("sr.p4.r29", "Same name and size: Tyvek Suit 2XL."),
+    "tv-tyvek-suits-l": ("sr.p4.r31", "Same name and size: Tyvek Suit Large."),
+    "tv-tyvek-suits-xl": ("sr.p4.r30", "Same name and size: Tyvek Suit XL."),
+    "tv-vinegar-bottle": ("sr.p3.r64", "The only vinegar in the room."),
+    "tv-yellow-foam-blanket": ("sr.p2.r22", "Same name: Yellow Foam Blankets."),
+    "tv-zofran": ("wb.c301", "Zofran is the brand name printed beside Ondansetron on the supply list, and it is the only ondansetron in the room."),
+}
+
+# catalog_ref -> reason it is not drawn from the supply room list.
+NOT_STOCKED: dict[str, str] = {
+    "d-cylinder-with-regulator": "An oxygen cylinder with its regulator is bag equipment that is exchanged, not a supply room stock item. The room list holds a loose Oxygen Regulator as As Needed only.",
+}
+
+# Why a form item was left open (shown to the person who reviews the list). Anything not listed here has no matching supply room row at all.
+OPEN_NOTES: dict[str, str] = {
+    "ammonia-inhalants-als-bag": "Ammonia inhalants and Ammonia Wipes are probably different products.",
+    "bp-cuff-adult": "Two rows could fit: BP AN (ADULT) and Auto BP Cuff (regular adult).",
+    "bvm-capnoline": "Capnoline for a BVM is not the nasal Smart Capnoline; no BVM row.",
+    "duoneb-als-bag": "The room row is Ipratropium Bromide with the alias ALBUTEROL; DuoNeb is not named.",
+    "et-tube-extension": "BVM Tube Extention Adaptors may be the same; not proven.",
+    "gloves-airway-bag": "Nitrile and latex gloves in every size could fit; size and material are not stated.",
+    "gloves-als-bag": "Nitrile and latex gloves in every size could fit; size and material are not stated.",
+    "iv-catheter-14g": "Two 14 ga. rows: IV Catheters 14 ga. (1.75 inch) and the 3.25 inch DECOMPRESS needle.",
+    "magill-forceps-als-bag": "Forceps Magill comes in Adult and Pedi; the form does not say which.",
+    "nitro-spray-als-bag": "The room stocks nitroglycerin tablets, not spray.",
+    "red-bag-als-bag": "Could be a red biohazard bag (two sizes) or a G3 ALS Soft Red Bag (two sizes).",
+    "red-bag-small-airway-bag": "Red Bio Bags 23 x 23 (sml) and G3 ALS Soft Red Bag ( Small ) both fit.",
+    "safety-goggles": "The room row is Safety Glasses; goggles and glasses are different products.",
+    "sleeves-airway-bag": "Counted in sets on the bag; the room row is Tyvek Sleeves by the piece.",
+    "surge-mask": "SURGE is not defined on the form.",
+    "syringe-10cc-airway-bag": "Could be the 10-12 cc syringe or the 10 ml saline flush; the form does not say.",
+    "tv-disposable-gloves-l": "Nitrile and latex gloves both come in this size.",
+    "tv-disposable-gloves-m": "Nitrile and latex gloves both come in this size.",
+    "tv-disposable-gloves-s": "Nitrile and latex gloves both come in this size.",
+    "tv-disposable-gloves-xl": "Nitrile and latex gloves both come in this size.",
+    "tv-disposable-gloves-xxl": "Nitrile and latex gloves both come in this size.",
+    "tv-disposable-straps": "Autopulse Straps and Backboard Straps both fit the word straps.",
+    "tv-large-adult-ez-io-yellow": "EZ-IO (Obese) is likely, but the lists do not say so.",
+    "tv-ocular-patch": "The room row is Eye Covers; patch and cover are not proven the same.",
+    "tv-portable-suction-canister": "Electric Suction Cannisters and the manual canister both fit.",
+    "tv-sscor-disposable-canister": "Electric Suction Cannisters may be the same; not proven.",
+    "tv-red-biohazard-bags": "Red Bio Bags come in two sizes; the form does not say which.",
+    "tv-shoe-covers": "The room row is Tyvek Boot Covers; shoe cover and boot cover are not proven the same.",
+    "tv-cpap-tube-mask-set": "The room row is CPAP (new); a tube and mask set is not named.",
+    "tv-pedi-pulse-ox-sensor": "Two pedi rows fit: the single use SpO2 sensor and the Rainbow Rad 57 sensor.",
+    "zofran-iv": "The room has one ondansetron row and does not say whether it is IV or oral.",
+    "zofran-oral": "The room has one ondansetron row and does not say whether it is IV or oral.",
+    "solu-medrol": "No Solu-Medrol row on the supply list.",
+}
