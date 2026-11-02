@@ -181,6 +181,17 @@ async function runPendingSubmissionPass(
   currentIdentity?: OfflineIdentity,
 ): Promise<{ processed: number; failed: number }> {
   const identity = currentIdentity ?? await refreshOfflineIdentity();
+  // Earlier releases held another member's work as "needs review" while
+  // someone else was signed in. It was never sent or changed: its owner, signed
+  // in again with the same security context, gets it back in the queue.
+  await db.pendingSubmissions
+    .where('ownerUserId')
+    .equals(identity.userId)
+    .filter((submission) => submission.status === 'requires_attention'
+      && submission.ownershipState === 'identity_mismatch'
+      && submission.lastErrorCode === 'OFFLINE_QUEUE_OWNER_MISMATCH'
+      && submission.ownerSecurityVersion === identity.securityVersion)
+    .modify({ status: 'pending', ownershipState: 'owned', lastError: undefined, lastErrorCode: undefined });
   const pending = await db.pendingSubmissions
     .where('status')
     .anyOf('pending', 'failed')
@@ -206,13 +217,8 @@ async function runPendingSubmissionPass(
       continue;
     }
     if (submission.ownerUserId !== identity.userId) {
-      await db.pendingSubmissions.update(submission.id!, {
-        status: 'requires_attention',
-        ownershipState: 'identity_mismatch',
-        lastError: 'This saved work belongs to a different signed-in member and was not submitted.',
-        lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
-      });
-      failed++;
+      // Another member's saved work on a shared device: left untouched, so it
+      // is sent when that member signs in on this device.
       continue;
     }
     if (submission.ownerSecurityVersion !== identity.securityVersion) {
