@@ -12,3 +12,12 @@
 #
 # Issue history test: 'front_cab-item-3' is a real checklist item key (compartment plus position), not a credential.
 99faadad49a3143bad4650bb7e9582c49bf248a8:tests/Feature/Api/ApparatusIssueHistoryTest.php:generic-api-key:249
+# Four medical inventory forms (PR 574): form keys, deep-link keys, section keys and catalog slugs such as
+# 'fire-boat-6-medical-inventory', 'bls-compartment-1', 'fb6-miscellaneous-on-boat' and 'needle-18ga-1-5in-filtered'.
+# They are public identifiers printed in URLs and data files, not credentials.
+ef43c0afa271ea1a5268de07a4ff90395a959630:app/Services/Ems/FormFamilies.php:generic-api-key:57
+ef43c0afa271ea1a5268de07a4ff90395a959630:database/data/ems/EXTRACTION_VALIDATION.md:generic-api-key:722
+ef43c0afa271ea1a5268de07a4ff90395a959630:tests/Node/operational-forms/ems-four-forms.test.mjs:generic-api-key:64
+ef43c0afa271ea1a5268de07a4ff90395a959630:database/data/ems/bls_detail_bag_inventory.json:generic-api-key:860
+ef43c0afa271ea1a5268de07a4ff90395a959630:tests/e2e/ems-four-forms.spec.ts:generic-api-key:19
+ef43c0afa271ea1a5268de07a4ff90395a959630:database/data/ems/fire_boat_6_als_inventory.json:generic-api-key:5585
