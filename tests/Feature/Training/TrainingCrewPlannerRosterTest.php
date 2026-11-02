@@ -84,7 +84,7 @@ final class TrainingCrewPlannerRosterTest extends TestCase
         self::assertFalse(Route::has('training.crew-planner.upload'));
         Livewire::test(TrainingCrewPlanner::class)
             ->assertDontSeeHtml('type="file"')->assertDontSee('TeleStaff PDF')->assertDontSee('Upload')
-            ->assertSee('TeleStaff roster');
+            ->assertSeeHtml('data-roster-source="verified"');
         $this->post('/training/crew-planner/upload')->assertNotFound();
     }
 
@@ -93,8 +93,9 @@ final class TrainingCrewPlannerRosterTest extends TestCase
         $this->publishRoster();
         Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id)
             ->assertSet('scheduleDate', self::DATE)
-            ->assertSeeHtml('data-roster-source="verified"')->assertSee('B Shift')->assertSee('as of')
-            ->assertSee('3 eligible')->assertSeeHtml('aria-label="Select Synthetic 90001"');
+            ->assertSeeHtml('data-roster-source="verified"')->assertSee('B Shift')
+            ->assertSee('3 on duty Wednesday, Oct 21 have not completed Synthetic course')->assertSeeHtml('aria-label="Select Synthetic 90001"')
+            ->assertDontSee('next day')->assertDontSee('On duty 0');
     }
 
     public function test_it_keeps_working_seats_and_partial_intervals_and_identifies_people_by_employee_id(): void
@@ -121,7 +122,7 @@ final class TrainingCrewPlannerRosterTest extends TestCase
             $this->row('90003', 'VACA', RosterAssignment::AVAILABILITY_NOT_WORKING, ['category' => 'Vacation']),
         ]);
         $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id);
-        $component->assertSee('1 eligible')->assertDontSeeHtml('aria-label="Select Synthetic 90002"')->assertDontSeeHtml('aria-label="Select Synthetic 90003"');
+        $component->assertSee('1 on duty')->assertDontSeeHtml('aria-label="Select Synthetic 90002"')->assertDontSeeHtml('aria-label="Select Synthetic 90003"');
         $component->assertDontSee('Sick')->assertDontSee('Vacation')->assertDontSee('VACA')->assertDontSee('SIC');
         $component->call('toggleMember', $this->employees['90002']->id)->assertHasErrors('selection');
         $json = json_encode($this->draft($component), JSON_THROW_ON_ERROR);
@@ -133,7 +134,7 @@ final class TrainingCrewPlannerRosterTest extends TestCase
     {
         $this->publishRoster([$this->row('90001'), $this->row('90002', 'ZZZ', RosterAssignment::AVAILABILITY_UNKNOWN)]);
         $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id);
-        $component->assertSee('1 eligible')->assertSee('Duty needs verification')->assertDontSee('ZZZ');
+        $component->assertSee('1 on duty')->assertDontSeeHtml('aria-label="Select Synthetic 90002"')->assertDontSee('ZZZ');
     }
 
     public function test_overtime_outranks_an_aday_only_for_its_own_hours(): void
@@ -156,25 +157,43 @@ final class TrainingCrewPlannerRosterTest extends TestCase
         ]);
         $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id)
             ->set('slotEdits.0.start', '09:00')->set('slotEdits.0.end', '11:00')->assertHasNoErrors();
-        $component->assertSee('1 eligible')->assertSeeHtml('aria-label="Select Synthetic 90001"')->assertDontSeeHtml('aria-label="Select Synthetic 90002"');
+        $component->assertSee('1 on duty')->assertSeeHtml('aria-label="Select Synthetic 90001"')->assertDontSeeHtml('aria-label="Select Synthetic 90002"');
     }
 
-    public function test_a_duty_date_with_no_roster_is_provisional_and_never_borrows_another_days(): void
+    public function test_only_days_with_a_roster_are_offered_and_any_other_day_is_refused(): void
     {
         $this->publishRoster();
-        $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id)->set('scheduleDate', '2026-10-30');
-        $component->assertHasNoErrors()->assertSeeHtml('data-roster-source="unavailable"')
-            ->assertSee('has not published a roster')->assertSee('Duty not confirmed')->assertSee('provisional');
-        $component->assertDontSee('On duty 08:00');
-        $component->call('toggleMember', $this->employees['90004']->id)->assertHasNoErrors();
-        self::assertArrayHasKey($this->employees['90004']->id, $this->draft($component)['selections']);
+        $this->publishRoster([$this->row('90004')], '2026-10-22');
+        $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id);
+        $component->assertSeeHtml('<option value="2026-10-22">Thursday, Oct 22</option>')
+            ->assertSeeHtml('<option value="2026-10-21">Wednesday, Oct 21 (today)</option>')->assertDontSeeHtml('type="date"');
+        $component->set('scheduleDate', '2026-10-30')->assertHasErrors('scheduleDate')->assertSet('scheduleDate', self::DATE);
+        self::assertSame(self::DATE, $this->draft($component)['metadata']['schedule_date'] ?? self::DATE);
     }
 
-    public function test_todays_roster_late_says_so_instead_of_using_yesterdays(): void
+    public function test_when_todays_roster_is_late_the_planner_opens_on_the_newest_roster_and_names_its_day(): void
     {
         $this->publishRoster(date: '2026-10-20');
         $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id);
-        $component->assertSeeHtml('data-roster-source="unavailable"')->assertDontSee('On duty 08:00');
+        $component->assertSet('scheduleDate', '2026-10-20')->assertSeeHtml('data-roster-source="verified"')
+            ->assertSee('Tuesday, October 20, 2026')->assertSee('3 on duty Tuesday, Oct 20');
+    }
+
+    public function test_rank_checkboxes_combine_and_none_ticked_shows_everyone(): void
+    {
+        $this->publishRoster([
+            $this->row('90001', extra: ['rank' => 'Captain']), $this->row('90002'), $this->row('90004', extra: ['rank' => 'Lieutenant']),
+        ]);
+        $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id);
+        $component->assertSee('Captains (1)')->assertSee('Lieutenants (1)')->assertSee('Firefighters (1)')->assertSee('3 on duty');
+        $component->call('toggleRank', 'Captain')->assertSet('ranks', ['Captain'])->assertSee('1 of 3 on duty')
+            ->assertSeeHtml('aria-label="Select Synthetic 90001"')->assertDontSeeHtml('aria-label="Select Synthetic 90004"');
+        $component->call('toggleRank', 'Lieutenant')->assertSet('ranks', ['Captain', 'Lieutenant'])->assertSee('2 of 3 on duty')
+            ->assertSeeHtml('aria-label="Select Synthetic 90004"')->assertDontSeeHtml('aria-label="Select Synthetic 90002"');
+        $component->call('selectAllShown');
+        self::assertEqualsCanonicalizing([$this->employees['90001']->id, $this->employees['90004']->id], array_keys($this->draft($component)['selections']));
+        $component->call('toggleRank', 'Captain')->call('toggleRank', 'Lieutenant')->assertSet('ranks', [])
+            ->assertSee('3 on duty')->assertSeeHtml('aria-label="Select Synthetic 90002"');
     }
 
     public function test_another_verified_date_can_be_chosen_and_session_times_follow(): void
@@ -183,7 +202,7 @@ final class TrainingCrewPlannerRosterTest extends TestCase
         $this->publishRoster([$this->row('90004')], '2026-10-22');
         $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id)
             ->set('slotEdits.0.start', '09:00')->set('slotEdits.0.end', '11:00');
-        $component->set('scheduleDate', '2026-10-22')->assertHasNoErrors()->assertSee('1 eligible')->assertSeeHtml('aria-label="Select Synthetic 90004"');
+        $component->set('scheduleDate', '2026-10-22')->assertHasNoErrors()->assertSee('1 on duty')->assertSeeHtml('aria-label="Select Synthetic 90004"');
         self::assertSame('2026-10-22T09:00:00-04:00', $this->draft($component)['slots'][0]['start_at']);
     }
 
@@ -220,13 +239,14 @@ final class TrainingCrewPlannerRosterTest extends TestCase
         $this->publishRoster(options: ['shift' => 'B']);
         self::assertNotNull(app(TrainingRosterDutySource::class)->forDate(self::DATE)->warning);
         Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id)
-            ->assertSee('0 eligible')->assertSee('does not match the department calendar');
+            ->assertSee('0 on duty')->assertSee('does not match the department calendar');
     }
 
-    public function test_a_future_date_shows_the_rotation_as_scheduled_not_as_fact(): void
+    public function test_with_no_roster_on_file_it_says_so_and_refuses_every_day(): void
     {
-        config(['captain5.shift_rotation' => ['enabled' => true, 'order' => ['A', 'B', 'C'], 'anchor_shift' => 'A', 'anchor_date' => self::DATE]]);
-        Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id)->set('scheduleDate', '2026-10-22')
-            ->assertHasNoErrors()->assertSee('B Shift (scheduled)')->assertSeeHtml('data-roster-source="unavailable"');
+        Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id)
+            ->assertSee('No TeleStaff roster on file yet.')->assertSeeHtml('data-roster-source="unavailable"')
+            ->assertDontSeeHtml('aria-label="Select Synthetic')
+            ->set('scheduleDate', '2026-10-22')->assertHasErrors('scheduleDate');
     }
 }

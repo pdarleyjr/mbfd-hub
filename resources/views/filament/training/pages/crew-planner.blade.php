@@ -4,10 +4,11 @@
         $selectedCount = count($draft['selections']);
         $shownCount = count($candidates);
         $searching = trim((string) ($filters['search'] ?? '')) !== '';
-        $filtersActive = collect(['rank', 'day_station', 'day_apparatus', 'assignment_category', 'published_assignment'])->contains(fn ($key) => trim((string) ($filters[$key] ?? '')) !== '') || ($filters['de_bid'] ?? false);
-        $moreFiltersActive = collect(['rank', 'assignment_category', 'published_assignment'])->contains(fn ($key) => trim((string) ($filters[$key] ?? '')) !== '') || ($filters['de_bid'] ?? false);
+        $filtersActive = $ranks !== [];
         $tz = \App\Support\HubTimezone::NAME;
         $dateLabel = \Carbon\CarbonImmutable::parse($duty->dutyDate, $tz)->format('l, F j, Y');
+        $dateShort = \Carbon\CarbonImmutable::parse($duty->dutyDate, $tz)->format('l, M j');
+        $classLabel = $chosen ? ($draft['module_id'] ? ($chosen->modules->firstWhere('id', $draft['module_id'])?->name ?? 'this module') : $chosen->name) : trim((string) ($draft['class_title'] ?? ''));
         $sessionsOpen = $slotCount > 0 || collect($slotEdits)->contains(fn ($row) => collect(['label', 'start', 'end', 'location_choice', 'venue'])->contains(fn ($field) => ($row[$field] ?? '') !== ''));
         $latestPublished = $publications->first()?->fingerprint;
         $latest = $publications->where('fingerprint', $latestPublished);
@@ -16,7 +17,7 @@
         $failureText = ['not_permitted' => 'Your account cannot post there.', 'rejected' => 'It was not accepted.', 'send_failed' => 'It could not be sent.'];
     @endphp
     <div class="space-y-6 crew-planner" wire:poll.120s.visible="refreshRoster">
-        <p class="text-sm text-gray-600">Plan who attends a class, then send the list. Staffing comes from the TeleStaff roster the Hub already receives. Nothing here records attendance or changes any course, roster or duty schedule.</p>
+        <p class="text-sm text-gray-600">Pick a day and a class. The list shows who is on the TeleStaff schedule that day and has not completed it.</p>
         <div wire:offline class="hub-callout" role="status">Requires connection. Your saved proposal remains on the server; reconnect before editing or sending.</div>
         @error('proposal') <p role="alert" class="text-danger-600">{{ $message }}</p> @enderror
         @if ($draft['version'] !== $version)
@@ -31,9 +32,14 @@
         @endif
 
         <x-filament::section>
-            <x-slot name="heading">1. Class</x-slot>
-            <x-slot name="headerEnd">@if ($hasClass)<x-filament::badge color="success">Chosen</x-filament::badge>@endif</x-slot>
+            <x-slot name="heading">1. Day and class</x-slot>
             <div class="flex flex-wrap items-end gap-4">
+                <label class="flex-1 min-w-0">Day
+                    <select wire:model.live="scheduleDate" class="block w-full rounded-lg border-gray-300" data-crew-date>
+                        @unless (collect($dates)->contains('date', $scheduleDate))<option value="{{ $scheduleDate }}" disabled>Choose a day</option>@endunless
+                        @foreach ($dates as $choice) <option value="{{ $choice['date'] }}">{{ $choice['label'] }}</option> @endforeach
+                    </select>
+                </label>
                 @if ($showCourseSearch)
                     <label class="min-w-0 flex-1">Find a course<input type="search" wire:model.live.debounce.350ms="courseSearch" class="block w-full rounded-lg border-gray-300" /></label>
                 @endif
@@ -51,62 +57,44 @@
                         </select>
                     </label>
                 @endif
-                <label class="flex-1 min-w-0">Class date
-                    <input type="date" wire:model.live.debounce.400ms="scheduleDate" class="block w-full rounded-lg border-gray-300" />
-                </label>
             </div>
-            <details class="mt-3" wire:ignore.self @if (trim($classTitle) !== '') open @endif>
-                <summary class="cursor-pointer font-medium">Class isn't in the list?</summary>
-                <label class="mt-2 block">Class title
-                    <input type="text" wire:model.live.debounce.500ms="classTitle" maxlength="160" class="block w-full rounded-lg border-gray-300" />
-                </label>
-                <p class="mt-1 text-sm">The title stays on this plan. It does not create a course or a training record, and no attendance history is checked.</p>
-            </details>
             @error('courseId') <p role="alert" class="mt-2 text-danger-600">{{ $message }}</p> @enderror
             @error('scheduleDate') <p role="alert" class="mt-2 text-danger-600">{{ $message }}</p> @enderror
-            @error('classTitle') <p role="alert" class="mt-2 text-danger-600">{{ $message }}</p> @enderror
 
-            <div class="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Rosters on file">
-                @foreach ($dates as $choice)
-                    <x-filament::button size="sm" :color="$choice['date'] === $duty->dutyDate ? 'primary' : 'gray'" wire:click="$set('scheduleDate', '{{ $choice['date'] }}')">{{ $choice['label'] }}</x-filament::button>
-                @endforeach
-            </div>
-
-            @if ($duty->isVerified())
-                <p class="mt-3 font-semibold" role="status" data-roster-source="verified">{{ $dateLabel }} · {{ $duty->shiftLabel() }} · TeleStaff roster{{ $duty->asOf ? ', as of '.$duty->asOf->setTimezone($tz)->format('M j g:i A') : '' }}</p>
+            @if ($dates === [])
+                <div class="hub-callout mt-3" role="status" data-roster-source="unavailable">
+                    <strong>No TeleStaff roster on file yet.</strong>
+                    <p>{{ $duty->unavailableReason }} Days appear here as soon as a roster arrives.</p>
+                </div>
+            @elseif ($duty->isVerified())
+                <p class="mt-3 font-semibold" role="status" data-roster-source="verified">{{ $dateLabel }} · {{ $duty->shiftLabel() }}</p>
                 @if ($duty->warning)<p role="status" class="mt-2 text-warning-700">{{ $duty->warning }}</p>@endif
             @else
                 <div class="hub-callout mt-3" role="status" data-roster-source="unavailable">
-                    <strong>{{ $dateLabel }} · {{ $duty->shiftLabel() }}</strong>
-                    <p>{{ $duty->unavailableReason }} You can plan with a provisional list. Nobody on it is shown as on duty, and the plan says so wherever it goes.</p>
+                    <strong>{{ $dateLabel }}</strong>
+                    <p>{{ $duty->unavailableReason }}</p>
                 </div>
-            @endif
-            @if ($hasClass && ! empty($draft['course_id']))
-                <p class="mt-3 text-sm" role="status">Leaving out members who already attended {{ $draft['module_id'] ? 'this module' : 'any session of this course' }} (verified records only). Attendance is checked {{ $cutoffIsClassStart ? 'as it stood when class begins' : 'against current verified Hub records as of' }} {{ $cutoff->setTimezone($tz)->format('M j, Y g:i A T') }}.</p>
             @endif
         </x-filament::section>
 
         <x-filament::section>
-            <x-slot name="heading">2. Personnel</x-slot>
+            <x-slot name="heading">2. Who still needs it</x-slot>
             <x-slot name="headerEnd"><x-filament::badge>{{ $selectedCount }} selected</x-filament::badge></x-slot>
             @if (! $hasClass)
-                <p>Choose a course or enter a class title in step 1 to see who is available.</p>
+                <p>Choose a course in step 1.</p>
             @else
-                <p class="font-semibold" role="status" aria-live="polite">{{ $eligibleTotal }} {{ $duty->isVerified() ? 'eligible' : 'provisional' }} · {{ $selectedCount }} selected{{ ($filtersActive || $searching) ? ' · '.$shownCount.' shown' : '' }}</p>
-                <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <label>Find a member<input type="search" wire:model.live.debounce.350ms="filters.search" placeholder="Name or employee ID" class="block w-full rounded-lg border-gray-300" /></label>
-                    <label>Station<select wire:model.live="filters.day_station" class="block w-full rounded-lg border-gray-300"><option value="">All stations</option>@foreach ($stations as $station)<option value="{{ $station }}">{{ $station }}</option>@endforeach</select></label>
-                    <label>Unit<select wire:model.live="filters.day_apparatus" class="block w-full rounded-lg border-gray-300"><option value="">All units</option>@foreach ($units as $unit)<option value="{{ $unit }}">{{ $unit }}</option>@endforeach</select></label>
-                </div>
-                <details class="mt-3" wire:ignore.self @if ($moreFiltersActive) open @endif>
-                    <summary class="cursor-pointer font-medium">More filters</summary>
-                    <div class="mt-3 flex flex-wrap items-end gap-4">
-                        <label>Rank<select wire:model.live="filters.rank" class="block w-full rounded-lg border-gray-300"><option value="">All ranks</option>@foreach ($ranks as $rank)<option value="{{ $rank }}">{{ $rank }}</option>@endforeach</select></label>
-                        <label>Published bid assignment<select wire:model.live="filters.published_assignment" class="block w-full rounded-lg border-gray-300"><option value="">All published assignments</option>@foreach ($assignments as $assignment)<option value="{{ $assignment }}">{{ $assignment }}</option>@endforeach</select></label>
-                        <label>Published bid category<select wire:model.live="filters.assignment_category" class="block w-full rounded-lg border-gray-300"><option value="">All published categories</option>@foreach ($categories as $category)<option value="{{ $category }}">{{ $category }}</option>@endforeach</select></label>
-                        <label class="flex items-center gap-3"><input type="checkbox" wire:model.live="filters.de_bid" /> Published Driver Engineer bid seat</label>
-                    </div>
-                </details>
+                <p class="font-semibold" role="status" aria-live="polite" data-crew-summary>{{ $filtersActive || $searching ? $shownCount.' of '.$eligibleTotal : $eligibleTotal }} on duty {{ $dateShort }} {{ $eligibleTotal === 1 && ! ($filtersActive || $searching) ? 'has' : 'have' }} not completed {{ $classLabel }}</p>
+                @if ($rankChoices !== [])
+                    <fieldset class="mt-3">
+                        <legend class="font-medium">Rank <span class="font-normal text-sm">(tick any; none ticked shows everyone)</span></legend>
+                        <div class="mt-1 cp-ranks">
+                            @foreach ($rankChoices as $choice)
+                                <label class="flex items-center gap-2" wire:key="rank-{{ md5($choice['value']) }}"><input type="checkbox" wire:click="toggleRank(@js($choice['value']))" @checked(in_array($choice['value'], $ranks, true)) /> {{ $choice['label'] }} ({{ $choice['count'] }})</label>
+                            @endforeach
+                        </div>
+                    </fieldset>
+                @endif
+                <label class="mt-3 block cp-search">Find a name<input type="search" wire:model.live.debounce.350ms="filters.search" placeholder="Name or employee ID" class="block w-full rounded-lg border-gray-300" /></label>
                 <div class="mt-4 flex flex-wrap items-center gap-3">
                     @if ($shownCount > 0)<x-filament::button color="gray" wire:click="selectAllShown" wire:loading.attr="disabled">Select all {{ $shownCount }} shown</x-filament::button>@endif
                     @if ($selectedCount > 0)<x-filament::button color="gray" wire:click="clearSelection" wire:loading.attr="disabled">Clear selection</x-filament::button>@endif
@@ -120,12 +108,9 @@
                                 <input type="checkbox" wire:click="toggleMember({{ $id }})" @checked($person['selected']) aria-label="Select {{ $person['name'] }}" />
                                 <span class="min-w-0"><strong>{{ $person['name'] }}</strong><br /><span class="text-sm">{{ $person['rank'] }} · ID {{ $person['employee_id'] }}</span></span>
                             </label>
-                            @if ($person['provisional'])
-                                <span class="cp-duty text-sm">Duty not confirmed</span>
-                            @else
+                            @unless ($person['provisional'])
                                 <span class="cp-duty text-sm">{{ $person['station'] }} · {{ $person['unit'] }}</span>
-                                <span class="cp-time text-sm">On duty {{ $person['duty'] }}</span>
-                            @endif
+                            @endunless
                             @if ($person['partial'] && $slotCount > 0)
                                 <span class="cp-note text-sm">Eligible for {{ collect($person['slot_options'])->pluck('label')->implode(', ') }} only</span>
                             @endif
@@ -139,29 +124,10 @@
                             @endif
                         </li>
                     @empty
-                        <li class="py-4">{{ ($filtersActive || $searching) ? 'No eligible members match. Clear a filter, or open "Why isn\'t someone listed?" below.' : 'No one on this roster is eligible. Check the date and session times, or open "Why isn\'t someone listed?" below.' }}</li>
+                        <li class="py-4">{{ ($filtersActive || $searching) ? 'No one matches. Untick a rank or clear the name.' : 'Everyone on duty that day has completed it.' }}</li>
                     @endforelse
                 </ul>
-                @if ($shownCount > 250)<p class="mt-3 text-sm">Showing the first 250 members. Search to find a specific person. Select all applies to every member shown.</p>@endif
-                {{-- A new search can open it; otherwise it stays as the planner left it. --}}
-                <details class="mt-4" wire:ignore.self wire:key="why-not-listed-{{ $searching ? 'search' : 'all' }}" @if ($searching && ($notListed !== [] || $unmatched !== [])) open @endif>
-                    <summary class="cursor-pointer font-medium">Why isn't someone listed?</summary>
-                    <p class="mt-2 text-sm">Search for a name to include members who are not on this roster. Adding someone here is a deliberate exception, and it is labelled on the plan.</p>
-                    <ul class="mt-2 divide-y divide-gray-200">
-                        @foreach ($notListed as $other)
-                            <li class="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-                                <span class="min-w-0"><strong>{{ $other['name'] }}</strong> · {{ $other['rank'] }} · ID {{ $other['employee_id'] }}<span class="block">{{ $other['reason'] }}</span></span>
-                                @unless ($other['selected'])<x-filament::button color="gray" size="sm" wire:click="addException({{ $other['id'] }})" aria-label="Add {{ $other['name'] }} as an exception">Add as exception</x-filament::button>@endunless
-                            </li>
-                        @endforeach
-                        @foreach ($unmatched as $other)
-                            <li class="py-3 text-sm"><strong>{{ $other['name'] }}</strong> · ID {{ $other['employee_id'] !== '' ? $other['employee_id'] : 'not reported' }}<span class="block">{{ $other['reason'] }}</span></li>
-                        @endforeach
-                        @if ($notListed === [] && $unmatched === [])
-                            <li class="py-3 text-sm">{{ $searching ? 'No one in the department matches that search.' : 'Everyone on the roster is listed above.' }}</li>
-                        @endif
-                    </ul>
-                </details>
+                @if ($shownCount > 250)<p class="mt-3 text-sm">Showing the first 250. Tick a rank or search for a name to narrow it.</p>@endif
             @endif
         </x-filament::section>
 
@@ -334,8 +300,11 @@
             .crew-planner .cp-row { display: grid; gap: 0.5rem 1rem; grid-template-columns: minmax(0, 1fr); align-items: center; }
             .crew-planner .cp-pick { display: flex; align-items: center; gap: 0.75rem; cursor: pointer; }
             .crew-planner .cp-note { color: rgb(var(--warning-700)); }
+            .crew-planner .cp-ranks { display: flex; flex-wrap: wrap; column-gap: 1.5rem; }
+            .crew-planner .cp-ranks label { display: flex; align-items: center; gap: 0.5rem; }
+            .crew-planner .cp-search { max-width: 28rem; }
             @media (min-width: 900px) {
-                .crew-planner .cp-row { grid-template-columns: minmax(14rem, 1.4fr) minmax(10rem, 1fr) minmax(8rem, 0.8fr); }
+                .crew-planner .cp-row { grid-template-columns: minmax(14rem, 1.4fr) minmax(10rem, 1fr); }
                 .crew-planner .cp-note, .crew-planner .cp-session { grid-column: 1 / -1; }
             }
         </style>
