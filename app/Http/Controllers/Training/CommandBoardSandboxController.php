@@ -48,6 +48,8 @@ final class CommandBoardSandboxController extends Controller
             'X-Content-Type-Options' => 'nosniff',
             'Referrer-Policy' => 'same-origin',
             'Permissions-Policy' => 'microphone=(), camera=(), geolocation=()',
+            // A window the practice page opens gets no handle back to it, and it cannot reach one that opened it.
+            'Cross-Origin-Opener-Policy' => 'same-origin',
         ]);
     }
 }

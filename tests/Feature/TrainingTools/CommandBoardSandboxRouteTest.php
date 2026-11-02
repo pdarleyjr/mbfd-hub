@@ -78,6 +78,7 @@ final class CommandBoardSandboxRouteTest extends TestCase
         self::assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
         self::assertSame('same-origin', $response->headers->get('Referrer-Policy'));
         self::assertSame('microphone=(), camera=(), geolocation=()', $response->headers->get('Permissions-Policy'));
+        self::assertSame('same-origin', $response->headers->get('Cross-Origin-Opener-Policy'));
         self::assertStringStartsWith('text/html', (string) $response->headers->get('Content-Type'));
         self::assertSame($this->bundle->page(), $response->getContent(), 'The page is served byte for byte, with nothing injected.');
         self::assertCount(1, $response->headers->all('Content-Security-Policy'));

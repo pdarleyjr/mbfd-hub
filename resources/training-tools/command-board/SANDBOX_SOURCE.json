@@ -1,7 +1,7 @@
 {
   "repository": "pdarleyjr/mbfd-command",
-  "commit": "ff6d5759ea528dcd920851a13448d21318f4be03",
-  "built_at": "2026-11-02T14:10:40.202Z",
+  "commit": "8d7ac4f02975506546b70766202c2eb31be36fb1",
+  "built_at": "2026-11-02T16:21:06.790Z",
   "base_path": "/training-tools/command-board/",
   "files": [
     {
@@ -30,13 +30,13 @@
       "bytes": 71693
     },
     {
-      "path": "assets/training-BeyE0lIX.js",
-      "sha256": "d1a219bad98f6d987087905503b8fe037b2c8f3a07f5ad3324166bb5f6cbfcf5",
-      "bytes": 703389
+      "path": "assets/training-BbaNYL1I.js",
+      "sha256": "eb40ba6d2b7d87230cd8fd1575f004d21379cac8af6ae786a55aba4bf816bc8f",
+      "bytes": 703526
     },
     {
       "path": "index.html",
-      "sha256": "858c60ea4e9317cc64fbfeb817a9e33f0dcc6580420d2895adf7ac1b18885e4a",
+      "sha256": "ce7bf5f7cf5a895ff5891ab9c9cc8c4ab00a891dd6189f59da3c6ccee68a2c21",
       "bytes": 787
     }
   ]
