@@ -250,17 +250,23 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
         self::assertCount(2, $selections);
         $before = $this->domainHashes();
 
-        // No roster is on file for the new date, so nobody can be called on duty there.
+        // A day with no roster on file cannot be chosen at all.
+        $component->set('scheduleDate', '2026-10-25')->assertHasErrors('scheduleDate')->assertSet('scheduleDate', self::DATE);
+        self::assertSame($selections, $this->draft($id)['selections']);
+
+        // Another day with a roster: selections and session clock times carry over.
+        $this->roster(['90001' => ['08:00', '20:00']], '2026-10-24');
         $component->set('scheduleDate', '2026-10-24')->assertHasNoErrors();
         $after = $this->draft($id);
         self::assertSame($selections, $after['selections'], 'Selections survive a date change.');
         self::assertSame('2026-10-24T08:30:00-04:00', $after['slots'][0]['start_at']);
         self::assertSame('2026-10-24T11:30:00-04:00', $after['slots'][0]['end_at']);
-        $component->assertSeeHtml('data-roster-source="unavailable"')->assertSee('provisional');
-        $component->call('download', 'pdf')->assertFileDownloaded('MBFD-Training-Class-Roster-2026-10-24.pdf');
-        self::assertStringContainsString('no TeleStaff roster was available', (new Parser)->parseContent($this->downloadBytes($component))->getText());
-        $component->call('download', 'xlsx')->assertFileDownloaded('MBFD-Training-Class-Roster-2026-10-24.xlsx');
+        // 90002 is not on that day's roster, so the export waits for the planner to accept rechecking them.
+        $component->assertSeeHtml('data-roster-source="verified"')->assertSee('Needs verification');
+        $component->call('download', 'xlsx')->assertHasErrors('confirmReview')->assertNoFileDownloaded();
+        $component->set('confirmReview', true)->call('download', 'xlsx')->assertFileDownloaded('MBFD-Training-Class-Roster-2026-10-24.xlsx');
         self::assertSame($after, $this->draft($id));
+        $before = $this->domainHashes();
 
         // Back on the day with a roster, the same people are in the same session without any retyping.
         $component->set('scheduleDate', self::DATE)->assertHasNoErrors();
@@ -311,7 +317,7 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
         $slot = ['id' => (string) Str::uuid(), 'label' => 'Overnight', 'start_at' => '2026-10-21T23:00:00-04:00', 'end_at' => '2026-10-22T01:00:00-04:00'];
         $store->update($this->admin, $id, $this->draft($id)['version'], fn (array $row): array => [...$row, 'slots' => [$slot]]);
         $component = Livewire::test(TrainingCrewPlanner::class)->assertSet('draftId', $id);
-        $component->assertSee('2 eligible')->assertSeeHtml('aria-label="Select Synthetic 90001"')->assertSeeHtml('aria-label="Select Synthetic 90003"')
+        $component->assertSee('2 on duty')->assertSeeHtml('aria-label="Select Synthetic 90001"')->assertSeeHtml('aria-label="Select Synthetic 90003"')
             ->assertDontSeeHtml('aria-label="Select Synthetic 90002"');
         $component->call('toggleMember', $this->employees['90002']->id)->assertHasErrors('selection');
         self::assertSame([], $this->draft($id)['selections']);
@@ -326,10 +332,10 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
     {
         // The 20th's night row runs until 08:00 on the 21st, yet a plan for the 21st reads only the 21st's roster.
         $this->roster(['90001' => ['20:00', '08:00']], '2026-10-20');
-        $component = Livewire::test(TrainingCrewPlanner::class)->set('scheduleDate', self::DATE)->set('courseId', $this->course->id);
-        $component->assertSeeHtml('data-roster-source="unavailable"')->assertDontSee('On duty 20:00')->assertDontSee('On duty');
-        $component->set('slotEdits.0.start', '03:00')->set('slotEdits.0.end', '06:00')->assertHasNoErrors();
-        $component->assertSee('Duty not confirmed')->assertDontSee('On duty');
+        $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id);
+        // The 21st has no roster, so it is not offered; the page names the 20th it is showing.
+        $component->assertSet('scheduleDate', '2026-10-20')->assertSee('Tuesday, October 20, 2026');
+        $component->set('scheduleDate', self::DATE)->assertHasErrors('scheduleDate')->assertSet('scheduleDate', '2026-10-20');
         $duty = app(\App\Services\Training\CrewPlanner\TrainingRosterDutySource::class)->forDate(self::DATE);
         self::assertSame([], $duty->staff);
         self::assertFalse($duty->isVerified());

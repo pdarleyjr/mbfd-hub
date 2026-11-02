@@ -27,7 +27,7 @@ final class TrainingPlannerCandidateService
             ? $this->attendance->population($actor, $personnelAsOf ?? $asOf->setTimezone(\App\Support\HubTimezone::NAME)->toDateString())
             : $this->attendance->lookup($actor, $course, $moduleId, $asOf, $personnelAsOf);
         $filters = Validator::make($filters, [
-            'rank' => ['nullable', 'string', 'max:100'], 'cohort' => ['nullable', Rule::in(['all', 'officers', 'captain', 'lieutenant', 'firefighters'])],
+            'rank' => ['nullable', 'string', 'max:100'], 'ranks' => ['nullable', 'array', 'max:50'], 'ranks.*' => ['string', 'max:100'], 'cohort' => ['nullable', Rule::in(['all', 'officers', 'captain', 'lieutenant', 'firefighters'])],
             'assignment' => ['nullable', Rule::in(['rescue', 'combat', 'day_other', 'unverified'])],
             'assignment_category' => ['nullable', Rule::in(['rescue', 'combat', 'day_other', 'unverified'])],
             'published_assignment' => ['nullable', 'string', 'max:255'],
@@ -105,7 +105,8 @@ final class TrainingPlannerCandidateService
             'officers' => ['Captain', 'Lieutenant'], 'captain' => ['Captain'], 'lieutenant' => ['Lieutenant'],
             'firefighters' => ['Firefighter'], default => null,
         };
-        if (($ranks !== null && ! in_array($row['rank'], $ranks, true)) || (filled($filters['rank'] ?? null) && $row['rank'] !== $filters['rank'])) {
+        if (($ranks !== null && ! in_array($row['rank'], $ranks, true)) || (filled($filters['rank'] ?? null) && $row['rank'] !== $filters['rank'])
+            || (($filters['ranks'] ?? []) !== [] && ! in_array($row['rank'], $filters['ranks'], true))) {
             return false;
         }
         foreach (['assignment' => 'assignment_category', 'assignment_category' => 'assignment_category', 'published_assignment' => 'assignment', 'shift' => 'shift', 'de_bid' => 'is_de_bid', 'floating' => 'is_floating'] as $filter => $field) {
