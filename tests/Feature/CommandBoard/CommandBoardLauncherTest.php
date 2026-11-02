@@ -65,10 +65,14 @@ final class CommandBoardLauncherTest extends TestCase
         // Without 300 Command Access (the Command Board app grant alone is not it) Home offers no Command Board button.
         foreach ([$plain, $direct, $inherited] as $user) {
             $this->actingAsCanonicalUser($user->fresh());
-            $this->get('/')->assertOk()
+            $response = $this->get('/')->assertOk()
                 ->assertSee('Quick Access')
-                ->assertDontSee('Command Board')
+                ->assertDontSee('data-home-command-board', false)
                 ->assertDontSee('href="'.self::URL.'"', false);
+            // The Training Tools card links to the offline Command Board Sandbox for everyone. Outside that card the
+            // words "Command Board" (the live board's button) still must not appear.
+            $outsideTrainingTools = preg_replace('#<details[^>]*data-training-tools.*?</details>#s', '', (string) $response->getContent());
+            self::assertStringNotContainsString('Command Board', (string) $outsideTrainingTools);
         }
         // An administrator holds 300 Command Access, so Home's quick-action row (not the shared launcher) offers the button.
         $superAdmin->forceFill(['must_change_password' => false])->save();
