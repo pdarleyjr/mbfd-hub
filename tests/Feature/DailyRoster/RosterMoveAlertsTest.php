@@ -324,6 +324,30 @@ final class RosterMoveAlertsTest extends TestCase
         Notification::assertNotSentTo($member, RosterMoveNotification::class);
     }
 
+    public function test_the_hub_learning_what_a_code_means_is_not_a_move(): void
+    {
+        // Seen on 2026-11-01: MILA, AHTA, BER and EFLO went from unknown to not working when a release taught the Hub
+        // those codes. TeleStaff printed the same rows, and those members had not gone anywhere.
+        $member = $this->member('90001');
+        $this->baseline([self::ENGINE => [$this->row('90001', code: 'MILA', availability: RosterAssignment::AVAILABILITY_UNKNOWN, category: 'Other')]]);
+
+        $this->publish([self::ENGINE => [$this->row('90001', code: 'MILA', availability: RosterAssignment::AVAILABILITY_NOT_WORKING, category: 'Leave')]]);
+        $this->assertSame(0, $this->detect());
+
+        Notification::assertNotSentTo($member, RosterMoveNotification::class);
+    }
+
+    public function test_a_real_code_change_to_leave_still_alerts_when_the_old_code_was_unknown(): void
+    {
+        $member = $this->member('90001');
+        $this->baseline([self::ENGINE => [$this->row('90001', code: 'HOOT', availability: RosterAssignment::AVAILABILITY_UNKNOWN, category: 'Other')]]);
+
+        $this->publish([self::ENGINE => [$this->row('90001', code: 'SIC', availability: RosterAssignment::AVAILABILITY_NOT_WORKING, category: 'Sick')]]);
+        $this->assertSame(1, $this->detect());
+
+        Notification::assertSentTo($member, RosterMoveNotification::class);
+    }
+
     public function test_only_the_member_who_moved_is_told(): void
     {
         $moved = $this->member('90001');
