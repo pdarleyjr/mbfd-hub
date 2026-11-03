@@ -44,7 +44,7 @@ final class UnitStatusViewRenderTest extends TestCase
         $html = $this->rows();
 
         $this->assertSame(5, preg_match_all('/<h2 class="us-station"/', $html));
-        $this->assertSame(16, preg_match_all('/<button\s+type="button"\s+class="us-row"/', $html));
+        $this->assertSame(16, preg_match_all('/<button\s+type="button"\s+class="us-row us-tone--[a-z_]+"/', $html));
         preg_match_all('/data-unit-code="([^"]+)"/', $html, $codes);
         $this->assertSame(self::ORDER, $codes[1]);
         $this->assertSame(self::ORDER, UnitStatusBoardFixture::unitCodes());
@@ -64,17 +64,98 @@ final class UnitStatusViewRenderTest extends TestCase
         $this->assertSame(16, preg_match_all('/aria-haspopup="dialog"/', $html));
     }
 
-    public function test_a_row_shows_only_unit_chip_and_incident(): void
+    public function test_a_row_shows_only_unit_address_incident_and_chip(): void
     {
         $html = $this->rows();
 
         $this->assertMatchesRegularExpression('/<strong class="us-row__code">R2<\/strong>\s*<span class="us-row__name">Rescue 2<\/span>/', $html);
         $this->assertStringContainsString('#2601241652', $html);
         $this->assertStringContainsString('ID pending', $html);
-        // Only the on-call units show an incident; quiet units show none.
+        // Only the on-call units show an address and an incident; quiet units show neither.
         $this->assertSame(7, preg_match_all('/class="us-row__incident"/', $html));
+        $this->assertSame(7, preg_match_all('/class="us-row__where"/', $html));
         $this->assertStringNotContainsString('Lt. Benson', $html);
         $this->assertStringNotContainsString('>Lift Assist', $html);
+    }
+
+    /**
+     * A screen reader hears unit, status, address, incident. On screen the grid areas in unit-status.css put the address
+     * left of center, the incident right of it and the status in its own column.
+     */
+    public function test_the_row_is_read_as_unit_status_address_incident(): void
+    {
+        $row = $this->row('unit-r22');
+
+        $this->assertStringContainsString('<span class="us-row__where" title="9 Bay Rd">9 Bay Rd</span>', $row);
+        $unit = strpos($row, 'us-row__unit');
+        $status = strpos($row, 'us-row__status');
+        $where = strpos($row, 'us-row__where');
+        $incident = strpos($row, 'us-row__incident');
+        $this->assertTrue($unit < $status && $status < $where && $where < $incident, 'unit, status, address, incident');
+        $this->assertStringContainsString('#2601241720', $row);
+    }
+
+    public function test_only_the_newest_call_address_is_on_the_row(): void
+    {
+        $row = $this->row('unit-e1');
+
+        $this->assertStringContainsString('100 Lincoln Rd', $row);
+        $this->assertStringNotContainsString('200 Collins Ave', $row);
+    }
+
+    public function test_coordinates_stand_in_when_pulsepoint_gave_no_address(): void
+    {
+        $board = UnitStatusBoardFixture::make([], ['R3' => ['currentCalls' => [array_replace($this->fixtureCall('R3'), ['address' => '  '])]]]);
+
+        $this->assertStringContainsString('>25.79000, -80.13000</span>', $this->row('unit-r3', $board));
+
+        $none = UnitStatusBoardFixture::make([], ['R3' => ['currentCalls' => [array_replace($this->fixtureCall('R3'), ['address' => '', 'location' => null])]]]);
+        $this->assertStringNotContainsString('us-row__where', $this->row('unit-r3', $none));
+        $this->assertStringContainsString('#2601241735', $this->row('unit-r3', $none));
+    }
+
+    public function test_a_hostile_address_is_escaped_on_the_row(): void
+    {
+        $row = $this->row('unit-l1');
+
+        $this->assertStringNotContainsString('<script>', $row);
+        $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $row);
+    }
+
+    public function test_each_row_and_its_chip_carry_the_board_color_for_its_status(): void
+    {
+        $expected = [
+            'unit-l1' => 'on_scene', 'unit-e1' => 'enroute', 'unit-r1' => 'dispatched', 'unit-r2' => 'transport',
+            'unit-r22' => 'on_scene', 'unit-cpt5' => 'idle', 'unit-300' => 'idle', 'unit-l3' => 'arrived',
+            'unit-r3' => 'assigned', 'unit-e2' => 'available', 'unit-fb6' => 'available',
+        ];
+        foreach ($expected as $domId => $tone) {
+            $row = $this->row($domId);
+            $this->assertStringContainsString('class="us-row us-tone--'.$tone.'"', $row, $domId);
+            $this->assertStringContainsString('us-chip us-tone--'.$tone, $row, $domId);
+        }
+        $this->assertStringContainsString('class="us-row us-tone--not_confirmed"', $this->rows(UnitStatusBoardFixture::degraded()));
+    }
+
+    /** One rendered row, from its list item to the end of its button. */
+    private function row(string $domId, ?array $board = null): string
+    {
+        preg_match('/<li class="us-item" id="'.preg_quote($domId, '/').'".*?<\/button>/s', $this->rows($board), $m);
+
+        return $m[0] ?? '';
+    }
+
+    /** @return array<string, mixed> */
+    private function fixtureCall(string $code): array
+    {
+        foreach (UnitStatusBoardFixture::make()['stations'] as $station) {
+            foreach ($station['units'] as $unit) {
+                if ($unit['code'] === $code) {
+                    return $unit['currentCalls'][0];
+                }
+            }
+        }
+        $this->fail('No call for '.$code);
     }
 
     public function test_the_incident_is_hidden_unless_the_unit_is_on_a_call(): void
@@ -221,14 +302,15 @@ final class UnitStatusViewRenderTest extends TestCase
         $this->assertStringNotContainsString('javascript:', $this->board($board));
     }
 
-    public function test_the_status_chip_uses_the_indicator_only_as_a_dot(): void
+    public function test_the_status_chip_takes_its_color_from_a_class_never_from_feed_text(): void
     {
         $html = $this->rows();
 
-        $this->assertStringContainsString('style="--us-indicator: rgb(204,0,0)"', $html);
+        $this->assertStringNotContainsString('--us-indicator', $html);
+        $this->assertStringNotContainsString('style="--us-tone', $html);
         $this->assertStringContainsString('hub-tag--success', $html);
         $this->assertStringContainsString('hub-tag--warning', $this->board(UnitStatusBoardFixture::degraded()));
-        $this->assertDoesNotMatchRegularExpression('/hub-tag--success[^>]*us-indicator/', $html);
+        $this->assertSame(16, preg_match_all('/<span class="us-dot" aria-hidden="true"><\/span>/', $html));
     }
 
     public function test_a_hostile_indicator_color_is_dropped(): void
