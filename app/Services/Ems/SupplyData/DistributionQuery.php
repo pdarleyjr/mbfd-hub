@@ -19,7 +19,7 @@ use stdClass;
  * (`adjusted` with a request id; `corrects_movement_id` points at the row they offset). A reversed issuance therefore
  * nets to zero and is not an event. A correction is dated by the issuance it corrects, so reversing last week's
  * issuance this week does not make this week negative. Manual adjustments and receipts have no request and are
- * never part of "distributed".
+ * never part of "distributed". Supply room screen withdrawals are distributions too (docs/ems/supply-room-kiosk.md).
  */
 final class DistributionQuery
 {
@@ -45,6 +45,42 @@ final class DistributionQuery
         }
         if ($filters->unit !== null) {
             UnitKey::restrict($query, $filters->unit, 'r');
+        }
+        if ($filters->category !== null) {
+            $query->join('ems_catalog_items as ci', 'ci.id', '=', 'i.catalog_item_id')->where('ci.category', $filters->category);
+        }
+
+        return $query->unionAll($this->kioskPairs($from, $to, $filters));
+    }
+
+    /**
+     * Supply room screen withdrawals, one event per (withdrawal, item), shaped like the request pairs. The unit is the
+     * truck the member picked; a typed unit or none is "unassigned". An undone withdrawal nets to zero and drops out.
+     */
+    private function kioskPairs(CarbonImmutable $from, CarbonImmutable $to, SupplyDataFilters $filters): Builder
+    {
+        $query = DB::table('ems_stock_movements as m')
+            ->join('ems_kiosk_withdrawals as w', 'w.id', '=', 'm.kiosk_withdrawal_id')
+            ->join('ems_supply_items as i', 'i.id', '=', 'm.supply_item_id')
+            ->leftJoin('ems_stock_movements as c', 'c.id', '=', 'm.corrects_movement_id')
+            ->where('i.controlled_substance', false)
+            ->whereIn('m.movement_type', [StockMovement::ISSUED, StockMovement::ADJUSTED])
+            ->whereRaw(self::EFFECTIVE_AT.' >= '.Instant::placeholder(), [Instant::bind($from)])
+            ->whereRaw(self::EFFECTIVE_AT.' < '.Instant::placeholder(), [Instant::bind($to)])
+            ->groupBy('m.kiosk_withdrawal_id', 'm.supply_item_id', 'w.apparatus_id', 'w.unit_label')
+            ->havingRaw('SUM(m.quantity_base) < 0')
+            ->selectRaw("NULL AS request_id, m.supply_item_id AS supply_item_id, w.apparatus_id AS apparatus_id, 'supply_room_screen' AS target_kind, w.unit_label AS target_label, -SUM(m.quantity_base) AS net_base, MIN(".self::EFFECTIVE_AT.') AS eff_at');
+
+        if ($filters->item !== null) {
+            $query->where('m.supply_item_id', $filters->item);
+        }
+        if ($filters->unit !== null) {
+            $apparatus = UnitKey::apparatusId($filters->unit);
+            match (true) {
+                $apparatus !== null => $query->where('w.apparatus_id', $apparatus),
+                $filters->unit === UnitKey::DETAIL => $query->whereRaw('1 = 0'),
+                default => $query->whereNull('w.apparatus_id'),
+            };
         }
         if ($filters->category !== null) {
             $query->join('ems_catalog_items as ci', 'ci.id', '=', 'i.catalog_item_id')->where('ci.category', $filters->category);
@@ -137,7 +173,8 @@ final class DistributionQuery
         Instant::where($query, 'm.occurred_at', '>=', $from);
         Instant::where($query, 'm.occurred_at', '<', $to);
         $row = $query
-            ->selectRaw('COALESCE(SUM(CASE WHEN m.request_id IS NULL THEN 1 ELSE 0 END), 0) AS unattributed,
+            // A supply room screen withdrawal is attributed (to its own record and unit), not "unlinked".
+            ->selectRaw('COALESCE(SUM(CASE WHEN m.request_id IS NULL AND m.kiosk_withdrawal_id IS NULL THEN 1 ELSE 0 END), 0) AS unattributed,
                 COALESCE(SUM(CASE WHEN r.status IN (\'cancelled\', \'returned\', \'superseded\') THEN 1 ELSE 0 END), 0) AS on_uncounted_requests')
             ->first();
 

@@ -62,7 +62,7 @@ final class StockLedger
     /**
      * Append one movement. Replaying the same idempotency key returns the original row.
      *
-     * @param  array{request_id?: int|null, request_line_id?: int|null, supply_order_id?: int|null, corrects_movement_id?: int|null}  $links
+     * @param  array{request_id?: int|null, request_line_id?: int|null, supply_order_id?: int|null, corrects_movement_id?: int|null, kiosk_withdrawal_id?: int|null}  $links
      */
     public function record(SupplyItem $item, string $type, int $quantityBase, EmsActor $actor, string $idempotencyKey, ?string $reason = null, array $links = []): StockMovement
     {
@@ -105,6 +105,7 @@ final class StockLedger
             'request_line_id' => $links['request_line_id'] ?? null,
             'supply_order_id' => $links['supply_order_id'] ?? null,
             'corrects_movement_id' => $links['corrects_movement_id'] ?? null,
+            'kiosk_withdrawal_id' => $links['kiosk_withdrawal_id'] ?? null,
             'idempotency_key' => $idempotencyKey,
         ]);
     }
@@ -221,8 +222,9 @@ final class StockLedger
     }
 
     /**
-     * Units taken off the shelf for apparatus since each item's last real count: issued movements plus the
-     * corrections that belong to a request. Receipts and manual adjustments are not deductions. An item
+     * Units taken off the shelf since each item's last real count: issued movements plus the corrections that
+     * belong to a request or to a supply room screen withdrawal (its Undo). Receipts and manual adjustments are
+     * not deductions. An item
      * never counted has nothing to compare against and reports zero.
      *
      * @param  array<int, array{through: int, counted_at: CarbonImmutable|null, counted_by: string|null}>  $lastCounts
@@ -237,7 +239,8 @@ final class StockLedger
                 ->whereIn('supply_item_id', $group->keys()->all())
                 ->where('id', '>', (int) $through)
                 ->where(fn ($query) => $query->where('movement_type', StockMovement::ISSUED)
-                    ->orWhere(fn ($corrections) => $corrections->where('movement_type', StockMovement::ADJUSTED)->whereNotNull('request_id')))
+                    ->orWhere(fn ($corrections) => $corrections->where('movement_type', StockMovement::ADJUSTED)
+                        ->where(fn ($linked) => $linked->whereNotNull('request_id')->orWhereNotNull('kiosk_withdrawal_id'))))
                 ->groupBy('supply_item_id')
                 ->selectRaw('supply_item_id, SUM(quantity_base) as total')
                 ->pluck('total', 'supply_item_id');

@@ -435,6 +435,17 @@ jobs:
           name: daily-roster-outlook-browser-evidence
           path: test-results/daily-roster-outlook
           retention-days: 7
+      - name: Verify the EMS supply room screen at phone and tablet widths
+        id: supply-kiosk
+        if: ${{ !cancelled() && steps.hub-assets.outcome == 'success' }}
+        run: npx playwright test --config=playwright.supply-kiosk.config.ts
+      - name: Retain supply room screen browser evidence
+        if: ${{ always() && steps.supply-kiosk.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: supply-kiosk-browser-evidence
+          path: test-results/supply-kiosk
+          retention-days: 7
 
   daily-authenticated-shell:
     name: Daily Checkout authenticated shell and Bid browsers

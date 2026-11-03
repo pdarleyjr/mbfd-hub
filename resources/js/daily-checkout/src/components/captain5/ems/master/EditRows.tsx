@@ -7,6 +7,7 @@ import {
 } from './batchLogic';
 import { MAX_NAME, MAX_SHELF_LABEL, NEW_SHELF, levelText, wholeText } from './editLogic';
 import { ShelfOptions, UnitOptions } from './ItemFields';
+import { CountDueTag } from './OnHandCell';
 import LevelTag, { LEVEL_ACCENT, LEVEL_ROW } from './StockLevelTag';
 import { orderBadge, stateShort, unitOption, unitPlural } from './orderLogic';
 import type { CountUnit, MasterItem, MasterSection, UnitOption } from './types';
@@ -138,9 +139,14 @@ export const EditRow = memo(function EditRow({ item, draft, errors, sections, un
         </div>
 
         <Cell label={`On hand (${plural})`} error={errors.onHand}>
-          {(aria) => <input {...aria} type="text" inputMode="numeric" autoComplete="off" className={NUMBER} value={shownOnHand(item, draft)} disabled={disabled}
-            placeholder={savedOnHand === '' ? 'Not counted' : savedOnHand} data-testid="edit-on-hand"
-            onChange={(event) => onChange(item, withNumber(draft, 'onHand', levelText(event.target.value)))} />}
+          {(aria) => (
+            <>
+              <input {...aria} type="text" inputMode="numeric" autoComplete="off" className={NUMBER} value={shownOnHand(item, draft)} disabled={disabled}
+                placeholder={savedOnHand === '' ? 'Not counted' : savedOnHand} data-testid="edit-on-hand"
+                onChange={(event) => onChange(item, withNumber(draft, 'onHand', levelText(event.target.value)))} />
+              {item.count_due === true && <CountDueTag testId="edit-count-due" className="mt-1 inline-block" />}
+            </>
+          )}
         </Cell>
 
         <Cell label={`Expected (${plural})`} error={errors.expected}>

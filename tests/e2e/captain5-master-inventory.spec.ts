@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import type { EmsMeta } from '../../resources/js/daily-checkout/src/components/captain5/ems/types';
 import type {
-  CountUnit, EntryMap, MasterItem, MasterSection, OpenOrder, OrderState, UnitOption,
+  CountUnit, EntryMap, MasterItem, MasterSection, OpenOrder, OrderState, ScreenWithdrawal, SupplyScreenData, UnitOption,
 } from '../../resources/js/daily-checkout/src/components/captain5/ems/master/types';
 
 /**
@@ -85,10 +85,19 @@ interface Server {
   submitted: boolean;
   nextOrderId: number;
   meta?: EmsMeta;
+  /** GET /supply/screen: the supply room kiosk section. */
+  screen: SupplyScreenData;
+  screenForbidden: boolean;
+  screenReads: number;
 }
 
+const NO_SCREEN: SupplyScreenData = { withdrawals: [], screens: [], search_words_waiting: 0 };
+
 function newServer(overrides: Partial<Server> = {}): Server {
-  return { items: catalog(), inactive: [], entries: null, putMode: 'ok', batchMode: 'ok', batchDelayMs: 0, masterDelayMs: 0, orderForbidden: false, submitDelayMs: 0, conflictOnce: false, writes: [], submitted: false, nextOrderId: 500, ...overrides };
+  return {
+    items: catalog(), inactive: [], entries: null, putMode: 'ok', batchMode: 'ok', batchDelayMs: 0, masterDelayMs: 0, orderForbidden: false, submitDelayMs: 0, conflictOnce: false,
+    writes: [], submitted: false, nextOrderId: 500, screen: NO_SCREEN, screenForbidden: false, screenReads: 0, ...overrides,
+  };
 }
 
 const sectionsOf = (server: Server): MasterSection[] => {
@@ -230,6 +239,11 @@ async function handleEms(route: Route, server: Server, url: URL): Promise<void> 
   if (method !== 'GET') server.writes.push(recorded);
 
   if (path === '/meta') return ok(route, server.meta ?? META);
+  if (path === '/supply/screen') {
+    server.screenReads++;
+    if (server.screenForbidden) return fail(route, 403, 'forbidden', 'You do not have access to the supply room inventory.');
+    return ok(route, server.screen);
+  }
   if (path === '/supply/master') {
     const body = {
       sections: sectionsOf(server), items: presentAll(server), inactive: server.inactive,
@@ -1452,4 +1466,109 @@ test.describe('stock levels', () => {
     await page.getByTestId('review-bottom').click();
     await expect(page.getByTestId('submit-inventory')).toBeEnabled();
   });
+});
+
+// ------------------------------------------------------------------ supply room screen
+
+const withdrawal = (n: number, overrides: Partial<ScreenWithdrawal> = {}): ScreenWithdrawal => ({
+  uuid: `00000000-aaaa-4aaa-8aaa-${String(n).padStart(12, '0')}`, number: `W-${String(n).padStart(6, '0')}`, employee_name: 'Lt. J. Smith', unit_label: 'R22',
+  taken_at: `Nov 3, 9:${String(10 + n).padStart(2, '0')} AM`, taken_at_iso: `2026-11-03T14:${String(10 + n).padStart(2, '0')}:00Z`, status: 'taken', note: null, count_due: false,
+  lines: [{ name: 'Gauze 4x4', quantity: 2, unit_label: 'each', count_due: false }], ...overrides,
+});
+
+const ONLINE_SCREEN: SupplyScreenData['screens'][number] = {
+  id: 1, name: 'Supply room screen', state: 'online', state_label: 'Online', last_seen: 'Nov 3, 9:15 AM', paired_at: 'Nov 1, 8:00 AM', paired_by: 'Alex Rivera',
+};
+
+test.describe('supply room screen section', () => {
+  test('shows the screen, recent withdrawals with Undone and Count due, the note and the search words; it refreshes with the list', async ({ page }) => {
+    const server = newServer({
+      screen: {
+        screens: [ONLINE_SCREEN, { ...ONLINE_SCREEN, id: 2, name: 'Old screen', state: 'revoked', state_label: 'Revoked' }],
+        withdrawals: [
+          withdrawal(1, { unit_label: null, note: 'Shelf was empty', count_due: true,
+            lines: [{ name: 'IV Catheter 18 Gauge', quantity: 3, unit_label: 'each', count_due: true }, { name: 'Saline Flush', quantity: 1, unit_label: 'box', count_due: false }] }),
+          withdrawal(2, { status: 'undone', employee_name: 'FF A. Jones' }),
+        ],
+        search_words_waiting: 2,
+      },
+    });
+    await open(page, server, SUPPLY);
+    const section = page.getByTestId('supply-screen');
+    await expect(section.getByTestId('screen-status')).toHaveText(['Supply room screen: Online, last checked in Nov 3, 9:15 AM']);
+    await expect(section.getByTestId('screen-status')).toHaveAttribute('data-state', 'online');
+    // Collapsed until opened; the master list is still right there.
+    await expect(section.getByTestId('screen-withdrawal')).toHaveCount(0);
+    await expect(page.getByTestId('master-row').first()).toBeVisible();
+    await section.getByTestId('supply-screen-toggle').click();
+    await expect(section.getByTestId('supply-screen-toggle')).toHaveAttribute('aria-expanded', 'true');
+
+    const rows = section.getByTestId('screen-withdrawal');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0).getByTestId('screen-withdrawal-time')).toHaveText('Nov 3, 9:11 AM');
+    await expect(rows.nth(0).getByTestId('screen-withdrawal-who')).toHaveText('Lt. J. Smith, No unit');
+    await expect(rows.nth(0).getByTestId('screen-withdrawal-line')).toHaveText(['IV Catheter 18 Gauge: 3 eachCount due', 'Saline Flush: 1 box']);
+    await expect(rows.nth(0).getByTestId('screen-line-count-due')).toHaveCount(1);
+    await expect(rows.nth(0).getByTestId('screen-withdrawal-note')).toHaveText('Note: Shelf was empty');
+    await expect(rows.nth(0).getByTestId('screen-withdrawal-undone')).toHaveCount(0);
+    await expect(rows.nth(1)).toHaveAttribute('data-status', 'undone');
+    await expect(rows.nth(1).getByTestId('screen-withdrawal-undone')).toHaveText('Undone');
+    await expect(rows.nth(1).getByTestId('screen-withdrawal-who')).toHaveText('FF A. Jones, R22');
+    await expect(section.getByTestId('screen-search-words')).toHaveText('2 search words to review in Admin > Medical Supply Room > Supply room screen.');
+
+    // The section follows the master list's refresh.
+    const before = server.screenReads;
+    server.screen = { ...server.screen, screens: [{ ...ONLINE_SCREEN, state: 'offline', state_label: 'Offline', last_seen: 'Nov 3, 8:40 AM' }] };
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(section.getByTestId('screen-status')).toHaveText(['Supply room screen: Offline, last checked in Nov 3, 8:40 AM']);
+    await expect(section.getByTestId('screen-status')).toHaveAttribute('data-state', 'offline');
+    expect(server.screenReads).toBeGreaterThan(before);
+  });
+
+  test('with no screen paired it says where to pair one, and a long list folds after ten', async ({ page }) => {
+    const server = newServer({ screen: { screens: [], withdrawals: Array.from({ length: 12 }, (_, i) => withdrawal(i + 1)), search_words_waiting: 0 } });
+    await open(page, server, SUPPLY);
+    const section = page.getByTestId('supply-screen');
+    await expect(section.getByTestId('screen-status-none')).toHaveText('No screen is paired yet. Pair one from Admin > Medical Supply Room > Supply room screen.');
+    await section.getByTestId('supply-screen-toggle').click();
+    await expect(section.getByTestId('screen-withdrawal')).toHaveCount(10);
+    await expect(section.getByTestId('screen-search-words')).toHaveCount(0);
+    await section.getByTestId('screen-withdrawals-more').click();
+    await expect(section.getByTestId('screen-withdrawal')).toHaveCount(12);
+  });
+
+  test('a 403 leaves the section out and the master list in place', async ({ page }) => {
+    const server = newServer({ screenForbidden: true });
+    await open(page, server, SUPPLY);
+    await expect(page.getByTestId('master-row').first()).toBeVisible();
+    await expect.poll(() => server.screenReads).toBeGreaterThan(0);
+    await expect(page.getByTestId('supply-screen')).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Master Supply Room Inventory' })).toBeVisible();
+  });
+
+  for (const width of [320, 390]) {
+    test(`no horizontal scrolling at ${width}px with the section open`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      const server = newServer({
+        screen: { screens: [ONLINE_SCREEN], withdrawals: [withdrawal(1, { note: `${LONG_NAME} note`, lines: [{ name: LONG_NAME, quantity: 120, unit_label: 'boxes of 50', count_due: true }] })], search_words_waiting: 1 },
+      });
+      await open(page, server, SUPPLY);
+      await page.getByTestId('supply-screen-toggle').click();
+      await expect(page.getByTestId('screen-withdrawal')).toHaveCount(1);
+      await expect(page.getByTestId('screen-search-words')).toHaveText('1 search word to review in Admin > Medical Supply Room > Supply room screen.');
+      await expectTouchTarget(page.getByTestId('supply-screen-toggle'), 'Supply room screen toggle');
+      await noHorizontalOverflow(page);
+    });
+  }
+});
+
+test('more taken than the ledger held shows Count due by the on-hand number, in view and Edit mode', async ({ page }) => {
+  const server = newServer({ items: [item(1, 'Oral Airway Size 3', 'A1', { on_hand: 0, on_hand_base: 0, count_due: true }), item(2, 'Nasal Airway 28 Fr', 'A1', { on_hand: 2, on_hand_base: 2 })] });
+  await open(page, server, SUPPLY);
+  await expect(rowById(page, 1).getByTestId('on-hand-number')).toHaveText('0');
+  await expect(rowById(page, 1).getByTestId('on-hand-count-due')).toHaveText('Count due');
+  await expect(rowById(page, 2).getByTestId('on-hand-count-due')).toHaveCount(0);
+  await page.getByTestId('edit-mode').click();
+  await expect(editRow(page, 1).getByTestId('edit-count-due')).toHaveText('Count due');
+  await expect(editRow(page, 2).getByTestId('edit-count-due')).toHaveCount(0);
 });

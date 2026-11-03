@@ -11,6 +11,7 @@ import LowStockCard from './LowStockCard';
 import MasterTable from './MasterTable';
 import ShelfNav from './ShelfNav';
 import SummaryStrip from './SummaryStrip';
+import SupplyScreenCard from './SupplyScreenCard';
 import { buildSearchIndex, groupBySection, lastCountText, normalizeText, searchItems, sectionParam } from './logic';
 import { applyFilter, filterHeading, summarize, type OrderFilter } from './orderLogic';
 import type { MasterItem } from './types';
@@ -181,6 +182,7 @@ export default function MasterInventoryView({ canStart, onCounting, onForbidden,
       {data && (
         <>
           <LowStockCard items={items} onOpen={openFromCard} headingLevel={showTitle ? 3 : 2} />
+          <SupplyScreenCard tick={master.refreshes} headingLevel={showTitle ? 3 : 2} />
           <InventorySearch value={query} onChange={(value) => { setQuery(value); setHighlightId(null); }}
             resultNote={searching ? `${listed.length} ${listed.length === 1 ? 'item matches' : 'items match'}` : ''} />
           <SummaryStrip summary={summary} active={filter} onChange={changeFilter} />

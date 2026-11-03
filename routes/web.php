@@ -733,4 +733,5 @@ Route::middleware(['auth', 'workgroup.access'])->group(function () {
 });
 Route::get('/health', HealthReadinessController::class)->name('health.readiness');
 require __DIR__.'/ems.php';
+require __DIR__.'/supply-kiosk.php';
 require __DIR__.'/narcotics.php';

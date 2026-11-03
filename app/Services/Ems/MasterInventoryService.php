@@ -28,7 +28,7 @@ final class MasterInventoryService
     /** Stored order status => what the master list calls it. */
     public const ORDER_STATES = [SupplyOrder::PENDING => 'pending', SupplyOrder::PLACED => 'ordered', SupplyOrder::BACKORDERED => 'backordered'];
 
-    private const SECTION_LABELS = [
+    public const SECTION_LABELS = [
         'supplies' => 'Supplies',
         'supplies-after-unlabeled-band' => 'Supplies',
         'medications' => 'Medications',
@@ -340,7 +340,10 @@ final class MasterInventoryService
                 'package_unit' => $item->package_unit,
                 'units_per_package' => $item->units_per_package,
                 'on_hand_base' => $base,
-                'on_hand' => CountMath::display($base, $per),
+                // More was taken than the ledger held (the supply room screen never refuses a member holding the
+                // item): show 0, not a negative shelf, and flag the item for a count.
+                'on_hand' => CountMath::display($base === null ? null : max(0, $base), $per),
+                'count_due' => $base !== null && $base < 0,
                 'deducted_base' => $taken,
                 'deducted' => CountMath::display($taken, $per),
                 'counted_at' => ($count['counted_at'] ?? null)?->toIso8601String(),

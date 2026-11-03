@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEmsLoad } from '../shared';
 import { fetchMaster } from './api';
 import type { MasterData, MasterItem } from './types';
@@ -11,7 +11,14 @@ export const REFRESH_MS = 60_000;
  * open or something is unsaved (`paused`), and a failed refresh never blanks what is already on screen.
  */
 export function useMasterData({ paused, onForbidden }: { paused: boolean; onForbidden: () => void }) {
-  const load = useEmsLoad<MasterData>(fetchMaster, 'master', { onForbidden });
+  // Counts every answer from the server (not local row updates), so sections below the list can refresh with it.
+  const [refreshes, setRefreshes] = useState(0);
+  const fetchCounted = useCallback(async () => {
+    const next = await fetchMaster();
+    setRefreshes((count) => count + 1);
+    return next;
+  }, []);
+  const load = useEmsLoad<MasterData>(fetchCounted, 'master', { onForbidden });
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   const { reload } = load;
@@ -50,5 +57,5 @@ export function useMasterData({ paused, onForbidden }: { paused: boolean; onForb
     setData((current) => (current ? { ...current, items: current.items.filter((entry) => entry.id !== id) } : current));
   }, [setData]);
 
-  return { ...load, replaceItem, replaceItems, removeItem };
+  return { ...load, refreshes, replaceItem, replaceItems, removeItem };
 }
