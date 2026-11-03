@@ -7,6 +7,7 @@ namespace App\Services\UnitStatus;
 use App\Models\UnitStatus\UnitStatusCall;
 use App\Models\UnitStatus\UnitStatusCallUnit;
 use App\Models\UnitStatus\UnitStatusRun;
+use App\Support\UnitStatus\StatusFamily;
 use App\Support\UnitStatus\UnitDefinition;
 use App\Support\UnitStatus\UnitStatusTime;
 
@@ -51,7 +52,7 @@ final class RunHistory
                 'callType' => $callType,
                 'idLabel' => $externalId !== null ? '#'.$externalId : 'ID pending',
                 'externalId' => $externalId,
-                'unitStatus' => (string) ($statuses->get($run->source_call_id) ?? ''),
+                'unitStatus' => StatusFamily::label((string) ($statuses->get($run->source_call_id) ?? '')),
                 'confirmed' => $run->confirmed,
                 'provenance' => $run->provenance,
             ];

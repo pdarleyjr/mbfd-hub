@@ -140,7 +140,7 @@ final class UnitStatusAccessTest extends UnitStatusTestCase
         self::assertSame(1, $one->json('page'));
         self::assertSame('Call 11', $one->json('runs.0.callType'));
         self::assertSame('#2601100011', $one->json('runs.0.idLabel'));
-        self::assertSame('Cleared From Incident', $one->json('runs.0.unitStatus'));
+        self::assertSame('Cleared', $one->json('runs.0.unitStatus'));
         self::assertSame('live', $one->json('runs.0.provenance'));
         self::assertTrue($one->json('runs.0.confirmed'));
         self::assertFalse($one->json('runs.8.confirmed'));

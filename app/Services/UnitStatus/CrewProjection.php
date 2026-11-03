@@ -9,6 +9,7 @@ use App\Services\DailyRoster\CurrentRosterReader;
 use App\Services\DailyRoster\RosterFreshness;
 use App\Services\DailyRoster\RosterFreshnessResolver;
 use App\Services\DailyRoster\RosterSectionView;
+use App\Support\UnitStatus\ShortName;
 use App\Support\UnitStatus\UnitRegistry;
 use App\Support\UnitStatus\UnitStatusTime;
 use Carbon\CarbonImmutable;
@@ -86,12 +87,14 @@ final class CrewProjection
             }
             $person = $assignment->employee_id !== null && $assignment->employee_id !== '' ? 'id:'.$assignment->employee_id : 'name:'.mb_strtolower($name);
             $rank = $this->rank($assignment);
+            $short = ShortName::from($rank, (string) $assignment->raw_name, $name);
             if ($this->covers($assignment, $now)) {
-                $onTruck[$person] ??= ['rank' => $rank, 'name' => $name];
+                $onTruck[$person] ??= ['rank' => $rank, 'name' => $name, 'short' => $short];
             } elseif ($assignment->starts_at !== null && $assignment->starts_at->greaterThan($now)) {
                 $later[$person.'|'.$assignment->starts_at->getTimestamp()] ??= [
                     'rank' => $rank,
                     'name' => $name,
+                    'short' => $short,
                     'from' => UnitStatusTime::clock($assignment->starts_at),
                     'through' => UnitStatusTime::clock($assignment->ends_at),
                 ];

@@ -27,6 +27,14 @@ return [
     'sync_fresh_seconds' => 150,
     // A call open this long in PulsePoint is not treated as current: the unit shows "Not confirmed", never available.
     'current_call_max_age_hours' => 12,
+    // v1.1 (contract 10.1): PulsePoint draws "?" units orange, which the collector reads as "Dispatched"; no confirmed unit
+    // was ever reported Dispatched. So a "?" unit is on a call only this many minutes after the call was received, and
+    // 0 (the default) means never: it has no status, no place on a call and no counted run. A confirmed unit still
+    // Dispatched, Acknowledged or blank this many minutes after the call was received has moved on.
+    'unconfirmed_grace_minutes' => 0,
+    'stalled_dispatch_minutes' => 10,
+    // Command's medical rule: CPT5, 300 and FB6 count as rescue on a medical call and as combat on any other call.
+    'medical_call_pattern' => '/medical|medic|ems|cardiac|breathing|overdose|stroke|seizure|unconscious|injury|sick|expedite|interfacility/i',
     // One run stops paging after this long; the rest is a backlog the next run resumes exactly where this one stopped.
     'run_budget_seconds' => 20,
     // The built board is shared by everyone polling for this many seconds (0 turns the cache off).
@@ -41,33 +49,33 @@ return [
     'breaker_base_seconds' => 30,
     'breaker_max_seconds' => 300,
 
-    // Order is the order on the page. `designations` are matched exactly after normalization (never by prefix).
+    // `class` is rescue, combat or by_call (counted by call type). Order is the order on the page. `designations` are matched exactly after normalization (never by prefix).
     'stations' => [
         1 => [
-            ['code' => 'L1', 'name' => 'Ladder 1', 'designations' => ['L1'], 'roster_label' => 'Ladder 1'],
-            ['code' => 'E1', 'name' => 'Engine 1', 'designations' => ['E1'], 'roster_label' => 'Engine 1'],
-            ['code' => 'R1', 'name' => 'Rescue 1', 'designations' => ['R1'], 'roster_label' => 'Rescue 1'],
-            ['code' => 'R11', 'name' => 'Rescue 11', 'designations' => ['R11'], 'roster_label' => 'Rescue 11'],
+            ['code' => 'L1', 'name' => 'Ladder 1', 'class' => 'combat', 'designations' => ['L1'], 'roster_label' => 'Ladder 1'],
+            ['code' => 'E1', 'name' => 'Engine 1', 'class' => 'combat', 'designations' => ['E1'], 'roster_label' => 'Engine 1'],
+            ['code' => 'R1', 'name' => 'Rescue 1', 'class' => 'rescue', 'designations' => ['R1'], 'roster_label' => 'Rescue 1'],
+            ['code' => 'R11', 'name' => 'Rescue 11', 'class' => 'rescue', 'designations' => ['R11'], 'roster_label' => 'Rescue 11'],
         ],
         2 => [
-            ['code' => 'E2', 'name' => 'Engine 2', 'designations' => ['E2'], 'roster_label' => 'Engine 2'],
-            ['code' => 'R2', 'name' => 'Rescue 2', 'designations' => ['R2'], 'roster_label' => 'Rescue 2'],
-            ['code' => 'R22', 'name' => 'Rescue 22', 'designations' => ['R22'], 'roster_label' => 'Rescue 22'],
-            ['code' => 'CPT5', 'name' => 'Captain 5', 'designations' => ['CPT5'], 'roster_label' => 'Captain 5'],
-            ['code' => '300', 'name' => '300', 'designations' => ['300'], 'roster_label' => 'Division Chief 300'],
+            ['code' => 'E2', 'name' => 'Engine 2', 'class' => 'combat', 'designations' => ['E2'], 'roster_label' => 'Engine 2'],
+            ['code' => 'R2', 'name' => 'Rescue 2', 'class' => 'rescue', 'designations' => ['R2'], 'roster_label' => 'Rescue 2'],
+            ['code' => 'R22', 'name' => 'Rescue 22', 'class' => 'rescue', 'designations' => ['R22'], 'roster_label' => 'Rescue 22'],
+            ['code' => 'CPT5', 'name' => 'Captain 5', 'class' => 'by_call', 'designations' => ['CPT5'], 'roster_label' => 'Captain 5'],
+            ['code' => '300', 'name' => '300', 'class' => 'by_call', 'designations' => ['300'], 'roster_label' => 'Division Chief 300'],
         ],
         3 => [
-            ['code' => 'L3', 'name' => 'Ladder 3', 'designations' => ['L3'], 'roster_label' => 'Ladder 3'],
-            ['code' => 'E3', 'name' => 'Engine 3', 'designations' => ['E3'], 'roster_label' => 'Engine 3'],
-            ['code' => 'R3', 'name' => 'Rescue 3', 'designations' => ['R3'], 'roster_label' => 'Rescue 3'],
+            ['code' => 'L3', 'name' => 'Ladder 3', 'class' => 'combat', 'designations' => ['L3'], 'roster_label' => 'Ladder 3'],
+            ['code' => 'E3', 'name' => 'Engine 3', 'class' => 'combat', 'designations' => ['E3'], 'roster_label' => 'Engine 3'],
+            ['code' => 'R3', 'name' => 'Rescue 3', 'class' => 'rescue', 'designations' => ['R3'], 'roster_label' => 'Rescue 3'],
         ],
         4 => [
-            ['code' => 'E4', 'name' => 'Engine 4', 'designations' => ['E4'], 'roster_label' => 'Engine 4'],
-            ['code' => 'R4', 'name' => 'Rescue 4', 'designations' => ['R4'], 'roster_label' => 'Rescue 4'],
-            ['code' => 'R44', 'name' => 'Rescue 44', 'designations' => ['R44'], 'roster_label' => 'Rescue 44'],
+            ['code' => 'E4', 'name' => 'Engine 4', 'class' => 'combat', 'designations' => ['E4'], 'roster_label' => 'Engine 4'],
+            ['code' => 'R4', 'name' => 'Rescue 4', 'class' => 'rescue', 'designations' => ['R4'], 'roster_label' => 'Rescue 4'],
+            ['code' => 'R44', 'name' => 'Rescue 44', 'class' => 'rescue', 'designations' => ['R44'], 'roster_label' => 'Rescue 44'],
         ],
         6 => [
-            ['code' => 'FB6', 'name' => 'Fireboat 6', 'designations' => ['FB6'], 'roster_label' => 'Fire Boat 6'],
+            ['code' => 'FB6', 'name' => 'Fireboat 6', 'class' => 'by_call', 'designations' => ['FB6'], 'roster_label' => 'Fire Boat 6'],
         ],
     ],
 ];

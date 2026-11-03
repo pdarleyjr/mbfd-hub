@@ -183,7 +183,7 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
     public function test_an_active_call_shows_the_pulsepoint_status_word_and_its_family(): void
     {
         $this->markFeedFresh();
-        $this->storeCall(1, ['E2' => ['status' => 'On Scene'], 'R2' => ['status' => ''], 'R3' => ['status' => 'Dispatched', 'confirmed' => false]]);
+        $this->storeCall(1, ['E2' => ['status' => 'On Scene'], 'R2' => ['status' => ''], 'R3' => ['status' => 'Dispatched', 'confirmed' => false]], ['received_at' => self::et('2026-11-02 10:25:00')]);
 
         $board = $this->board();
 
@@ -196,10 +196,12 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
         self::assertTrue($e2['availability']['confirmed']);
         self::assertSame('Medical Emergency – 1230 OCEAN AVE, MIAMI BEACH, FL', $e2['assignmentSummary']);
         self::assertSame('Assigned', $this->unit($board, 'R2')['availability']['label']);
-        self::assertFalse($this->unit($board, 'R3')['availability']['confirmed']);
+        // R3 is listed with a question mark: PulsePoint's doubt is never shown, so it is simply not on the call.
+        self::assertSame([], $this->unit($board, 'R3')['currentCalls']);
+        self::assertNotSame('on_call', $this->unit($board, 'R3')['availability']['key']);
         $call = $e2['currentCalls'][0];
         self::assertSame('#2601100001', $call['idLabel']);
-        self::assertSame('9:15 AM ET', $call['receivedLabel']);
+        self::assertSame('10:25 AM ET', $call['receivedLabel']);
         self::assertSame('https://web.pulsepoint.org/DeepLink.aspx?incidentid=1', $call['sourceUrl']);
         self::assertNull($call['location']);
     }
@@ -233,18 +235,19 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
         self::assertStringStartsWith('May be out of date.', (string) $availability['note']);
     }
 
-    public function test_overlapping_active_calls_are_a_conflict_in_a_deterministic_order(): void
+    public function test_a_unit_on_two_current_calls_is_on_the_newer_one_only(): void
     {
         $this->markFeedFresh();
         $this->storeCall(1, ['E1' => ['status' => 'On Scene']], ['received_at' => self::et('2026-11-02 09:00:00')]);
         $this->storeCall(3, ['E1' => ['status' => 'Enroute']], ['received_at' => self::et('2026-11-02 10:00:00')]);
-        $this->storeCall(2, ['E1' => ['status' => 'Dispatched']], ['received_at' => self::et('2026-11-02 10:00:00')]);
+        $this->storeCall(2, ['E1' => ['status' => 'Enroute']], ['received_at' => self::et('2026-11-02 10:00:00')]);
 
         $e1 = $this->unit($this->board(), 'E1');
 
-        self::assertTrue($e1['conflict']);
-        self::assertSame([self::callId(2), self::callId(3), self::callId(1)], array_column($e1['currentCalls'], 'sourceCallId'));
-        self::assertSame('Dispatched', $e1['availability']['label']);
+        // Same received time: the first seen wins, then the id, so the answer is the same on every build.
+        self::assertFalse($e1['conflict']);
+        self::assertSame([self::callId(2)], array_column($e1['currentCalls'], 'sourceCallId'));
+        self::assertSame('En Route', $e1['availability']['label']);
         self::assertSame($e1, $this->unit($this->board(), 'E1'));
     }
 
@@ -298,8 +301,8 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
         $crew = $this->unit($this->board(), 'R1')['crew'];
 
         self::assertSame('confirmed', $crew['state']);
-        self::assertSame([['rank' => 'Captain', 'name' => 'ALPHA, ANN'], ['rank' => 'Firefighter', 'name' => 'BRAVO, BOB']], $crew['onTruck']);
-        self::assertSame([['rank' => 'Firefighter', 'name' => 'CHARLIE, CY', 'from' => '19:00', 'through' => '08:00']], $crew['later']);
+        self::assertSame([['rank' => 'Captain', 'name' => 'ALPHA, ANN', 'short' => 'Capt. ALPHA'], ['rank' => 'Firefighter', 'name' => 'BRAVO, BOB', 'short' => 'FF BRAVO']], $crew['onTruck']);
+        self::assertSame([['rank' => 'Firefighter', 'name' => 'CHARLIE, CY', 'short' => 'FF CHARLIE', 'from' => '19:00', 'through' => '08:00']], $crew['later']);
         self::assertSame(1, $crew['vacancies']);
         self::assertNotNull($crew['asOf']);
     }
@@ -345,7 +348,7 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
         self::assertStringContainsString('ALPHA, ANN', $json);
     }
 
-    public function test_run_counts_separate_this_shift_lifetime_unconfirmed_and_backfilled(): void
+    public function test_run_counts_cover_this_shift_lifetime_and_backfilled_and_never_count_unconfirmed(): void
     {
         $this->markFeedFresh();
         $make = static fn (int $n, array $a): UnitStatusRun => UnitStatusRun::query()->create($a + [
@@ -362,7 +365,8 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
 
         $board = $this->board();
 
-        self::assertSame(['shift' => 2, 'shiftUnconfirmed' => 1, 'lifetime' => 3, 'lifetimeUnconfirmed' => 2, 'backfilledLifetime' => 1], $this->unit($board, 'E2')['runs']);
+        self::assertSame(['shift' => 2, 'lifetime' => 3, 'backfilledLifetime' => 1], $this->unit($board, 'E2')['runs']);
+        self::assertStringNotContainsString('nconfirmed', (string) json_encode(array_column(array_merge(...array_column($board['stations'], 'units')), 'runs')));
         self::assertSame(1, $this->unit($board, 'R2')['runs']['shift']);
         self::assertSame(0, $this->unit($board, 'E1')['runs']['lifetime']);
         self::assertSame($board['stations'], $this->board()['stations']);

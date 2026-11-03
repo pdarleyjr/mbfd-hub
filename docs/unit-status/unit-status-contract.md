@@ -246,3 +246,87 @@ All timestamps ISO-8601 UTC; labels formatted in America/New_York with "ET". Tex
   "Approximate location" only when present); Calls this shift; Lifetime since {startsLabel}; counting definition;
   unconfirmed counts; coverage gaps; crew now + later reliefs + vacancies + roster as-of; recent runs (loaded from
   `/unit-status/units/{code}/runs`, "Show more").
+
+## 10. v1.1 changes (owner direction, 2026-11-02 evening)
+
+### 10.1 Stuck and phantom assignments (automatic; nothing to clear by hand)
+
+Observed: PulsePoint left a Water Rescue (received 2:16 PM) "active" for hours with six units marked `?` (not confirmed)
+at Dispatched, although every one of them had cleared. The owner confirmed none were on it. A `?` unit can also be a
+real dispatch for a few seconds (`?E4` became `E4` six seconds later). Rules, applied when deciding a unit's current
+calls (they never change Command's data):
+
+1. **Unconfirmed units are never shown.** A `?` designation never places a unit on a call, never shows a status and
+   never earns a run (`unit_status.unconfirmed_grace_minutes`, default 0). Evidence (Command history, Oct 31-Nov 2):
+   every orange "Dispatched" PulsePoint ever reported belonged to a `?` unit (7 of 7); no confirmed unit was ever
+   reported Dispatched, and none went backwards in 178 status histories. The collector reads list colors, and
+   PulsePoint draws `?` units orange, which the collector names "Dispatched". A real dispatch is confirmed within
+   seconds (`?E4` became `E4` six seconds later), so the unit appears then.
+2. **Stalled dispatch.** A confirmed unit whose status is still Dispatched, Acknowledged or blank on a call received more
+   than `unit_status.stalled_dispatch_minutes` (10) ago is not on that call. A unit that really responds shows Enroute
+   (green) or later within minutes.
+3. **Superseded.** A unit listed on two current calls is on the newer one only (received time, then first seen).
+4. The 12-hour age limit stays as it is.
+
+A unit whose calls all drop out under rules 1-3 gets its normal availability (Available when the feed is fresh, the
+roster is current and it has crew), because PulsePoint itself shows nothing more about it. **Unconfirmed runs are never
+counted or shown** anywhere (no "+1 unconfirmed").
+
+### 10.2 One compact row on every device; details in one pop-up card
+
+Each unit row shows only: unit (code, name), status chip, and when on a call its PulsePoint incident ID (`#2601372003`,
+or "ID pending"). The whole row opens the unit's pop-up card (the single `<dialog>`); there is no inline expansion. The
+pop-up card shows: status and last verified time; runs this shift; the current call (ID, type, address, received ET,
+unit status, Open in PulsePoint); the calls the unit ran this shift (time, type, ID, its last status); its busiest day
+(most runs in one duty day, with the date); all-time runs since tracking began; and today's crew in short form.
+
+### 10.3 Short crew names (pop-up)
+
+`{rank abbreviation} {surname}`: surname is the text before the comma of TeleStaff's "Last, First" name (so "Yacum Jr"
+stays whole); a leading "." on a rank is dropped. Abbreviations: Firefighter → FF; Firefighter DE → DE; Lieutenant and
+Combat Lieutenant → Lt.; Captain, Combat Captain, Captain PM and Marine Captain → Capt.; Division Chief → DC; Battalion
+Chief → BC; any other rank is shown as written. No rank → surname only.
+
+### 10.4 Shift totals at the top
+
+Four small cards for the current duty shift (08:00-08:00), confirmed non-voided runs only:
+* **Runs this shift**: rescue + combat.
+* **Rescue**: runs by R1, R11, R2, R22, R3, R4, R44, plus CPT5, 300 and FB6 runs on medical calls.
+* **Combat**: runs by E1, E2, E3, E4, L1, L3, plus CPT5, 300 and FB6 runs on any other call.
+  "Medical" = the call type matches Command's medical rule (`medical|medic|ems|cardiac|breathing|overdose|stroke|
+  seizure|unconscious|injury|sick|expedite|interfacility`, case-insensitive).
+* **Busiest unit**: the rescue or combat unit (any of the 16) with the most runs this shift, with its count; ties list
+  every tied unit; none yet → "No runs yet this shift".
+
+A small note near the cards: "Counts began Nov 2, 2026 at 8:00 AM and keep adding up from there."
+
+### 10.5 View-model additions
+
+`board.totals = { total, rescue, combat, busiest: { codes: [..], runs } | null }`, `board.tracking.note`;
+per unit `incidentLabel` (primary current call's `idLabel` or null) and `profile = { shiftRuns, lifetimeRuns,
+busiestDay: { runs, date, label } | null, todayCalls: [ { attributedAt, timeLabel, callType, idLabel, externalId,
+unitStatus, current, sourceUrl } ] }`; crew entries gain `short` ("Lt. Benson"). Unconfirmed counters are removed from
+the payload.
+
+### 10.6 Professional status wording (owner direction)
+
+The board never shows PulsePoint's raw words or the word "unconfirmed". Display labels (family and indicator color
+unchanged):
+
+| PulsePoint | Board label |
+| --- | --- |
+| Dispatched, Acknowledged | Dispatched |
+| Enroute | En Route |
+| Staged | Staged |
+| On Scene, Available On Scene | On Scene |
+| Transport | Transporting |
+| Transport Arrived | At Hospital |
+| Cleared From Incident | (not on the call) |
+| blank, confirmed unit, within 10 minutes | Assigned |
+| no current call | Available / No active call / Not staffed / Not confirmed (section 5) |
+
+Guarantees against a repeat of the "Dispatched (unconfirmed)" display: `?` units are removed server-side before any
+status is built (10.1); the label table above is the only source of status text; the views have no unconfirmed suffix;
+and a regression test renders the page, the fragment and the JSON from a feed containing `?` units and fails if
+"unconfirmed" (any case) or a `?`-prefixed designation appears anywhere in them. The pop-up's "other units" list shows
+only confirmed units.

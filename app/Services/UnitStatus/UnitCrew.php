@@ -11,8 +11,8 @@ namespace App\Services\UnitStatus;
 final readonly class UnitCrew
 {
     /**
-     * @param  list<array{rank: ?string, name: string}>  $onTruck
-     * @param  list<array{rank: ?string, name: string, from: ?string, through: ?string}>  $later
+     * @param  list<array{rank: ?string, name: string, short: string}>  $onTruck
+     * @param  list<array{rank: ?string, name: string, short: string, from: ?string, through: ?string}>  $later
      */
     public function __construct(
         public bool $listed,

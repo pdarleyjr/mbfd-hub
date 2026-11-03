@@ -10,14 +10,13 @@ import {
     nextDelay,
     profileChanged,
     staleNote,
-    survivingIds,
     toEntityTag,
 } from './unit-status/board-state.js';
 
 /**
- * Unit Status: row disclosure, the profile dialog and an in-place refresh. A new board replaces
+ * Unit Status: the profile dialog and an in-place refresh. A new board replaces
  * [data-us-board]; the page itself never reloads and no worker or busy registry is touched.
- * The server renders and escapes the board HTML; recent runs arrive as JSON and are written with textContent only.
+ * The server renders and escapes the board HTML; nothing from JSON is ever written as HTML.
  */
 const REQUEST_TIMEOUT_MS = 15_000;
 /** A timer asking is not a member using the Hub: the idle clock stays put, so a shared screen still signs out. */
@@ -47,22 +46,6 @@ function initUnitStatus(page) {
     let stale = false;
     let signedOut = false;
 
-    /* ---------- disclosure ---------- */
-
-    function setExpanded(id, expanded) {
-        const toggle = document.getElementById(`${id}-toggle`);
-        const panel = document.getElementById(`${id}-panel`);
-        if (!toggle || !panel) {
-            return;
-        }
-        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        panel.hidden = !expanded;
-    }
-
-    function expandedIds() {
-        return [...page.querySelectorAll('[data-us-toggle][aria-expanded="true"]')].map((el) => el.dataset.usToggle);
-    }
-
     /* ---------- profile dialog ---------- */
 
     function template(id) {
@@ -74,22 +57,13 @@ function initUnitStatus(page) {
         if (!source || !dialog) {
             return false;
         }
-        const previousRuns = dialogUnit === id ? dialogContent.querySelector('[data-us-runs]') : null;
         const fresh = source.content.cloneNode(true);
-        const freshRuns = fresh.querySelector('[data-us-runs]');
-        if (previousRuns && freshRuns) {
-            freshRuns.replaceWith(previousRuns);
-        }
         dialogContent.replaceChildren(fresh);
         dialog.setAttribute('aria-labelledby', `${id}-full-title`);
         dialogUnit = id;
         dialogMarkup = source.innerHTML;
         if (stale) {
             downgradeChips(dialogContent);
-        }
-        const runs = dialogContent.querySelector('[data-us-runs]');
-        if (runs && !previousRuns) {
-            loadRuns(runs);
         }
         return true;
     }
@@ -122,74 +96,10 @@ function initUnitStatus(page) {
         }
     });
 
-    /* ---------- recent runs ---------- */
-
-    async function loadRuns(section) {
-        const list = section.querySelector('[data-us-runs-list]');
-        const status = section.querySelector('[data-us-runs-status]');
-        const more = section.querySelector('[data-us-runs-more]');
-        const next = Number(section.dataset.page || 0) + 1;
-        more.hidden = true;
-        status.hidden = false;
-        status.textContent = 'Loading recent runs';
-        try {
-            const response = await fetch(`${section.dataset.url}?page=${next}`, {
-                cache: 'no-store',
-                credentials: 'same-origin',
-                redirect: 'manual',
-                headers: { Accept: 'application/json', ...BACKGROUND_REFRESH },
-            });
-            if (classifyResponse(response) === 'auth') {
-                status.hidden = false;
-                status.textContent = SIGN_IN_NOTE;
-                more.hidden = true;
-                return;
-            }
-            if (!response.ok) {
-                throw new Error(String(response.status));
-            }
-            const body = await response.json();
-            const runs = Array.isArray(body.runs) ? body.runs : [];
-            runs.forEach((run) => list.append(runItem(run)));
-            section.dataset.page = String(body.page ?? next);
-            status.hidden = list.children.length > 0;
-            status.textContent = list.children.length > 0 ? '' : 'No runs recorded yet';
-            more.hidden = !body.hasMore;
-        } catch {
-            status.hidden = false;
-            status.textContent = "Couldn't load recent runs. Try again.";
-            more.hidden = false;
-            more.textContent = 'Try again';
-            return;
-        }
-        more.textContent = 'Show more';
-    }
-
-    function runItem(run) {
-        const item = document.createElement('li');
-        const title = document.createElement('span');
-        title.textContent = [run.callType || 'Call type not given', run.idLabel].filter(Boolean).join(' · ');
-        const meta = document.createElement('span');
-        meta.className = 'us-runs-list__meta';
-        meta.textContent = [
-            run.attributedLabel,
-            run.unitStatus || 'Assigned',
-            run.confirmed ? null : 'unconfirmed',
-            run.provenance === 'backfill' ? 'recovered after the fact' : null,
-        ].filter(Boolean).join(' · ');
-        item.append(title, meta);
-        return item;
-    }
-
     /* ---------- clicks ---------- */
 
     page.addEventListener('click', (event) => {
         const target = event.target instanceof Element ? event.target : null;
-        const toggle = target?.closest('[data-us-toggle]');
-        if (toggle) {
-            setExpanded(toggle.dataset.usToggle, toggle.getAttribute('aria-expanded') !== 'true');
-            return;
-        }
         const open = target?.closest('[data-us-open]');
         if (open) {
             openProfile(open.dataset.usOpen, open);
@@ -198,10 +108,6 @@ function initUnitStatus(page) {
         if (target?.closest('[data-us-dialog-close]')) {
             dialog?.close();
             return;
-        }
-        const more = target?.closest('[data-us-runs-more]');
-        if (more) {
-            loadRuns(more.closest('[data-us-runs]'));
         }
     });
 
@@ -282,15 +188,12 @@ function initUnitStatus(page) {
         if (!next) {
             throw new Error('The response had no board.');
         }
-        const open = expandedIds();
         const scrollY = window.scrollY;
         const active = document.activeElement;
         const focusId = active?.id && board().contains(active) ? active.id : null;
 
         board().replaceWith(document.adoptNode(next));
 
-        const available = [...page.querySelectorAll('[data-us-toggle]')].map((el) => el.dataset.usToggle);
-        survivingIds(open, available).forEach((id) => setExpanded(id, true));
         refreshDialog();
         window.scrollTo({ top: scrollY, behavior: 'instant' });
         if (focusId) {

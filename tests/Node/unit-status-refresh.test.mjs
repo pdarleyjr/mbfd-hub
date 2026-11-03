@@ -114,9 +114,9 @@ test('the open profile is only rebuilt when its markup changed', () => {
     assert.equal(profileChanged('<p>a</p>', '<p>b</p>'), true);
 });
 
-test('the page script sends the background header and refuses redirects on every fetch', () => {
+test('the page script sends the background header and refuses redirects on its board fetch', () => {
     const source = readFileSync('resources/js/unit-status.js', 'utf8');
-    assert.equal((source.match(/redirect: 'manual'/g) ?? []).length, 2);
-    assert.equal((source.match(/\.\.\.BACKGROUND_REFRESH/g) ?? []).length, 2);
+    assert.equal((source.match(/redirect: 'manual'/g) ?? []).length, 1);
+    assert.equal((source.match(/\.\.\.BACKGROUND_REFRESH/g) ?? []).length, 1);
     assert.match(source, /data-focus-key/);
 });

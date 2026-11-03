@@ -1,5 +1,5 @@
 @php
-    /** @var array $board  The view model in docs/unit-status/unit-status-contract.md section 8. */
+    /** @var array $board  The view model in docs/unit-status/unit-status-contract.md sections 8 and 10.5. */
     $etTime = static function (?string $iso): ?string {
         if ($iso === null || $iso === '') {
             return null;
@@ -14,6 +14,9 @@
     $source = $board['source'] ?? [];
     $roster = $board['roster'] ?? [];
     $updated = $etTime($board['generatedAt'] ?? null);
+    $totals = $board['totals'] ?? [];
+    $busiest = $totals['busiest'] ?? null;
+    $busiestRuns = (int) ($busiest['runs'] ?? 0);
 
     $statusParts = [];
     if (! $live) {
@@ -45,116 +48,82 @@
     @else
         <p class="us-status-line" data-us-status-line>{{ implode('. ', $statusParts) }}</p>
     @endif
-    <p class="us-advisory">{{ $board['advisory'] ?? 'PulsePoint is advisory. Verify with dispatch.' }}</p>
     <p class="us-meta">
         @if(! empty($board['dutyWindow']['label']))<span>Duty window: {{ $board['dutyWindow']['label'] }}</span>@endif
         @if($updated)<span data-us-updated>Updated {{ $updated }}</span>@endif
     </p>
 
-    <div class="us-table-wrap">
-        <table class="us-table">
-            <caption class="sr-only">Unit status for every apparatus, grouped by station</caption>
-            <thead>
-                <tr>
-                    <th scope="col" class="us-col--unit">Unit</th>
-                    <th scope="col" class="us-col--status">Availability / Status</th>
-                    <th scope="col" class="us-col--assign">Current Assignment / Call Status</th>
-                    <th scope="col" class="us-col--runs">24h Runs <span class="sr-only">this duty shift since 8:00 AM</span></th>
-                    <th scope="col" class="us-col--crew">Personnel on Truck (This Shift)</th>
-                    <th scope="col" class="us-col--profile">Profile / Details</th>
-                </tr>
-            </thead>
-            @foreach($board['stations'] as $station)
-                <tbody class="us-station-group" data-us-station="{{ $station['number'] }}">
-                    <tr class="us-station">
-                        <th scope="rowgroup" colspan="6">{{ $station['label'] }}</th>
-                    </tr>
+    <div class="us-totals" data-us-totals>
+        <section class="us-total" aria-labelledby="us-total-all">
+            <h2 class="us-total__label" id="us-total-all">Runs this shift</h2>
+            <p class="us-total__figure">{{ $totals['total'] ?? 0 }}</p>
+        </section>
+        <section class="us-total" aria-labelledby="us-total-rescue">
+            <h2 class="us-total__label" id="us-total-rescue">Rescue</h2>
+            <p class="us-total__figure">{{ $totals['rescue'] ?? 0 }}</p>
+        </section>
+        <section class="us-total" aria-labelledby="us-total-combat">
+            <h2 class="us-total__label" id="us-total-combat">Combat</h2>
+            <p class="us-total__figure">{{ $totals['combat'] ?? 0 }}</p>
+        </section>
+        <section class="us-total" aria-labelledby="us-total-busiest">
+            <h2 class="us-total__label" id="us-total-busiest">Busiest unit</h2>
+            @if(! empty($busiest['codes']))
+                <p class="us-total__figure us-total__figure--text">{{ implode(' · ', $busiest['codes']) }}</p>
+                <p class="us-total__sub">{{ $busiestRuns }} {{ $busiestRuns === 1 ? 'run' : 'runs' }}</p>
+            @else
+                <p class="us-total__empty">No runs yet this shift</p>
+            @endif
+        </section>
+    </div>
+    @if(! empty($board['tracking']['note']))<p class="us-note-line">{{ $board['tracking']['note'] }}</p>@endif
+    <p class="us-advisory">{{ $board['advisory'] ?? 'PulsePoint is advisory. Verify with dispatch.' }}</p>
+
+    <div class="us-stations">
+        @foreach($board['stations'] as $station)
+            <section class="us-station-group" data-us-station="{{ $station['number'] }}" aria-labelledby="us-station-{{ $station['number'] }}">
+                <h2 class="us-station" id="us-station-{{ $station['number'] }}">{{ $station['label'] }}</h2>
+                <ul class="us-list">
                     @foreach($station['units'] as $unit)
                         @php
                             $availability = $unit['availability'];
-                            $crew = $unit['crew'] ?? [];
-                            $calls = $unit['currentCalls'] ?? [];
-                            $names = collect($crew['onTruck'] ?? [])->map(fn ($p) => trim(($p['rank'] ?? '') . ' ' . ($p['name'] ?? '')))->filter()->values();
-                            $lastSeen = ! empty($availability['stale']) ? $etTime($availability['observedAt'] ?? null) : null;
-                            $more = max(0, count($calls) - 1);
-                            $statusText = ($availability['label'] ?? '') . (($availability['confirmed'] ?? true) ? '' : ' (unconfirmed)');
+                            $statusText = $availability['label'] ?? '';
+                            $onCall = ($availability['key'] ?? '') === 'on_call';
+                            $incident = $onCall ? ($unit['incidentLabel'] ?? null) : null;
                         @endphp
-                        <tr
-                            class="us-unit"
-                            id="{{ $unit['domId'] }}"
-                            data-us-unit="{{ $unit['domId'] }}"
-                            data-unit-code="{{ $unit['code'] }}"
-                            data-status="{{ $statusText }}"
-                            data-summary="{{ $unit['assignmentSummary'] ?? '' }}"
-                        >
-                            <th scope="row" class="us-cell us-cell--unit">
-                                <button
-                                    type="button"
-                                    class="us-toggle"
-                                    id="{{ $unit['domId'] }}-toggle"
-                                    data-us-toggle="{{ $unit['domId'] }}"
-                                    aria-expanded="false"
-                                    aria-controls="{{ $unit['domId'] }}-panel"
-                                >
-                                    @include('unit-status.partials.chevron')
-                                    <span class="us-toggle__text">
-                                        <strong class="us-toggle__code">{{ $unit['code'] }}</strong>
-                                        <span class="us-toggle__name">{{ $unit['name'] }}</span>
-                                    </span>
-                                </button>
-                            </th>
-                            <td class="us-cell us-cell--status">
-                                <span class="us-cell__label">Availability / Status</span>
-                                @include('unit-status.partials.chip', ['availability' => $availability])
-                                @if(! empty($availability['note']))<span class="us-note">{{ $availability['note'] }}</span>@endif
-                                @if($lastSeen)<span class="us-note">Last seen {{ $lastSeen }}</span>@endif
-                            </td>
-                            <td class="us-cell us-cell--assign">
-                                <span class="us-cell__label">Current Assignment / Call Status</span>
-                                <span class="us-assign">{{ $unit['assignmentSummary'] ?? 'Not confirmed' }}</span>
-                                @if(! empty($calls[0]))
-                                    <span class="us-note">{{ $calls[0]['idLabel'] }}@if(! empty($calls[0]['receivedLabel'])) · Received {{ $calls[0]['receivedLabel'] }}@endif</span>
-                                @endif
-                                @if(! empty($unit['conflict']) && $more > 0)<span class="us-note us-note--more">+{{ $more }} more {{ $more === 1 ? 'call' : 'calls' }}</span>@endif
-                            </td>
-                            <td class="us-cell us-cell--runs">
-                                <span class="us-cell__label">24h Runs</span>
-                                <span class="us-runs">{{ $unit['runs']['shift'] ?? 0 }}<span class="sr-only"> runs this duty shift</span></span>
-                                @if(($unit['runs']['shiftUnconfirmed'] ?? 0) > 0)<span class="us-note">+{{ $unit['runs']['shiftUnconfirmed'] }} unconfirmed</span>@endif
-                            </td>
-                            <td class="us-cell us-cell--crew">
-                                <span class="us-cell__label">Personnel on Truck (This Shift)</span>
-                                @if($names->isNotEmpty())
-                                    <span class="us-crew-line">{{ $names->implode(', ') }}</span>
-                                    @if(($crew['state'] ?? '') === 'delayed')<span class="us-note">{{ $crew['label'] ?? 'Roster delayed' }}</span>@endif
-                                @else
-                                    <span class="us-crew-line us-crew-line--muted">{{ $crew['label'] ?? 'Personnel not confirmed' }}</span>
-                                @endif
-                                @if(($crew['vacancies'] ?? 0) > 0)<span class="us-note">{{ $crew['vacancies'] }} {{ $crew['vacancies'] === 1 ? 'vacancy' : 'vacancies' }}</span>@endif
-                            </td>
-                            <td class="us-cell us-cell--profile">
-                                <button type="button" class="us-view" id="{{ $unit['domId'] }}-view" data-us-open="{{ $unit['domId'] }}">
-                                    <span>View profile<span class="sr-only"> for {{ $unit['name'] }}</span></span>
-                                    @include('unit-status.partials.chevron', ['class' => 'us-view__icon'])
-                                </button>
-                            </td>
-                        </tr>
-                        <tr class="us-panel-row" id="{{ $unit['domId'] }}-panel" data-us-panel="{{ $unit['domId'] }}" hidden>
-                            <td colspan="6" class="us-panel-cell">
-                                @include('unit-status.partials.unit-profile', ['unit' => $unit, 'board' => $board, 'variant' => 'inline', 'etTime' => $etTime])
-                            </td>
-                        </tr>
+                        <li class="us-item" id="{{ $unit['domId'] }}" data-us-unit="{{ $unit['domId'] }}">
+                            <button
+                                type="button"
+                                class="us-row"
+                                id="{{ $unit['domId'] }}-view"
+                                data-us-open="{{ $unit['domId'] }}"
+                                data-unit-code="{{ $unit['code'] }}"
+                                data-status="{{ $statusText }}"
+                                data-summary="{{ $unit['assignmentSummary'] ?? '' }}"
+                                aria-haspopup="dialog"
+                            >
+                                <span class="us-row__unit">
+                                    <strong class="us-row__code">{{ $unit['code'] }}</strong>
+                                    <span class="us-row__name">{{ $unit['name'] }}</span>
+                                </span>
+                                <span class="us-row__status">
+                                    @include('unit-status.partials.chip', ['availability' => $availability])
+                                    @if($incident)<span class="us-row__incident">{{ $incident }}</span>@endif
+                                </span>
+                                @include('unit-status.partials.chevron', ['class' => 'us-row__chevron'])
+                            </button>
+                        </li>
                     @endforeach
-                </tbody>
-            @endforeach
-        </table>
+                </ul>
+            </section>
+        @endforeach
     </div>
 
     {{-- One full profile per unit; the page's single dialog is filled from the matching template. --}}
     @foreach($board['stations'] as $station)
         @foreach($station['units'] as $unit)
             <template id="profile-{{ $unit['domId'] }}" data-us-profile-template="{{ $unit['domId'] }}">
-                @include('unit-status.partials.unit-profile', ['unit' => $unit, 'board' => $board, 'variant' => 'full', 'etTime' => $etTime])
+                @include('unit-status.partials.unit-profile', ['unit' => $unit, 'board' => $board, 'etTime' => $etTime])
             </template>
         @endforeach
     @endforeach

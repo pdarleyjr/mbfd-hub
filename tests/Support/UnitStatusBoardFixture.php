@@ -66,11 +66,13 @@ final class UnitStatusBoardFixture
                 'label' => 'Nov 2, 8:00 AM – Nov 3, 8:00 AM ET', 'shift' => 'A',
             ],
             'tracking' => [
-                'startsAt' => '2026-11-02T13:00:00Z', 'startsLabel' => 'Nov 2, 8:00 AM ET', 'firstSyncedAt' => '2026-11-02T13:01:00Z',
+                'startsAt' => '2026-11-02T13:00:00Z', 'startsLabel' => 'Nov 2, 2026', 'firstSyncedAt' => '2026-11-02T13:01:00Z',
                 'definition' => 'A run is a PulsePoint call that listed this unit (an observed assignment). It is not proof the unit responded.',
+                'note' => 'Counts began Nov 2, 2026 at 8:00 AM and keep adding up from there.',
                 'openGap' => false,
                 'gaps' => [['startedAt' => '2026-11-02T15:00:00Z', 'endedAt' => '2026-11-02T15:10:00Z', 'reason' => 'feed_delayed', 'label' => 'Feed delayed 11:00 AM to 11:10 AM ET']],
             ],
+            'totals' => ['total' => 9, 'rescue' => 5, 'combat' => 4, 'busiest' => ['codes' => ['R2'], 'runs' => 4]],
             'stations' => $stations,
         ], $overrides);
     }
@@ -114,8 +116,9 @@ final class UnitStatusBoardFixture
             'assignmentSummary' => 'No active call',
             'conflict' => false,
             'currentCalls' => [],
-            'runs' => ['shift' => 0, 'shiftUnconfirmed' => 0, 'lifetime' => 0, 'lifetimeUnconfirmed' => 0, 'backfilledLifetime' => 0],
-            'crew' => self::crew('confirmed', 'Crew confirmed', [['rank' => 'Lt.', 'name' => 'Pat Tester '.$code], ['rank' => null, 'name' => 'Sam Sample']]),
+            'incidentLabel' => null,
+            'profile' => self::profile(0, 0, null, []),
+            'crew' => self::crew('confirmed', 'Crew confirmed', [['rank' => 'Lt.', 'name' => 'Benson, Lee'], ['rank' => 'FF', 'name' => 'Miller, Sam']]),
         ];
     }
 
@@ -128,36 +131,41 @@ final class UnitStatusBoardFixture
                 'availability' => self::availability('on_call', 'On Scene', 'source', 'on_scene', 'rgb(204,0,0)', true, false, null),
                 'assignmentSummary' => self::HOSTILE_CALL_TYPE.' – '.self::HOSTILE_ADDRESS,
                 'currentCalls' => [self::call('src-1', '2601241652', self::HOSTILE_CALL_TYPE, self::HOSTILE_ADDRESS, 'On Scene', true, 'https://web.pulsepoint.org/?agencyid=1&incident=1')],
-                'runs' => ['shift' => 3, 'shiftUnconfirmed' => 1, 'lifetime' => 12, 'lifetimeUnconfirmed' => 2, 'backfilledLifetime' => 1],
+                'incidentLabel' => '#2601241652',
+                'profile' => self::profile(3, 12, ['runs' => 5, 'date' => '2026-11-02', 'label' => 'Nov 2, 2026'], [self::run('4:58 PM', self::HOSTILE_CALL_TYPE, '#2601241652', 'On Scene', true), self::run('1:10 PM', 'Alarm', '#2601240900', 'Cleared From Incident', false)]),
             ],
             // Two calls at once.
             'E1' => [
-                'availability' => self::availability('on_call', 'Enroute', 'source', 'enroute', 'rgb(0,204,0)', true, false, null),
+                'availability' => self::availability('on_call', 'En Route', 'source', 'enroute', 'rgb(0,204,0)', true, false, null),
                 'assignmentSummary' => 'Alarm – 100 Lincoln Rd',
                 'conflict' => true,
                 'currentCalls' => [
-                    self::call('src-2', '2601241700', 'Alarm', '100 Lincoln Rd', 'Enroute', true, 'https://web.pulsepoint.org/?incident=2'),
+                    self::call('src-2', '2601241700', 'Alarm', '100 Lincoln Rd', 'En Route', true, 'https://web.pulsepoint.org/?incident=2'),
                     self::call('src-3', '2601241650', 'Medical Emergency', '200 Collins Ave', 'Dispatched', true, 'https://web.pulsepoint.org/?incident=3'),
                 ],
-                'runs' => ['shift' => 2, 'shiftUnconfirmed' => 0, 'lifetime' => 5, 'lifetimeUnconfirmed' => 0, 'backfilledLifetime' => 0],
+                'incidentLabel' => '#2601241700',
+                'profile' => self::profile(2, 5, null, []),
             ],
-            // Seen only with a leading "?": unconfirmed.
+            // Dispatched, confirmed.
             'R1' => [
-                'availability' => self::availability('on_call', 'Dispatched', 'source', 'dispatched', 'rgb(245,124,0)', false, false, null),
+                'availability' => self::availability('on_call', 'Dispatched', 'source', 'dispatched', 'rgb(245,124,0)', true, false, null),
                 'assignmentSummary' => 'Fire Alarm – 55 Meridian Ave',
-                'currentCalls' => [self::call('src-4', '2601241710', 'Fire Alarm', '55 Meridian Ave', 'Dispatched', false, 'https://web.pulsepoint.org/?incident=4')],
+                'incidentLabel' => '#2601241710',
+                'currentCalls' => [self::call('src-4', '2601241710', 'Fire Alarm', '55 Meridian Ave', 'Dispatched', true, 'https://web.pulsepoint.org/?incident=4')],
             ],
             // A provisional call that PulsePoint has not numbered yet.
             'R2' => [
-                'availability' => self::availability('on_call', 'Transport', 'source', 'transport', 'rgb(255,193,7)', true, false, null),
+                'availability' => self::availability('on_call', 'Transporting', 'source', 'transport', 'rgb(255,193,7)', true, false, null),
                 'assignmentSummary' => 'Medical Emergency – 1230 Ocean Ave',
-                'currentCalls' => [self::call('src-5', null, 'Medical Emergency', '1230 Ocean Ave', 'Transport', true, null)],
-                'runs' => ['shift' => 4, 'shiftUnconfirmed' => 0, 'lifetime' => 9, 'lifetimeUnconfirmed' => 0, 'backfilledLifetime' => 0],
+                'currentCalls' => [self::call('src-5', null, 'Medical Emergency', '1230 Ocean Ave', 'Transporting', true, null)],
+                'incidentLabel' => 'ID pending',
+                'profile' => self::profile(4, 9, ['runs' => 6, 'date' => '2026-11-02', 'label' => 'Nov 2, 2026'], [self::run('4:58 PM', 'Medical Emergency', 'ID pending', 'Transporting', true)]),
             ],
             // On a call, feed went stale.
             'R22' => [
                 'availability' => self::availability('on_call', 'On Scene', 'source', 'on_scene', 'rgb(204,0,0)', true, true, 'PulsePoint feed delayed', '2026-11-02T21:58:00Z'),
                 'assignmentSummary' => 'Lift Assist – 9 Bay Rd',
+                'incidentLabel' => '#2601241720',
                 'currentCalls' => [self::call('src-6', '2601241720', 'Lift Assist', '9 Bay Rd', 'On Scene', true, 'https://web.pulsepoint.org/?incident=6')],
             ],
             'CPT5' => [
@@ -169,6 +177,20 @@ final class UnitStatusBoardFixture
                 'availability' => self::availability('not_staffed', 'Not staffed', 'neutral', 'neutral', null, true, false, null),
                 'assignmentSummary' => 'No active call',
                 'crew' => self::crew('none_working', 'No one working now', [], 1),
+            ],
+            // At the hospital.
+            'L3' => [
+                'availability' => self::availability('on_call', 'At Hospital', 'source', 'arrived', 'rgb(25,118,210)', true, false, null),
+                'assignmentSummary' => 'Medical Emergency – 400 Alton Rd',
+                'incidentLabel' => '#2601241730',
+                'currentCalls' => [self::call('src-7', '2601241730', 'Medical Emergency', '400 Alton Rd', 'At Hospital', true, 'https://web.pulsepoint.org/?incident=7')],
+            ],
+            // A confirmed unit PulsePoint has not given a phase yet.
+            'R3' => [
+                'availability' => self::availability('on_call', 'Assigned', 'source', 'unknown', null, true, false, null),
+                'assignmentSummary' => 'Fire Alarm – 7 Lenox Ave',
+                'incidentLabel' => '#2601241735',
+                'currentCalls' => [self::call('src-8', '2601241735', 'Fire Alarm', '7 Lenox Ave', 'Assigned', true, 'https://web.pulsepoint.org/?incident=8')],
             ],
             default => [],
         };
@@ -207,12 +229,29 @@ final class UnitStatusBoardFixture
         ];
     }
 
+    /** @return array<string, mixed> */
+    private static function profile(int $shiftRuns, int $lifetimeRuns, ?array $busiestDay, array $todayCalls): array
+    {
+        return ['shiftRuns' => $shiftRuns, 'lifetimeRuns' => $lifetimeRuns, 'busiestDay' => $busiestDay, 'todayCalls' => $todayCalls];
+    }
+
+    /** @return array<string, mixed> */
+    private static function run(string $time, string $type, string $idLabel, string $status, bool $current): array
+    {
+        return ['attributedAt' => '2026-11-02T21:58:00Z', 'timeLabel' => $time, 'callType' => $type, 'idLabel' => $idLabel,
+            'externalId' => str_starts_with($idLabel, '#') ? substr($idLabel, 1) : null, 'unitStatus' => $status, 'current' => $current, 'sourceUrl' => null];
+    }
+
     /**
      * @param  list<array{rank: ?string, name: string}>  $onTruck
      * @return array<string, mixed>
      */
     private static function crew(string $state, string $label, array $onTruck, int $vacancies = 0): array
     {
-        return ['state' => $state, 'label' => $label, 'onTruck' => $onTruck, 'later' => [['rank' => 'FF', 'name' => 'Relief Person', 'from' => '19:00', 'through' => '08:00']], 'vacancies' => $vacancies, 'asOf' => '2026-11-02T12:30:00Z', 'note' => null];
+        $short = static fn (array $p): array => $p + ['short' => trim(($p['rank'] ?? '').' '.explode(',', $p['name'])[0])];
+
+        return ['state' => $state, 'label' => $label, 'onTruck' => array_map($short, $onTruck),
+            'later' => $state === 'confirmed' ? [['rank' => 'FF', 'name' => 'Ruiz, Ana', 'short' => 'FF Ruiz', 'from' => '19:00', 'through' => '08:00']] : [],
+            'vacancies' => $vacancies, 'asOf' => '2026-11-02T12:30:00Z', 'note' => null];
     }
 }
