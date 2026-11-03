@@ -96,7 +96,7 @@ final class UnitStatusViewRenderTest extends TestCase
     {
         $html = $this->board();
 
-        $this->assertMatchesRegularExpression('/<a class="us-link" href="https:\/\/web\.pulsepoint\.org[^"]*" target="_blank" rel="noopener noreferrer">Open in PulsePoint/', $html);
+        $this->assertMatchesRegularExpression('/<a class="us-link" data-focus-key="[^"]*" href="https:\/\/web\.pulsepoint\.org[^"]*" target="_blank" rel="noopener noreferrer">Open in PulsePoint/', $html);
         $this->assertStringNotContainsString('target="_blank">', $html);
     }
 
@@ -198,5 +198,33 @@ final class UnitStatusViewRenderTest extends TestCase
         $this->assertStringContainsString('data-board-url="'.url('/unit-status/board').'"', $html);
         $this->assertStringContainsString('data-us-board', $html);
         $this->assertStringContainsString('data-etag="fixture-etag-1"', $html);
+    }
+
+    public function test_a_null_confirmed_flag_is_not_marked_unconfirmed(): void
+    {
+        $html = $this->board();
+
+        // CPT5 carries confirmed = null (no call to confirm): only false appends the suffix.
+        $this->assertMatchesRegularExpression('/data-unit-code="CPT5"\s+data-status="No active call"/', $html);
+        $this->assertSame(1, substr_count($html, 'data-status="Dispatched (unconfirmed)"'));
+        $board = UnitStatusBoardFixture::make([], ['L3' => ['currentCalls' => [array_replace(
+            UnitStatusBoardFixture::make()['stations'][0]['units'][0]['currentCalls'][0], ['unitConfirmed' => null],
+        )]]]);
+        $this->assertSame(substr_count($this->board(), '(unconfirmed)'), substr_count($this->board($board), '(unconfirmed)'));
+    }
+
+    public function test_the_board_root_carries_its_generated_time_for_the_stale_check(): void
+    {
+        $this->assertStringContainsString('data-generated-at="2026-11-02T21:58:30Z"', $this->board());
+    }
+
+    public function test_focus_keys_let_an_open_profile_keep_focus_across_a_refresh(): void
+    {
+        $html = $this->board();
+
+        $this->assertStringContainsString('data-focus-key="call-src-1"', $html);
+        $this->assertStringContainsString('data-focus-key="runs-more"', $html);
+        $page = view('unit-status.show', ['board' => UnitStatusBoardFixture::make()])->render();
+        $this->assertStringContainsString('data-us-dialog-close data-focus-key="close"', $page);
     }
 }

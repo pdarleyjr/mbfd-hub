@@ -29,12 +29,14 @@ final class FeedStatusResolver
         $syncIsRecent = $success->greaterThanOrEqualTo($now->subSeconds((int) config('unit_status.sync_fresh_seconds', 150)));
         $reported = match (true) {
             ! $syncIsRecent => $state->consecutive_failures > 0 ? FeedStatus::UNREACHABLE : FeedStatus::DELAYED,
+            // Rows are still waiting to be read: what the page shows may be missing recent calls.
+            $state->backlog => FeedStatus::DELAYED,
             $state->source_state === 'live' => FeedStatus::LIVE,
             $state->source_state === 'delayed' => FeedStatus::DELAYED,
             $state->source_state === 'unavailable' => FeedStatus::UNAVAILABLE,
             default => FeedStatus::STARTING,
         };
 
-        return new FeedStatus($reported, $reported === FeedStatus::LIVE, $success, $state->source_checked_at);
+        return new FeedStatus($reported, $reported === FeedStatus::LIVE, $success, $state->source_checked_at, $syncIsRecent && $state->backlog);
     }
 }

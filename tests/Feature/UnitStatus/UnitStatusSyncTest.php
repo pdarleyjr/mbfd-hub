@@ -465,6 +465,7 @@ final class UnitStatusSyncTest extends UnitStatusTestCase
         self::assertNull($repeat->getValue($event));
         self::assertTrue($event->withoutOverlapping);
         self::assertTrue($event->onOneServer);
+        self::assertTrue($event->runInBackground);
         self::assertSame(2, $event->expiresAt);
     }
 

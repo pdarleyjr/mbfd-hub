@@ -170,6 +170,7 @@ Schedule::command('daily-roster:reconcile')
 // every other minute and delay daily-roster:reconcile. One missed run is tolerated (sync_fresh_seconds = 150).
 Schedule::command('unit-status:sync')
     ->everyMinute()
+    ->runInBackground()
     ->withoutOverlapping(2)
     ->onOneServer();
 

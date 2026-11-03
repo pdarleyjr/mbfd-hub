@@ -29,11 +29,19 @@ final class MergeHousekeeping
     public function run(UnitStatusSyncState $state, SyncContext $context): int
     {
         $retired = 0;
+        $since = $context->now->subHours((int) config('unit_status.merge_lookback_hours', 24));
+        // Every provisional call seen recently, and every one still counted as current however old: if Command folded
+        // that copy away while the Hub could not read the feed, only a lookup retires it.
         $ids = UnitStatusCall::query()
             ->whereNull('external_id')
             ->whereNull('merged_at')
             ->whereNull('duplicate_of')
-            ->where('last_seen_at', '>=', $context->now->subHours((int) config('unit_status.merge_lookback_hours', 24)))
+            ->where(static function ($query) use ($since): void {
+                $query->where('last_seen_at', '>=', $since)
+                    ->orWhere(static function ($open): void {
+                        $open->where('section', 'active')->whereNull('closed_at')->whereNull('disappeared_at');
+                    });
+            })
             ->orderBy('source_call_id')
             ->pluck('source_call_id')
             ->all();

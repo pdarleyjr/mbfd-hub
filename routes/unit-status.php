@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\UnitStatus\UnitStatusController;
 use App\Http\Middleware\CanonicalHostRedirect;
+use App\Http\Middleware\UnitStatus\SignedOutBackgroundRefresh;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,14 +16,14 @@ Route::get('/unit-status', [UnitStatusController::class, 'show'])
     ->name('unit-status.show');
 
 Route::get('/unit-status/board', [UnitStatusController::class, 'board'])
-    ->middleware(['auth:web', 'throttle:60,1'])
+    ->middleware([SignedOutBackgroundRefresh::class.':web', 'throttle:60,1'])
     ->name('unit-status.board');
 
 Route::get('/unit-status/data', [UnitStatusController::class, 'data'])
-    ->middleware(['auth:web', 'throttle:60,1'])
+    ->middleware([SignedOutBackgroundRefresh::class.':web', 'throttle:60,1'])
     ->name('unit-status.data');
 
 Route::get('/unit-status/units/{code}/runs', [UnitStatusController::class, 'runs'])
     ->where('code', '[A-Za-z0-9]{1,8}')
-    ->middleware(['auth:web', 'throttle:60,1'])
+    ->middleware([SignedOutBackgroundRefresh::class.':web', 'throttle:60,1'])
     ->name('unit-status.runs');

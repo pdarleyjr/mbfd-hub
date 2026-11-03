@@ -161,7 +161,7 @@ final class UnitStatusBoardFixture
                 'currentCalls' => [self::call('src-6', '2601241720', 'Lift Assist', '9 Bay Rd', 'On Scene', true, 'https://web.pulsepoint.org/?incident=6')],
             ],
             'CPT5' => [
-                'availability' => self::availability('no_active_call', 'No active call', 'neutral', 'neutral', null, true, false, 'Crew not confirmed'),
+                'availability' => self::availability('no_active_call', 'No active call', 'neutral', 'neutral', null, null, false, 'Crew not confirmed'),
                 'assignmentSummary' => 'No active call',
                 'crew' => self::crew('not_posted', 'Roster not posted — personnel not confirmed', []),
             ],
@@ -175,7 +175,7 @@ final class UnitStatusBoardFixture
     }
 
     /** @return array<string, mixed> */
-    private static function availability(string $key, string $label, string $tone, string $family, ?string $indicator, bool $confirmed, bool $stale, ?string $note, ?string $observedAt = null): array
+    private static function availability(string $key, string $label, string $tone, string $family, ?string $indicator, ?bool $confirmed, bool $stale, ?string $note, ?string $observedAt = null): array
     {
         return [
             'key' => $key, 'label' => $label, 'family' => $family, 'tone' => $tone,

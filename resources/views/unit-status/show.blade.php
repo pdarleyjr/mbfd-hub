@@ -25,7 +25,7 @@
         <dialog class="us-dialog" data-us-dialog aria-label="Unit profile">
             <div class="us-dialog__inner">
                 <div class="us-dialog__bar">
-                    <button type="button" class="hub-btn hub-btn--secondary" data-us-dialog-close>Close</button>
+                    <button type="button" class="hub-btn hub-btn--secondary" data-us-dialog-close data-focus-key="close">Close</button>
                 </div>
                 <div class="us-dialog__body" data-us-dialog-content></div>
             </div>

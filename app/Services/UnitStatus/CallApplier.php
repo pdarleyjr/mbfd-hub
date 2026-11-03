@@ -21,14 +21,16 @@ final class CallApplier
         private readonly RunLedger $ledger,
     ) {}
 
-    public function apply(SourceCall $source, SyncContext $context): void
+    /** @return bool Whether this row gave a provisional call its real PulsePoint id */
+    public function apply(SourceCall $source, SyncContext $context): bool
     {
-        DB::transaction(function () use ($source, $context): void {
+        return DB::transaction(function () use ($source, $context): bool {
             $existing = UnitStatusCall::query()->find($source->id);
             // A row older than what the Hub holds is a stale re-read; the newer one already did the work.
             if ($existing !== null && $source->updatedAt->lessThan($existing->source_updated_at)) {
-                return;
+                return false;
             }
+            $idResolved = $existing !== null && $existing->external_id === null && $source->externalId !== null;
 
             $call = $this->store($source, $existing, $context);
             $this->applyUnits($source, $call, $existing === null, $context);
@@ -39,6 +41,8 @@ final class CallApplier
             if ($source->externalId !== null && $source->duplicateOf === null) {
                 $this->ledger->retireOlderCopies($source->externalId, $context->now);
             }
+
+            return $idResolved;
         });
     }
 

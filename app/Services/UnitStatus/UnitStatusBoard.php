@@ -6,11 +6,13 @@ namespace App\Services\UnitStatus;
 
 use App\Models\UnitStatus\UnitStatusCoverageGap;
 use App\Models\UnitStatus\UnitStatusSyncState;
+use App\Services\DailyRoster\RosterFreshnessResolver;
 use App\Support\Captain5\DutyCalendar;
 use App\Support\UnitStatus\UnitRegistry;
 use App\Support\UnitStatus\UnitStatusTime;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Cache;
 
 /** The one view-model builder behind the page, the refresh fragment and the JSON, so the numbers never diverge. */
 final class UnitStatusBoard
@@ -27,16 +29,51 @@ final class UnitStatusBoard
         private readonly RunCounts $runCounts,
         private readonly UnitViewBuilder $units,
         private readonly DutyCalendar $calendar,
+        private readonly RosterFreshnessResolver $rosterFreshness,
     ) {}
 
-    /** @return array<string, mixed> */
+    /**
+     * Everyone polling shares one build per few seconds. The key follows what can change the payload between syncs
+     * (the sync itself, the roster snapshot, the clock bucket), so a cached board is never older than
+     * `board_cache_seconds`. The ETag is part of the cached payload.
+     *
+     * @return array<string, mixed>
+     */
     public function build(?CarbonInterface $now = null): array
     {
         $now = CarbonImmutable::instance($now ?? now());
+        $seconds = (int) config('unit_status.board_cache_seconds', 10);
+        if ($seconds <= 0) {
+            return $this->compose($now);
+        }
+
+        return Cache::remember($this->cacheKey($now, $seconds), $seconds, fn (): array => $this->compose($now));
+    }
+
+    private function cacheKey(CarbonImmutable $now, int $seconds): string
+    {
+        $state = UnitStatusSyncState::current();
+        $roster = $this->rosterFreshness->status($now);
+
+        return 'unit-status:board:'.sha1(implode('|', [
+            (string) $state?->last_success_at?->getTimestamp(),
+            (string) $state?->source_state,
+            (int) $state?->consecutive_failures,
+            (int) ($state !== null && $state->backlog),
+            $roster->state,
+            (string) $roster->snapshotId,
+            $roster->version,
+            intdiv($now->getTimestamp(), $seconds),
+        ]));
+    }
+
+    /** @return array<string, mixed> */
+    private function compose(CarbonImmutable $now): array
+    {
         $feed = $this->feed->resolve($now);
         $roster = $this->crew->at($now);
         $dutyDate = $this->calendar->dutyDate($now);
-        $current = $this->currentCalls->byUnit();
+        $found = $this->currentCalls->find($now);
         $counts = $this->runCounts->forDutyDate($dutyDate->format('Y-m-d'));
 
         $stations = [];
@@ -45,7 +82,7 @@ final class UnitStatusBoard
         }
         foreach ($this->registry->units() as $unit) {
             $index = array_search($unit->station, $this->registry->stationNumbers(), true);
-            $stations[$index]['units'][] = $this->units->build($unit, $current[$unit->code] ?? [], ($counts[$unit->code] ?? []) + RunCounts::empty(), $feed, $roster);
+            $stations[$index]['units'][] = $this->units->build($unit, $found['current'][$unit->code] ?? [], isset($found['aged'][$unit->code]), ($counts[$unit->code] ?? []) + RunCounts::empty(), $feed, $roster);
         }
 
         $body = [

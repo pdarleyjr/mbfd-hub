@@ -1,10 +1,15 @@
 import {
     POLL_INTERVAL_MS,
     SIGN_IN_NOTE,
+    STALE_CHECK_MS,
+    bodyHasBoard,
+    classifyResponse,
     describeChanges,
     failureNote,
-    isAuthStop,
+    isStale,
     nextDelay,
+    profileChanged,
+    staleNote,
     survivingIds,
     toEntityTag,
 } from './unit-status/board-state.js';
@@ -36,6 +41,11 @@ function initUnitStatus(page) {
     let dialogUnit = null;
     let dialogOpenerId = null;
     let lastSnapshot = snapshot();
+    let dialogMarkup = '';
+    let confirmedAt = Date.now();
+    let failed = false;
+    let stale = false;
+    let signedOut = false;
 
     /* ---------- disclosure ---------- */
 
@@ -73,6 +83,10 @@ function initUnitStatus(page) {
         dialogContent.replaceChildren(fresh);
         dialog.setAttribute('aria-labelledby', `${id}-full-title`);
         dialogUnit = id;
+        dialogMarkup = source.innerHTML;
+        if (stale) {
+            downgradeChips(dialogContent);
+        }
         const runs = dialogContent.querySelector('[data-us-runs]');
         if (runs && !previousRuns) {
             loadRuns(runs);
@@ -95,6 +109,7 @@ function initUnitStatus(page) {
         dialogContent.replaceChildren();
         dialog.removeAttribute('aria-labelledby');
         dialogUnit = null;
+        dialogMarkup = '';
         const opener = dialogOpenerId ? document.getElementById(dialogOpenerId) : null;
         dialogOpenerId = null;
         opener?.focus();
@@ -121,8 +136,15 @@ function initUnitStatus(page) {
             const response = await fetch(`${section.dataset.url}?page=${next}`, {
                 cache: 'no-store',
                 credentials: 'same-origin',
+                redirect: 'manual',
                 headers: { Accept: 'application/json', ...BACKGROUND_REFRESH },
             });
+            if (classifyResponse(response) === 'auth') {
+                status.hidden = false;
+                status.textContent = SIGN_IN_NOTE;
+                more.hidden = true;
+                return;
+            }
             if (!response.ok) {
                 throw new Error(String(response.status));
             }
@@ -193,11 +215,19 @@ function initUnitStatus(page) {
         }));
     }
 
-    function showNote(text, withLogin = false) {
+    function renderNote() {
+        let text = '';
+        if (signedOut) {
+            text = SIGN_IN_NOTE;
+        } else if (stale) {
+            text = staleNote(board()?.dataset.updatedLabel);
+        } else if (failed) {
+            text = failureNote(board()?.dataset.updatedLabel);
+        }
         note.replaceChildren();
         if (text) {
             note.append(text);
-            if (withLogin) {
+            if (signedOut) {
                 const link = document.createElement('a');
                 link.href = loginUrl;
                 link.textContent = 'Sign in';
@@ -205,6 +235,46 @@ function initUnitStatus(page) {
             }
         }
         note.hidden = !text;
+    }
+
+    /** Never green while stale: an Available chip becomes the warning "Not confirmed" chip. */
+    function downgradeChips(root) {
+        root.querySelectorAll('.us-chip.hub-tag--success:not([data-us-original])').forEach((chip) => {
+            chip.dataset.usOriginal = chip.innerHTML;
+            chip.classList.remove('hub-tag--success');
+            chip.classList.add('hub-tag--warning');
+            const label = document.createElement('span');
+            label.textContent = 'Not confirmed';
+            chip.replaceChildren(label);
+        });
+    }
+
+    function evaluateStale(force = false) {
+        const root = board();
+        if (!root) {
+            return;
+        }
+        stale = force || isStale(root.dataset.generatedAt, confirmedAt, Date.now());
+        root.toggleAttribute('data-stale', stale);
+        if (stale) {
+            downgradeChips(root);
+            if (dialog?.open) {
+                downgradeChips(dialogContent);
+            }
+        }
+        renderNote();
+    }
+
+    function refreshDialog() {
+        const source = dialog?.open && dialogUnit ? template(dialogUnit) : null;
+        if (!source || !profileChanged(dialogMarkup, source.innerHTML)) {
+            return;
+        }
+        const key = dialogContent.contains(document.activeElement) ? document.activeElement.dataset.focusKey : null;
+        fillDialog(dialogUnit);
+        const target = (key ? dialogContent.querySelector(`[data-focus-key="${CSS.escape(key)}"]`) : null)
+            ?? dialog.querySelector('[data-us-dialog-close]');
+        target?.focus({ preventScroll: true });
     }
 
     function swapBoard(html) {
@@ -221,9 +291,7 @@ function initUnitStatus(page) {
 
         const available = [...page.querySelectorAll('[data-us-toggle]')].map((el) => el.dataset.usToggle);
         survivingIds(open, available).forEach((id) => setExpanded(id, true));
-        if (dialog?.open && dialogUnit) {
-            fillDialog(dialogUnit);
-        }
+        refreshDialog();
         window.scrollTo({ top: scrollY, behavior: 'instant' });
         if (focusId) {
             document.getElementById(focusId)?.focus({ preventScroll: true });
@@ -247,15 +315,17 @@ function initUnitStatus(page) {
 
     function fail() {
         failures += 1;
-        showNote(failureNote(board()?.dataset.updatedLabel));
+        failed = true;
+        evaluateStale();
         schedule(nextDelay(failures));
     }
 
     function stop() {
         stopped = true;
+        signedOut = true;
         window.clearTimeout(timer);
         controller?.abort();
-        showNote(SIGN_IN_NOTE, true);
+        evaluateStale(true);
     }
 
     async function check() {
@@ -273,23 +343,31 @@ function initUnitStatus(page) {
             if (etag) {
                 headers['If-None-Match'] = etag;
             }
-            const response = await fetch(boardUrl, { cache: 'no-store', credentials: 'same-origin', headers, signal: own.signal });
-            if (isAuthStop(response.status)) {
+            const response = await fetch(boardUrl, {
+                cache: 'no-store', credentials: 'same-origin', redirect: 'manual', headers, signal: own.signal,
+            });
+            const kind = classifyResponse(response);
+            if (kind === 'auth') {
                 stop();
                 return;
             }
-            if (response.status === 304) {
-                failures = 0;
-                showNote('');
-            } else if (response.ok) {
+            if (kind === 'not_modified') {
+                confirmedAt = Date.now();
+            } else if (kind === 'ok') {
                 const html = await response.text();
+                if (!bodyHasBoard(html)) {
+                    stop();
+                    return;
+                }
                 swapBoard(html);
                 etag = toEntityTag(response.headers.get('ETag')) ?? toEntityTag(board()?.dataset.etag);
-                failures = 0;
-                showNote('');
+                confirmedAt = Date.now();
             } else {
                 throw new Error(String(response.status));
             }
+            failures = 0;
+            failed = false;
+            evaluateStale();
             schedule(nextDelay(0));
         } catch (error) {
             if (own.signal.aborted && !timedOut) {
@@ -309,6 +387,7 @@ function initUnitStatus(page) {
         }
     });
 
+    window.setInterval(() => evaluateStale(), STALE_CHECK_MS);
     schedule(POLL_INTERVAL_MS);
 }
 

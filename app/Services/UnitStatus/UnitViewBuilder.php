@@ -18,10 +18,11 @@ final class UnitViewBuilder
 
     /**
      * @param  list<array{call: UnitStatusCall, unit: UnitStatusCallUnit}>  $current
+     * @param  bool  $agedOut  The unit's only open calls are older than the current-call age limit
      * @param  array{shift: int, shiftUnconfirmed: int, lifetime: int, lifetimeUnconfirmed: int, backfilledLifetime: int}  $runs
      * @return array<string, mixed>
      */
-    public function build(UnitDefinition $unit, array $current, array $runs, FeedStatus $feed, CrewSnapshot $roster): array
+    public function build(UnitDefinition $unit, array $current, bool $agedOut, array $runs, FeedStatus $feed, CrewSnapshot $roster): array
     {
         $crew = $roster->crew($unit->code);
         $calls = array_map(fn (array $entry): array => $this->callView($entry['call'], $entry['unit'], $unit), $current);
@@ -31,8 +32,8 @@ final class UnitViewBuilder
             'name' => $unit->name,
             'station' => $unit->station,
             'domId' => $unit->domId(),
-            'availability' => $this->availability($current, $feed, $roster, $crew),
-            'assignmentSummary' => $this->summary($current, $feed),
+            'availability' => $this->availability($current, $agedOut, $feed, $roster, $crew),
+            'assignmentSummary' => $this->summary($current, $agedOut, $feed),
             'conflict' => count($current) > 1,
             'currentCalls' => $calls,
             'runs' => $runs,
@@ -44,7 +45,7 @@ final class UnitViewBuilder
      * @param  list<array{call: UnitStatusCall, unit: UnitStatusCallUnit}>  $current
      * @return array<string, mixed>
      */
-    private function availability(array $current, FeedStatus $feed, CrewSnapshot $roster, UnitCrew $crew): array
+    private function availability(array $current, bool $agedOut, FeedStatus $feed, CrewSnapshot $roster, UnitCrew $crew): array
     {
         if ($current !== []) {
             $unitRow = $current[0]['unit'];
@@ -52,20 +53,26 @@ final class UnitViewBuilder
 
             return $this->state('on_call', trim($unitRow->status) !== '' ? $unitRow->status : 'Assigned', $family, 'source', StatusFamily::color($family), $unitRow->confirmed, ! $feed->fresh, $feed->fresh ? null : 'May be out of date. '.$feed->note(), $unitRow->status_observed_at);
         }
+        // `confirmed` is null whenever there is no call: it only describes whether PulsePoint printed a "?" on a unit.
+        if ($agedOut) {
+            $note = 'Call open more than '.(int) config('unit_status.current_call_max_age_hours', 12).' hours in PulsePoint';
+
+            return $this->state('unknown', 'Not confirmed', 'unknown', 'warning', null, null, ! $feed->fresh, $note, $feed->lastSyncAt);
+        }
         if (! $feed->fresh) {
-            return $this->state('unknown', 'Not confirmed', 'unknown', 'warning', null, false, true, $feed->note(), $feed->lastSyncAt);
+            return $this->state('unknown', 'Not confirmed', 'unknown', 'warning', null, null, true, $feed->note(), $feed->lastSyncAt);
         }
         if ($roster->isCurrent() && $crew->listed) {
             return $crew->hasWorkingCrew()
-                ? $this->state('available', 'Available', 'available', 'success', null, true, false, null, $feed->lastSyncAt)
-                : $this->state('not_staffed', 'Not staffed', 'not_staffed', 'neutral', null, true, false, null, $feed->lastSyncAt);
+                ? $this->state('available', 'Available', 'available', 'success', null, null, false, null, $feed->lastSyncAt)
+                : $this->state('not_staffed', 'Not staffed', 'not_staffed', 'neutral', null, null, false, null, $feed->lastSyncAt);
         }
 
-        return $this->state('no_active_call', 'No active call', 'no_active_call', 'neutral', null, true, false, 'Crew not confirmed', $feed->lastSyncAt);
+        return $this->state('no_active_call', 'No active call', 'no_active_call', 'neutral', null, null, false, 'Crew not confirmed', $feed->lastSyncAt);
     }
 
     /** @return array<string, mixed> */
-    private function state(string $key, string $label, string $family, string $tone, ?string $color, bool $confirmed, bool $stale, ?string $note, ?\DateTimeInterface $observedAt): array
+    private function state(string $key, string $label, string $family, string $tone, ?string $color, ?bool $confirmed, bool $stale, ?string $note, ?\DateTimeInterface $observedAt): array
     {
         return [
             'key' => $key,
@@ -81,10 +88,10 @@ final class UnitViewBuilder
     }
 
     /** @param  list<array{call: UnitStatusCall, unit: UnitStatusCallUnit}>  $current */
-    private function summary(array $current, FeedStatus $feed): string
+    private function summary(array $current, bool $agedOut, FeedStatus $feed): string
     {
         if ($current === []) {
-            return $feed->fresh ? 'No active call' : 'Not confirmed';
+            return $feed->fresh && ! $agedOut ? 'No active call' : 'Not confirmed';
         }
         $call = $current[0]['call'];
         $parts = array_values(array_filter([$call->call_type, $call->address], static fn (string $part): bool => $part !== ''));

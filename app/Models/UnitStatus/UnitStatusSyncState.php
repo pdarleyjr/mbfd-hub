@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property \Carbon\CarbonImmutable|null $source_checked_at
  * @property \Carbon\CarbonImmutable|null $last_merge_check_at
  * @property int $rows_skipped_total
+ * @property bool $backlog
  */
 final class UnitStatusSyncState extends Model
 {
@@ -45,6 +46,7 @@ final class UnitStatusSyncState extends Model
         'last_merge_check_at' => 'immutable_datetime',
         'source_health' => 'array',
         'consecutive_failures' => 'integer',
+        'backlog' => 'boolean',
         'rows_skipped_total' => 'integer',
     ];
 

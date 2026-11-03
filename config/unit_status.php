@@ -25,6 +25,12 @@ return [
     'tracking_starts_at' => env('UNIT_STATUS_TRACKING_STARTS_AT') ?: '2026-11-02 08:00',
 
     'sync_fresh_seconds' => 150,
+    // A call open this long in PulsePoint is not treated as current: the unit shows "Not confirmed", never available.
+    'current_call_max_age_hours' => 12,
+    // One run stops paging after this long; the rest is a backlog the next run resumes exactly where this one stopped.
+    'run_budget_seconds' => 20,
+    // The built board is shared by everyone polling for this many seconds (0 turns the cache off).
+    'board_cache_seconds' => 10,
     'overlap_seconds' => 120,
     'first_run_lookback_hours' => 12,
     'page_limit' => 200,

@@ -26,6 +26,7 @@ final readonly class FeedStatus
         public bool $fresh,
         public ?CarbonImmutable $lastSyncAt,
         public ?CarbonImmutable $lastSourceReadAt,
+        public bool $catchingUp = false,
     ) {}
 
     public function label(): string
@@ -43,6 +44,10 @@ final readonly class FeedStatus
     /** The short reason shown on a unit whose status cannot be confirmed. */
     public function note(): ?string
     {
+        if ($this->catchingUp) {
+            return 'Catching up with PulsePoint calls';
+        }
+
         return match ($this->state) {
             self::LIVE => null,
             self::DELAYED => 'PulsePoint feed delayed',

@@ -37,6 +37,8 @@ abstract class UnitStatusTestCase extends TestCase
             'unit_status.source.url' => 'http://cmd-api:8200',
             'unit_status.source.token' => self::TOKEN,
             'unit_status.tracking_starts_at' => '2026-11-02 08:00',
+            // The board cache has its own test; everywhere else a changed row must show on the next build.
+            'unit_status.board_cache_seconds' => 0,
         ]);
         $this->travelTo(CarbonImmutable::parse(self::NOW, 'America/New_York'));
     }

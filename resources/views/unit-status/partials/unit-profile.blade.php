@@ -42,7 +42,7 @@
                         <div><dt>ID</dt><dd>{{ $call['idLabel'] }}</dd></div>
                         @if(! empty($call['receivedLabel']))<div><dt>Received</dt><dd>{{ $call['receivedLabel'] }}</dd></div>@endif
                         @if(! empty($call['address']))<div><dt>Address</dt><dd>{{ $call['address'] }}</dd></div>@endif
-                        <div><dt>Unit status</dt><dd>{{ $call['unitStatus'] ?: 'Assigned' }}@if(empty($call['unitConfirmed'])) (unconfirmed)@endif</dd></div>
+                        <div><dt>Unit status</dt><dd>{{ $call['unitStatus'] ?: 'Assigned' }}@if(($call['unitConfirmed'] ?? null) === false) (unconfirmed)@endif</dd></div>
                         @if($full && ! empty($call['lastSeenLabel']))<div><dt>Last seen</dt><dd>{{ $call['lastSeenLabel'] }}</dd></div>@endif
                         @if($full && ! empty($call['location']))<div><dt>Location</dt><dd>Approximate location</dd></div>@endif
                     </dl>
@@ -50,7 +50,7 @@
                         <p class="us-call__others">Also listed: {{ collect($call['otherUnits'])->map(fn ($o) => trim(($o['designation'] ?? '') . ' ' . ($o['status'] ?? '')))->implode(', ') }}</p>
                     @endif
                     @if(! empty($call['sourceUrl']) && str_starts_with((string) $call['sourceUrl'], 'https://'))
-                        <a class="us-link" href="{{ $call['sourceUrl'] }}" target="_blank" rel="noopener noreferrer">Open in PulsePoint<span class="sr-only"> (opens in a new tab)</span></a>
+                        <a class="us-link" data-focus-key="call-{{ $call['sourceCallId'] ?? $loop->index }}" href="{{ $call['sourceUrl'] }}" target="_blank" rel="noopener noreferrer">Open in PulsePoint<span class="sr-only"> (opens in a new tab)</span></a>
                     @endif
                 </div>
             @empty
@@ -115,7 +115,7 @@
                 <h3 class="us-card__heading">Recent runs</h3>
                 <p class="us-section__text" data-us-runs-status role="status">Loading recent runs</p>
                 <ul class="us-runs-list" data-us-runs-list></ul>
-                <button type="button" class="hub-btn hub-btn--secondary" data-us-runs-more hidden>Show more</button>
+                <button type="button" class="hub-btn hub-btn--secondary" data-us-runs-more data-focus-key="runs-more" hidden>Show more</button>
             </section>
         </div>
     @endif

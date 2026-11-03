@@ -59,3 +59,51 @@ export function failureNote(updatedLabel) {
 }
 
 export const SIGN_IN_NOTE = 'Sign in again to keep this page updated';
+
+/** The server calls the feed fresh for 150 seconds; a page not confirmed for longer must not show green. */
+export const STALE_AFTER_MS = 150_000;
+export const STALE_CHECK_MS = 15_000;
+
+/**
+ * Whether the board on screen is too old to trust. A 304 confirms the board as of that moment, so the
+ * freshest of the server's generated time and our last confirmation counts.
+ */
+export function isStale(generatedAtIso, confirmedAtMs, nowMs) {
+    const generated = Date.parse(generatedAtIso ?? '');
+    const confirmed = Number.isFinite(confirmedAtMs) ? confirmedAtMs : Number.NEGATIVE_INFINITY;
+    const latest = Math.max(Number.isFinite(generated) ? generated : Number.NEGATIVE_INFINITY, confirmed);
+    if (latest === Number.NEGATIVE_INFINITY) {
+        return true;
+    }
+    return nowMs - latest > STALE_AFTER_MS;
+}
+
+export function staleNote(updatedLabel) {
+    return updatedLabel
+        ? `Not updated since ${updatedLabel} — availability not confirmed`
+        : 'Not updated recently — availability not confirmed';
+}
+
+/**
+ * What a board response means. A redirect (to a login page), 401, 403 or 419 means the session or route is gone.
+ * Returns 'auth' | 'not_modified' | 'ok' | 'error'.
+ */
+export function classifyResponse({ status, type = 'basic', redirected = false, ok = false }) {
+    if (type === 'opaqueredirect' || redirected || isAuthStop(status)) {
+        return 'auth';
+    }
+    if (status === 304) {
+        return 'not_modified';
+    }
+    return ok ? 'ok' : 'error';
+}
+
+/** A 200 that is not the board (a login page, an error page) is the same as being signed out. */
+export function bodyHasBoard(html) {
+    return typeof html === 'string' && html.includes('data-us-board');
+}
+
+/** Re-fill the open profile only when its markup really changed. */
+export function profileChanged(currentMarkup, nextMarkup) {
+    return currentMarkup !== nextMarkup;
+}

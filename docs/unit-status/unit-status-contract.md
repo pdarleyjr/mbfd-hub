@@ -55,9 +55,16 @@ itself refreshes every 30 s, and the feed counts as fresh for 150 s (one missed 
   page then shows the feed as unreachable with the last good time; cached data stays visible but marked stale.
 * **Cursor:** delta mode from `(cursor_updated_since − 120 s overlap)`; first run starts at `tracking_starts_at − 12 h`
   (to pick up calls received before tracking began that were still running). Pages until `hasMore=false`, at most
-  10 pages per run. Every row is applied idempotently (upsert by `source_call_id`).
-* **Merge housekeeping:** every 5 minutes, look up (lookup mode, ≤100 ids) calls that are still provisional
-  (`external_id` null) and were last seen in the past 24 h. A `missing` id is a provisional copy Command folded into
+  10 pages per run and at most `run_budget_seconds` (20 s). Every row is applied idempotently (upsert by `source_call_id`).
+  **Backlog:** a run that stops with `hasMore=true` (page cap or time budget) stores `backlog = true`; the next run then
+  resumes exactly at `(cursor_updated_since, cursor_after_id)` with **no** overlap (otherwise more than 2,000 rows inside
+  one overlap window would be re-read forever). The cursor only moves forward by `(updatedSince, afterId)`. While a
+  backlog remains the feed is not fresh: the page reports it as delayed, "Catching up with PulsePoint calls".
+* **Merge housekeeping:** every 5 minutes, and immediately at the end of any run in which a delta gave a
+  previously provisional call its real `external_id`, look up (lookup mode, ≤100 ids per request, paged) calls that are
+  still provisional (`external_id` null) and either were last seen in the past 24 h **or are still current** (section
+  `active`, not closed or disappeared) however old, so a copy Command folded away while the Hub could not read the
+  feed is still retired. A `missing` id is a provisional copy Command folded into
   another call: set `merged_at` and void its runs (`void_reason = merged`). A row with `duplicateOf` is never credited
   and any credit it had is voided (`void_reason = duplicate`). When two Hub call rows carry the same `external_id`, the
   older-created one is treated as merged.
@@ -104,6 +111,8 @@ add runs."
   stored on first sync and is then fixed: deploys, restarts, outages and calendar rollovers never reset a count.
 * A unit listed twice on one call counts once (unique key). Each of our units on a multi-unit call is credited
   separately.
+* A unit added to a call while the Hub could not read the feed across 08:00 is credited at the delivery time, so it can
+  land on the next duty date; this is rare and logged as basis `unit_added`.
 
 ## 5. Status and availability (per unit, evaluated at request time)
 
@@ -111,6 +120,9 @@ Feed is **fresh** when the last successful sync is ≤ 150 s old **and** `source
 
 1. **Current calls** = rows in `unit_status_call_units` whose call is `section = active`, `closed_at`,
    `disappeared_at`, `merged_at`, `duplicate_of` all null, and whose unit `status` is not `Cleared From Incident`.
+   **Age limit:** a call whose `COALESCE(received_at, first_seen_at)` is older than `current_call_max_age_hours` (12) is
+   not current. A unit whose only open calls are aged out shows `unknown` / "Not confirmed" with the note "Call open
+   more than 12 hours in PulsePoint", never `available`.
    Ordered by `received_at` desc, then `source_call_id` (deterministic). More than one → `conflict = true` and every
    call is shown; the row shows the newest one with "+1 more call".
 2. With a current call: `availability.key = on_call`, label = the unit's PulsePoint status word
@@ -157,6 +169,11 @@ Status families (text always shown; the PulsePoint color is an indicator only, n
 * `GET /unit-status/data` (`unit-status.data`): `[auth:web, throttle:60,1]`, the JSON in section 8, with ETag.
 * `GET /unit-status/units/{code}/runs?page=N` (`unit-status.runs`): `[auth:web, throttle:60,1]`, recent run history,
   10 per page, newest first; unknown code → 404.
+* Board, data and runs use `SignedOutBackgroundRefresh:web` in place of `auth:web`: a signed-out request carrying
+  `X-Hub-Background-Refresh: 1` gets `401 {"error":"signed_out"}` (no-store, private) instead of the login redirect;
+  every other signed-out request is handed to the normal `auth` middleware and redirects as before.
+* The built board is cached for `board_cache_seconds` (10 s), keyed on the last successful sync, feed state, backlog,
+  roster snapshot and a 10-second clock bucket; the ETag is part of the cached payload.
 * Every response: `Cache-Control: no-store, private`; unauthorized → 403 with the same header. Service workers must
   not cache these paths (they are not in any allowlist; verify).
 * Menu: one entry "Unit Status" in `HubShellNavigation` `moreNavigation`, next to Daily Roster, gated by flag + access.
@@ -184,7 +201,9 @@ One builder serves the page, the fragment and the JSON so the numbers never dive
 Unit {
   code, name, station, domId: 'unit-r1',
   availability: { key: available|on_call|no_active_call|not_staffed|unknown, label, family, tone: success|source|neutral|warning,
-                  indicatorColor: 'rgb(..)'|null, confirmed: bool, stale: bool, note: string|null, observedAt: ISO|null },
+                  indicatorColor: 'rgb(..)'|null, confirmed: bool|null, stale: bool, note: string|null, observedAt: ISO|null },
+                  // confirmed is null whenever there is no call (available, not_staffed, no_active_call, unknown); only a unit
+                  // on a call has true/false, and the UI appends "(unconfirmed)" only for false
   assignmentSummary: string,          // e.g. "Medical Emergency – 1230 Ocean Ave" or "No active call" / "Not confirmed"
   conflict: bool,
   currentCalls: [ { sourceCallId, externalId|null, idLabel: '#2601241652'|'ID pending', callType, address,

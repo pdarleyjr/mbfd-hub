@@ -60,23 +60,27 @@ final class UnitStatusSync
         $skipped = 0;
         $pages = 0;
         $context = new SyncContext($now, $state->tracking_starts_at, $state->first_synced_at ?? $now);
-        [$since, $afterId] = [$this->startCursor($state), null];
+        [$since, $afterId] = $this->startCursor($state);
+        $started = hrtime(true);
+        $idResolved = false;
 
         do {
             $page = $this->client->delta($since, $afterId);
             $pages++;
             $this->markFirstSync($state, $now);
             foreach ($page->calls as $call) {
-                $this->applier->apply($call, $context);
+                $idResolved = $this->applier->apply($call, $context) || $idResolved;
                 $applied++;
             }
             $skipped += $page->skipped;
             $this->keeper->recordHealth($state, $page, $now);
             $this->advanceCursor($state, $page);
+            // Stopping with pages left is a backlog: the next run resumes at the saved cursor with no overlap.
+            $state->forceFill(['backlog' => $page->hasMore])->save();
             [$since, $afterId] = [$page->cursorUpdatedSince ?? $since, $page->cursorAfterId];
-        } while ($page->hasMore && $pages < (int) config('unit_status.max_pages', 10));
+        } while ($page->hasMore && $pages < (int) config('unit_status.max_pages', 10) && $this->withinBudget($started));
 
-        $this->runHousekeeping($state, $context);
+        $this->runHousekeeping($state, $context, $idResolved);
         $this->keeper->recordSuccess($state, $now, $skipped);
         if ($skipped > 0) {
             Log::warning('unit_status.sync.rows_skipped', ['skipped' => $skipped]);
@@ -85,14 +89,27 @@ final class UnitStatusSync
         return new SyncOutcome(SyncOutcome::OK, 'Applied '.$applied.' call rows.', $applied, $skipped, $pages);
     }
 
-    /** The saved cursor minus the overlap; the very first run starts before tracking began to catch calls still running. */
-    private function startCursor(UnitStatusSyncState $state): CarbonImmutable
+    /**
+     * The saved cursor minus the overlap; the very first run starts before tracking began to catch calls still running;
+     * a run that follows a backlog resumes exactly at the saved cursor, or it would re-read the same window forever.
+     *
+     * @return array{0: CarbonImmutable, 1: ?string}
+     */
+    private function startCursor(UnitStatusSyncState $state): array
     {
         if ($state->cursor_updated_since === null) {
-            return $state->tracking_starts_at->subHours((int) config('unit_status.first_run_lookback_hours', 12));
+            return [$state->tracking_starts_at->subHours((int) config('unit_status.first_run_lookback_hours', 12)), null];
+        }
+        if ($state->backlog) {
+            return [$state->cursor_updated_since, $state->cursor_after_id];
         }
 
-        return $state->cursor_updated_since->subSeconds((int) config('unit_status.overlap_seconds', 120));
+        return [$state->cursor_updated_since->subSeconds((int) config('unit_status.overlap_seconds', 120)), null];
+    }
+
+    private function withinBudget(int $startedNs): bool
+    {
+        return (hrtime(true) - $startedNs) / 1_000_000_000 < (float) config('unit_status.run_budget_seconds', 20);
     }
 
     private function markFirstSync(UnitStatusSyncState $state, CarbonImmutable $now): void
@@ -103,9 +120,10 @@ final class UnitStatusSync
     }
 
     /** A failed lookup must not turn a good delta into a failed run; it is retried on the next run. */
-    private function runHousekeeping(UnitStatusSyncState $state, SyncContext $context): void
+    private function runHousekeeping(UnitStatusSyncState $state, SyncContext $context, bool $idResolved): void
     {
-        if (! $this->housekeeping->due($state, $context)) {
+        // A provisional call that just learned its real id is the moment its folded copy is most likely to be gone.
+        if (! $idResolved && ! $this->housekeeping->due($state, $context)) {
             return;
         }
         try {
@@ -119,7 +137,8 @@ final class UnitStatusSync
     private function advanceCursor(UnitStatusSyncState $state, SourceFeedPage $page): void
     {
         $next = $page->cursorUpdatedSince;
-        if ($next === null || ($state->cursor_updated_since !== null && $next->lessThanOrEqualTo($state->cursor_updated_since))) {
+        $stored = $state->cursor_updated_since;
+        if ($next === null || ($stored !== null && ($next->lessThan($stored) || ($next->equalTo($stored) && strcmp((string) $page->cursorAfterId, (string) $state->cursor_after_id) <= 0)))) {
             return;
         }
         $state->forceFill(['cursor_updated_since' => $next, 'cursor_after_id' => $page->cursorAfterId])->save();

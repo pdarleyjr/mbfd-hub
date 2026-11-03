@@ -8,7 +8,6 @@ use App\Models\UnitStatus\UnitStatusCall;
 use App\Models\UnitStatus\UnitStatusRun;
 use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
  * The credit ledger (contract section 4). A run is created at most once per (unit, call), never moves, and is never
@@ -44,20 +43,21 @@ final class RunLedger
             return;
         }
 
-        try {
-            UnitStatusRun::query()->create([
-                'unit_code' => $unitCode,
-                'source_call_id' => $call->source_call_id,
-                'external_id' => $call->external_id,
-                'attributed_at' => $attributedAt,
-                'attribution_basis' => $basis,
-                'duty_date' => $this->calendar->dutyDate($attributedAt)->format('Y-m-d'),
-                'confirmed' => $confirmed,
-                'provenance' => $attributedAt->lessThan($context->firstSyncedAt) ? UnitStatusRun::PROVENANCE_BACKFILL : UnitStatusRun::PROVENANCE_LIVE,
-            ]);
-        } catch (UniqueConstraintViolationException) {
-            // Another worker credited the same (unit, call) first. The ledger already holds the one row it may have.
-        }
+        // INSERT ... ON CONFLICT DO NOTHING: a concurrent credit for the same (unit, call) is simply kept, and unlike a
+        // caught unique violation it does not abort the surrounding PostgreSQL transaction.
+        $model = new UnitStatusRun;
+        UnitStatusRun::query()->insertOrIgnore([
+            'unit_code' => $unitCode,
+            'source_call_id' => $call->source_call_id,
+            'external_id' => $call->external_id,
+            'attributed_at' => $model->fromDateTime($attributedAt),
+            'attribution_basis' => $basis,
+            'duty_date' => $this->calendar->dutyDate($attributedAt)->format('Y-m-d'),
+            'confirmed' => $confirmed,
+            'provenance' => $attributedAt->lessThan($context->firstSyncedAt) ? UnitStatusRun::PROVENANCE_BACKFILL : UnitStatusRun::PROVENANCE_LIVE,
+            'created_at' => $model->fromDateTime($context->now),
+            'updated_at' => $model->fromDateTime($context->now),
+        ]);
     }
 
     /** Stop counting every credit on a call. Rows stay, so the call can never be credited again. */

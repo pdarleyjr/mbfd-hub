@@ -36,6 +36,7 @@
     class="us-board"
     data-us-board
     data-etag="{{ $board['etag'] ?? '' }}"
+    data-generated-at="{{ $board['generatedAt'] ?? '' }}"
     data-live="{{ $live ? '1' : '0' }}"
     data-updated-label="{{ $updated }}"
 >
