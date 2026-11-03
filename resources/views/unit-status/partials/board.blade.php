@@ -49,15 +49,17 @@
     data-live="{{ $live ? '1' : '0' }}"
     data-updated-label="{{ $updated }}"
 >
-    @if($live)
-        <p class="us-subtitle">24-Hour Live Availability</p>
-    @else
-        <p class="us-status-line" data-us-status-line>{{ implode('. ', $statusParts) }}</p>
-    @endif
-    <p class="us-meta">
-        @if(! empty($board['dutyWindow']['label']))<span>Duty window: {{ $board['dutyWindow']['label'] }}</span>@endif
-        @if($updated)<span data-us-updated>Updated {{ $updated }}</span>@endif
-    </p>
+    <div class="us-head">
+        @if($live)
+            <p class="us-subtitle">24-Hour Live Availability</p>
+        @else
+            <p class="us-status-line" data-us-status-line>{{ implode('. ', $statusParts) }}</p>
+        @endif
+        <p class="us-meta">
+            @if(! empty($board['dutyWindow']['label']))<span>Duty window: {{ $board['dutyWindow']['label'] }}</span>@endif
+            @if($updated)<span data-us-updated>Updated {{ $updated }}</span>@endif
+        </p>
+    </div>
 
     <section class="us-totals" data-us-totals aria-label="Shift totals">
         <div class="us-total">
@@ -82,12 +84,10 @@
             @endif
         </div>
     </section>
-    @if(! empty($board['tracking']['note']))<p class="us-note-line">{{ $board['tracking']['note'] }}</p>@endif
-    <p class="us-advisory">{{ $board['advisory'] ?? 'PulsePoint is advisory. Verify with dispatch.' }}</p>
 
     <div class="us-stations">
         @foreach($board['stations'] as $station)
-            <section class="us-station-group" data-us-station="{{ $station['number'] }}" aria-labelledby="us-station-{{ $station['number'] }}">
+            <section class="us-station-group" style="--us-units: {{ count($station['units']) }}" data-us-station="{{ $station['number'] }}" aria-labelledby="us-station-{{ $station['number'] }}">
                 <h2 class="us-station" id="us-station-{{ $station['number'] }}">{{ $station['label'] }}</h2>
                 <ul class="us-list">
                     @foreach($station['units'] as $unit)
@@ -96,11 +96,17 @@
                             $statusText = $availability['label'] ?? '';
                             $onCall = ($availability['key'] ?? '') === 'on_call';
                             $incident = $onCall ? ($unit['incidentLabel'] ?? null) : null;
+                            $call = $onCall ? ($unit['currentCalls'][0] ?? null) : null;
+                            // PulsePoint's address, or its approximate coordinates when it gave no address (contract 11).
+                            $where = trim((string) ($call['address'] ?? ''));
+                            if ($where === '' && isset($call['location']['lat'], $call['location']['lng'])) {
+                                $where = number_format((float) $call['location']['lat'], 5).', '.number_format((float) $call['location']['lng'], 5);
+                            }
                         @endphp
                         <li class="us-item" id="{{ $unit['domId'] }}" data-us-unit="{{ $unit['domId'] }}">
                             <button
                                 type="button"
-                                class="us-row"
+                                class="us-row us-tone--{{ \App\Support\UnitStatus\BoardTone::for($availability) }}"
                                 id="{{ $unit['domId'] }}-view"
                                 data-us-open="{{ $unit['domId'] }}"
                                 data-unit-code="{{ $unit['code'] }}"
@@ -112,10 +118,12 @@
                                     <strong class="us-row__code">{{ $unit['code'] }}</strong>
                                     <span class="us-row__name">{{ $unit['name'] }}</span>
                                 </span>
+                                {{-- Markup order is what a screen reader says (unit, status, address, incident); the grid areas place them on screen. --}}
                                 <span class="us-row__status">
                                     @include('unit-status.partials.chip', ['availability' => $availability])
-                                    @if($incident)<span class="us-row__incident">{{ $incident }}</span>@endif
                                 </span>
+                                @if($where !== '')<span class="us-row__where" title="{{ $where }}">{{ $where }}</span>@endif
+                                @if($incident)<span class="us-row__incident">{{ $incident }}</span>@endif
                                 @include('unit-status.partials.chevron', ['class' => 'us-row__chevron'])
                             </button>
                         </li>
@@ -123,6 +131,11 @@
                 </ul>
             </section>
         @endforeach
+    </div>
+
+    <div class="us-foot">
+        @if(! empty($board['tracking']['note']))<p class="us-note-line">{{ $board['tracking']['note'] }}</p>@endif
+        <p class="us-advisory">{{ $board['advisory'] ?? 'PulsePoint is advisory. Verify with dispatch.' }}</p>
     </div>
 
     {{-- One full profile per unit; the page's single dialog is filled from the matching template. --}}

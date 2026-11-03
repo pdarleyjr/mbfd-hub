@@ -1,8 +1,22 @@
 /*
- * Unit Status page. Tokens only (mbfd-theme.css). One compact row per unit on every device; the details
- * open in one pop-up card. The PulsePoint indicator color arrives as --us-indicator on a chip and is used
- * for the 8px dot only, never for text.
+ * Unit Status page. Tokens only (mbfd-theme.css), except the board colors below. One row per unit on every device;
+ * the details open in one pop-up card. On a desktop the board fills the window: the header is one band, the stations
+ * take the rest of the height, and each row is one line with the address left of center and the incident right of it.
  */
+
+/* Board colors (BoardTone, contract 11): green is Available, so En Route is amber and Transporting violet. */
+.us-main .us-tone--available { --us-tone: 22 163 74; }
+.us-main .us-tone--dispatched { --us-tone: 245 124 0; }
+.us-main .us-tone--enroute { --us-tone: 214 158 0; }
+.us-main .us-tone--on_scene { --us-tone: 220 38 38; }
+.us-main .us-tone--transport { --us-tone: 124 58 237; }
+.us-main .us-tone--arrived { --us-tone: 25 118 210; }
+.us-main .us-tone--assigned { --us-tone: 100 116 139; }
+.us-main .us-tone--not_confirmed,
+.us-main .us-tone--idle { --us-tone: 148 163 184; }
+.us-main .us-chip.us-tone--not_confirmed { --us-tone: 217 119 6; }
+/* Never green while stale: the chip is downgraded by unit-status.js, the row loses its color here. */
+.us-main .us-board[data-stale] .us-row.us-tone--available { --us-tone: 148 163 184; }
 
 .us-main {
     max-width: 960px;
@@ -27,15 +41,15 @@
     font-weight: 600;
 }
 
+.us-main .us-foot { margin-top: 10px; }
+
 .us-main .us-advisory,
 .us-main .us-note-line {
-    margin: 0 0 4px;
+    margin: 0;
     color: rgb(var(--hub-muted));
     font-size: 12px;
     line-height: 18px;
 }
-
-.us-main .us-advisory { margin-bottom: 16px; }
 
 .us-main .us-meta {
     display: flex;
@@ -62,7 +76,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    margin: 0 0 8px;
+    margin: 0 0 12px;
 }
 
 @media (min-width: 720px) {
@@ -109,7 +123,7 @@
 
 .us-main .us-total__empty { color: rgb(var(--hub-ink-secondary)); font-size: 13px; line-height: 34px; }
 
-/* Stations and rows */
+/* Stations and rows. Phone: unit | status, the incident under the status. */
 
 .us-main .us-stations {
     overflow: clip;
@@ -130,67 +144,104 @@
 }
 
 .us-main .us-list { margin: 0; padding: 0; list-style: none; }
+.us-main .us-item { background: rgb(var(--hub-surface)); }
 .us-main .us-item + .us-item { border-top: 1px solid rgb(var(--hub-border-soft)); }
 
 .us-main .us-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto 16px;
+    grid-template-columns: minmax(0, 1fr) 8.5rem 16px;
+    grid-template-areas:
+        "unit status chevron"
+        "unit incident chevron";
     align-items: center;
-    gap: 12px;
+    column-gap: 12px;
+    row-gap: 2px;
     width: 100%;
     min-height: 52px;
     padding: 6px 16px;
     border: 0;
-    background: rgb(var(--hub-surface));
+    background-color: transparent;
+    background-image: linear-gradient(90deg, rgb(var(--us-tone, 148 163 184) / .22), rgb(var(--us-tone, 148 163 184) / .1) 55%, rgb(var(--us-tone, 148 163 184) / .05));
+    box-shadow: inset 4px 0 0 rgb(var(--us-tone, 148 163 184));
     color: rgb(var(--hub-ink));
     font: inherit;
     text-align: left;
     cursor: pointer;
+    transition: background-color 120ms ease;
 }
 
-.us-main .us-row:hover { background: rgb(var(--hub-n-25)); }
+.us-main .us-row:hover { background-color: rgb(var(--us-tone, 148 163 184) / .1); }
 
 .us-main .us-row:focus-visible {
     outline: 2px solid rgb(var(--hub-focus));
     outline-offset: -2px;
-    background: rgb(var(--hub-n-25));
 }
 
-.us-main .us-row__unit { display: flex; flex-direction: column; min-width: 0; }
+.us-main .us-row__unit { grid-area: unit; display: flex; flex-direction: column; min-width: 0; }
 .us-main .us-row__code { font-size: 15px; line-height: 20px; font-weight: 700; }
-.us-main .us-row__name { color: rgb(var(--hub-muted)); font-size: 12px; line-height: 16px; overflow-wrap: anywhere; }
+.us-main .us-row__name { color: rgb(var(--hub-ink-secondary)); font-size: 12px; line-height: 16px; overflow-wrap: anywhere; }
 
-.us-main .us-row__status {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    min-width: 0;
-}
+.us-main .us-row__where { grid-area: where; display: none; min-width: 0; }
+.us-main .us-row__status { grid-area: status; display: flex; min-width: 0; }
 
 .us-main .us-row__incident {
+    grid-area: incident;
     color: rgb(var(--hub-ink-secondary));
     font-size: 12px;
     line-height: 16px;
     font-variant-numeric: tabular-nums;
-    text-align: right;
+    white-space: nowrap;
 }
 
+.us-main .us-row__chevron { grid-area: chevron; color: rgb(var(--hub-muted)); }
+
+/* Tablet and up: one line per row, the address left of center, the incident right of it, the status in a fixed column. */
 @media (min-width: 640px) {
-    .us-main .us-row__status { flex-direction: row; align-items: center; gap: 12px; }
-    .us-main .us-row__incident { min-width: 104px; }
+    .us-main .us-row {
+        grid-template-columns: minmax(7rem, 10rem) minmax(0, 1.7fr) minmax(7.5rem, 1fr) 8.75rem 16px;
+        grid-template-areas: "unit where incident status chevron";
+        column-gap: 20px;
+        min-height: 48px;
+    }
+
+    .us-main .us-row__unit { flex-direction: row; align-items: baseline; gap: 8px; }
+    .us-main .us-row__name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .us-main .us-row__where {
+        display: block;
+        padding-right: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: rgb(var(--hub-ink));
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 600;
+    }
+
+    .us-main .us-row__incident { font-size: 14px; line-height: 20px; color: rgb(var(--hub-ink)); }
 }
 
-.us-main .us-row__chevron { color: rgb(var(--hub-muted)); }
+/* Status chip: one width for every status in a row, so the column stays straight. */
 
-/* Status chip */
+.us-main .us-chip {
+    gap: 6px;
+    min-height: 26px;
+    padding: 2px 10px;
+    border: 1px solid rgb(var(--us-tone, 148 163 184) / .5);
+    background: rgb(var(--hub-surface) / .92);
+    color: rgb(var(--hub-ink));
+    font-weight: 600;
+    white-space: normal;
+    text-align: left;
+}
 
-.us-main .us-chip { white-space: normal; text-align: left; min-height: 24px; padding: 2px 8px; }
+.us-main .us-row .us-chip { width: 100%; justify-content: flex-start; font-size: 13px; line-height: 18px; }
 
-.us-main .us-chip--source {
-    border-color: rgb(var(--hub-border-strong));
-    background: rgb(var(--hub-surface));
-    color: rgb(var(--hub-n-900));
+.us-main .us-chip.hub-tag--warning {
+    border-color: rgb(var(--hub-warning-border));
+    background: rgb(var(--hub-warning-bg));
+    color: rgb(var(--hub-warning-strong));
 }
 
 .us-main .us-dot {
@@ -198,8 +249,103 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--us-indicator, rgb(var(--hub-n-400)));
-    box-shadow: 0 0 0 1px rgb(var(--hub-n-900) / .25);
+    background: rgb(var(--us-tone, 148 163 184));
+    box-shadow: 0 0 0 1px rgb(var(--hub-n-900) / .2);
+}
+
+/* Desktop: fill the window. Header band (title left, totals right), stations fill the rest, notes at the foot. */
+@media (min-width: 1024px) {
+    .us-main {
+        display: grid;
+        /* The title column is capped, so a long "feed delayed" line wraps instead of crushing the totals. */
+        grid-template-columns: fit-content(42%) minmax(0, 1fr);
+        /* The stations' track fills the window and still grows to its content on a short screen. */
+        grid-template-rows: auto auto 1fr auto auto;
+        column-gap: 32px;
+        max-width: 1880px;
+        min-height: calc(100dvh - var(--hub-bar-total));
+        padding: 12px clamp(24px, 2.5vw, 48px);
+    }
+
+    .us-main .us-board { display: contents; }
+    .us-main .us-title { grid-column: 1; grid-row: 1; align-self: end; margin: 0; }
+    .us-main .us-head { grid-column: 1; grid-row: 2; align-self: start; }
+    .us-main .us-head .us-meta { margin: 0; }
+    .us-main .us-head .us-subtitle,
+    .us-main .us-head .us-status-line { margin: 2px 0 0; }
+
+    .us-main .us-totals {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        align-self: center;
+        justify-self: end;
+        width: min(100%, 860px);
+        margin: 0;
+    }
+
+    .us-main .us-total { padding: 8px 14px; }
+    .us-main .us-total__label { margin-bottom: 2px; }
+    .us-main .us-total__figure { font-size: 24px; line-height: 30px; }
+    .us-main .us-total__figure--text { font-size: 20px; line-height: 30px; }
+    .us-main .us-total__empty { line-height: 30px; }
+
+    .us-main .us-stations {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        display: flex;
+        flex-direction: column;
+        margin-top: 12px;
+    }
+
+    .us-main .us-foot { grid-column: 1 / -1; grid-row: 4; display: flex; flex-wrap: wrap; gap: 0 16px; margin-top: 8px; }
+    .us-main .us-refresh-note { grid-column: 1 / -1; grid-row: 5; margin-top: 4px; }
+
+    /* Each station's label sits in a column beside its units, so 16 rows fit without five header rows. */
+    .us-main .us-station-group {
+        display: grid;
+        grid-template-columns: 7rem minmax(0, 1fr);
+        flex: var(--us-units, 1) 1 auto;
+    }
+
+    .us-main .us-station-group + .us-station-group { border-top: 1px solid rgb(var(--hub-border)); }
+
+    .us-main .us-station {
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        border-right: 1px solid rgb(var(--hub-border));
+        background: rgb(var(--hub-n-100));
+        color: rgb(var(--hub-header));
+        font-size: 15px;
+    }
+
+    .us-main .us-list { display: flex; flex-direction: column; }
+    .us-main .us-item { display: flex; flex: 1 1 auto; }
+
+    .us-main .us-row {
+        grid-template-columns: minmax(9rem, 13rem) minmax(0, 1.7fr) minmax(8.5rem, 1fr) 9.25rem 16px;
+        column-gap: 24px;
+        min-height: 34px;
+        padding: 4px 20px;
+    }
+
+    .us-main .us-row__code { font-size: 16px; }
+}
+
+/* A short desktop window (a laptop): tighter band and rows, so all 16 units still fit without scrolling. */
+@media (min-width: 1024px) and (max-height: 780px) {
+    .us-main { padding-block: 6px; }
+    .us-main .us-title { font-size: 24px; line-height: 30px; }
+    .us-main .us-total { padding: 6px 12px; }
+    .us-main .us-total__label { font-size: 10px; line-height: 14px; }
+    .us-main .us-total__figure,
+    .us-main .us-total__figure--text,
+    .us-main .us-total__empty { font-size: 20px; line-height: 24px; }
+    .us-main .us-total__sub { font-size: 11px; line-height: 14px; }
+    .us-main .us-stations { margin-top: 8px; }
+    .us-main .us-foot { margin-top: 4px; }
+    .us-main .us-row { min-height: 30px; padding-block: 2px; }
+    .us-main .us-row .us-chip { min-height: 22px; padding-block: 1px; }
 }
 
 .us-main .us-link {

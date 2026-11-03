@@ -186,3 +186,18 @@ const root = document.querySelector('[data-home-duty]');
 if (root) {
     initHomeDuty(root);
 }
+
+/**
+ * The Training Tools list on Home is a closed disclosure. A link to /#training-tools (the Command Board Sandbox's
+ * way back to the list) opens it, and the browser has already scrolled to it. Independent of the greeting above.
+ */
+function openTrainingToolsFromHash() {
+    if (window.location.hash !== '#training-tools') return;
+    const details = document.getElementById('training-tools');
+    if (!(details instanceof HTMLDetailsElement)) return;
+    details.open = true;
+    details.querySelector('summary')?.focus({ preventScroll: true });
+}
+
+openTrainingToolsFromHash();
+window.addEventListener('hashchange', openTrainingToolsFromHash);

@@ -334,3 +334,34 @@ only confirmed units.
 ### 10.7 Review fixes (v1.1.1)
 
 `schemaVersion` is 2 and is part of the board cache key. Crew entries (`onTruck`, `later`) carry `rank`, `short` (and `from`/`through` for reliefs) and no `name`; the short name is built from the roster display name only. The stalled-dispatch clock (10.1 rule 2) starts at the later of the call being received and the unit joining it, and treats unrecognised status words like Dispatched. The runs endpoint lists confirmed runs only and has no `confirmed` field. `profile.todayCalls[].timeLabel` ends with " ET".
+
+## 11. v1.2 wide board (owner direction, 2026-11-03)
+
+- **Desktop fills the window.** From 1024px wide the page is one grid: the title and duty line on the left with the
+  four totals cards beside them in one band, the stations below taking the rest of the window height, and the notes
+  ("Counts began…", the PulsePoint advisory) on one line at the foot. Each station's name sits in a column beside its
+  units instead of a header row, and the rows share the height in proportion, so all 16 units fit with no scrolling
+  at 1366×657 and above. A window shorter than 780px gets a tighter band and 30px rows; a still shorter one scrolls.
+- **One line per row from 640px:** unit | address (left of center) | incident (right of center) | status | chevron.
+  The status column has one fixed width and every chip fills it, so the statuses line up in one straight column.
+  Only the unit's newest current call is on the row; the address is PulsePoint's, or its approximate coordinates
+  ("25.79000, -80.13000") when it gave no address, and nothing when it gave neither. Phones keep the compact row
+  (unit | status, incident under it); the address is in the pop-up.
+- **Row color.** The whole row is tinted, light and transparent, with a solid 4px bar on its left; the chip's dot
+  matches. `App\Support\UnitStatus\BoardTone` picks the color from the availability; the RGB values live in
+  `resources/css/unit-status.css`:
+
+  | Board tone | When | Color |
+  |---|---|---|
+  | available | Available | green 22 163 74 |
+  | dispatched | Dispatched (PulsePoint orange) | 245 124 0 |
+  | enroute | En Route | gold 214 158 0 (PulsePoint draws green, which means Available here) |
+  | on_scene | On Scene, Staged | red 220 38 38 |
+  | transport | Transporting | violet 124 58 237 (PulsePoint's yellow would read as En Route) |
+  | arrived | At Hospital (PulsePoint blue) | 25 118 210 |
+  | assigned | on a call, no known phase | slate 100 116 139 |
+  | not_confirmed, idle | Not confirmed; Not staffed; No active call | grey 148 163 184 (a Not confirmed chip stays amber) |
+
+  The colors never come from feed text: the chip no longer takes PulsePoint's `indicatorColor` (still in the JSON).
+  A stale page greys out every Available row as well as downgrading its chip. Class names never contain the word
+  "unconfirmed" (10.6 applies to markup too).
