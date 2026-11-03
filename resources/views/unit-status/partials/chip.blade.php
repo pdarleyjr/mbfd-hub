@@ -8,7 +8,7 @@
         'warning' => 'hub-tag--warning',
         default => '',
     };
-    $text = ($availability['label'] ?? 'Not confirmed') . (($availability['confirmed'] ?? true) ? '' : ' (unconfirmed)');
+    $text = $availability['label'] ?? 'Not confirmed';
 @endphp
 <span class="hub-tag us-chip us-chip--{{ $tone }} {{ $toneClass }}" @if($tone === 'source' && $indicator) style="--us-indicator: {{ $indicator }}" @endif>
     @if($tone === 'source')<span class="us-dot" aria-hidden="true"></span>@endif

@@ -120,7 +120,7 @@ final class UnitStatusAccessTest extends UnitStatusTestCase
     public function test_run_history_pages_ten_at_a_time_newest_first_without_voided_credits(): void
     {
         $this->actingAsCanonicalFixture();
-        foreach (range(1, 12) as $n) {
+        foreach (range(1, 13) as $n) {
             $this->storeCall($n, ['E2' => ['status' => 'Cleared From Incident']], ['section' => 'recent', 'call_type' => 'Call '.$n]);
             UnitStatusRun::query()->create([
                 'unit_code' => 'E2', 'source_call_id' => self::callId($n), 'external_id' => '26011'.str_pad((string) $n, 5, '0', STR_PAD_LEFT),
@@ -138,13 +138,14 @@ final class UnitStatusAccessTest extends UnitStatusTestCase
         self::assertCount(10, $one->json('runs'));
         self::assertTrue($one->json('hasMore'));
         self::assertSame(1, $one->json('page'));
-        self::assertSame('Call 11', $one->json('runs.0.callType'));
-        self::assertSame('#2601100011', $one->json('runs.0.idLabel'));
-        self::assertSame('Cleared From Incident', $one->json('runs.0.unitStatus'));
+        self::assertSame('Call 13', $one->json('runs.0.callType'));
+        self::assertSame('#2601100013', $one->json('runs.0.idLabel'));
+        self::assertSame('Cleared', $one->json('runs.0.unitStatus'));
         self::assertSame('live', $one->json('runs.0.provenance'));
-        self::assertTrue($one->json('runs.0.confirmed'));
-        self::assertFalse($one->json('runs.8.confirmed'));
-        self::assertSame(['attributedAt', 'attributedLabel', 'callType', 'idLabel', 'externalId', 'unitStatus', 'confirmed', 'provenance'], array_keys($one->json('runs.0')));
+        self::assertNotContains('Call 3', array_column($one->json('runs'), 'callType'));
+        self::assertNotContains('Call 12', array_column($one->json('runs'), 'callType'));
+        self::assertStringNotContainsString('confirmed', (string) $one->getContent());
+        self::assertSame(['attributedAt', 'attributedLabel', 'callType', 'idLabel', 'externalId', 'unitStatus', 'provenance'], array_keys($one->json('runs.0')));
         self::assertCount(1, $two->json('runs'));
         self::assertFalse($two->json('hasMore'));
         self::assertSame('backfill', $two->json('runs.0.provenance'));

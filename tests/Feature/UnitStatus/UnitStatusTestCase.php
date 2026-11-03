@@ -196,7 +196,7 @@ abstract class UnitStatusTestCase extends TestCase
     /**
      * Insert a stored call and the units the Hub holds on it, bypassing the sync.
      *
-     * @param  array<string, array{status?: string, confirmed?: bool}>  $units  unit code => state
+     * @param  array<string, array{status?: string, confirmed?: bool, joined?: \DateTimeInterface}>  $units  unit code => state
      * @param  array<string, mixed>  $attributes
      */
     protected function storeCall(int $number, array $units, array $attributes = []): UnitStatusCall
@@ -224,7 +224,8 @@ abstract class UnitStatusTestCase extends TestCase
                 'designation' => $code,
                 'status' => $unit['status'] ?? 'Dispatched',
                 'confirmed' => $unit['confirmed'] ?? true,
-                'first_seen_on_call_at' => now(),
+                // Joined with the call unless a test says the unit was added later.
+                'first_seen_on_call_at' => $unit['joined'] ?? ($attributes['received_at'] ?? self::et('2026-11-02 09:15:00')),
                 'status_observed_at' => now(),
             ]);
         }
