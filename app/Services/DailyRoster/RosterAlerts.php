@@ -8,7 +8,7 @@ use App\Notifications\CriticalAlertNotification;
 use App\Services\Notifications\NotificationRecipientEvaluator;
 use Carbon\CarbonImmutable;
 use Filament\Notifications\Notification as FilamentNotification;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Throwable;
 
@@ -19,6 +19,11 @@ use Throwable;
  */
 final class RosterAlerts
 {
+    private const TABLE = 'roster_alert_deliveries';
+
+    /** How long a sent alert stays remembered, as the cache key did. Every key names its duty date. */
+    private const KEEP_DAYS = 2;
+
     private const MESSAGES = [
         'delayed' => 'Today\'s TeleStaff roster has not arrived. Members still see the last roster, marked as delayed.',
         'stale' => 'TeleStaff has stopped sending roster updates. Members still see the last roster, marked as delayed.',
@@ -68,7 +73,7 @@ final class RosterAlerts
     private function deliver(string $key, string $message, string $path): void
     {
         try {
-            if (! Cache::add($key, true, now()->addDays(2))) {
+            if (! $this->claim($key)) {
                 return;
             }
 
@@ -83,11 +88,31 @@ final class RosterAlerts
         }
     }
 
-    /** The cache may be what just failed, and that must not stop the import either. */
+    /**
+     * Records the alert as sent, true only for the caller that wrote the row. It is kept in the database,
+     * not the cache, because every deploy clears the cache and the same alert would go out again. The
+     * savepoint keeps a failure here from spoiling a transaction the caller may have open.
+     */
+    private function claim(string $key): bool
+    {
+        $now = now();
+
+        return DB::transaction(static function () use ($key, $now): bool {
+            DB::table(self::TABLE)->where('expires_at', '<=', $now)->delete();
+
+            return DB::table(self::TABLE)->insertOrIgnore([
+                'alert_key' => $key,
+                'sent_at' => $now,
+                'expires_at' => $now->copy()->addDays(self::KEEP_DAYS),
+            ]) === 1;
+        });
+    }
+
+    /** The database may be what just failed, and that must not stop the import either. */
     private function forget(string $key): void
     {
         try {
-            Cache::forget($key);
+            DB::table(self::TABLE)->where('alert_key', $key)->delete();
         } catch (Throwable) {
             // Nothing else to do: the original failure is about to be reported.
         }
