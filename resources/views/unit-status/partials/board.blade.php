@@ -118,11 +118,12 @@
                                     <strong class="us-row__code">{{ $unit['code'] }}</strong>
                                     <span class="us-row__name">{{ $unit['name'] }}</span>
                                 </span>
-                                @if($where !== '')<span class="us-row__where" title="{{ $where }}">{{ $where }}</span>@endif
-                                @if($incident)<span class="us-row__incident">{{ $incident }}</span>@endif
+                                {{-- Markup order is what a screen reader says (unit, status, address, incident); the grid areas place them on screen. --}}
                                 <span class="us-row__status">
                                     @include('unit-status.partials.chip', ['availability' => $availability])
                                 </span>
+                                @if($where !== '')<span class="us-row__where" title="{{ $where }}">{{ $where }}</span>@endif
+                                @if($incident)<span class="us-row__incident">{{ $incident }}</span>@endif
                                 @include('unit-status.partials.chevron', ['class' => 'us-row__chevron'])
                             </button>
                         </li>

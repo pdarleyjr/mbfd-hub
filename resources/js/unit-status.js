@@ -157,10 +157,13 @@ function initUnitStatus(page) {
         note.hidden = !text;
     }
 
+    /** Each downgraded chip's own class and content, so it comes back exactly when the board is fresh again. */
+    const downgraded = new WeakMap();
+
     /** Never green while stale: an Available chip becomes the warning "Not confirmed" chip. */
     function downgradeChips(root) {
-        root.querySelectorAll('.us-chip.hub-tag--success:not([data-us-original])').forEach((chip) => {
-            chip.dataset.usOriginal = chip.innerHTML;
+        root.querySelectorAll('.us-chip.hub-tag--success').forEach((chip) => {
+            downgraded.set(chip, { className: chip.className, nodes: [...chip.childNodes] });
             chip.classList.remove('hub-tag--success', 'us-tone--available');
             chip.classList.add('hub-tag--warning', 'us-tone--not_confirmed');
             const dot = document.createElement('span');
@@ -172,6 +175,21 @@ function initUnitStatus(page) {
         });
     }
 
+    /**
+     * A 304 can end a stale spell without a new board (the ETag leaves out the time), so the downgraded chips are put
+     * back here; otherwise a row would turn green again beside a chip still reading "Not confirmed".
+     */
+    function restoreChips(root) {
+        root.querySelectorAll('.us-chip').forEach((chip) => {
+            const saved = downgraded.get(chip);
+            if (saved) {
+                chip.className = saved.className;
+                chip.replaceChildren(...saved.nodes);
+                downgraded.delete(chip);
+            }
+        });
+    }
+
     function evaluateStale(force = false) {
         const root = board();
         if (!root) {
@@ -179,11 +197,10 @@ function initUnitStatus(page) {
         }
         stale = force || isStale(root.dataset.generatedAt, confirmedAt, Date.now());
         root.toggleAttribute('data-stale', stale);
-        if (stale) {
-            downgradeChips(root);
-            if (dialog?.open) {
-                downgradeChips(dialogContent);
-            }
+        const apply = stale ? downgradeChips : restoreChips;
+        apply(root);
+        if (dialog?.open) {
+            apply(dialogContent);
         }
         renderNote();
     }

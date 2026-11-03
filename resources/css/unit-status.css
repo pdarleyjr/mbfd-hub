@@ -257,7 +257,8 @@
 @media (min-width: 1024px) {
     .us-main {
         display: grid;
-        grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+        /* The title column is capped, so a long "feed delayed" line wraps instead of crushing the totals. */
+        grid-template-columns: fit-content(42%) minmax(0, 1fr);
         /* The stations' track fills the window and still grows to its content on a short screen. */
         grid-template-rows: auto auto 1fr auto auto;
         column-gap: 32px;

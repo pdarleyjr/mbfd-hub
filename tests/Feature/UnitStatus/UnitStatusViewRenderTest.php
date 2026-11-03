@@ -78,17 +78,20 @@ final class UnitStatusViewRenderTest extends TestCase
         $this->assertStringNotContainsString('>Lift Assist', $html);
     }
 
-    /** The row reads left to right: unit, address (left of center), incident (right of it), then the status column. */
-    public function test_the_address_sits_between_the_unit_and_the_incident_and_the_status_comes_last(): void
+    /**
+     * A screen reader hears unit, status, address, incident. On screen the grid areas in unit-status.css put the address
+     * left of center, the incident right of it and the status in its own column.
+     */
+    public function test_the_row_is_read_as_unit_status_address_incident(): void
     {
         $row = $this->row('unit-r22');
 
         $this->assertStringContainsString('<span class="us-row__where" title="9 Bay Rd">9 Bay Rd</span>', $row);
         $unit = strpos($row, 'us-row__unit');
+        $status = strpos($row, 'us-row__status');
         $where = strpos($row, 'us-row__where');
         $incident = strpos($row, 'us-row__incident');
-        $status = strpos($row, 'us-row__status');
-        $this->assertTrue($unit < $where && $where < $incident && $incident < $status, 'unit, address, incident, status');
+        $this->assertTrue($unit < $status && $status < $where && $where < $incident, 'unit, status, address, incident');
         $this->assertStringContainsString('#2601241720', $row);
     }
 
