@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\AiKnowledgeArticleResource\Pages;
 use App\Models\AiAutomation\AiKnowledgeArticle;
 use App\Models\AiAutomation\AiKnowledgeArticleVersion as Version;
@@ -31,6 +32,7 @@ use InvalidArgumentException;
 final class AiKnowledgeArticleResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = AiKnowledgeArticle::class;
 
@@ -137,7 +139,7 @@ final class AiKnowledgeArticleResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        $table = self::applyEnterpriseDefaults($table)
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['publishedVersion', 'latestVersion']))
             ->columns([
                 Tables\Columns\TextColumn::make('title')->searchable()->sortable()->wrap()
@@ -189,6 +191,8 @@ final class AiKnowledgeArticleResource extends Resource
             ->bulkActions([])
             ->emptyStateHeading('No articles yet')
             ->emptyStateDescription('Add an article, or run "php artisan ai-automation:seed" to load the starter guide.');
+
+        return self::withExportActions($table);
     }
 
     /** Version history modal; used by the table and the edit page. */

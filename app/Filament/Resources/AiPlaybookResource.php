@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\AiPlaybookResource\Pages;
 use App\Models\AiAutomation\AiAutomationPlaybook;
 use App\Services\AiAutomation\AiAutomationAccess;
@@ -28,6 +29,7 @@ use InvalidArgumentException;
 final class AiPlaybookResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = AiAutomationPlaybook::class;
 
@@ -78,7 +80,7 @@ final class AiPlaybookResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        $table = self::applyEnterpriseDefaults($table)
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('updatedBy'))
             ->columns([
                 Tables\Columns\TextColumn::make('label')->label('Playbook')->searchable()->sortable()->description(fn (AiAutomationPlaybook $record): ?string => $record->help)->wrap(),
@@ -101,6 +103,8 @@ final class AiPlaybookResource extends Resource
             ->bulkActions([])
             ->emptyStateHeading('No playbooks yet')
             ->emptyStateDescription('Run "php artisan ai-automation:seed" to load the default replies and word lists.');
+
+        return self::withExportActions($table);
     }
 
     public static function getPages(): array

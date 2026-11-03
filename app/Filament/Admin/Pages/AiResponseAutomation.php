@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Concerns\HasPageTableExportActions;
 use App\Models\AiAutomation\AiAutomationSwitchEvent;
 use App\Models\AiAutomation\AiBacklogRun;
 use App\Models\AiAutomation\AiIntakeEvent;
@@ -15,6 +16,7 @@ use App\Services\AiAutomation\Finding;
 use App\Services\AiAutomation\IntakeFacts;
 use App\Services\AiAutomation\Model\AiBudgetGuard;
 use App\Services\AiAutomation\ResponseComposer;
+use App\Services\Exports\ExportableTable;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -31,8 +33,9 @@ use Illuminate\Support\Str;
  * The one admin place for AI Response automation: the master ON/OFF switch, a few numbers, the historical
  * backlog and an activity log. Knowledge Library and Response Playbooks sit beside it in the same group.
  */
-class AiResponseAutomation extends Page implements HasTable
+class AiResponseAutomation extends Page implements ExportableTable, HasTable
 {
+    use HasPageTableExportActions;
     use InteractsWithTable;
 
     protected static ?string $navigationGroup = 'AI Response Automation';
@@ -64,20 +67,6 @@ class AiResponseAutomation extends Page implements HasTable
     public static function canAccess(): bool
     {
         return AiAutomationAccess::allowsCurrentUser();
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        if (! self::canAccess()) {
-            return null;
-        }
-
-        return app(AiAutomationSwitch::class)->isOn() ? 'ON' : 'OFF';
-    }
-
-    public static function getNavigationBadgeColor(): ?string
-    {
-        return app(AiAutomationSwitch::class)->isOn() ? 'success' : 'gray';
     }
 
     public function turnOffAction(): Action
@@ -197,7 +186,7 @@ class AiResponseAutomation extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table
+        return self::withExportActions($table
             ->query(AiIntakeEvent::query())
             ->defaultSort('id', 'desc')
             ->paginated([10, 25, 50])
@@ -248,7 +237,7 @@ class AiResponseAutomation extends Page implements HasTable
                     'vehicle' => 'Vehicle', 'station' => 'Station request', 'support' => 'Support Services',
                 ]),
                 SelectFilter::make('origin')->options(['live' => 'Live', 'backlog' => 'Backlog']),
-            ]);
+            ]));
     }
 
     /** @return array<string, mixed> */
