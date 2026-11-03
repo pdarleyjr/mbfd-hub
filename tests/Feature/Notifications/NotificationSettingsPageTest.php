@@ -134,12 +134,17 @@ final class NotificationSettingsPageTest extends TestCase
     {
         $super = $this->withRole($this->rosterMember(), 'super_admin');
 
+        // The EMS low-stock alert reaches only the people on its list, super administrators included,
+        // so nobody starts getting supply emails they did not ask for.
         $wired = collect(app(NotificationCategoryRegistry::class)->all())
-            ->filter(fn ($category) => $category->senderWired)->keys()->all();
+            ->filter(fn ($category) => $category->senderWired)->except(NotificationCategoryRegistry::EMS_LOW_STOCK)->keys()->all();
         sort($wired);
 
         $this->assertSame($wired, $this->visibleKeys($super));
         $this->assertNotContains('fire_equipment_requests', $this->visibleKeys($super), 'the dead category was removed');
+
+        app(\App\Services\Ems\StockAlertRecipients::class)->add([$super->id], null, 'Test');
+        $this->assertContains(NotificationCategoryRegistry::EMS_LOW_STOCK, $this->visibleKeys($super->fresh()));
     }
 
     public function test_a_disabled_member_cannot_open_the_page_and_has_no_categories(): void

@@ -144,7 +144,7 @@ final class SupplyRoomOrdersTest extends TestCase
         $this->assertSame(5, $row['on_hand']);
         $this->assertSame('ok', $row['order_state']);
         $this->assertSame(0, $row['to_order']);
-        $this->assertSame(['needs_order' => 0, 'pending' => 0, 'ordered' => 0, 'backordered' => 0], $this->actingAs($this->captain)->getJson('/ems/api/supply/master')->json('data.summary'));
+        $this->assertSame(['needs_order' => 0, 'pending' => 0, 'ordered' => 0, 'backordered' => 0, 'red' => 0, 'yellow' => 0, 'green' => 1], $this->actingAs($this->captain)->getJson('/ems/api/supply/master')->json('data.summary'));
 
         $this->assertSame(['pending', 'placed', 'backordered', 'received'], SupplyOrderEvent::query()->where('supply_order_id', $orderId)->orderBy('id')->pluck('to_status')->all());
         $this->assertSame(0, SupplyOrder::query()->whereIn('status', SupplyOrder::OPEN)->count());
