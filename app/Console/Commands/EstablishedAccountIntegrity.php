@@ -51,6 +51,8 @@ final class EstablishedAccountIntegrity extends Command
             $this->line('ESTABLISHED_MUST_CHANGE_STATE_CHANGED='.$comparison['must_change_state_changed']);
             $this->line('ESTABLISHED_ROLE_PERMISSION_CHANGES='.$comparison['role_permission_changes']);
             $this->line('ESTABLISHED_EMAIL_CHANGES='.$comparison['email_changes']);
+            // Members signing in, signing out or timing out during the window: reported, never a failure.
+            $this->line('ESTABLISHED_SESSION_ACTIVITY='.$comparison['session_activity']);
             $this->line('ESTABLISHED_ACCOUNT_UNEXPECTED_CHANGES='.$comparison['unexpected_changes']);
 
             return $comparison['unexpected_changes'] === 0 ? self::SUCCESS : self::FAILURE;
