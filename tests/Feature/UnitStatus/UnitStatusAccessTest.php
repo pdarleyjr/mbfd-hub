@@ -199,6 +199,44 @@ final class UnitStatusAccessTest extends UnitStatusTestCase
         self::assertNotContains('unit-status', $keys(User::factory()->create()));
     }
 
+    public function test_home_offers_unit_status_next_to_the_daily_roster_only_when_enabled_and_allowed(): void
+    {
+        config(['daily_roster.mode' => 'publish']);
+        $this->actingAsCanonicalFixture();
+        $actions = static function (string $html): array {
+            $dom = new \DOMDocument;
+            @$dom->loadHTML($html);
+            $links = (new \DOMXPath($dom))->query('//section[contains(@class,"home-today")]//div[contains(@class,"hub-page-header__actions")]/a');
+
+            return array_map(static fn (\DOMElement $link): array => [
+                'name' => trim(preg_replace('/\s+/', ' ', $link->textContent) ?? ''),
+                'class' => $link->getAttribute('class'),
+                'href' => $link->getAttribute('href'),
+            ], iterator_to_array($links));
+        };
+
+        $buttons = $actions($this->get('/')->assertOk()->getContent());
+        $names = array_column($buttons, 'name');
+        $roster = array_search('Daily Roster', $names, true);
+        self::assertIsInt($roster);
+        self::assertSame('Unit Status', $names[$roster + 1], 'Unit Status sits right after the Daily Roster.');
+        self::assertSame(route('unit-status.show'), $buttons[$roster + 1]['href']);
+        foreach ($buttons as $button) {
+            // Vehicle Checkout keeps its solid blue; every other top action carries the branded tint, none stays plain white.
+            $expected = $button['name'] === 'Vehicle Checkout' ? 'hub-btn--primary' : 'hub-btn--brand';
+            self::assertStringContainsString($expected, $button['class'], $button['name']);
+            self::assertStringNotContainsString('hub-btn--secondary', $button['class'], $button['name']);
+        }
+
+        config(['unit_status.enabled' => false]);
+        self::assertNotContains('Unit Status', array_column($actions($this->get('/')->assertOk()->getContent()), 'name'));
+
+        config(['unit_status.enabled' => true]);
+        $this->logoutCanonicalSession();
+        $this->actingAsCanonicalUser(User::factory()->create());
+        self::assertNotContains('Unit Status', array_column($actions($this->get('/')->assertOk()->getContent()), 'name'));
+    }
+
     public function test_the_menu_entry_follows_daily_roster_in_the_more_menu(): void
     {
         config(['daily_roster.mode' => 'publish']);
