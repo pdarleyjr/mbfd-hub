@@ -19,6 +19,23 @@ async function openRoster(page: Page, path = PAGE): Promise<void> {
   await expect(page.getByRole('heading', { level: 1, name: 'Daily Roster' })).toBeVisible();
 }
 
+function hubCalendarDate(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+}
+
+// The strip opens on the duty day (08:00 to 08:00), so from midnight to 8 AM the day on screen is yesterday's
+// date and "Today" sits on the day after it. "Today" is the calendar date, whatever the hour.
+async function expectTodayMarked(page: Page): Promise<void> {
+  const before = hubCalendarDate();
+  await expect(days(page).first()).toHaveAttribute('aria-current', 'date');
+  const marked = await days(page).evaluateAll(items => items
+    .filter(item => (item.textContent ?? '').trim().startsWith('Today'))
+    .map(item => item.getAttribute('data-roster-day')));
+  expect(marked).toHaveLength(1);
+  // Either side of midnight, in case the page and this check straddle it.
+  expect([before, hubCalendarDate()]).toContain(marked[0]);
+}
+
 async function expectAccessible(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).include('main').analyze();
   expect(results.violations.map(({ id, impact, nodes }) => ({ id, impact, nodes: nodes.map(node => node.target) }))).toEqual([]);
@@ -28,7 +45,7 @@ test('the day strip fits, is accessible and marks today', async ({ page }) => {
   await openRoster(page);
 
   await expect(days(page)).toHaveCount(7);
-  await expect(strip(page).locator('[aria-current="date"]')).toHaveText(/^Today/);
+  await expectTodayMarked(page);
   await expect(strip(page).locator('a[data-roster-day]')).toHaveCount(3);
   await expect(strip(page).locator('.roster-days__day--missing').first()).toContainText('not available yet');
   for (const box of await strip(page).locator('a[data-roster-day]').evaluateAll(links => links.map(link => link.getBoundingClientRect()))) {
@@ -69,7 +86,7 @@ test('an outlook day opens as one page, is labelled and the back button returns'
 
   await page.goBack();
   await expect(page).toHaveURL(/\/daily-roster$/);
-  await expect(strip(page).locator('[aria-current="date"]')).toHaveText(/^Today/);
+  await expectTodayMarked(page);
 });
 
 test('the strip works from the keyboard with a visible focus ring', async ({ page }, testInfo) => {
