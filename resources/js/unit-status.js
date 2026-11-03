@@ -161,11 +161,14 @@ function initUnitStatus(page) {
     function downgradeChips(root) {
         root.querySelectorAll('.us-chip.hub-tag--success:not([data-us-original])').forEach((chip) => {
             chip.dataset.usOriginal = chip.innerHTML;
-            chip.classList.remove('hub-tag--success');
-            chip.classList.add('hub-tag--warning');
+            chip.classList.remove('hub-tag--success', 'us-tone--available');
+            chip.classList.add('hub-tag--warning', 'us-tone--not_confirmed');
+            const dot = document.createElement('span');
+            dot.className = 'us-dot';
+            dot.setAttribute('aria-hidden', 'true');
             const label = document.createElement('span');
             label.textContent = 'Not confirmed';
-            chip.replaceChildren(label);
+            chip.replaceChildren(dot, label);
         });
     }
 
