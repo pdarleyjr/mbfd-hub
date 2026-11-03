@@ -227,7 +227,8 @@ final class SupplyStockLevelsTest extends TestCase
         $this->artisan('ems:stock-alert-recipients', ['action' => 'add', 'users' => [$this->captain->id, $member->id], '--by' => 'Chief request'])
             ->expectsOutputToContain('NO, will not be alerted')->assertSuccessful();
         $this->assertSame('Chief request', StockAlertRecipient::query()->where('user_id', $member->id)->value('added_by_name'));
-        $this->artisan('ems:stock-alert-recipients', ['action' => 'remove', 'users' => [$member->id], '--by' => 'Chief request'])->assertSuccessful();
+        $this->artisan('ems:stock-alert-recipients', ['action' => 'remove', 'users' => [$member->id], '--by' => 'Chief request'])
+            ->doesntExpectOutputToContain('NO, will not be alerted')->assertSuccessful();
         $this->assertSame([$this->captain->id], StockAlertRecipient::query()->pluck('user_id')->all());
         $this->artisan('ems:stock-alert-recipients', ['action' => 'add', 'users' => [999999], '--by' => 'x'])->assertFailed();
         $this->artisan('ems:stock-alert-recipients', ['action' => 'add', 'users' => [$member->id]])->assertFailed();
