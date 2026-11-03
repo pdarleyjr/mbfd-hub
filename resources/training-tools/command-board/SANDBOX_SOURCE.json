@@ -1,7 +1,7 @@
 {
   "repository": "pdarleyjr/mbfd-command",
-  "commit": "8d7ac4f02975506546b70766202c2eb31be36fb1",
-  "built_at": "2026-11-02T16:21:06.790Z",
+  "commit": "58ba8b8b4f8aa34489f7b502f9cd8d09933511d4",
+  "built_at": "2026-11-03T12:12:25.189Z",
   "base_path": "/training-tools/command-board/",
   "files": [
     {
@@ -25,18 +25,18 @@
       "bytes": 8352
     },
     {
-      "path": "assets/training-B9AcTBVQ.css",
-      "sha256": "1683b67a872d3975bb74281d91f0553ed78d709df60634c8293fcc6454ab95d0",
-      "bytes": 71693
+      "path": "assets/training-DOSoHgUG.js",
+      "sha256": "2aa00fc3e063a9268cfe17a491ba87f06861d9173ef960a55d969b42fc4308c4",
+      "bytes": 765531
     },
     {
-      "path": "assets/training-BbaNYL1I.js",
-      "sha256": "eb40ba6d2b7d87230cd8fd1575f004d21379cac8af6ae786a55aba4bf816bc8f",
-      "bytes": 703526
+      "path": "assets/training-WOAthqHp.css",
+      "sha256": "6f317bdcd2c9a84d4ffee4448306eb9f695b2a71c1f0e8d5c61f8e57b2c5ac77",
+      "bytes": 71384
     },
     {
       "path": "index.html",
-      "sha256": "ce7bf5f7cf5a895ff5891ab9c9cc8c4ab00a891dd6189f59da3c6ccee68a2c21",
+      "sha256": "21a99616b938cbdba544634995cb00b5fda0a30f41b39ec670b9b5e7641f135b",
       "bytes": 787
     }
   ]
