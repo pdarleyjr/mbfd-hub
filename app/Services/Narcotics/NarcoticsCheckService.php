@@ -91,10 +91,9 @@ final class NarcoticsCheckService
         // One photo at a time: processed, stored, then only its facts are kept, so ten photos never sit in
         // memory together. A refused or unstorable photo removes the ones already stored: nothing is sent.
         // Ten originals the browser could not shrink take a while to re-encode; a worker cut off midway would
-        // leave files with no row, so the request gets time for every photo.
-        if (function_exists('set_time_limit')) {
-            @set_time_limit(60 + 20 * count($photos));
-        }
+        // leave files with no row, so the request gets time for every photo. Only ever raised: an unlimited
+        // process (0: the CLI, a queue worker, a test runner) is left unlimited.
+        $this->allowTimeFor(count($photos));
         $several = count($photos) > 1;
         $kept = [];
         $all = [];
@@ -370,6 +369,15 @@ final class NarcoticsCheckService
             'payload' => $payload === [] ? null : $payload,
             'created_at' => now(),
         ]);
+    }
+
+    private function allowTimeFor(int $photos): void
+    {
+        $current = (int) ini_get('max_execution_time');
+        $needed = 60 + 20 * $photos;
+        if ($current > 0 && $current < $needed && function_exists('set_time_limit')) {
+            @set_time_limit($needed);
+        }
     }
 
     private function clean(mixed $text): ?string
