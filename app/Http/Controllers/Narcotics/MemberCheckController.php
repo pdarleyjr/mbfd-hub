@@ -50,6 +50,8 @@ final class MemberCheckController extends Controller
                 'seal_number_max_length' => SealNumber::maxLength(),
                 'accepted_mime_types' => NarcoticsImageProcessor::acceptedMimeTypes(),
                 'max_upload_bytes' => (int) $image['max_upload_kb'] * 1024,
+                // Photos one check may carry; each is checked against the limits here on its own.
+                'max_photos' => NarcoticsCheckService::maxPhotos(),
                 'max_edge' => (int) $image['full_edge'],
                 'min_edge' => (int) $image['min_edge'],
             ]);
@@ -61,18 +63,12 @@ final class MemberCheckController extends Controller
         return $this->guarded(function () use ($request): JsonResponse {
             $user = $this->authorizeSubmit($request);
             $employee = $this->authenticatedEmployee();
-            $photo = $request->file('photo');
-            if (! $photo instanceof UploadedFile) {
-                throw new EmsException('Choose or take a photo first.', 'photo_missing', 422, ['photo' => ['Choose or take a photo first.']]);
-            }
-            if (! $photo->isValid()) {
-                throw new EmsException('The photo did not finish uploading. Please try again.', 'photo_upload_failed', 422, ['photo' => ['The photo did not finish uploading. Please try again.']]);
-            }
+            $photos = $this->photos($request);
 
-            $outcome = $this->checks->submit($user, $employee, $photo, $request->only(['client_submission_id', 'rescue_unit', 'rescue_unit_other', 'seal_number', 'note', 'resubmission_of']));
+            $outcome = $this->checks->submit($user, $employee, $photos, $request->only(['client_submission_id', 'rescue_unit', 'rescue_unit_other', 'seal_number', 'note', 'resubmission_of']));
 
             return $this->ok(
-                $this->presenter->detail($outcome['check']->fresh(['resubmission', 'resubmissionOf']), NarcoticsCheckPresenter::AUDIENCE_MEMBER),
+                $this->presenter->detail($outcome['check']->fresh(['resubmission', 'resubmissionOf', 'extraPhotos']), NarcoticsCheckPresenter::AUDIENCE_MEMBER),
                 ['replayed' => $outcome['replayed']],
                 $outcome['replayed'] ? 200 : 201,
             );
@@ -91,7 +87,7 @@ final class MemberCheckController extends Controller
 
             $page = NarcoticsCheck::query()
                 ->where('submitted_by_user_id', $user->getKey())
-                ->with(['resubmission:id,uuid,resubmission_of_id', 'resubmissionOf:id,uuid'])
+                ->with(['resubmission:id,uuid,resubmission_of_id', 'resubmissionOf:id,uuid', 'extraPhotos'])
                 ->orderByDesc('submitted_at')->orderByDesc('id')
                 ->paginate($perPage, ['*'], 'page', (int) ($f['page'] ?? 1));
 
@@ -110,7 +106,7 @@ final class MemberCheckController extends Controller
             $check = NarcoticsCheck::query()
                 ->where('uuid', Str::lower($uuid))
                 ->where('submitted_by_user_id', $user->getKey())
-                ->with(['resubmission:id,uuid,resubmission_of_id', 'resubmissionOf:id,uuid'])
+                ->with(['resubmission:id,uuid,resubmission_of_id', 'resubmissionOf:id,uuid', 'extraPhotos'])
                 ->first();
             if ($check === null) {
                 throw EmsException::notFound('narcotics check');
@@ -118,6 +114,40 @@ final class MemberCheckController extends Controller
 
             return $this->ok($this->presenter->detail($check, NarcoticsCheckPresenter::AUDIENCE_MEMBER));
         });
+    }
+
+    /**
+     * The photos, in the order sent: `photos[]` from this form, or the single `photo` an older open tab still sends.
+     *
+     * @return list<UploadedFile>
+     */
+    private function photos(Request $request): array
+    {
+        // allFiles() keeps whatever shape was sent: anything but a flat list of files (a hand-made `photos[a][b]`) is not a photo.
+        $sent = $request->allFiles()['photos'] ?? null;
+        $files = [];
+        foreach (is_array($sent) ? $sent : [$sent] as $file) {
+            if ($file instanceof UploadedFile) {
+                $files[] = $file;
+            }
+        }
+        $single = $request->file('photo');
+        if ($files === [] && $single instanceof UploadedFile) {
+            $files = [$single];
+        }
+        if ($files === []) {
+            throw new EmsException('Choose or take a photo first.', 'photo_missing', 422, ['photo' => ['Choose or take a photo first.']]);
+        }
+        $several = count($files) > 1;
+        foreach ($files as $index => $file) {
+            if (! $file->isValid()) {
+                $message = ($several ? 'Photo '.($index + 1).' did not finish uploading.' : 'The photo did not finish uploading.').' Please try again.';
+
+                throw new EmsException($message, 'photo_upload_failed', 422, ['photo' => [$message]]);
+            }
+        }
+
+        return $files;
     }
 
     private function authorizeSubmit(Request $request): User

@@ -26,25 +26,38 @@ final class CheckImageController extends Controller
         private readonly NarcoticsImageStore $store,
     ) {}
 
+    /** Photo 1 (the address every check had before a check could carry more than one photo). */
     public function show(Request $request, string $uuid, string $variant): Response
     {
+        return $this->deliver($request, $uuid, 1, $variant);
+    }
+
+    /** Photo N of a check, 1 being the first. */
+    public function photo(Request $request, string $uuid, string $position, string $variant): Response
+    {
+        return $this->deliver($request, $uuid, (int) $position, $variant);
+    }
+
+    private function deliver(Request $request, string $uuid, int $position, string $variant): Response
+    {
         $user = $request->user();
-        $check = $user instanceof User && in_array($variant, NarcoticsImageStore::VARIANTS, true)
+        $check = $user instanceof User && $position >= 1 && in_array($variant, NarcoticsImageStore::VARIANTS, true)
             ? NarcoticsCheck::query()->where('uuid', Str::lower($uuid))->first()
             : null;
         if ($check === null || ! $this->access->canView($user, $check)) {
             abort(404);
         }
 
-        $file = $this->store->read($check, $variant);
+        $file = $this->store->read($check, $variant, $position);
         if ($file === null) {
             abort(404);
         }
+        $name = $position === 1 ? "narcotics-check-{$variant}" : "narcotics-check-{$position}-{$variant}";
 
         return response($file['bytes'], 200, [
             'Content-Type' => $file['mime'],
             'Content-Length' => (string) strlen($file['bytes']),
-            'Content-Disposition' => 'inline; filename="narcotics-check-'.$variant.'.'.$file['extension'].'"',
+            'Content-Disposition' => 'inline; filename="'.$name.'.'.$file['extension'].'"',
             'Cache-Control' => 'private, no-store, max-age=0',
             'Pragma' => 'no-cache',
             'X-Content-Type-Options' => 'nosniff',

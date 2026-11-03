@@ -34,7 +34,12 @@ function CheckRow({ check, onOpen }: { check: NarcoticsCheck; onOpen: (uuid: str
         className="flex min-h-[4.5rem] w-full items-center gap-3 rounded-hub-control border border-hub-border bg-hub-well px-3 py-2.5 text-left transition-colors hover:bg-hub-blue-tint"
       >
         {check.image.thumb_url
-          ? <img src={check.image.thumb_url} alt="" width={64} height={64} loading="lazy" className="h-16 w-16 flex-none rounded-hub-control bg-hub-n-100 object-cover" />
+          ? (
+            <span className="relative block h-16 w-16 flex-none">
+              <img src={check.image.thumb_url} alt="" width={64} height={64} loading="lazy" className="h-16 w-16 rounded-hub-control bg-hub-n-100 object-cover" />
+              {(check.photo_count ?? 1) > 1 && <span className="absolute bottom-0.5 right-0.5 rounded-full border border-hub-border bg-hub-n-0 px-1.5 text-[11px] font-bold text-hub-ink" aria-label={`${check.photo_count} photos`} data-testid="narcotics-row-photo-count">{check.photo_count}</span>}
+            </span>
+          )
           : <span className="grid h-16 w-16 flex-none place-items-center rounded-hub-control bg-hub-n-100 text-center text-[11px] text-hub-n-600" aria-hidden="true">Photo removed</span>}
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

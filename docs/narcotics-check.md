@@ -29,13 +29,15 @@ profile; hidden when `narcotics_checks.enabled` is false). One screen:
    length is `narcotics_checks.seal_number_max_length`, sent in the form answer (the form keeps 40 only as a
    fallback when the answer lacks it). Errors behave like the unit's: the reason sits next to the field,
    linked with `aria-describedby`, and focus moves to the first missing field.
-3. **Take photo** (primary) or **Upload photo**. Phones and tablets open the system camera
+3. **Take photo** (primary) or **Upload photo**, then **Take another photo** / **Upload more photos** for up to`
+   `max_photos` photos (10; `NARCOTICS_CHECK_MAX_PHOTOS`). The upload picker takes several files at once. Phones and tablets open the system camera
    (`<input accept="image/*" capture="environment">`); computers use an in-page `getUserMedia` camera
    when the page is secure and a camera exists. Permission denied, no camera, plain HTTP or an
    unsupported browser all fall back to the upload picker with a plain-language reason.
-4. A sharp preview (tap to zoom), **Retake photo** / **Choose a different photo**, an optional note
+4. A sharp preview of each photo (tap to zoom; a grid of tiles once there are two or more), **Remove** on each,
+   an optional note
    (500 characters), **Send to Captain 5**, a progress bar.
-5. "Narcotics check sent to Captain 5." appears only after the server has stored the photo and the
+5. "Narcotics check sent to Captain 5." appears only after the server has stored every photo and the
    database row (HTTP 201). Until then the photo stays on screen.
 6. **My narcotics checks** lists their own checks: Sent to Captain 5 / Approved / Rejected, the rescue
    unit and seal number ("Rescue unit: R22", "Seal number: ZX-4471"; "Not recorded" on a check sent before
@@ -119,6 +121,17 @@ rejected --member sends a new photo--> NEW pending row (resubmission_of_id); the
 
 ## 4. Photo pipeline and storage (server)
 
+**More than one photo** (`2026_11_03_180000_create_narcotics_check_photos`, additive): photo 1 stays in the
+`narcotics_checks` image columns exactly as before, so every older check and reader is unchanged. Photos 2
+and up are rows of `narcotics_check_photos` (`narcotics_check_id`, `position` 2..N unique per check, the same
+disk/path/mime/size/sha256 columns). The member sends `photos[]` (an older open tab's single `photo` is still
+accepted); at most `narcotics_checks.max_photos` (422 `photo_too_many`). Each photo is processed and stored
+one at a time (only its facts stay in memory); a refused photo is named ("Photo 2: ...") and every photo
+already stored is removed, so a check is all of its photos or nothing. The `submitted` audit row snapshots
+`photo_count` and each photo's facts in `photos`. Check JSON keeps `image` (photo 1) and adds `photo_count` and
+`photos` (every photo, photo 1 first, each with `position` and its own addresses). Retention purges every
+photo's files; the rows stay.
+
 `NarcoticsImageProcessor`: size cap (15 MB), file type from its signature (JPEG, PNG, WebP; HEIC only
 when Imagick can decode it), script markers (`<?php`, `<script`, `<html`, ...) refuse a polyglot,
 header pixel cap (40 MP) and memory estimate before decoding, EXIF orientation applied by a built-in
@@ -129,7 +142,8 @@ Smaller of WebP and JPEG is kept; full (<= 3200), preview (1280) and thumb (360)
 `narcotics-checks/YYYY/MM/<random uuid>/{full,preview,thumb}.<ext>`; all-or-nothing, cleaned up when
 the database write fails or loses a race. No public disk, symlink or URL exists for these files.
 
-Delivery: `GET /api/narcotics-checks/{uuid}/image/{thumb|preview|full}` returns bytes only to the
+Delivery: `GET /api/narcotics-checks/{uuid}/image/{thumb|preview|full}` (photo 1) and
+`GET /api/narcotics-checks/{uuid}/photos/{position}/{thumb|preview|full}` (any photo, 1 first) return bytes only to the
 submitting member or a reviewer, **404 for everyone else** (and for unknown, purged or disabled).
 `Cache-Control: private, no-store`, `nosniff`, `Content-Security-Policy: ... sandbox`, `noindex`,
 CORP same-origin. Browser JSON never contains a path, disk or hash.
@@ -142,12 +156,12 @@ photo is never cached on a shared device (`tests` assert this prefix).
 Member (`auth:web` + `EnsureEmployeeAuthenticated`): `GET form` (limits, accepted picture types and the
 rescue-unit settings: `rescue_units` = every option in order with `Other` last, `rescue_unit_other_option`,
 `rescue_unit_other_max_length`, and `seal_number_max_length`), `GET mine`, `GET mine/{uuid}`,
-`POST /` (multipart `photo`, `client_submission_id`, `rescue_unit`, `rescue_unit_other?` (only read when
+`POST /` (multipart `photos[]` (or one `photo`), `client_submission_id`, `rescue_unit`, `rescue_unit_other?` (only read when
 `rescue_unit` is `Other`), `seal_number`, `note?`, `resubmission_of?`; throttle 12/min). Check JSON carries
 `rescue_unit` (what people read: "R22", or the typed text; null when not recorded) plus
 `rescue_unit_choice` and `rescue_unit_other` (the stored values, used to prefill a resubmission), and
 `seal_number` (as typed; null when not recorded).
-Shared: `GET {uuid}/image/{variant}`. Captain 5: `GET staff/meta` (plain `review:false` for
+Shared: `GET {uuid}/image/{variant}` and `GET {uuid}/photos/{position}/{variant}`. Captain 5: `GET staff/meta` (plain `review:false` for
 others, drives the tab), and behind `EnsureNarcoticsReviewer`: `GET staff/checks?scope=inbox|archive&status&q&date_from&date_to&page`,
 `GET staff/checks/{uuid}` (records one `viewed` audit row per reviewer), `POST .../approve`,
 `POST .../reject {explanation?}`. All responses use the EMS `{ok,data,meta}` / `{ok:false,error}` envelope.
@@ -192,3 +206,6 @@ seal-number one adds one; their `down()` refuses to run outside local/testing, a
 the `narcotics_*` ledger rows (an old retry command would treat a stuck `narcotics:` row as a plain
 inspection key and give up after its attempts). Photos and records are never deleted by a rollback.
 `NARCOTICS_CHECKS_ENABLED=false` hides the card and closes every endpoint without touching data.
+
+
+Multiple photos (`narcotics_check_photos`) can stay after an image rollback: the older build shows and serves photo 1 only, and its retention purge removes photo 1's files but not photos 2 and up (it does not know the table). Keep retention off (`NARCOTICS_CHECK_IMAGE_RETENTION_DAYS=0`, the default) while rolled back, or remove those files by hand after rolling forward.
