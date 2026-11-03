@@ -81,6 +81,7 @@ final class CallApplier
     private function applyUnits(SourceCall $source, UnitStatusCall $call, bool $callIsNew, SyncContext $context): void
     {
         foreach ($this->ourUnits($source) as $code => $seen) {
+            $code = (string) $code; // PHP turns the array key "300" into the integer 300
             $row = UnitStatusCallUnit::query()->where('source_call_id', $call->source_call_id)->where('unit_code', $code)->first();
             $unitIsNew = $row === null;
             $row ??= new UnitStatusCallUnit(['source_call_id' => $call->source_call_id, 'unit_code' => $code]);

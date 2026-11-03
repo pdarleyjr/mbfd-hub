@@ -32,6 +32,18 @@ final class UnitStatusSyncTest extends UnitStatusTestCase
         self::assertSame(2, UnitStatusCallUnit::query()->count());
     }
 
+    public function test_the_all_digit_unit_300_is_credited_like_any_other_unit(): void
+    {
+        // Regression: PHP turns the array key "300" into the integer 300, which once broke every sync with 300 on a call.
+        $this->fakeFeed($this->feedPage([$this->sourceCall(1, [['unitId' => '300', 'status' => 'Enroute'], ['unitId' => 'CPT5', 'status' => '']])]));
+
+        $outcome = $this->sync();
+
+        self::assertSame(SyncOutcome::OK, $outcome->status);
+        self::assertEqualsCanonicalizing(['300' => 1, 'CPT5' => 1], $this->ledgerCounts());
+        self::assertSame('Enroute', UnitStatusCallUnit::query()->where('unit_code', '300')->value('status'));
+    }
+
     public function test_a_unit_listed_twice_on_one_call_counts_once(): void
     {
         $this->fakeFeed($this->feedPage([$this->sourceCall(1, [['unitId' => 'E2', 'status' => 'Dispatched'], ['unitId' => 'E2', 'status' => 'On Scene']])]));
