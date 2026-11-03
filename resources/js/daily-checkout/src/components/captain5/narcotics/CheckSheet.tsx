@@ -9,7 +9,7 @@ import { Fact, Sheet } from '../ui';
 import { BTN, BTN_PRIMARY, BTN_SECONDARY, ErrorText, FIELD, HINT, LABEL, LiveNote, useWrite } from '../ems/shared';
 import PhotoZoom from './PhotoZoom';
 import { REJECT_NOTE_MAX, STATUS_TONE, decisionText, etDateTime, memberText, rejectError, rescueUnitText, sealNumberText } from './logic';
-import type { NarcoticsCheckDetail } from './types';
+import type { NarcoticsCheckDetail, NarcoticsPhoto } from './types';
 
 interface Props {
   uuid: string | null;
@@ -70,6 +70,7 @@ export default function CheckSheet({ uuid, onClose, onChanged, onOpen, onForbidd
   const [notice, setNotice] = useState<{ tone: 'info' | 'warning'; text: string } | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  const [shown, setShown] = useState(0);
   const approve = useWrite();
   const reject = useWrite();
   const latest = useRef(0);
@@ -95,7 +96,7 @@ export default function CheckSheet({ uuid, onClose, onChanged, onOpen, onForbidd
   }, [onForbidden]);
 
   useEffect(() => {
-    setCheck(null); setError(null); setNotice(null); setRejecting(false); setZoomed(false);
+    setCheck(null); setError(null); setNotice(null); setRejecting(false); setZoomed(false); setShown(0);
     approve.clear(); reject.clear();
     if (uuid !== null) void load(uuid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,6 +130,10 @@ export default function CheckSheet({ uuid, onClose, onChanged, onOpen, onForbidd
   const unavailable = error !== null && (error.status === 403 || error.status === 404);
   const pending = check?.status === 'pending';
   const decision = check ? decisionText(check) : null;
+  // Every photo, photo 1 first; an older answer has only `image`.
+  const photos: NarcoticsPhoto[] = check ? (check.photos && check.photos.length > 0 ? check.photos : [{ ...check.image, position: 1 }]) : [];
+  const photo = photos[Math.min(shown, Math.max(0, photos.length - 1))];
+  const several = photos.length > 1;
 
   return (
     <Sheet
@@ -166,22 +171,39 @@ export default function CheckSheet({ uuid, onClose, onChanged, onOpen, onForbidd
           </div>
           {error && <LiveNote tone="warning">{error.message} What you see may be out of date.</LiveNote>}
 
-          {check.image.available && check.image.preview_url ? (
-            <section aria-label="Photo" className="space-y-2">
+          {photo.available && photo.preview_url ? (
+            <section aria-label={several ? `Photos (${photos.length})` : 'Photo'} className="space-y-2">
               <button
                 type="button"
                 className="group relative block w-full cursor-zoom-in overflow-hidden rounded-hub-control border border-hub-border bg-hub-n-900"
                 onClick={() => setZoomed(true)}
-                aria-label="Zoom in on the photo"
+                aria-label={several ? `Zoom in on photo ${photo.position} of ${photos.length}` : 'Zoom in on the photo'}
                 data-testid="narcotics-photo"
               >
-                <img src={check.image.preview_url} alt={`Narcotics check photo from ${check.submitter_name}, sent ${etDateTime(check.submitted_at)}`} className="mx-auto block max-h-[70vh] w-full object-contain" />
-                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full border border-hub-border bg-hub-n-0 px-3 py-1 text-xs font-semibold text-hub-ink"><ZoomIn className="h-4 w-4" aria-hidden="true" /> Zoom</span>
+                <img src={photo.preview_url} alt={`Narcotics check photo ${several ? `${photo.position} of ${photos.length} ` : ''}from ${check.submitter_name}, sent ${etDateTime(check.submitted_at)}`} className="mx-auto block max-h-[70vh] w-full object-contain" />
+                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full border border-hub-border bg-hub-n-0 px-3 py-1 text-xs font-semibold text-hub-ink"><ZoomIn className="h-4 w-4" aria-hidden="true" /> {several ? `${photo.position} of ${photos.length} · Zoom` : 'Zoom'}</span>
               </button>
-              <p className={HINT}>{check.image.width} × {check.image.height} pixels. Tap the photo to zoom in and look closely.</p>
+              {several && (
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2" aria-label="Choose a photo" data-testid="narcotics-photo-strip">
+                  {photos.map((item, index) => (
+                    <li key={item.position}>
+                      <button
+                        type="button"
+                        onClick={() => setShown(index)}
+                        aria-current={item.position === photo.position ? 'true' : undefined}
+                        aria-label={`Show photo ${item.position} of ${photos.length}`}
+                        className={`block aspect-square min-h-11 w-full overflow-hidden rounded-hub-control border-2 bg-hub-n-900 ${item.position === photo.position ? 'border-hub-ink' : 'border-hub-border'}`}
+                      >
+                        {item.thumb_url && <img src={item.thumb_url} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className={HINT}>{several ? `Photo ${photo.position} of ${photos.length}: ` : ''}{photo.width} × {photo.height} pixels. Tap the photo to zoom in and look closely.</p>
             </section>
           ) : (
-            <p className="hub-callout p-3 text-sm" data-testid="narcotics-photo-removed">The photo file was removed under the retention policy. The record and the decision are kept.</p>
+            <p className="hub-callout p-3 text-sm" data-testid="narcotics-photo-removed">The {several ? 'photo files were' : 'photo file was'} removed under the retention policy. The record and the decision are kept.</p>
           )}
 
           <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2" data-testid="narcotics-summary">
@@ -235,7 +257,7 @@ export default function CheckSheet({ uuid, onClose, onChanged, onOpen, onForbidd
         </div>
       )}
 
-      {zoomed && check?.image.full_url && <PhotoZoom src={check.image.full_url} alt={`Narcotics check photo from ${check.submitter_name}`} onClose={() => setZoomed(false)} />}
+      {zoomed && check && photo?.full_url && <PhotoZoom src={photo.full_url} alt={`Narcotics check photo ${several ? `${photo.position} ` : ''}from ${check.submitter_name}`} onClose={() => setZoomed(false)} />}
     </Sheet>
   );
 }

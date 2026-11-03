@@ -36,6 +36,10 @@ Route::prefix('api/narcotics-checks')
             ->whereUuid('uuid')->where('variant', 'thumb|preview|full')
             ->middleware('throttle:240,1,narcotics-image')
             ->name('checks.image');
+        Route::get('/{uuid}/photos/{position}/{variant}', [CheckImageController::class, 'photo'])
+            ->whereUuid('uuid')->where('position', '[1-9][0-9]?')->where('variant', 'thumb|preview|full')
+            ->middleware('throttle:240,1,narcotics-image')
+            ->name('checks.photo');
 
         // Captain 5: the answer to "do I get the Narcotics Checks tab?" is a plain false, not a 403.
         Route::get('/staff/meta', [StaffCheckController::class, 'meta'])->middleware('throttle:120,1,narcotics-staff-meta')->name('staff.meta');

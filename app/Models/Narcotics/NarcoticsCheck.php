@@ -120,6 +120,22 @@ class NarcoticsCheck extends Model
         return $this->hasMany(NarcoticsCheckEvent::class, 'narcotics_check_id')->orderBy('id');
     }
 
+    /**
+     * Photos 2 and up, in order. Photo 1 is this row's own image columns.
+     *
+     * @return HasMany<NarcoticsCheckPhoto, $this>
+     */
+    public function extraPhotos(): HasMany
+    {
+        return $this->hasMany(NarcoticsCheckPhoto::class, 'narcotics_check_id')->orderBy('position');
+    }
+
+    /** How many photos this check carries (1 plus the extra ones). */
+    public function photoCount(): int
+    {
+        return 1 + ($this->relationLoaded('extraPhotos') ? $this->extraPhotos->count() : $this->extraPhotos()->count());
+    }
+
     /** @return BelongsTo<self, $this> */
     public function resubmissionOf(): BelongsTo
     {
