@@ -26,6 +26,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $packages_per_case
  * @property int|null $threshold_qty_base
  * @property string|null $threshold_source_text
+ * @property int|null $reorder_at_qty_base yellow at or below; null = half the expected amount
+ * @property int|null $critical_at_qty_base red at or below; null = a quarter of the expected amount
+ * @property string|null $stock_alert_level the level the alert check last saw (green, yellow, red)
+ * @property \Illuminate\Support\Carbon|null $stock_alert_level_at
  * @property string|null $qty_per_package_text
  * @property string|null $order_amount_text
  * @property int|null $order_qty_packages
@@ -56,6 +60,9 @@ class SupplyItem extends Model
             'units_per_package' => 'integer',
             'packages_per_case' => 'integer',
             'threshold_qty_base' => 'integer',
+            'reorder_at_qty_base' => 'integer',
+            'critical_at_qty_base' => 'integer',
+            'stock_alert_level_at' => 'datetime',
             'order_qty_packages' => 'integer',
             'suppliers' => 'array',
             'item_numbers' => 'array',

@@ -22,6 +22,7 @@ use App\Services\Ems\Exports\SnapshotExporter;
 use App\Services\Ems\ReconciliationService;
 use App\Services\Ems\ReorderAdvisor;
 use App\Services\Ems\SnapshotPresenter;
+use App\Services\Ems\StockAlertRecipients;
 use App\Services\Ems\SupplyItemOrders;
 use App\Services\Ems\SupplyOrderService;
 use App\Services\Ems\SupplyRoomQuery;
@@ -434,6 +435,32 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
             ->modalSubmitActionLabel('Cancel order')
             ->action(function (array $arguments, Action $action): void {
                 $this->emsRun($action, 'act', fn (User $user) => app(SupplyOrderService::class)->cancel((int) ($arguments['order'] ?? 0), $user, 'cancel-order-'.(int) ($arguments['order'] ?? 0).'-'.$user->getKey()), 'Order cancelled');
+            });
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [$this->stockAlertListAction(), $this->datasetExportAction()];
+    }
+
+    /** Who is told when supply room items drop into red. Being on the list grants no access to anything. */
+    public function stockAlertListAction(): Action
+    {
+        return Action::make('stockAlertList')->label('Low-stock alert list')->icon('heroicon-o-bell-alert')->color('gray')
+            ->visible(fn (): bool => $this->emsCan('configure'))
+            ->modalHeading('Low-stock alert list')
+            ->modalDescription('These people get an in-app alert, a phone notification (if they installed the app and allowed it) and an email to their city account when supply room items drop into red, with how many to order. Someone who cannot open the supply room inventory is not alerted.')
+            ->modalSubmitActionLabel('Save list')
+            ->fillForm(fn (): array => ['users' => app(StockAlertRecipients::class)->all()->pluck('user_id')->map(fn ($id): string => (string) $id)->all()])
+            ->form([
+                \Filament\Forms\Components\Select::make('users')->label('People')->multiple()->searchable()->native(false)
+                    ->options(fn (): array => User::query()->where('account_status', 'active')->orderBy('name')->pluck('name', 'id')->all()),
+            ])
+            ->action(function (array $data): void {
+                $user = $this->emsActor('configure');
+                $result = app(StockAlertRecipients::class)->sync(array_map('intval', (array) ($data['users'] ?? [])), $user, (string) $user->name);
+                \Filament\Notifications\Notification::make()->success()->title('Alert list saved')
+                    ->body(count($result['added']).' added, '.count($result['removed']).' removed.')->send();
             });
     }
 

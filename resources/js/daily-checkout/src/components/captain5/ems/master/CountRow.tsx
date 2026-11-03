@@ -1,5 +1,8 @@
 import { memo, type KeyboardEvent } from 'react';
 import { digitsOnly, orderFor, orderText, parseEntry, unitWord } from './logic';
+import { quantityText } from './orderLogic';
+import { itemLines, levelFor } from './stockLevel';
+import LevelTag, { levelRowClass } from './StockLevelTag';
 import type { MasterItem } from './types';
 
 interface Props {
@@ -12,7 +15,11 @@ interface Props {
   register: (itemId: number, input: HTMLInputElement | null) => void;
 }
 
-/** One item: the name, the order it needs as soon as a number is typed, and one large numeric box. */
+/**
+ * One item: the name, the expected amount, the order it needs as soon as a number is typed, and one large numeric box.
+ * The row is coloured by stock level: from the typed number as soon as there is one, otherwise (lighter) from where the
+ * item stands now. Every box stays optional.
+ */
 function CountRow({ item, value, onChange, onEnter, onFocusItem, register }: Props) {
   const entered = value !== null;
   const result = entered ? orderFor(value, item) : null;
@@ -20,16 +27,23 @@ function CountRow({ item, value, onChange, onEnter, onFocusItem, register }: Pro
   const unit = unitWord(item, value ?? 2);
   const nameId = `count-name-${item.id}`;
   const resultId = `count-result-${item.id}`;
+  const level = entered ? levelFor(value, itemLines(item)) : item.level;
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') { event.preventDefault(); onEnter(item.id); }
   };
 
   return (
-    <li data-testid="count-row" data-item-id={item.id} data-entered={entered ? 'true' : 'false'}
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-hub-border-soft px-3 py-2.5 last:border-b-0">
+    <li data-testid="count-row" data-item-id={item.id} data-entered={entered ? 'true' : 'false'} data-level={level ?? 'none'}
+      className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-hub-border-soft px-3 py-2.5 last:border-b-0 ${levelRowClass(level, !entered)}`}>
       <div className="min-w-0">
         <p id={nameId} className="font-semibold leading-snug text-hub-ink [overflow-wrap:anywhere]" data-testid="count-name">{item.name}</p>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] leading-5 text-hub-n-600">
+          {item.expected !== null
+            ? <span data-testid="count-expected">Expected {quantityText(item, item.expected)}</span>
+            : !entered && <span data-testid="count-expected">No expected amount</span>}
+          <LevelTag level={level} testId="count-level" prefix={entered ? undefined : 'Now:'} className="!py-0 text-[12px]" />
+        </p>
         <p id={resultId} aria-live="polite" className="min-h-5 text-[13px] leading-5" data-testid="order-result" data-kind={result?.kind ?? 'blank'}>
           {result === null
             ? <span className="sr-only">Not entered yet</span>

@@ -7,6 +7,7 @@ namespace App\Services\Notifications;
 use App\Models\ApparatusServiceTicket;
 use App\Models\AssignedEquipment;
 use App\Models\CapitalProject;
+use App\Models\Ems\StockAlertRecipient;
 use App\Models\EvaluationSubmission;
 use App\Models\HubSupportTicket;
 use App\Models\PersonnelRequest;
@@ -14,6 +15,7 @@ use App\Models\Station;
 use App\Models\StationInspection;
 use App\Models\Todo;
 use App\Models\User;
+use App\Services\Ems\EmsAccess;
 use App\Services\Security\Captain5Access;
 use App\Services\Security\Command300Access;
 use App\Services\Security\EmployeeLogisticsMessagingAccess;
@@ -65,6 +67,8 @@ final class NotificationCategoryRegistry
     public const SUPPORT_SERVICES_MESSAGES = 'support_services_messages';
 
     public const ROSTER_MOVES = 'roster_moves';
+
+    public const EMS_LOW_STOCK = 'ems_low_stock';
 
     /** @var array<string, NotificationCategory>|null */
     private ?array $categories = null;
@@ -443,6 +447,21 @@ final class NotificationCategoryRegistry
                 eligibility: static fn (EligibilityContext $c): ?string => self::captain5Allows($c->user)
                     ? 'captain5_duty_access' : null,
             ),
+            // Two conditions, both asked live: the person is on the EMS low-stock alert list, and can still read the
+            // supply room inventory. The list alone grants nothing, so someone whose access ends stops getting these.
+            new NotificationCategory(
+                key: self::EMS_LOW_STOCK,
+                label: 'EMS supplies low or out',
+                description: 'A medical supply room item dropped to its red line (low or out), with how many to order. Sent to the people on the EMS low-stock alert list.',
+                group: self::GROUP_COMMAND,
+                channels: $all,
+                locked: [],
+                significance: 'important',
+                eligibility: static fn (EligibilityContext $c): ?string => self::emsLowStockAllows($c->user)
+                    ? 'ems_low_stock_list' : null,
+                candidates: static fn (): Builder => User::query()->where('account_status', 'active')
+                    ->whereIn('id', StockAlertRecipient::query()->select('user_id')),
+            ),
             new NotificationCategory(
                 key: 'command_communications',
                 label: '300 Command messages',
@@ -469,6 +488,16 @@ final class NotificationCategoryRegistry
     {
         try {
             return $context->user->canAccessPanel(Filament::getPanel('training'));
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private static function emsLowStockAllows(User $user): bool
+    {
+        try {
+            return StockAlertRecipient::query()->where('user_id', $user->getKey())->exists()
+                && app(EmsAccess::class)->canReadInventory($user);
         } catch (Throwable) {
             return false;
         }

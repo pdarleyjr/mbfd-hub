@@ -7,6 +7,7 @@ import EditBar from './EditBar';
 import { EditList } from './EditRows';
 import InventorySearch from './InventorySearch';
 import ItemSheet from './ItemSheet';
+import LowStockCard from './LowStockCard';
 import MasterTable from './MasterTable';
 import ShelfNav from './ShelfNav';
 import SummaryStrip from './SummaryStrip';
@@ -46,6 +47,7 @@ export default function MasterInventoryView({ canStart, onCounting, onForbidden,
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const pendingJump = useRef<number | null>(null);
   const lastOpened = useRef<number | null>(null);
+  const openedFromCard = useRef(false);
   const master = useMasterData({ paused: openId !== null || adding || editing, onForbidden });
   const { data, replaceItems } = master;
 
@@ -68,18 +70,23 @@ export default function MasterInventoryView({ canStart, onCounting, onForbidden,
   const batch = useBatchEdit({ items, onSaved: replaceItems });
 
   // Stable handlers, so a memoized Edit mode row only redraws when its own item, draft or errors change.
-  const openSheet = useCallback((item: MasterItem) => setOpenId(item.id), []);
+  const openSheet = useCallback((item: MasterItem) => { openedFromCard.current = false; setOpenId(item.id); }, []);
+  const openFromCard = useCallback((item: MasterItem) => { openedFromCard.current = true; setOpenId(item.id); }, []);
   const closeSheet = useCallback(() => setOpenId(null), []);
 
   /**
-   * Focus after the sheet closes: the control that opened it (the name in view mode, the order badge in Edit mode). If
-   * that row is gone, for example it left the filter, focus goes to the pressed summary button, then the heading.
+   * Focus after the sheet closes: the control that opened it (the Low or out card's item, the name in view mode, the order
+   * badge in Edit mode). If that row is gone, for example it left the filter, focus goes to the pressed summary button,
+   * then the heading.
    */
   const returnFocus = useCallback((): HTMLElement | null => {
     const id = lastOpened.current;
-    const opener = id === null ? null : document.querySelector<HTMLElement>(
+    const cardOpener = id !== null && openedFromCard.current
+      ? document.querySelector<HTMLElement>(`[data-testid="low-stock-item"][data-item-id="${id}"]`)
+      : null;
+    const opener = cardOpener ?? (id === null ? null : document.querySelector<HTMLElement>(
       `#master-row-${id} [data-testid="open-item"], [data-testid="edit-row"][data-item-id="${id}"] [data-testid="edit-state"]`,
-    );
+    ));
     return opener
       ?? document.querySelector<HTMLElement>('[data-testid="order-summary"] [aria-pressed="true"]')
       ?? document.getElementById('master-inventory-heading')
@@ -173,6 +180,7 @@ export default function MasterInventoryView({ canStart, onCounting, onForbidden,
 
       {data && (
         <>
+          <LowStockCard items={items} onOpen={openFromCard} headingLevel={showTitle ? 3 : 2} />
           <InventorySearch value={query} onChange={(value) => { setQuery(value); setHighlightId(null); }}
             resultNote={searching ? `${listed.length} ${listed.length === 1 ? 'item matches' : 'items match'}` : ''} />
           <SummaryStrip summary={summary} active={filter} onChange={changeFilter} />
