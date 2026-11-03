@@ -165,6 +165,14 @@ Schedule::command('daily-roster:reconcile')
     ->withoutOverlapping(5)
     ->onOneServer();
 
+// Unit Status pulls PulsePoint calls from Command. Every minute, not every 30 seconds: production runs the scheduler as
+// `schedule:run; sleep 60`, and a sub-minute task makes schedule:run block until the end of the minute, which would skip
+// every other minute and delay daily-roster:reconcile. One missed run is tolerated (sync_fresh_seconds = 150).
+Schedule::command('unit-status:sync')
+    ->everyMinute()
+    ->withoutOverlapping(2)
+    ->onOneServer();
+
 // Alerts the queue would not take during an outage. Normally one empty read.
 Schedule::command('notifications:retry-dispatch')
     ->everyMinute()
