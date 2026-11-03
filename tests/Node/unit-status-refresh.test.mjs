@@ -17,6 +17,10 @@ import {
     isStale,
     profileChanged,
     staleNote,
+    RELOAD_NOTE,
+    ROW_SELECTOR,
+    buildMismatch,
+    snapshotRows,
 } from '../../resources/js/unit-status/board-state.js';
 
 test('the refresh waits 30 seconds, then backs off by doubling up to five minutes', () => {
@@ -68,7 +72,8 @@ test('the failure note names the last good time', () => {
 
 test('the page script refreshes quietly: no reload, no worker, no innerHTML from JSON', () => {
     const source = readFileSync('resources/js/unit-status.js', 'utf8');
-    assert.ok(!/location\.reload/.test(source));
+    assert.equal((source.match(/location\.reload/g) ?? []).length, 1, 'only the Reload button may reload');
+    assert.match(source, /\[data-us-reload\][\s\S]{0,200}location\.reload/);
     assert.ok(!/serviceWorker/.test(source));
     assert.ok(!/pwa\/busy/.test(source));
     assert.ok(!/\.innerHTML\s*=/.test(source));
@@ -114,9 +119,57 @@ test('the open profile is only rebuilt when its markup changed', () => {
     assert.equal(profileChanged('<p>a</p>', '<p>b</p>'), true);
 });
 
-test('the page script sends the background header and refuses redirects on every fetch', () => {
+test('the page script sends the background header and refuses redirects on its board fetch', () => {
     const source = readFileSync('resources/js/unit-status.js', 'utf8');
-    assert.equal((source.match(/redirect: 'manual'/g) ?? []).length, 2);
-    assert.equal((source.match(/\.\.\.BACKGROUND_REFRESH/g) ?? []).length, 2);
+    assert.equal((source.match(/redirect: 'manual'/g) ?? []).length, 1);
+    assert.equal((source.match(/\.\.\.BACKGROUND_REFRESH/g) ?? []).length, 1);
     assert.match(source, /data-focus-key/);
+});
+
+/** A row exactly as the board partial renders it (v1.1): the data lives on the button, not the <li>. */
+const RENDERED_ROW = `<li class="us-item" id="unit-r2" data-us-unit="unit-r2">
+    <button
+        type="button"
+        class="us-row"
+        id="unit-r2-view"
+        data-us-open="unit-r2"
+        data-unit-code="R2"
+        data-status="Transporting"
+        data-summary="Medical Emergency &ndash; 1230 Ocean Ave"
+        aria-haspopup="dialog"
+    >x</button>
+</li>`;
+
+/** A minimal stand-in for querySelectorAll: elements with a dataset, found by the script's own selector. */
+function elementsMatching(markup, selector) {
+    const attribute = /^button\[(data-[a-z-]+)\]$/.exec(selector)?.[1];
+    assert.ok(attribute, 'the selector is a button attribute selector');
+    const camel = (name) => name.replace(/^data-/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    return [...markup.matchAll(/<(\w+)\b([^>]*)>/g)]
+        .filter(([, tag, attrs]) => tag === 'button' && attrs.includes(`${attribute}=`))
+        .map(([, , attrs]) => ({
+            dataset: Object.fromEntries([...attrs.matchAll(/(data-[a-z-]+)="([^"]*)"/g)].map(([, n, v]) => [camel(n), v])),
+        }));
+}
+
+test('the announcement snapshot reads the rendered row and a status change is announced', () => {
+    const before = snapshotRows(elementsMatching(RENDERED_ROW, ROW_SELECTOR));
+    assert.deepEqual(before.map((unit) => [unit.code, unit.status]), [['R2', 'Transporting']]);
+
+    const after = snapshotRows(elementsMatching(RENDERED_ROW.replace('Transporting', 'At Hospital'), ROW_SELECTOR));
+    assert.equal(describeChanges(before, after), 'Unit status updated. R2: At Hospital.');
+    assert.equal(describeChanges(before, before), '');
+});
+
+test('the old list-item selector would have read nothing from the rendered row', () => {
+    const li = [...RENDERED_ROW.matchAll(/<li\b([^>]*)>/g)][0][1];
+    assert.ok(!li.includes('data-unit-code'));
+});
+
+test('a changed build marker stops the swap; unknown markers never do', () => {
+    assert.equal(buildMismatch('abc123', 'def456'), true);
+    assert.equal(buildMismatch('abc123', 'abc123'), false);
+    assert.equal(buildMismatch('', 'def456'), false);
+    assert.equal(buildMismatch('abc123', undefined), false);
+    assert.equal(RELOAD_NOTE, 'The page was updated \u2014 reload to see the new layout');
 });

@@ -8,6 +8,7 @@ use App\Models\UnitStatus\UnitStatusCoverageGap;
 use App\Models\UnitStatus\UnitStatusSyncState;
 use App\Services\DailyRoster\RosterFreshnessResolver;
 use App\Support\Captain5\DutyCalendar;
+use App\Support\HubTimezone;
 use App\Support\UnitStatus\UnitRegistry;
 use App\Support\UnitStatus\UnitStatusTime;
 use Carbon\CarbonImmutable;
@@ -17,6 +18,9 @@ use Illuminate\Support\Facades\Cache;
 /** The one view-model builder behind the page, the refresh fragment and the JSON, so the numbers never diverge. */
 final class UnitStatusBoard
 {
+    /** Bumped whenever the payload shape changes; it is also part of the cache key, so a deploy never serves an old shape. */
+    public const SCHEMA_VERSION = 2;
+
     public const ADVISORY = 'PulsePoint is advisory. Verify with dispatch.';
 
     public const DEFINITION = 'A run is a PulsePoint call that listed this unit (an observed assignment). It is not proof the unit responded. Each call counts once per unit; status changes, repeat updates and page refreshes never add runs.';
@@ -26,7 +30,7 @@ final class UnitStatusBoard
         private readonly FeedStatusResolver $feed,
         private readonly CrewProjection $crew,
         private readonly CurrentCallFinder $currentCalls,
-        private readonly RunCounts $runCounts,
+        private readonly UnitActivity $activity,
         private readonly UnitViewBuilder $units,
         private readonly DutyCalendar $calendar,
         private readonly RosterFreshnessResolver $rosterFreshness,
@@ -55,7 +59,7 @@ final class UnitStatusBoard
         $state = UnitStatusSyncState::current();
         $roster = $this->rosterFreshness->status($now);
 
-        return 'unit-status:board:'.sha1(implode('|', [
+        return 'unit-status:board:v'.self::SCHEMA_VERSION.':'.sha1(implode('|', [
             (string) $state?->last_success_at?->getTimestamp(),
             (string) $state?->source_state,
             (int) $state?->consecutive_failures,
@@ -74,7 +78,7 @@ final class UnitStatusBoard
         $roster = $this->crew->at($now);
         $dutyDate = $this->calendar->dutyDate($now);
         $found = $this->currentCalls->find($now);
-        $counts = $this->runCounts->forDutyDate($dutyDate->format('Y-m-d'));
+        $activity = $this->activity->forDutyDate($dutyDate->format('Y-m-d'));
 
         $stations = [];
         foreach ($this->registry->stationNumbers() as $number) {
@@ -82,21 +86,22 @@ final class UnitStatusBoard
         }
         foreach ($this->registry->units() as $unit) {
             $index = array_search($unit->station, $this->registry->stationNumbers(), true);
-            $stations[$index]['units'][] = $this->units->build($unit, $found['current'][$unit->code] ?? [], isset($found['aged'][$unit->code]), ($counts[$unit->code] ?? []) + RunCounts::empty(), $feed, $roster);
+            $stations[$index]['units'][] = $this->units->build($unit, $found['current'][$unit->code] ?? [], isset($found['aged'][$unit->code]), $activity['units'][$unit->code], $feed, $roster);
         }
 
         $body = [
-            'schemaVersion' => 1,
+            'schemaVersion' => self::SCHEMA_VERSION,
             'live' => $feed->fresh && $roster->isCurrent(),
             'advisory' => self::ADVISORY,
             'source' => $this->source($feed),
             'roster' => $this->roster($roster),
             'dutyWindow' => $this->dutyWindow($dutyDate, $roster),
+            'totals' => $activity['totals'],
             'tracking' => $this->tracking(),
             'stations' => $stations,
         ];
 
-        return ['schemaVersion' => 1, 'generatedAt' => UnitStatusTime::iso($now), 'etag' => sha1((string) json_encode($body))] + $body;
+        return ['schemaVersion' => self::SCHEMA_VERSION, 'generatedAt' => UnitStatusTime::iso($now), 'etag' => sha1((string) json_encode($body))] + $body;
     }
 
     /** @return array<string, mixed> */
@@ -167,6 +172,7 @@ final class UnitStatusBoard
             'startsAt' => UnitStatusTime::iso($starts),
             'startsLabel' => UnitStatusTime::dateTime($starts),
             'firstSyncedAt' => UnitStatusTime::iso($state?->first_synced_at),
+            'note' => 'Counts began '.$this->countsBeganLabel($starts).' and keep adding up from there.',
             'definition' => self::DEFINITION,
             'openGap' => $gaps->contains(static fn (UnitStatusCoverageGap $gap): bool => $gap->ended_at === null),
             'gaps' => $gaps->map(fn (UnitStatusCoverageGap $gap): array => [
@@ -176,6 +182,14 @@ final class UnitStatusBoard
                 'label' => $this->gapLabel($gap),
             ])->values()->all(),
         ];
+    }
+
+    /** "Nov 2, 2026 at 8:00 AM", Eastern. */
+    private function countsBeganLabel(CarbonImmutable $starts): string
+    {
+        $local = $starts->setTimezone(HubTimezone::NAME);
+
+        return $local->format('M j, Y').' at '.$local->format('g:i A');
     }
 
     private function gapLabel(UnitStatusCoverageGap $gap): string

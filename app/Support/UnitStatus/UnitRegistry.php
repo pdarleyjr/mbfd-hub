@@ -30,6 +30,7 @@ final class UnitRegistry
                     (int) $number,
                     array_map(static fn (string $designation): string => self::normalizeDesignation($designation)['designation'], (array) $row['designations']),
                     (string) $row['roster_label'],
+                    in_array($row['class'] ?? null, [UnitDefinition::RESCUE, UnitDefinition::COMBAT], true) ? (string) $row['class'] : UnitDefinition::BY_CALL,
                 );
                 $this->units[] = $unit;
                 foreach ($unit->designations as $designation) {

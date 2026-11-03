@@ -19,10 +19,10 @@ final class UnitViewBuilder
     /**
      * @param  list<array{call: UnitStatusCall, unit: UnitStatusCallUnit}>  $current
      * @param  bool  $agedOut  The unit's only open calls are older than the current-call age limit
-     * @param  array{shift: int, shiftUnconfirmed: int, lifetime: int, lifetimeUnconfirmed: int, backfilledLifetime: int}  $runs
+     * @param  array{shift: int, lifetime: int, backfilledLifetime: int, busiestDay: ?array{runs: int, date: string, label: string}, todayRuns: list<array<string, mixed>>}  $activity
      * @return array<string, mixed>
      */
-    public function build(UnitDefinition $unit, array $current, bool $agedOut, array $runs, FeedStatus $feed, CrewSnapshot $roster): array
+    public function build(UnitDefinition $unit, array $current, bool $agedOut, array $activity, FeedStatus $feed, CrewSnapshot $roster): array
     {
         $crew = $roster->crew($unit->code);
         $calls = array_map(fn (array $entry): array => $this->callView($entry['call'], $entry['unit'], $unit), $current);
@@ -35,9 +35,36 @@ final class UnitViewBuilder
             'availability' => $this->availability($current, $agedOut, $feed, $roster, $crew),
             'assignmentSummary' => $this->summary($current, $agedOut, $feed),
             'conflict' => count($current) > 1,
+            'incidentLabel' => $calls[0]['idLabel'] ?? null,
             'currentCalls' => $calls,
-            'runs' => $runs,
+            'runs' => ['shift' => $activity['shift'], 'lifetime' => $activity['lifetime'], 'backfilledLifetime' => $activity['backfilledLifetime']],
+            'profile' => $this->profile($activity, $current),
             'crew' => $this->crewView($crew, $roster),
+        ];
+    }
+
+    /**
+     * The pop-up card's numbers: this shift, since tracking began, the busiest duty day, and the calls run this shift.
+     *
+     * @param  array{shift: int, lifetime: int, busiestDay: ?array{runs: int, date: string, label: string}, todayRuns: list<array<string, mixed>>}  $activity
+     * @param  list<array{call: UnitStatusCall, unit: UnitStatusCallUnit}>  $current
+     * @return array<string, mixed>
+     */
+    private function profile(array $activity, array $current): array
+    {
+        $currentIds = array_map(static fn (array $entry): string => $entry['call']->source_call_id, $current);
+        $calls = array_map(static function (array $run) use ($currentIds): array {
+            $current = in_array($run['sourceCallId'], $currentIds, true);
+            unset($run['sourceCallId']);
+
+            return $run + ['current' => $current];
+        }, $activity['todayRuns']);
+
+        return [
+            'shiftRuns' => $activity['shift'],
+            'lifetimeRuns' => $activity['lifetime'],
+            'busiestDay' => $activity['busiestDay'],
+            'todayCalls' => $calls,
         ];
     }
 
@@ -51,7 +78,7 @@ final class UnitViewBuilder
             $unitRow = $current[0]['unit'];
             $family = StatusFamily::family($unitRow->status);
 
-            return $this->state('on_call', trim($unitRow->status) !== '' ? $unitRow->status : 'Assigned', $family, 'source', StatusFamily::color($family), $unitRow->confirmed, ! $feed->fresh, $feed->fresh ? null : 'May be out of date. '.$feed->note(), $unitRow->status_observed_at);
+            return $this->state('on_call', StatusFamily::label($unitRow->status), $family, 'source', StatusFamily::color($family), true, ! $feed->fresh, $feed->fresh ? null : 'May be out of date. '.$feed->note(), $unitRow->status_observed_at);
         }
         // `confirmed` is null whenever there is no call: it only describes whether PulsePoint printed a "?" on a unit.
         if ($agedOut) {
@@ -113,10 +140,11 @@ final class UnitViewBuilder
             'address' => $call->address,
             'receivedAt' => UnitStatusTime::iso($call->received_at),
             'receivedLabel' => UnitStatusTime::time($call->received_at),
-            'unitStatus' => $unitRow->status,
+            'unitStatus' => StatusFamily::label($unitRow->status),
             'unitFamily' => $family,
             'indicatorColor' => StatusFamily::color($family),
-            'unitConfirmed' => $unitRow->confirmed,
+            // Never false: a "?" unit is not shown at all, and the board never says "unconfirmed" (contract 10.6).
+            'unitConfirmed' => true,
             'sourceStatus' => $call->source_status,
             'lastSeenAt' => UnitStatusTime::iso($call->last_seen_at),
             'lastSeenLabel' => UnitStatusTime::time($call->last_seen_at),
@@ -132,10 +160,11 @@ final class UnitViewBuilder
         $others = [];
         foreach ((array) $call->units_json as $listed) {
             $designation = $listed['unitId'];
-            if ($designation === '' || $this->registry->matchDesignation($designation)?->unit->code === $unit->code) {
+            // A "?" designation is PulsePoint's own doubt; the board lists confirmed units only.
+            if ($designation === '' || str_starts_with(ltrim($designation), '?') || $this->registry->matchDesignation($designation)?->unit->code === $unit->code) {
                 continue;
             }
-            $others[$designation] ??= ['designation' => $designation, 'status' => $listed['status']];
+            $others[$designation] ??= ['designation' => $designation, 'status' => StatusFamily::label($listed['status'])];
         }
 
         return array_values($others);

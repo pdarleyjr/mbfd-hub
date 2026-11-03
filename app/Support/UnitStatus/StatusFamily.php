@@ -37,6 +37,24 @@ final class StatusFamily
         return self::WORDS[self::key($word)] ?? self::UNKNOWN;
     }
 
+    /**
+     * The only source of status text on the board (contract 10.6). PulsePoint's own words are never shown: an unknown or
+     * blank word reads "Assigned", which is all that is known about a confirmed unit on a call.
+     */
+    public static function label(?string $word): string
+    {
+        return match (self::key($word)) {
+            'dispatched', 'acknowledged' => 'Dispatched',
+            'enroute' => 'En Route',
+            'staged' => 'Staged',
+            'on scene', 'available on scene' => 'On Scene',
+            'transport' => 'Transporting',
+            'transport arrived' => 'At Hospital',
+            'cleared from incident' => 'Cleared',
+            default => 'Assigned',
+        };
+    }
+
     public static function color(string $family): ?string
     {
         return self::COLORS[$family] ?? null;

@@ -6,6 +6,13 @@
     <title>Unit Status · MBFD Hub</title>
     @vite(['resources/css/app.css', 'resources/css/unit-status.css', 'resources/js/unit-status.js'])
 </head>
+@php
+    try {
+        $build = substr(md5(\Illuminate\Support\Facades\Vite::asset('resources/css/unit-status.css')), 0, 12);
+    } catch (\Throwable) {
+        $build = '';
+    }
+@endphp
 <body data-hub-ui="2" class="hub-page min-h-screen bg-hub-canvas text-hub-ink antialiased">
     <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub.shell module="Unit Status" :back-href="url('/')" />
@@ -13,6 +20,7 @@
         id="main"
         class="hub-page__main us-main"
         data-us-page
+        data-build="{{ $build }}"
         data-board-url="{{ url('/unit-status/board') }}"
         data-login-url="{{ url('/login') }}"
     >

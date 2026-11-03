@@ -107,3 +107,22 @@ export function bodyHasBoard(html) {
 export function profileChanged(currentMarkup, nextMarkup) {
     return currentMarkup !== nextMarkup;
 }
+
+/** The element that carries a unit's code, status and summary: the row button, not its list item. */
+export const ROW_SELECTOR = 'button[data-us-open]';
+
+/** Reads the announcement snapshot from row elements (anything with a dataset). */
+export function snapshotRows(rows) {
+    return [...rows].map((row) => ({
+        code: row.dataset.unitCode,
+        status: row.dataset.status,
+        summary: row.dataset.summary,
+    }));
+}
+
+/** A page left open across a deploy gets new markup with old styles; only a known, different build counts. */
+export function buildMismatch(pageBuild, nextBuild) {
+    return Boolean(pageBuild) && Boolean(nextBuild) && pageBuild !== nextBuild;
+}
+
+export const RELOAD_NOTE = 'The page was updated \u2014 reload to see the new layout';

@@ -175,7 +175,7 @@ final class UnitStatusHardeningTest extends UnitStatusTestCase
         $this->markFeedFresh();
         $this->actingAsCanonicalFixture();
 
-        $this->get('/unit-status/data', ['X-Hub-Background-Refresh' => '1'])->assertOk()->assertJsonPath('schemaVersion', 1);
+        $this->get('/unit-status/data', ['X-Hub-Background-Refresh' => '1'])->assertOk()->assertJsonPath('schemaVersion', 2);
     }
 
     // 3. Backlog
@@ -334,14 +334,14 @@ final class UnitStatusHardeningTest extends UnitStatusTestCase
             'Station 1 / Ladder 1' => [['employee_id' => 'EMP-SECRET-1', 'name' => 'ALPHA, ANN']],
             'Station 1 / Rescue 1' => [['employee_id' => 'EMP-SECRET-2', 'name' => 'BRAVO, BOB', 'availability' => 'not_working']],
         ]);
-        $this->storeCall(1, ['E1' => ['status' => 'On Scene', 'confirmed' => false]]);
+        $this->storeCall(1, ['E1' => ['status' => 'On Scene']], ['received_at' => now()->subMinutes(5)]);
 
         $board = $this->board();
 
         self::assertNull($this->unit($board, 'L1')['availability']['confirmed']);
         self::assertNull($this->unit($board, 'R1')['availability']['confirmed']);
         self::assertNull($this->unit($board, 'E3')['availability']['confirmed']);
-        self::assertFalse($this->unit($board, 'E1')['availability']['confirmed']);
+        self::assertTrue($this->unit($board, 'E1')['availability']['confirmed']);
 
         $this->markFeedFresh('live', now()->subMinutes(10));
         self::assertNull($this->unit($this->board(), 'L1')['availability']['confirmed']);
