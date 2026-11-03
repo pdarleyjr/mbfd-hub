@@ -87,6 +87,42 @@ export interface MasterItem {
   reorder_at_auto: boolean;
   /** True when `critical_at` is the preset (a quarter of the expected amount). */
   critical_at_auto: boolean;
+  /** More was taken than the ledger held, so on hand shows 0 until someone counts the shelf. */
+  count_due?: boolean;
+}
+
+// ------------------------------------------------------------ supply room screen (GET /supply/screen)
+
+export interface ScreenWithdrawalLine { name: string; quantity: number; unit_label: string; count_due: boolean }
+
+export interface ScreenWithdrawal {
+  uuid: string;
+  number: string;
+  employee_name: string;
+  unit_label: string | null;
+  /** Ready to show, for example "Nov 3, 9:15 AM". */
+  taken_at: string;
+  taken_at_iso: string;
+  status: 'taken' | 'undone';
+  note: string | null;
+  count_due: boolean;
+  lines: ScreenWithdrawalLine[];
+}
+
+export interface KioskScreen {
+  id: number;
+  name: string;
+  state: 'online' | 'offline' | 'waiting' | 'revoked';
+  state_label: string;
+  last_seen: string | null;
+  paired_at: string | null;
+  paired_by: string | null;
+}
+
+export interface SupplyScreenData {
+  withdrawals: ScreenWithdrawal[];
+  screens: KioskScreen[];
+  search_words_waiting: number;
 }
 
 export interface InactiveItem { id: number; name: string; location_code: string | null }

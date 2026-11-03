@@ -56,6 +56,8 @@ final class NotificationPresetPolicyTest extends TestCase
         'captain5_ems' => [true, true, true],
         // The owner asked for in-app, push and city email for the low-stock list (2026-11-02).
         'ems_low_stock' => [true, true, true],
+        // Supply room screen withdrawals: in-app per withdrawal and one daily email; no phone alerts (2026-11-03).
+        'ems_supply_withdrawals' => [true, false, true],
         'command_communications' => [true, true, true],
     ];
 
@@ -189,7 +191,7 @@ final class NotificationPresetPolicyTest extends TestCase
 
                 continue;
             }
-            if (in_array($category->key, ['fleet_operational_alerts', 'roster_moves', 'ems_low_stock'], true)) {
+            if (in_array($category->key, ['fleet_operational_alerts', 'roster_moves', 'ems_low_stock', 'ems_supply_withdrawals'], true)) {
                 $this->assertSame([false, false, false], $this->stored($user, $category->key), 'newer than this migration, whose list is frozen');
 
                 continue;

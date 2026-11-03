@@ -42,6 +42,8 @@ export default defineConfig({
                 // Unit Status board: grouped table/cards, profile dialog, in-place refresh.
                 'resources/css/unit-status.css',
                 'resources/js/unit-status.js',
+                // EMS supply room touchscreen (paired device, no sign-in).
+                'resources/js/supply-kiosk/main.tsx',
             ],
             refresh: true,
         }),

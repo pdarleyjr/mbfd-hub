@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Pages;
 
 use App\Filament\Admin\Pages\Concerns\SupplyRoomCounts;
 use App\Filament\Admin\Pages\Concerns\SupplyRoomDataExports;
+use App\Filament\Admin\Pages\Concerns\SupplyRoomKiosk;
 use App\Filament\Admin\Pages\Concerns\SupplyRoomStockTable;
 use App\Filament\Concerns\HasPageTableExportActions;
 use App\Filament\Concerns\RunsEmsActions;
@@ -56,6 +57,7 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
     use RunsEmsActions;
     use SupplyRoomCounts;
     use SupplyRoomDataExports;
+    use SupplyRoomKiosk;
 
     public const TABS = [
         'stock' => 'Stock',
@@ -64,6 +66,7 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
         'reorder' => 'Reorder',
         'movements' => 'Movements',
         'snapshots' => 'Snapshots',
+        'screen' => 'Supply room screen',
     ];
 
     private const MOVEMENTS_PER_PAGE = 25;
@@ -153,6 +156,7 @@ final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
             'reorder' => $this->reorderData(),
             'movements' => $this->movementsData(),
             'snapshots' => $this->snapshotsData(),
+            'screen' => $this->screenData(),
             default => [],
         };
     }

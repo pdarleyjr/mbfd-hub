@@ -70,6 +70,8 @@ final class NotificationCategoryRegistry
 
     public const EMS_LOW_STOCK = 'ems_low_stock';
 
+    public const EMS_SUPPLY_WITHDRAWALS = 'ems_supply_withdrawals';
+
     /** @var array<string, NotificationCategory>|null */
     private ?array $categories = null;
 
@@ -455,6 +457,21 @@ final class NotificationCategoryRegistry
                 description: 'A medical supply room item dropped to its red line (low or out), with how many to order. Sent to the people on the EMS low-stock alert list.',
                 group: self::GROUP_COMMAND,
                 channels: $all,
+                locked: [],
+                significance: 'important',
+                eligibility: static fn (EligibilityContext $c): ?string => self::emsLowStockAllows($c->user)
+                    ? 'ems_low_stock_list' : null,
+                candidates: static fn (): Builder => User::query()->where('account_status', 'active')
+                    ->whereIn('id', StockAlertRecipient::query()->select('user_id')),
+            ),
+            // The same list and live access check as the low-stock alerts. Each withdrawal is an in-app notice only;
+            // the email is one daily summary (docs/ems/supply-room-kiosk.md section 7).
+            new NotificationCategory(
+                key: self::EMS_SUPPLY_WITHDRAWALS,
+                label: 'EMS supply room screen withdrawals',
+                description: 'A member took supplies at the supply room screen: an in-app notice for each one and one email a day listing them all. Sent to the people on the EMS low-stock alert list.',
+                group: self::GROUP_COMMAND,
+                channels: [$db, $mail],
                 locked: [],
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => self::emsLowStockAllows($c->user)

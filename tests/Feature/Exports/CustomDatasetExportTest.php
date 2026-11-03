@@ -54,7 +54,7 @@ final class CustomDatasetExportTest extends ExportTestCase
 
     public static function supplyTabs(): array
     {
-        return array_combine($tabs = ['counts', 'reconcile', 'reorder', 'movements', 'snapshots'], array_map(static fn ($tab): array => [$tab], $tabs));
+        return array_combine($tabs = ['counts', 'reconcile', 'reorder', 'movements', 'snapshots', 'screen'], array_map(static fn ($tab): array => [$tab], $tabs));
     }
 
     #[DataProvider('supplyTabs')]

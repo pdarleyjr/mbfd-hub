@@ -139,7 +139,8 @@ final class ItemReport
         return DB::table('ems_stock_movements as m')
             ->where('m.supply_item_id', $item->getKey())
             ->tap(fn (Builder $q) => Instant::where(Instant::where($q, 'm.occurred_at', '>=', $f->fromUtc()), 'm.occurred_at', '<', $f->toUtc()))
-            ->where(fn ($q) => $q->where('m.movement_type', StockMovement::RECEIVED)->orWhere(fn ($q2) => $q2->where('m.movement_type', StockMovement::ADJUSTED)->whereNull('m.request_id')))
+            // A supply room screen Undo puts back what a member took; it is not replenishment.
+            ->where(fn ($q) => $q->where('m.movement_type', StockMovement::RECEIVED)->orWhere(fn ($q2) => $q2->where('m.movement_type', StockMovement::ADJUSTED)->whereNull('m.request_id')->whereNull('m.kiosk_withdrawal_id')))
             ->orderByDesc('m.occurred_at')->orderByDesc('m.id')->limit(self::MOVEMENT_LIMIT)
             ->get(['m.occurred_at', 'm.movement_type', 'm.quantity_base', 'm.reason'])
             ->map(fn (stdClass $m): array => [
@@ -156,12 +157,13 @@ final class ItemReport
     {
         return DB::table('ems_stock_movements as m')
             ->leftJoin('ems_inventory_requests as r', 'r.id', '=', 'm.request_id')
+            ->leftJoin('ems_kiosk_withdrawals as w', 'w.id', '=', 'm.kiosk_withdrawal_id')
             ->where('m.supply_item_id', $item->getKey())
             ->tap(fn (Builder $q) => Instant::where(Instant::where($q, 'm.occurred_at', '>=', $f->fromUtc()), 'm.occurred_at', '<', $f->toUtc()))
             ->when($f->unit !== null, fn ($q) => UnitKey::restrict($q, (string) $f->unit, 'r'))
             ->orderByDesc('m.occurred_at')->orderByDesc('m.id')->limit(self::MOVEMENT_LIMIT + 1)
             ->selectRaw('m.id AS id, m.occurred_at AS occurred_at, m.movement_type AS movement_type, m.quantity_base AS quantity_base, m.reason AS reason,
-                m.corrects_movement_id AS corrects_movement_id, r.number AS request_number, r.target_label AS unit_label,
+                m.corrects_movement_id AS corrects_movement_id, r.number AS request_number, COALESCE(r.target_label, w.unit_label) AS unit_label,
                 (SELECT COALESCE(SUM(c.quantity_base), 0) FROM ems_stock_movements c WHERE c.corrects_movement_id = m.id) AS corrected_base')
             ->get()
             ->map(fn (stdClass $m): array => [

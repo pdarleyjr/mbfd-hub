@@ -11,6 +11,7 @@ use App\Services\Ems\CountFormService;
 use App\Services\Ems\EmsException;
 use App\Services\Ems\EmsValidator;
 use App\Services\Ems\FormReconciliationService;
+use App\Services\Ems\Kiosk\KioskReport;
 use App\Services\Ems\MasterInventoryService;
 use App\Services\Ems\SupplyItemOrders;
 use Illuminate\Http\JsonResponse;
@@ -52,6 +53,12 @@ final class MasterInventoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         return $this->guarded(fn (): JsonResponse => $this->ok($this->master->read($this->user($request))));
+    }
+
+    /** The supply room screen: recent withdrawals, screen health, search words waiting (docs/ems/supply-room-kiosk.md section 7). */
+    public function screen(): JsonResponse
+    {
+        return $this->guarded(fn (): JsonResponse => $this->ok(app(KioskReport::class)->overview(100)));
     }
 
     public function store(Request $request): JsonResponse

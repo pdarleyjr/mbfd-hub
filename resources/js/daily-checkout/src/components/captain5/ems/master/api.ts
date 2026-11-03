@@ -3,7 +3,7 @@ import { call as emsCall, send } from '../../../../utils/emsApi';
 import { DEFAULT_UNITS, normalizeItem, summarize } from './orderLogic';
 import type {
   ArrivedInput, BatchChange, CountReviewData, EntryWrite, ItemChanges, MasterData, MasterItem, NewItemInput, OrderInput, OrderUpdate,
-  SaveEntriesResult, StartResult, SubmitResult, UnitOption,
+  SaveEntriesResult, StartResult, SubmitResult, SupplyScreenData, UnitOption,
 } from './types';
 
 /**
@@ -42,7 +42,18 @@ export async function fetchMaster(): Promise<MasterData> {
   };
 }
 
-export const createMasterItem = (input: NewItemInput, key: string): Promise<MasterItem> => itemCall('/supply/master/items', 'POST', input, key);
+/** The supply room screen section: recent kiosk withdrawals, paired screens and search words waiting for review. */
+export async function fetchSupplyScreen(): Promise<SupplyScreenData> {
+  const data = await call<Partial<SupplyScreenData>>('/supply/screen', 'GET');
+  const withdrawals = Array.isArray(data.withdrawals) ? data.withdrawals : [];
+  return {
+    withdrawals: withdrawals.map((entry) => ({ ...entry, lines: Array.isArray(entry.lines) ? entry.lines : [] })),
+    screens: Array.isArray(data.screens) ? data.screens : [],
+    search_words_waiting: Number(data.search_words_waiting ?? 0) || 0,
+  };
+}
+
+export const createMasterItem =(input: NewItemInput, key: string): Promise<MasterItem> => itemCall('/supply/master/items', 'POST', input, key);
 
 export const updateMasterItem = (itemId: number, changes: ItemChanges, key: string): Promise<MasterItem> => (
   itemCall(`/supply/master/items/${id(itemId)}`, 'PATCH', changes, key)
