@@ -87,6 +87,8 @@ final class EndToEndTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Replies add a 300 line on Saturdays and Sundays; pin a Tuesday so the wording checks never depend on the run day.
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-03 15:00:00', 'America/New_York'));
         Mail::fake();
         $this->buildWorld();
         RateLimiter::clear('employee-logistics-message:1');
@@ -138,8 +140,8 @@ final class EndToEndTest extends TestCase
         $this->assertCount(1, $messages);
         $this->assertSame((int) $inspection->id, (int) $messages[0]->apparatus_inspection_id);
         $this->assertSame('member', $messages[0]->visibility);
-        $this->assertStringContainsString('Please check if there is any extra', $messages[0]->body);
-        $this->assertStringContainsString('call or text before coming by Station 2', $messages[0]->body);
+        $this->assertStringContainsString("hasn't been misplaced", $messages[0]->body);
+        $this->assertStringContainsString('call or text us before heading to Station 2', $messages[0]->body);
 
         $row = AiIntakeEvent::query()->where('source_type', 'apparatus_inspection')->sole();
         $this->assertSame(AiIntakeEvent::STATE_SENT, $row->state);
@@ -150,9 +152,9 @@ final class EndToEndTest extends TestCase
         $this->assertOneBell($this->alpha, $messages[0]->body);
         $this->assertNoMailAndNoPush();
 
-        // The member's own screen shows it as AI Response.
+        // The member's own screen shows it as Support Services (never an 'AI' title).
         $this->actAs($this->alpha);
-        $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk()->assertSee('AI Response')->assertSee('Station 2');
+        $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk()->assertSee('Support Services')->assertDontSee('AI Response')->assertSee('Station 2');
     }
 
     public function test_a_station_request_gets_one_ai_response_update_and_one_bell(): void
@@ -163,7 +165,7 @@ final class EndToEndTest extends TestCase
 
         $updates = StationRequestUpdate::query()->where('station_request_id', $id)->autoReceipts()->get();
         $this->assertCount(1, $updates);
-        $this->assertSame('AI Response', $updates[0]->senderLabel());
+        $this->assertSame('Support Services', $updates[0]->senderLabel());
         $this->assertNull($updates[0]->changed_by_user_id);
         $this->assertStringStartsWith('Acknowledged.', (string) $updates[0]->public_note);
 
@@ -185,7 +187,7 @@ final class EndToEndTest extends TestCase
         $replies = EmployeeLogisticsMessage::query()->where('author_side', EmployeeLogisticsMessage::SIDE_ASSISTANT)->get();
         $this->assertCount(1, $replies);
         $this->assertSame((int) $message->thread_id, (int) $replies[0]->thread_id);
-        $this->assertSame('AI Response', $replies[0]->author_name);
+        $this->assertSame('Support Services', $replies[0]->author_name);
         $this->assertNull($replies[0]->author_user_id);
 
         $row = AiIntakeEvent::query()->where('source_type', 'employee_logistics_message')->sole();
@@ -246,7 +248,7 @@ final class EndToEndTest extends TestCase
 
         $message = ApparatusIssueMessage::query()->where('author_context', 'assistant')->sole();
         $this->assertSame((int) $inspection->id, (int) $message->apparatus_inspection_id);
-        $this->assertSame("Please check if there is any extra kitty litter at your station. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.", $message->body);
+        $this->assertSame("Acknowledged. Please make sure the kitty litter hasn't been misplaced and isn't somewhere around the station, on another apparatus, or left on a spare truck during a recent truck swap. If it's still missing, call or text us before heading to Station 2 so we can confirm we have a spare ready.", $message->body);
     }
 
     public function test_the_station_reply_leaves_status_priority_acknowledgment_and_public_response_alone(): void
@@ -289,7 +291,7 @@ final class EndToEndTest extends TestCase
 
     // ================================================================================== 3. critical item
 
-    public function test_a_missing_scba_item_gets_a_bare_acknowledgment_and_is_flagged_critical(): void
+    public function test_a_missing_scba_item_gets_the_readiness_line_and_is_flagged_critical(): void
     {
         $this->switchOn();
 
@@ -297,9 +299,10 @@ final class EndToEndTest extends TestCase
 
         $message = ApparatusIssueMessage::query()->where('author_context', 'assistant')->sole();
         $this->assertSame((int) $inspection->id, (int) $message->apparatus_inspection_id);
-        $this->assertSame('Acknowledged.', $message->body);
+        $this->assertStringContainsString("make sure the SCBA hasn't been misplaced", $message->body);
+        $this->assertStringEndsWith("If this affects your unit's readiness, notify your officer and 300 right away.", $message->body);
         $row = AiIntakeEvent::query()->where('source_type', 'apparatus_inspection')->sole();
-        $this->assertSame('Acknowledged.', $row->reply_text);
+        $this->assertSame($message->body, $row->reply_text);
         $this->assertSame('critical', $row->risk_tier);
         $this->assertTrue((bool) $row->needs_human);
     }
@@ -778,7 +781,7 @@ final class EndToEndTest extends TestCase
         $rows = $this->aiNotifications()->where('notifiable_id', $member->id)->get();
         $this->assertCount(1, $rows, 'Exactly one in-app notification for the submitter.');
         $payload = json_decode((string) $rows[0]->data, true);
-        $this->assertSame('AI Response', $payload['title']);
+        $this->assertSame('Support Services', $payload['title']);
         $this->assertSame($reply, $payload['body']);
         $this->assertSame(1, $this->aiNotifications()->count(), 'Nobody else is notified.');
         $this->assertSame([[AiResponseNotification::class, 'database']], $this->aiDeliveries());

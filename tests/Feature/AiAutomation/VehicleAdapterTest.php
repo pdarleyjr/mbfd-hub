@@ -378,18 +378,18 @@ final class VehicleAdapterTest extends TestCase
         $detail = app(EmployeeInspectionHistoryService::class)->detail($inspection);
         $conversation = app(MemberInspectionConversation::class)->project($this->alpha, $inspection, $detail);
         $row = $conversation['inspection']['messages'][0];
-        $this->assertSame('AI Response', $row['author']);
+        $this->assertSame('Support Services', $row['author']);
         $this->assertFalse($row['own']);
         $this->assertFalse($row['from_logistics']);
         $this->assertNull($conversation['clarification']);
         $this->assertNull($conversation['rejection_reason']);
         $this->actAs($this->alpha);
-        $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk()->assertSee('AI Response')->assertSee('Your report was received.');
+        $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk()->assertSee('Support Services')->assertSee('Your report was received.');
 
         // The Logistics inspection page and timeline.
         $workspace = app(InspectionWorkspace::class)->build($inspection, $this->reviewer);
-        $this->assertSame('AI Response', collect($workspace['general_thread'])->firstWhere('id', (int) $message->id)['author']);
-        $this->assertContains('AI Response', collect($workspace['timeline'] ?? [])->pluck('actor')->all());
+        $this->assertSame('Support Services (automated)', collect($workspace['general_thread'])->firstWhere('id', (int) $message->id)['author']);
+        $this->assertContains('Support Services (automated)', collect($workspace['timeline'] ?? [])->pluck('actor')->all());
 
         // The staff-attention dashboard feed and the crew-wide issue history never carry it.
         $this->assertSame([], collect(DailyCheckoutNotesFeed::build()['rows'])->filter(fn (array $r): bool => str_contains($r['author'], 'AI') || $r['excerpt'] === 'Your report was received.')->all());
@@ -415,7 +415,7 @@ final class VehicleAdapterTest extends TestCase
 
         $detail = app(EmployeeInspectionHistoryService::class)->detail($inspection);
         $thread = app(MemberInspectionConversation::class)->project($this->alpha, $inspection, $detail)['issues'][$defect->id]['messages'];
-        $this->assertSame('AI Response', end($thread)['author']);
+        $this->assertSame('Support Services', end($thread)['author']);
         $this->assertTrue($this->adapter()->facts($intake)->alreadyAnswered);
         $this->assertSame($record->id, $this->adapter()->writeReply($intake, $this->adapter()->facts($intake), 'Your message was received.')->id);
     }

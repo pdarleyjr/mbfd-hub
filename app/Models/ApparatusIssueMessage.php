@@ -30,8 +30,11 @@ final class ApparatusIssueMessage extends Model
      */
     public const CONTEXT_ASSISTANT = 'assistant';
 
-    /** The one name the assistant is shown under, everywhere. */
-    public const ASSISTANT_LABEL = 'AI Response';
+    /** Members see the department name; staff screens mark it as automated so the team can tell it apart. */
+    public static function assistantLabel(bool $forStaff = false): string
+    {
+        return (string) config($forStaff ? 'ai_automation.staff_label' : 'ai_automation.sender_label', 'Support Services');
+    }
 
     /** Contexts that speak for the department (Logistics or Captain 5), not for a crew member. */
     public const STAFF_CONTEXTS = [self::CONTEXT_LOGISTICS, self::CONTEXT_CAPTAIN5];

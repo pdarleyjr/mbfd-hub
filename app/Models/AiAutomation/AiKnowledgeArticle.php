@@ -24,6 +24,7 @@ class AiKnowledgeArticle extends Model
         return [
             'topic_tags' => 'array',
             'member_safe' => 'boolean',
+            'always_include' => 'boolean',
             'published_version_id' => 'integer',
         ];
     }

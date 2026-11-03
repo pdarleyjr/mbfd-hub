@@ -38,115 +38,136 @@ final class ResponseComposerTest extends TestCase
         $this->assertSame(ComposedReply::RECEIPT_ONLY, $reply->decision);
     }
 
-    public function test_missing_kitty_litter_gets_the_station_check_and_station_2_line(): void
+    private const SEARCH = "hasn't been misplaced and isn't somewhere around the station, on another apparatus, or left on a spare truck during a recent truck swap.";
+
+    private const CALL_AHEAD = 'call or text us before heading to Station 2 so we can confirm we have a spare ready.';
+
+    private const READINESS = "If this affects your unit's readiness, notify your officer and 300 right away.";
+
+    private const WEEKEND = "Support Services staff are off this weekend. If this can't wait, contact 300. Otherwise we'll follow up on the next weekday.";
+
+    public function test_a_missing_item_gets_the_look_first_reply_naming_the_item(): void
     {
         $reply = $this->findings([new Finding('Kitty Litter', 'missing')]);
 
-        $this->assertSame("Please check if there is any extra kitty litter at your station. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.", $reply->text);
-        $this->assertSame('missing_consumable', $reply->templateKey);
-        $this->assertSame(ComposedReply::RECEIPT_PLUS_GUIDANCE, $reply->decision);
+        $this->assertSame('Acknowledged. Please make sure the kitty litter '.self::SEARCH." If it's still missing, ".self::CALL_AHEAD, $reply->text);
+        $this->assertSame('missing_item', $reply->templateKey);
+        $this->assertSame('routine', $reply->riskTier);
     }
 
-    public function test_missing_dewalt_battery_gets_the_blower_reminder(): void
+    /** @return array<string, array{0: string, 1: string}> */
+    public static function anyMissingItem(): array
+    {
+        return [
+            'tool' => ['Spanner Wrench', 'spanner wrench'],
+            'expensive' => ['iPad', 'ipad'],
+            'unknown' => ['Thing We Have Never Seen', 'thing we have never seen'],
+            'acronym kept' => ['TIC Mount (rear)', 'TIC mount'],
+        ];
+    }
+
+    /** @dataProvider anyMissingItem */
+    public function test_every_missing_vehicle_item_gets_the_same_reply_with_its_own_name(string $item, string $label): void
+    {
+        $reply = $this->findings([new Finding($item, 'missing')]);
+
+        $this->assertStringContainsString("make sure the {$label} hasn't been misplaced", $reply->text);
+        $this->assertStringContainsString(self::CALL_AHEAD, $reply->text);
+    }
+
+    public function test_a_missing_battery_is_reminded_about_chargers_and_other_tools(): void
     {
         $reply = $this->findings([new Finding('DeWalt 20V Battery', 'missing')]);
 
-        $this->assertStringContainsString('such as the station blower', $reply->text);
-        $this->assertSame('missing_dewalt_battery', $reply->templateKey);
+        $this->assertSame('missing_battery', $reply->templateKey);
+        $this->assertStringContainsString("make sure the dewalt 20V battery wasn't left on a charger or in another tool, such as the station blower", $reply->text);
     }
 
-    public function test_other_tool_batteries_do_not_mention_the_blower(): void
+    public function test_several_missing_items_get_one_reply_listing_them(): void
     {
-        $reply = $this->findings([new Finding('Milwaukee Battery', 'missing')]);
+        $reply = $this->findings([new Finding('Kitty Litter', 'missing'), new Finding('Spanner Wrench', 'missing'), new Finding('K-Tool', 'missing')]);
 
-        $this->assertStringNotContainsString('blower', $reply->text);
-        $this->assertSame('missing_tool_battery', $reply->templateKey);
+        $this->assertSame('missing_items', $reply->templateKey);
+        $this->assertStringContainsString("make sure the kitty litter, spanner wrench and k-tool haven't been misplaced", $reply->text);
+
+        $many = $this->findings([new Finding('Kitty Litter', 'missing'), new Finding('Spanner Wrench', 'missing'), new Finding('Broom', 'missing'), new Finding('Bucket', 'missing')]);
+        $this->assertStringContainsString('kitty litter, spanner wrench, broom and other items', $many->text);
     }
 
-    public function test_missing_routine_interchangeable_equipment(): void
+    public function test_several_missing_items_with_a_battery_add_the_charger_line(): void
     {
-        $reply = $this->findings([new Finding('Spanner Wrench', 'missing')]);
+        $reply = $this->findings([new Finding('Spanner Wrench', 'missing'), new Finding('M18 Batteries', 'missing')]);
 
-        $this->assertStringStartsWith('Please check whether the item was moved to another compartment', $reply->text);
-    }
-
-    public function test_several_routine_missing_items_get_one_combined_reply(): void
-    {
-        $reply = $this->findings([new Finding('Kitty Litter', 'missing'), new Finding('Spanner Wrench', 'missing')]);
-
-        $this->assertSame('missing_multiple', $reply->templateKey);
-        $this->assertStringContainsString('replacements', $reply->text);
+        $this->assertStringEndsWith('Check chargers and other tools, such as the station blower, for any batteries.', $reply->text);
     }
 
     /** @return array<string, array{0: Finding}> */
-    public static function criticalFindings(): array
+    public static function readinessFindings(): array
     {
         return [
             'scba' => [new Finding('SCBA Cylinder', 'missing')],
             'radio' => [new Finding('Portable Radio', 'missing')],
-            'lifepak' => [new Finding('LifePak 15', 'damaged')],
-            'tires' => [new Finding('Front Tire', 'damaged')],
-            'significant damage' => [new Finding('Spanner Wrench', 'damaged', true)],
-            'gas monitor' => [new Finding('Gas Monitor', 'missing')],
+            'saw with battery' => [new Finding('Dewalt K-Saw with Spare battery', 'missing')],
+            'significant' => [new Finding('Spanner Wrench', 'missing', true)],
         ];
     }
 
-    /** @dataProvider criticalFindings */
-    public function test_critical_or_significant_findings_get_acknowledged_only_and_flagged(Finding $finding): void
+    /** @dataProvider readinessFindings */
+    public function test_a_missing_readiness_item_also_tells_them_to_notify_the_officer_and_300(Finding $finding): void
     {
         $reply = $this->findings([$finding]);
 
-        $this->assertSame('Acknowledged.', $reply->text);
-        $this->assertSame(ComposedReply::RECEIPT_AND_HUMAN_FLAG, $reply->decision);
+        $this->assertStringStartsWith('Acknowledged. Please make sure the ', $reply->text);
+        $this->assertStringEndsWith(self::READINESS, $reply->text);
         $this->assertSame('critical', $reply->riskTier);
+        $this->assertSame(ComposedReply::RECEIPT_AND_HUMAN_FLAG, $reply->decision);
     }
 
-    public function test_a_critical_item_anywhere_in_the_checkout_suppresses_all_guidance(): void
+    public function test_damaged_items(): void
     {
-        $reply = $this->findings([new Finding('Kitty Litter', 'missing'), new Finding('SCBA Mask', 'missing')]);
-
-        $this->assertSame('Acknowledged.', $reply->text);
+        $this->assertSame("Acknowledged. We'll follow up if needed.", $this->findings([new Finding('Broom', 'damaged')])->text);
+        $this->assertSame('Acknowledged. '.self::READINESS, $this->findings([new Finding('Front Tire', 'damaged')])->text);
     }
 
-    public function test_expensive_items_get_acknowledged_only(): void
+    public function test_a_checkout_with_missing_and_damaged_items_answers_the_missing_ones(): void
     {
-        $reply = $this->findings([new Finding('iPad', 'missing')]);
+        $reply = $this->findings([new Finding('Kitty Litter', 'missing'), new Finding('Broom', 'damaged')]);
 
-        $this->assertSame('Acknowledged.', $reply->text);
-        $this->assertSame('elevated', $reply->riskTier);
+        $this->assertStringContainsString("make sure the kitty litter hasn't been misplaced", $reply->text);
     }
 
-    public function test_unknown_items_get_no_guessed_guidance(): void
+    public function test_weekends_add_the_300_line_instead_of_the_readiness_line(): void
     {
-        $reply = $this->findings([new Finding('Thing We Have Never Seen', 'missing')]);
+        $routine = $this->findings([new Finding('Kitty Litter', 'missing')], self::SATURDAY);
+        $this->assertStringEndsWith(self::WEEKEND, $routine->text);
 
-        $this->assertSame('Acknowledged.', $reply->text);
-    }
+        $critical = $this->findings([new Finding('SCBA Cylinder', 'missing')], self::SATURDAY);
+        $this->assertStringEndsWith(self::WEEKEND, $critical->text);
+        $this->assertStringNotContainsString('notify your officer', $critical->text);
 
-    public function test_damaged_noncritical_item(): void
-    {
-        $reply = $this->findings([new Finding('Broom', 'damaged')]);
-
-        $this->assertSame("Acknowledged. We'll follow up if needed.", $reply->text);
-    }
-
-    public function test_weekend_line_only_on_saturday_or_sunday_when_needed_now(): void
-    {
-        $urgent = [new Finding('Kitty Litter', 'missing', false, true, 'Need it ASAP')];
-
-        $saturday = $this->findings($urgent, self::SATURDAY);
-        $this->assertStringEndsWith('If it needs to be addressed immediately this weekend, contact 300 to check whether a spare is available.', $saturday->text);
-
-        $this->assertStringNotContainsString('300', $this->findings($urgent, self::TUESDAY)->text);
-        $this->assertStringNotContainsString('300', $this->findings([new Finding('Kitty Litter', 'missing')], self::SATURDAY)->text);
+        $this->assertStringNotContainsString('weekend', $this->findings([new Finding('Kitty Litter', 'missing')])->text);
     }
 
     public function test_weekend_is_judged_in_eastern_time(): void
     {
-        // 2026-11-09 02:00 UTC is still Sunday evening in Miami Beach.
-        $reply = $this->findings([new Finding('Kitty Litter', 'missing', false, true, 'need it today')], '2026-11-09 02:00:00');
+        // 2026-11-09 02:00 UTC is still Sunday evening in Miami Beach; 2026-11-07 03:00 UTC is still Friday.
+        $this->assertStringEndsWith(self::WEEKEND, $this->findings([new Finding('Kitty Litter', 'missing')], '2026-11-09 02:00:00')->text);
+        $this->assertStringNotContainsString('weekend', $this->findings([new Finding('Kitty Litter', 'missing')], '2026-11-07 03:00:00')->text);
+    }
 
-        $this->assertStringContainsString('contact 300', $reply->text);
+    public function test_weekend_line_on_station_requests_and_urgent_support_messages(): void
+    {
+        $composer = app(ResponseComposer::class);
+        $saturday = CarbonImmutable::parse(self::SATURDAY);
+
+        $request = $composer->compose(new IntakeFacts('station', 'station_request', null, [], 'Need two new chairs for the kitchen.', 'equipment', false, null, true), $saturday);
+        $this->assertSame('Acknowledged. Forwarded to the appropriate personnel. '.self::WEEKEND, $request->text);
+
+        $urgent = $composer->compose(new IntakeFacts('support', 'support_message', null, [], 'Bay door remote stopped working, need it today.'), $saturday);
+        $this->assertSame('Acknowledged. '.self::WEEKEND, $urgent->text);
+
+        $calm = $composer->compose(new IntakeFacts('support', 'support_message', null, [], 'Bay door remote is getting weak.'), $saturday);
+        $this->assertSame('Acknowledged.', $calm->text);
     }
 
     public function test_station_request_says_forwarded_only_when_it_really_was(): void
@@ -198,17 +219,24 @@ final class ResponseComposerTest extends TestCase
 
     public function test_plurals_match_the_word_lists(): void
     {
-        $this->assertSame('missing_interchangeable', $this->findings([new Finding('Spanners', 'missing')])->templateKey);
-        $this->assertSame('elevated', $this->findings([new Finding('Elevator Keys', 'missing')])->riskTier);
+        $this->assertSame('critical', $this->findings([new Finding('Portable Radios', 'missing')])->riskTier);
+        $this->assertSame('elevated', $this->message('support_message', 'Lost the elevator keys again')->riskTier);
         $this->assertSame('critical', $this->message('station_request', 'Water leaking from the ceiling')->riskTier);
     }
 
-    public function test_dewalt_saws_are_escalated_not_given_the_battery_reminder(): void
+    public function test_standing_guidance_travels_with_every_model_call(): void
     {
-        $reply = $this->findings([new Finding('Dewalt K-Saw with Spare battery', 'missing')]);
+        $this->publishArticle();
+        $this->publishArticle('how-support-services-handles-submissions', 'How Support Services handles submissions', ['support-services'],
+            'On Saturday and Sunday no Support Services staff are on duty; anything that cannot wait goes to 300.', true);
+        $this->enableModel();
+        Http::fake(['api.cloudflare.com/*' => Http::response($this->modelResponse('Mark it Missing on the daily checkout, then check the station for extra.'))]);
 
-        $this->assertSame('Acknowledged.', $reply->text);
-        $this->assertSame('critical', $reply->riskTier);
+        $reply = $this->message('support_message', 'Where do I report missing kitty litter on the truck?');
+
+        $this->assertSame(ComposedReply::APPROVED_RAG_GUIDANCE, $reply->decision);
+        $this->assertCount(2, $reply->knowledgeRefs);
+        Http::assertSent(fn ($request): bool => str_contains((string) json_encode($request->data()), 'no Support Services staff are on duty'));
     }
 
     public function test_a_question_with_no_published_guidance_gets_acknowledged(): void
@@ -326,19 +354,26 @@ final class ResponseComposerTest extends TestCase
         );
     }
 
-    private function publishArticle(): void
-    {
+    /** @param  list<string>|null  $tags */
+    private function publishArticle(
+        string $slug = 'missing-low-value-consumables',
+        string $title = 'Missing kitty litter and other low-cost consumables',
+        ?array $tags = null,
+        ?string $body = null,
+        bool $always = false,
+    ): void {
         $article = AiKnowledgeArticle::query()->create([
-            'slug' => 'missing-low-value-consumables',
-            'title' => 'Missing kitty litter and other low-cost consumables',
-            'topic_tags' => ['missing', 'kitty litter', 'consumable', 'checkout'],
+            'slug' => $slug,
+            'title' => $title,
+            'topic_tags' => $tags ?? ['missing', 'kitty litter', 'consumable', 'checkout'],
             'member_safe' => true,
+            'always_include' => $always,
         ]);
         $version = AiKnowledgeArticleVersion::query()->create([
             'article_id' => $article->id,
             'version' => 1,
             'title' => $article->title,
-            'body' => 'Report missing kitty litter by marking it Missing on the daily checkout. Check the station for extra first. If there is none, call or text before coming by Station 2 so Support Services can check on a replacement.',
+            'body' => $body ?? 'Report missing kitty litter by marking it Missing on the daily checkout. Check the station for extra first. If there is none, call or text before coming by Station 2 so Support Services can check on a replacement.',
             'status' => 'published',
             'created_by_name' => 'Test',
             'published_at' => now(),

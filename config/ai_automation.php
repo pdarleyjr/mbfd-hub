@@ -13,7 +13,9 @@ declare(strict_types=1);
 return [
     'hard_disabled' => (bool) env('AI_AUTOMATION_HARD_DISABLED', false),
 
-    'sender_label' => 'AI Response',
+    // What members see as the sender (owner decision 2026-11-03: never an 'AI' title). Staff screens add a marker.
+    'sender_label' => 'Support Services',
+    'staff_label' => 'Support Services (automated)',
 
     'timezone' => 'America/New_York',
 
@@ -77,51 +79,53 @@ return [
         'max_sentences' => 3,
     ],
 
+    // Owner decisions 2026-11-03: every missing vehicle item gets the "look for it first" reply naming the item;
+    // members call or text before heading to Station 2; weekends have no admin staff, so 300 is the contact.
     'templates' => [
         'receipt' => [
             'label' => 'Acknowledgment',
-            'help' => 'Default reply when no guidance is useful, and the only reply for anything critical or expensive.',
+            'help' => 'Default reply when nothing more is useful.',
             'body' => 'Acknowledged.',
         ],
         'receipt_forwarded' => [
             'label' => 'Acknowledgment, forwarded',
-            'help' => 'Only used when the request really reached an existing staff work list.',
+            'help' => 'Station requests that reached the staff work list.',
             'body' => 'Acknowledged. Forwarded to the appropriate personnel.',
         ],
-        'noncritical_followup' => [
-            'label' => 'Noncritical item needs attention',
-            'help' => 'Damaged noncritical equipment with no documented fix.',
+        'missing_item' => [
+            'label' => 'One missing vehicle item',
+            'help' => '{item} is replaced with the item name from the checkout.',
+            'body' => "Acknowledged. Please make sure the {item} hasn't been misplaced and isn't somewhere around the station, on another apparatus, or left on a spare truck during a recent truck swap. If it's still missing, call or text us before heading to Station 2 so we can confirm we have a spare ready.",
+        ],
+        'missing_items' => [
+            'label' => 'Several missing vehicle items',
+            'help' => '{item} is replaced with the item names, e.g. "spanner wrench, kitty litter and K-tool".',
+            'body' => "Acknowledged. Please make sure the {item} haven't been misplaced and aren't somewhere around the station, on another apparatus, or left on a spare truck during a recent truck swap. If anything is still missing, call or text us before heading to Station 2 so we can confirm we have spares ready.",
+        ],
+        'missing_battery' => [
+            'label' => 'One missing battery',
+            'help' => 'Batteries are often on a charger or in another tool.',
+            'body' => "Acknowledged. Please make sure the {item} wasn't left on a charger or in another tool, such as the station blower, and isn't somewhere around the station, on another apparatus, or on a spare truck from a recent truck swap. If it's still missing, call or text us before heading to Station 2 so we can confirm we have a spare ready.",
+        ],
+        'battery_line' => [
+            'label' => 'Battery reminder (added to several missing items)',
+            'help' => 'Added when one of several missing items is a battery.',
+            'body' => 'Check chargers and other tools, such as the station blower, for any batteries.',
+        ],
+        'damaged_item' => [
+            'label' => 'Damaged vehicle item',
+            'help' => 'Damaged equipment that is not on the readiness list.',
             'body' => "Acknowledged. We'll follow up if needed.",
         ],
-        'missing_consumable' => [
-            'label' => 'Missing low-cost consumable',
-            'help' => 'Use {item} for the item name.',
-            'body' => "Please check if there is any extra {item} at your station. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.",
+        'readiness_line' => [
+            'label' => 'Readiness reminder',
+            'help' => 'Added on weekdays when the item is on the readiness list or marked significant.',
+            'body' => "If this affects your unit's readiness, notify your officer and 300 right away.",
         ],
-        'missing_dewalt_battery' => [
-            'label' => 'Missing DeWalt battery',
-            'help' => 'Only for DeWalt tool batteries, which also fit the station blower.',
-            'body' => "Please check that the battery wasn't misplaced or being used with another tool, such as the station blower. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.",
-        ],
-        'missing_tool_battery' => [
-            'label' => 'Missing tool battery (not DeWalt)',
-            'help' => 'Other removable tool batteries.',
-            'body' => "Please check that the battery wasn't misplaced or being used with another tool or apparatus. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.",
-        ],
-        'missing_interchangeable' => [
-            'label' => 'Missing routine equipment',
-            'help' => 'Inexpensive, noncritical items that are often moved between compartments or units.',
-            'body' => "Please check whether the item was moved to another compartment, tool or apparatus at your station. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.",
-        ],
-        'missing_multiple' => [
-            'label' => 'Several missing routine items',
-            'help' => 'One reply when a checkout lists more than one routine missing item.',
-            'body' => "Please check whether the missing items were moved or are stocked elsewhere at your station. If they're still missing, call or text before coming by Station 2 so we can check on replacements.",
-        ],
-        'weekend_spare' => [
-            'label' => 'Weekend, needed right away',
-            'help' => 'Added on Saturday or Sunday when the member says a noncritical replacement is needed now.',
-            'body' => 'If it needs to be addressed immediately this weekend, contact 300 to check whether a spare is available.',
+        'weekend_line' => [
+            'label' => 'Weekend reminder',
+            'help' => 'Added on Saturday and Sunday (Eastern time), when no Support Services staff are on duty.',
+            'body' => "Support Services staff are off this weekend. If this can't wait, contact 300. Otherwise we'll follow up on the next weekday.",
         ],
     ],
 
@@ -129,8 +133,8 @@ return [
     // a trailing * matches any word starting with the term.
     'lists' => [
         'safety_terms' => [
-            'label' => 'Always escalate (no guidance)',
-            'help' => 'Any match gets a plain acknowledgment only and stays with staff.',
+            'label' => 'Readiness and safety items',
+            'help' => 'Missing or damaged items here add the readiness reminder, and messages about them never get an AI-written answer.',
             'terms' => [
                 // Breathing air, PPE and accountability
                 'scba', 'air pack', 'airpack', 'cylinder', 'bottle', 'facepiece', 'face piece', 'mask', 'regulator', 'pass device', 'rit pack',
@@ -177,42 +181,14 @@ return [
                 'clicker', 'garage door', 'supervac', 'super vac',
             ],
         ],
-        'consumable_terms' => [
-            'label' => 'Low-cost consumables',
-            'help' => 'Missing items here get the "check for extra at your station" reply.',
-            'terms' => [
-                'kitty litter', 'oil dry', 'absorbent', 'absorbent pad',
-                'paper towel', 'towel', 'shop towel', 'rag', 'wipes',
-                'trash bag', 'garbage bag', 'zip tie', 'tape', 'duct tape', 'caution tape', 'safety tape', 'flagging tape',
-                'aa battery', 'aa batteries', 'aaa battery', 'aaa batteries', 'd battery', 'd batteries',
-                'chalk', 'permanent marker', 'sharpie', 'pen', 'grease pencil',
-                'hand sanitizer', 'sanitizer', 'soap', 'degreaser', 'windex', 'glass cleaner',
-                'cup', 'lubricant', 'silicone', 'bar oil', 'chain oil', 'bar chain oil',
-                'out of service tag', 'oos tag',
-            ],
-        ],
-        'dewalt_battery_terms' => [
-            'label' => 'DeWalt battery',
-            'help' => 'Battery items that match these get the blower reminder. Saws are always escalated first.',
-            'terms' => ['dewalt battery', 'dewalt batteries', 'dewalt 20v', 'dewalt 60v', 'dewalt flexvolt', 'flexvolt', 'dewalt'],
-        ],
-        'tool_battery_terms' => [
-            'label' => 'Other tool batteries',
-            'help' => 'Removable tool batteries that are not DeWalt. Never stretcher, monitor, TIC or SCBA batteries.',
-            'terms' => ['tool battery', 'tool batteries', 'drill battery', 'drill batteries', 'milwaukee battery', 'milwaukee batteries', 'm18 battery', 'm18 batteries', 'makita battery', 'makita batteries'],
-        ],
-        'interchangeable_terms' => [
-            'label' => 'Routine interchangeable equipment',
-            'help' => 'Inexpensive, noncritical items that are often moved between compartments or units.',
-            'terms' => [
-                'spanner', 'spanner wrench', 'hydrant wrench', 'door wedge', 'door chock',
-                'broom', 'squeegee', 'shovel', 'bucket', 'mop', 'traffic cone', 'cone', 'mallet', 'rubber mallet', 'screwdriver', 'pliers',
-                'tarp', 'salvage cover', 'extension cord', 'cord reel', 'bungee', 'clipboard', 'water cooler',
-            ],
+        'battery_terms' => [
+            'label' => 'Batteries',
+            'help' => 'Missing items matching these get the charger / other-tool reminder.',
+            'terms' => ['battery', 'batteries', 'dewalt', 'flexvolt', 'm18', 'milwaukee battery', 'makita battery', 'battery pack'],
         ],
         'urgency_terms' => [
             'label' => 'Needed right away',
-            'help' => 'Words that mean the member needs a replacement now (used only for the weekend line).',
+            'help' => 'Support Services messages with these words get the weekend reminder on Saturday and Sunday.',
             'terms' => ['asap', 'urgent', 'urgently', 'immediately', 'right away', 'right now', 'need it now', 'need one now', 'need them now', 'needed now', 'cannot wait', "can't wait", 'today', 'tonight', 'tomorrow', 'this shift', 'this weekend'],
         ],
         'bunker_dropoff_terms' => [

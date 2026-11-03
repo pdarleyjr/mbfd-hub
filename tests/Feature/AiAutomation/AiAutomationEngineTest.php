@@ -114,7 +114,7 @@ final class AiAutomationEngineTest extends TestCase
 
         $this->assertSame(1, DB::table('notifications')->where('notifiable_id', $member->id)->count());
         $payload = json_decode((string) DB::table('notifications')->value('data'), true);
-        $this->assertSame('AI Response', $payload['title']);
+        $this->assertSame('Support Services', $payload['title']);
         $this->assertSame('Acknowledged.', $payload['body']);
         Mail::assertNothingSent();
         Mail::assertNothingQueued();

@@ -81,6 +81,10 @@ final class AiKnowledgeArticleResource extends Resource
                         ->label('Safe to use in replies to members')
                         ->helperText('Turn off to keep this article out of automatic replies. Applies immediately.')
                         ->default(true),
+                    Forms\Components\Toggle::make('always_include')
+                        ->label('Use in every AI answer')
+                        ->helperText('Standing facts (who to contact, weekends, how Station 2 works) that every AI-written answer should follow, even when the question is about something else. Keep it short.')
+                        ->default(false),
                 ])->columns(2),
             Forms\Components\Section::make('Content')
                 ->schema([

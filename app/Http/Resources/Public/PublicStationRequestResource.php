@@ -57,7 +57,7 @@ class PublicStationRequestResource extends JsonResource
                 'status' => $update->status,
                 'public_note' => $update->public_note,
                 'created_at' => $update->created_at,
-                // Additive. 'AI Response' for the assistant's receipt, null for every staff/system row.
+                // Additive. The department name on the automated receipt, null for every staff/system row.
                 'sender' => $update->senderLabel(),
                 'is_auto_receipt' => $update->isAutoReceipt(),
             ])->all()),
@@ -68,7 +68,7 @@ class PublicStationRequestResource extends JsonResource
                 $receipt = $stationRequest->updates->first(fn (StationRequestUpdate $update): bool => $update->isAutoReceipt());
 
                 return $receipt === null ? null : [
-                    'sender' => StationRequestUpdate::AUTO_RECEIPT_SENDER,
+                    'sender' => StationRequestUpdate::autoReceiptSender(),
                     'at' => $receipt->created_at,
                 ];
             }),

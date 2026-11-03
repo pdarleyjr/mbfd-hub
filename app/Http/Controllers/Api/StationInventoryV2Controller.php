@@ -190,7 +190,7 @@ class StationInventoryV2Controller extends Controller
                     'public_response' => $req->public_response,
                     // Additive: the assistant's receipt, separate from Support Services' own response above.
                     'ai_response' => $req->ai_receipt_text === null ? null : [
-                        'sender' => StationRequestUpdate::AUTO_RECEIPT_SENDER,
+                        'sender' => StationRequestUpdate::autoReceiptSender(),
                         'text' => $req->ai_receipt_text,
                         'at' => $req->ai_receipt_at?->toISOString(),
                     ],

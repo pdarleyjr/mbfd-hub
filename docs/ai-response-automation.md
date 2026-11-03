@@ -1,11 +1,11 @@
 # AI Response automation
 
-The Hub posts one short reply, signed **AI Response**, when a member submits something in three areas:
+The Hub posts one short automated reply, signed **Support Services**, when a member submits something in three areas:
 
 | Area | What gets a reply | Where the member sees it |
 |---|---|---|
 | Vehicle | A daily checkout that records Missing, Damaged or other equipment findings; a member message on a vehicle issue thread | The checkout's issue conversation |
-| Station requests | A new station request (equipment, supplies, appliance or facility maintenance) and a station supply request | The member's request, as an update from AI Response |
+| Station requests | A new station request (equipment, supplies, appliance or facility maintenance) and a station supply request | The member's request, as an update from Support Services |
 | Support Services | A member message to Support Services (My Messages) | The message thread |
 
 Nothing else is touched: no EMS or medical inventory, Captain 5, narcotics, rosters, staffing, incidents, personnel or uniform workflows, training, IT tickets or email. Clean checkouts get no reply.
@@ -36,33 +36,35 @@ The switch lives in the database (`ai_automation_settings`), never in cache, so 
 
 ## What the replies say
 
-Replies come from **Response Playbooks** (editable, versioned). The defaults:
+Members see the sender as **Support Services**, styled like any Support Services reply (owner decision: no "AI" title). Staff screens show **Support Services (automated)** so the team can tell it apart. Replies come from **Response Playbooks** (editable, versioned). The defaults:
 
 | Situation | Reply |
 |---|---|
-| Anything with no useful guidance | `Acknowledged.` |
+| A missing vehicle item (any item) | `Acknowledged. Please make sure the {item} hasn't been misplaced and isn't somewhere around the station, on another apparatus, or left on a spare truck during a recent truck swap. If it's still missing, call or text us before heading to Station 2 so we can confirm we have a spare ready.` |
+| A missing battery | Same, also asking them to check chargers and other tools such as the station blower |
+| Several missing items | One reply naming them ("kitty litter, spanner wrench and K-tool"), plus the battery reminder if one is a battery |
+| A readiness or safety item (SCBA, radios, monitors, lighting, brakes, tires, pump, aerial, PPE, saws…) or anything marked significant | Same reply, plus `If this affects your unit's readiness, notify your officer and 300 right away.` |
+| Damaged item | `Acknowledged. We'll follow up if needed.` (readiness items: `Acknowledged.` plus the readiness line) |
 | Station request that reached the staff work list | `Acknowledged. Forwarded to the appropriate personnel.` |
-| Missing low-cost consumable (kitty litter, paper towels…) | `Please check if there is any extra {item} at your station. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.` |
-| Missing DeWalt battery | Reminder that it may be on another tool such as the station blower, then the Station 2 line |
-| Missing other tool battery | Same, without the blower |
-| Missing routine interchangeable equipment (wrenches, chocks, brooms…) | Check other compartments, tools or apparatus, then the Station 2 line |
-| Several routine missing items on one checkout | One combined reply |
-| Damaged noncritical item | `Acknowledged. We'll follow up if needed.` |
-| Anything safety-related, significant, expensive or unique (SCBA, radios, monitors, lights, brakes, tires, pump, aerial, PPE, hazards…) | `Acknowledged.` only, flagged in Activity |
-| Saturday or Sunday and the member says it's needed now | Adds `If it needs to be addressed immediately this weekend, contact 300 to check whether a spare is available.` |
-| Bunker gear dropped off | `Acknowledged.` |
+| Anything else, including bunker gear drop-offs | `Acknowledged.` |
+| Saturday or Sunday (Eastern) — vehicle and station submissions, and Support Services messages that say it's needed now | Adds `Support Services staff are off this weekend. If this can't wait, contact 300. Otherwise we'll follow up on the next weekday.` (replaces the readiness line, since 300 covers it) |
 
-A conversation (a Support Services thread or a vehicle issue thread) gets at most one AI Response per 24 hours, however many messages the member sends; after that it is the team's to answer. Unit and place names such as "Engine 2", "Ladder 3" or "Fire Station 4" are ignored when looking for safety words.
+Why: missing equipment is usually misplaced, on another truck or left on a swap truck. The reply gets crews looking first and calling ahead before driving to Station 2, so staff can confirm a spare is actually on hand. Weekends have no administrative staff; 300, the on-shift Division Chief, has supply room access.
 
-The word lists that decide these cases (always escalate, expensive, consumables, DeWalt, other tool batteries, interchangeable equipment, urgency, bunker drop-off) are on the same Playbooks screen, one term per line. Anything a list does not recognize gets `Acknowledged.`; the engine never guesses guidance. One checkout gets one reply, however many findings it has. Repeat reports of an item already answered get none.
+A conversation (a Support Services thread or a vehicle issue thread) gets at most one automated reply per 24 hours. Unit and place names such as "Engine 2" or "Fire Station 4" are ignored when looking for safety words. The word lists (readiness and safety items, expensive items, batteries, urgency words, bunker drop-off, exposure) are on the Playbooks screen, one term per line.
 
+## Questions and the AI model
+
+When a member asks a question (in a Support Services message, on a vehicle issue thread, or in a station request) and a published Knowledge Library article matches, Cloudflare Workers AI (`@cf/openai/gpt-oss-120b`) writes a 1-3 sentence answer from that article plus every article marked **Use in every AI answer**. The answer is checked before it is sent: short, no greetings or promises, no document names, contact details or links, numbers must come from the article, and most of its words must come from the article. Anything that fails becomes `Acknowledged.`. Questions about readiness or safety items never go to the model. The historical backlog never uses the model.
+
+Spend limits: 100 calls a day and $10 a month, reserved before each call (`AI_AUTOMATION_MODEL_DAILY_CALLS`, `AI_AUTOMATION_MODEL_MONTHLY_USD`). Today's calls and the month's spend are on the AI Automations page. Production settings (values only in the server environment): `AI_AUTOMATION_MODEL_ENABLED=true`, `AI_AUTOMATION_CF_ACCOUNT_ID`, `AI_AUTOMATION_CF_API_TOKEN` — a dedicated Cloudflare token (id `be014d3f92c830d518dc2671f0f7a0c1`, name `mbfd-hub-ai-response-2026-11-03`) with only Workers AI Read and Write on the MBFD account. Set `AI_AUTOMATION_MODEL_ENABLED=false` to stop model calls while keeping playbook replies.
 ## Knowledge Library
 
 **Admin > AI Response Automation > Knowledge Library.** Short Support Services guidance articles in Markdown. Edit in the browser or upload a `.md`/`.txt` file, **Save draft**, **Preview**, **Submit for review**, **Approve & publish**, or **Withdraw**. Publishing takes effect immediately; no code deployment. Every version is kept with its editor, publisher and dates. The *Internal source note* records which procedure or owner decision an article came from and is never shown to members.
 
 The starter guide is `resources/ai/knowledge/mbfd-support-services-guidance.md`; `php artisan ai-automation:seed` imports it (and the Playbooks defaults) once and never overwrites anything an administrator has edited. The internal source map is `docs/ai-response-automation/sog-crosswalk.md`.
 
-Articles are only used to answer a member's short low-risk *question* (not a report) when an AI model is enabled. Only published, member-safe articles inside their review date are used; withdrawn, stale or unmatched articles mean the member gets `Acknowledged.`. Library content stays in the Hub database; there is no external index to keep in sync.
+**Use in every AI answer** marks standing facts (weekends and 300, calling ahead to Station 2, looking for missing items first) that every AI-written answer must follow; the starter guide's "How Support Services Handles Submissions" article is marked this way. Update it whenever how you work changes. Articles are only used to answer a member's question (not a report). Only published, member-safe articles inside their review date are used; withdrawn, stale or unmatched articles mean the member gets `Acknowledged.`. Library content stays in the Hub database; there is no external index to keep in sync.
 
 ## Historical backlog
 
@@ -76,18 +78,7 @@ Start with the preview, process, and spot-check a few replies in Activity and on
 
 ## Activity
 
-Every automated decision: when, area, record, live or backlog, sent / skipped / stopped by OFF / failed, the exact AI Response text, risk, why, and which playbook version or library articles were used. The underlying submission always stays with staff. **Test a response** previews a made-up submission without saving or sending anything.
-
-## Optional AI model (off)
-
-The Hub works fully on playbooks alone. A Cloudflare Workers AI model can phrase answers to low-risk questions from published articles. It is off until these production settings exist (names only; values are kept in the server environment, never in the repository):
-
-- `AI_AUTOMATION_MODEL_ENABLED=true`
-- `AI_AUTOMATION_CF_ACCOUNT_ID` — the Cloudflare account id
-- `AI_AUTOMATION_CF_API_TOKEN` — a dedicated token with only *Workers AI Read* and *Workers AI Edit*
-- optional: `AI_AUTOMATION_MODEL` (default `@cf/openai/gpt-oss-120b`), `AI_AUTOMATION_MODEL_DAILY_CALLS` (100), `AI_AUTOMATION_MODEL_MONTHLY_USD` (10), `AI_AUTOMATION_MODEL_REASONING`
-
-Each call is reserved against the daily and monthly limits before it is made and refused when either is reached. The model never sees personal details beyond the member's own question, never decides risk, has no tools, and its answer is checked (length, tone, no promises, no document names, no contact details, numbers must come from the article) before it is used; anything doubtful becomes `Acknowledged.`. Historical backlog never uses the model.
+Every automated decision: when, area, record, live or backlog, sent / skipped / stopped by OFF / failed, the exact reply text, risk, why, and which playbook version or library articles were used. The underlying submission always stays with staff. **Test a response** previews a made-up submission without saving or sending anything.
 
 ## Operations
 
@@ -100,6 +91,6 @@ Each call is reserved against the daily and monthly limits before it is made and
 ## Verifying after a release
 
 1. Switch shows OFF. Activity is empty.
-2. Turn ON. Submit a test checkout with a missing routine item on a test unit, a test station request and a Support Services message from a test account; each gets one AI Response on the member's screen, the staff lists still show them as unanswered, and no email is sent.
+2. Turn ON. Submit a test checkout with a missing routine item on a test unit, a test station request and a Support Services message from a test account; each gets one reply from Support Services on the member's screen, the staff lists still show them as unanswered, and no email is sent.
 3. Turn OFF; submit again; nothing is posted and Activity shows nothing new.
 4. Preview the backlog; process a small batch only after reviewing the preview.

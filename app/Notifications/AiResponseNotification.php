@@ -41,7 +41,7 @@ final class AiResponseNotification extends Notification implements ShouldQueue
     public function toDatabase(object $notifiable): array
     {
         $payload = [
-            'title' => (string) config('ai_automation.sender_label', 'AI Response'),
+            'title' => (string) config('ai_automation.sender_label', 'Support Services'),
             'body' => $this->reply,
             'icon' => 'heroicon-o-chat-bubble-left-ellipsis',
             'iconColor' => 'info',

@@ -610,7 +610,7 @@ final class InspectionWorkspace
         $name = trim((string) (data_get($message, 'author.display_name') ?: data_get($message, 'author.name')));
 
         if ($message->isFromAssistant()) {
-            return ApparatusIssueMessage::ASSISTANT_LABEL;
+            return ApparatusIssueMessage::assistantLabel(forStaff: true);
         }
         if ($message->isFromCaptain5()) {
             return $name !== '' ? 'Captain 5 · '.$name : 'Captain 5';

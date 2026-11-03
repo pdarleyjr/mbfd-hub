@@ -18,7 +18,7 @@ use InvalidArgumentException;
  */
 final class PlaybookRepository
 {
-    public const TEMPLATE_MAX_CHARS = 320;
+    public const TEMPLATE_MAX_CHARS = 500;
 
     public const LIST_MAX_LINES = 300;
 

@@ -14,14 +14,17 @@
     @endif
     @forelse ($messages as $message)
         @php
+            $staffView = $viewerSide === \App\Models\EmployeeMessaging\EmployeeLogisticsMessage::SIDE_LOGISTICS;
             $fromAssistant = $message->isFromAssistant();
-            $fromLogistics = $message->isFromLogistics();
-            // The assistant is never "mine" for either viewer: it is a third voice, always shown on the received side.
-            $mine = ! $fromAssistant && ($viewerSide === \App\Models\EmployeeMessaging\EmployeeLogisticsMessage::SIDE_LOGISTICS) === $fromLogistics;
-            $sideLabel = $fromAssistant ? (string) config('ai_automation.sender_label', 'AI Response') : ($fromLogistics ? 'Support Services' : 'Member');
+            // Members see the automated reply exactly like a Support Services reply (owner decision); staff see it marked.
+            $fromLogistics = $message->isFromLogistics() || ($fromAssistant && ! $staffView);
+            $markAssistant = $fromAssistant && $staffView;
+            // The automated reply is never "mine" for staff: it is not something a team member wrote.
+            $mine = ! $fromAssistant && $staffView === $message->isFromLogistics();
+            $sideLabel = $markAssistant ? (string) config('ai_automation.staff_label', 'Support Services (automated)') : ($fromLogistics ? 'Support Services' : 'Member');
             $local = $message->created_at?->copy()->timezone($zone);
         @endphp
-        <li wire:key="emsg-message-{{ $message->id }}" @class(['emsg-bubble', 'emsg-bubble--mine' => $mine, 'emsg-bubble--theirs' => ! $mine, 'emsg-bubble--logistics' => $fromLogistics, 'emsg-bubble--assistant' => $fromAssistant])>
+        <li wire:key="emsg-message-{{ $message->id }}" @class(['emsg-bubble', 'emsg-bubble--mine' => $mine, 'emsg-bubble--theirs' => ! $mine, 'emsg-bubble--logistics' => $fromLogistics, 'emsg-bubble--assistant' => $markAssistant])>
             <div class="emsg-bubble__meta">
                 <span class="emsg-bubble__side">{{ $sideLabel }}</span>
                 @unless ($fromAssistant)

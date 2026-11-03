@@ -130,7 +130,7 @@ final class SupportServicesAdapter implements DomainAdapter
             'thread_id' => $thread->getKey(),
             'author_user_id' => null,
             'author_side' => EmployeeLogisticsMessage::SIDE_ASSISTANT,
-            'author_name' => (string) config('ai_automation.sender_label', 'AI Response'),
+            'author_name' => (string) config('ai_automation.sender_label', 'Support Services'),
             'body' => $text,
             'client_request_id' => 'ai-intake-'.$intake->getKey(),
             'ai_intake_event_id' => $intake->getKey(),

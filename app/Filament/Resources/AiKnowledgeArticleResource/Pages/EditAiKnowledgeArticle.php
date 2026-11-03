@@ -173,7 +173,7 @@ final class EditAiKnowledgeArticle extends EditRecord
         if ($open === null) {
             $base = $library->workingVersion($article);
             if ($base !== null && $this->sameContent($base, $data)) {
-                $library->updateSettings($article, $data['topic_tags'] ?? [], (bool) ($data['member_safe'] ?? true));
+                $library->updateSettings($article, $data['topic_tags'] ?? [], (bool) ($data['member_safe'] ?? true), (bool) ($data['always_include'] ?? false));
 
                 return null;
             }

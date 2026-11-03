@@ -2,6 +2,17 @@
 
 Short, member-safe guidance for answering low-risk "how do I" and "where do I" questions about Support Services, vehicle checkouts and station requests in the Hub. Anything involving safety, readiness, protective gear, medical items, radios or lighting, or anything expensive, unusual or unclear, stays with staff and gets a plain acknowledgment.
 
+## How Support Services Handles Submissions
+<!-- kb slug="how-support-services-handles-submissions" tags="support-services,missing,spare,station-2,weekend,300,acknowledged" review="2027-05-01" always="true" -->
+These are the standing facts behind every reply.
+
+- "Acknowledged" means Support Services received the submission. The issue stays open for staff until it is resolved; nothing is approved, ordered or fixed by that reply.
+- Missing equipment is often not lost: it is somewhere around the station, on another apparatus, or was left on a spare truck during a recent truck swap. Members should look there first, and batteries are often on a charger or in another tool such as the station blower.
+- If an item is still missing, the member should call or text Support Services before heading to Station 2, so staff can confirm a spare is on hand and have it ready. Never tell a member a spare is in stock.
+- On Saturday and Sunday no Support Services administrative staff are on duty. Anything that can't wait goes to 300, the on-shift Division Chief, who has access to the supply room. Otherwise staff follow up on the next weekday.
+- Anything affecting a unit's readiness is reported to the company officer and 300 right away, not only in the Hub.
+- Replies never name individual staff members, phone numbers or room locations.
+
 ## Acknowledgment and Tone
 <!-- kb slug="acknowledgment-and-tone" tags="tone,acknowledgment,reply,receipt,style" review="2027-05-01" -->
 Replies are brief. Most are just "Acknowledged." A low-risk how-do-I or where-do-I question gets one to three plain sentences, using only this guidance.
@@ -95,12 +106,14 @@ Unknown chemicals or an exposure: tell the officer first. Exposure reporting and
 Calling the Company Officer, 300 or the on-duty contact for urgent matters still happens. A Hub entry does not replace it, and priority settings do not change a unit's status. If the Hub is unavailable, tell the officer, use the paper backup and enter it when the Hub returns.
 
 ## Station 2 and Weekend Handoff
-<!-- kb slug="station2-and-weekend-handoff" tags="station-2,weekend,saturday,sunday,spare,300,replacement,after-hours" review="2027-05-01" -->
-For routine missing items, staff may check on a replacement through Station 2. Call or text first. Do not come by without contacting staff.
+<!-- kb slug="station2-and-weekend-handoff" tags="station-2,weekend,saturday,sunday,spare,300,replacement,after-hours,supply room" review="2027-05-01" -->
+Before heading to Station 2 for a replacement, call or text Support Services first and say you are coming. Staff use that message to confirm the item is actually on hand and get it ready, or to tell you not to come yet. Do not drive over without reaching out; the item may not be in stock.
 
-On Saturday and Sunday, if a noncritical item is needed right away, contact 300 to check whether a spare is available. That is a check, not a promise that a spare exists. It applies only to noncritical needs, not to safety, readiness or protective equipment.
+Several staff members handle these issues and where they are changes during the day, so the reply says "call or text us" instead of naming a person.
 
-After hours, only 300 or the ranking officer on the unit starts a call for apparatus service. Never call an off-duty technician. An unanswered call or a closed shop does not lift a restriction on an unsafe unit, and 300 decides coverage.
+Support Services administrative staff are not on duty on Saturday and Sunday. If something can't wait until the next weekday, contact 300. 300 is the on-shift Division Chief, has access to the supply room, and can provide the equipment or decide how to handle it. If it can wait, staff pick it up on the next weekday.
+
+After hours, only 300 or the ranking officer on the unit starts a call for apparatus service. 300 decides coverage.
 
 ## Who Handles What
 <!-- kb slug="contact-and-routing-roles" tags="roles,routing,officer,300,support-services,fleet,air-tech,who" review="2027-05-01" -->

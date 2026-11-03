@@ -248,7 +248,7 @@ final class StationAdapter implements DomainAdapter
                 'event' => StationRequestUpdate::AUTO_RECEIPT_EVENT,
                 'automation' => [
                     'intake_id' => (int) $intake->getKey(),
-                    'sender' => StationRequestUpdate::AUTO_RECEIPT_SENDER,
+                    'sender' => StationRequestUpdate::autoReceiptSender(forStaff: true),
                 ],
             ],
         ]);

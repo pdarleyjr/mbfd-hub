@@ -161,7 +161,7 @@ final class StationRequestSource extends QueryBackedSource
         $status = Status::from($request->status);
         $timeline = $request->updates->map(fn (StationRequestUpdate $update): array => [
             'at' => CarbonImmutable::instance($update->created_at),
-            'actor' => $update->senderLabel() ?? $update->changedBy->name ?? 'System',
+            'actor' => $update->senderLabel(forStaff: true) ?? $update->changedBy->name ?? 'System',
             'text' => collect([
                 'Status: '.(Status::tryFrom((string) $update->status)?->label() ?? (string) $update->status),
                 filled($update->public_note) ? 'Update to station: '.$update->public_note : null,

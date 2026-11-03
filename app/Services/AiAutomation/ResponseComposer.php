@@ -9,13 +9,23 @@ use App\Services\AiAutomation\Model\WorkersAiClient;
 use Carbon\CarbonImmutable;
 
 /**
- * Deterministic-first reply selection. Rules and the Playbooks templates decide almost everything with no
- * model call. The model is only asked to phrase an answer to a member's low-risk question when a
- * published Knowledge Library article matches; risk set by the rules can never be lowered by the model.
+ * Deterministic-first reply selection. The Playbooks templates decide every report (missing or damaged
+ * equipment, station requests, plain statements) with no model call. The model is only asked to phrase an
+ * answer to a member's question when a published Knowledge Library article matches; risk set by the rules
+ * can never be lowered by the model.
+ *
+ * Owner decisions (2026-11-03): every missing vehicle item gets the "look for it first, then call or text
+ * before heading to Station 2" reply naming the item; readiness items add "notify your officer and 300";
+ * on Saturday and Sunday, with no Support Services staff on duty, replies add the 300 weekend line.
  */
 final class ResponseComposer
 {
     private const QUESTION_STARTS = ['how', 'where', 'what', 'when', 'who', 'which', 'why', 'can', 'could', 'should', 'do', 'does', 'is', 'are', 'will', 'would'];
+
+    private const MAX_NAMED_ITEMS = 3;
+
+    /** Why the last question got no grounded answer (recorded in Activity). */
+    private string $lastQuestionReason = 'question_no_published_guidance';
 
     public function __construct(
         private readonly PlaybookRepository $playbooks,
@@ -26,82 +36,89 @@ final class ResponseComposer
 
     public function compose(IntakeFacts $facts, CarbonImmutable $now, bool $allowModel = true): ComposedReply
     {
+        $weekend = $now->setTimezone((string) config('ai_automation.timezone', 'America/New_York'))->isWeekend();
+
         return match ($facts->kind) {
-            'inspection_findings' => $this->forFindings($facts, $now),
-            'station_request', 'supply_request' => $this->forStationRequest($facts),
-            default => $this->forMessage($facts, $allowModel),
+            'inspection_findings' => $this->forFindings($facts, $weekend),
+            'station_request', 'supply_request' => $this->forStationRequest($facts, $weekend, $allowModel),
+            default => $this->forMessage($facts, $weekend, $allowModel),
         };
     }
 
-    private function forFindings(IntakeFacts $facts, CarbonImmutable $now): ComposedReply
+    private function forFindings(IntakeFacts $facts, bool $weekend): ComposedReply
     {
         if ($facts->findings === []) {
             return $this->receipt(['no_findings']);
         }
 
         $safety = $this->playbooks->terms('safety_terms');
-        $expensive = $this->playbooks->terms('expensive_terms');
-        $guidance = [];
-        $damagedRoutine = 0;
-
+        $critical = false;
+        $missing = [];
+        $damaged = 0;
         foreach ($facts->findings as $finding) {
-            $text = $finding->itemName.' '.($finding->note ?? '');
-            if ($finding->significant || TermMatcher::any($text, $safety)) {
-                return $this->receipt(['safety_or_significant'], 'critical');
+            if ($finding->significant || TermMatcher::any($finding->itemName.' '.($finding->note ?? ''), $safety)) {
+                $critical = true;
             }
-            if (TermMatcher::any($text, $expensive)) {
-                return $this->receipt(['expensive_item'], 'elevated');
-            }
-            if ($finding->condition === 'damaged') {
-                $damagedRoutine++;
-
-                continue;
-            }
-            if ($finding->condition !== 'missing') {
-                return $this->receipt(['other_condition']);
-            }
-            $class = $this->missingClass($finding->itemName);
-            if ($class === null) {
-                return $this->receipt(['no_guidance_for_item']);
-            }
-            $guidance[] = [$class, $finding];
+            match ($finding->condition) {
+                'missing' => $missing[] = $finding,
+                'damaged' => $damaged++,
+                default => null,
+            };
         }
 
-        if ($guidance === [] && $damagedRoutine > 0) {
-            return $this->template('noncritical_followup', ComposedReply::RECEIPT_ONLY, ['damaged_noncritical']);
-        }
-        if ($guidance === [] || $damagedRoutine > 0) {
-            return $this->receipt(['mixed_findings']);
-        }
+        $tier = $critical ? 'critical' : 'routine';
+        $decision = $critical ? ComposedReply::RECEIPT_AND_HUMAN_FLAG : ComposedReply::RECEIPT_PLUS_GUIDANCE;
 
-        if (count($guidance) > 1) {
-            $reply = $this->template('missing_multiple', ComposedReply::RECEIPT_PLUS_GUIDANCE, ['missing_routine_multiple']);
+        if ($missing !== []) {
+            $batteries = array_filter($missing, fn (Finding $finding): bool => TermMatcher::any($finding->itemName.' '.($finding->note ?? ''), $this->playbooks->terms('battery_terms')));
+            $names = $this->itemList($missing);
+            if (count($missing) === 1) {
+                $key = $batteries !== [] ? 'missing_battery' : 'missing_item';
+                $reply = $this->template($key, $decision, [$critical ? 'missing_readiness_item' : 'missing_item'], ['{item}' => $names], $tier);
+            } else {
+                $reply = $this->template('missing_items', $decision, [$critical ? 'missing_readiness_items' : 'missing_items'], ['{item}' => $names], $tier);
+                if ($batteries !== []) {
+                    $reply = $this->append($reply, 'battery_line', 'battery');
+                }
+            }
+        } elseif ($damaged > 0) {
+            $reply = $critical
+                ? $this->receipt(['damaged_readiness_item'], 'critical')
+                : $this->template('damaged_item', ComposedReply::RECEIPT_ONLY, ['damaged_item']);
         } else {
-            [$class, $finding] = $guidance[0];
-            $reply = $this->template($class, ComposedReply::RECEIPT_PLUS_GUIDANCE, ['missing_routine'], ['{item}' => $this->itemLabel($finding->itemName)]);
+            $reply = $this->receipt(['other_condition'], $tier);
         }
 
-        return $this->withWeekendLine($reply, $facts, $now);
+        // 300 already covers readiness on the weekend; on weekdays the officer and 300 line stands on its own.
+        if ($weekend) {
+            return $this->append($reply, 'weekend_line', 'weekend');
+        }
+
+        return $critical ? $this->append($reply, 'readiness_line', 'readiness') : $reply;
     }
 
-    private function forStationRequest(IntakeFacts $facts): ComposedReply
+    private function forStationRequest(IntakeFacts $facts, bool $weekend, bool $allowModel): ComposedReply
     {
         $text = ($facts->category ?? '').' '.($facts->memberText ?? '');
         if (TermMatcher::any($text, $this->playbooks->terms('safety_terms'))) {
-            return $this->receipt(['safety_term'], 'critical');
+            $reply = $this->receipt(['safety_term'], 'critical');
+        } elseif ($this->isQuestion((string) $facts->memberText) && ($answer = $this->answerQuestion((string) $facts->memberText, $allowModel)) !== null) {
+            return $answer;
+        } elseif ($facts->routed) {
+            // "Forwarded" is only true when the adapter confirmed an existing staff work list received it.
+            $reply = $this->template('receipt_forwarded', ComposedReply::RECEIPT_ONLY, ['routed']);
+        } else {
+            $reply = $this->receipt(['not_routed']);
         }
 
-        // "Forwarded" is only true when the adapter confirmed an existing staff work list received it.
-        if ($facts->routed) {
-            return $this->template('receipt_forwarded', ComposedReply::RECEIPT_ONLY, ['routed']);
-        }
-
-        return $this->receipt(['not_routed']);
+        return $weekend ? $this->append($reply, 'weekend_line', 'weekend') : $reply;
     }
 
-    private function forMessage(IntakeFacts $facts, bool $allowModel): ComposedReply
+    private function forMessage(IntakeFacts $facts, bool $weekend, bool $allowModel): ComposedReply
     {
         $text = (string) $facts->memberText;
+        $urgentWeekend = $weekend && TermMatcher::any($text, $this->playbooks->terms('urgency_terms'));
+        $finish = fn (ComposedReply $reply): ComposedReply => $urgentWeekend ? $this->append($reply, 'weekend_line', 'weekend') : $reply;
 
         if ($facts->kind === 'support_message' && TermMatcher::any($text, $this->playbooks->terms('bunker_dropoff_terms'))) {
             // Gear words are safety words, so drop-offs are judged on exposure or damage instead.
@@ -109,83 +126,114 @@ final class ResponseComposer
                 ? $this->receipt(['bunker_gear_drop_off', 'exposure_or_damage'], 'critical')
                 : $this->receipt(['bunker_gear_drop_off']);
         }
+
         // A message on an issue thread is judged together with the item the thread is about.
         $context = $text.' '.implode(' ', array_map(static fn (Finding $finding): string => $finding->itemName, $facts->findings));
         $significant = array_filter($facts->findings, static fn (Finding $finding): bool => $finding->significant) !== [];
         if ($significant || TermMatcher::any($context, $this->playbooks->terms('safety_terms'))) {
-            return $this->receipt(['safety_term'], 'critical');
+            return $finish($this->receipt(['safety_term'], 'critical'));
         }
         if (TermMatcher::any($context, $this->playbooks->terms('expensive_terms'))) {
-            return $this->receipt(['expensive_item'], 'elevated');
+            return $finish($this->receipt(['expensive_item'], 'elevated'));
         }
         if (! $this->isQuestion($text)) {
-            return $this->receipt(['statement']);
+            return $finish($this->receipt(['statement']));
         }
 
+        return $this->answerQuestion($text, $allowModel) ?? $finish($this->receipt([$this->lastQuestionReason]));
+    }
+
+    /** A grounded 1-3 sentence answer, or null so the caller falls back to its acknowledgment. */
+    private function answerQuestion(string $text, bool $allowModel): ?ComposedReply
+    {
         $articles = $this->library->retrieve($text);
         if ($articles === []) {
-            return $this->receipt(['question_no_published_guidance']);
+            $this->lastQuestionReason = 'question_no_published_guidance';
+
+            return null;
         }
         if (! $allowModel || ! $this->model->available()) {
-            return $this->receipt(['question_model_unavailable']);
+            $this->lastQuestionReason = 'question_model_unavailable';
+
+            return null;
         }
 
+        // Standing guidance (Knowledge Library articles marked "use in every answer") travels with every call.
+        $sources = [];
+        foreach ([...$this->library->standing(), ...$articles] as $version) {
+            $sources[(int) $version->getKey()] = $version;
+        }
+        $sources = array_values($sources);
         $guidanceText = implode("\n\n", array_map(
             static fn ($version): string => '### '.$version->title."\n".$version->body,
-            $articles,
+            $sources,
         ));
-        $reply = $this->model->compose(ModelPrompt::system(), ModelPrompt::user($text, $guidanceText));
-        if ($reply === null) {
-            return $this->receipt(['model_failed']);
-        }
-
-        $answer = $this->validator->validateModelAnswer($reply->text, $guidanceText);
         $refs = array_map(static fn ($version): array => [
             'article_id' => (int) $version->article_id,
             'version_id' => (int) $version->getKey(),
             'version' => (int) $version->version,
-        ], $articles);
+        ], $sources);
 
+        $reply = $this->model->compose(ModelPrompt::system(), ModelPrompt::user($text, $guidanceText));
+        if ($reply === null) {
+            $this->lastQuestionReason = 'model_failed';
+
+            return null;
+        }
+
+        $answer = $this->validator->validateModelAnswer($reply->text, $guidanceText);
         if ($answer === null) {
-            return new ComposedReply(ComposedReply::RECEIPT_ONLY, $this->templateText('receipt'), 'routine', true, 'receipt',
-                $this->playbooks->template('receipt')['version'], ['model_answer_rejected'], $refs, $reply->modelCallId);
+            $receipt = $this->receipt(['model_answer_rejected']);
+
+            return new ComposedReply($receipt->decision, $receipt->text, 'routine', true, $receipt->templateKey,
+                $receipt->templateVersion, $receipt->reasonCodes, $refs, $reply->modelCallId);
         }
 
         return new ComposedReply(ComposedReply::APPROVED_RAG_GUIDANCE, $answer, 'routine', true, null, null,
             ['approved_guidance'], $refs, $reply->modelCallId);
     }
 
-    private function missingClass(string $itemName): ?string
+    /**
+     * "spanner wrench", "spanner wrench and kitty litter", "spanner wrench, kitty litter and K-tool",
+     * "spanner wrench, kitty litter, K-tool and other items". The member's own item names, never invented.
+     *
+     * @param  list<Finding>  $findings
+     */
+    private function itemList(array $findings): string
     {
-        if (TermMatcher::any($itemName, $this->playbooks->terms('dewalt_battery_terms')) && TermMatcher::any($itemName, ['battery', 'batteries'])) {
-            return 'missing_dewalt_battery';
+        $names = [];
+        foreach ($findings as $finding) {
+            $label = $this->itemLabel($finding->itemName);
+            if ($label !== '' && ! in_array($label, $names, true)) {
+                $names[] = $label;
+            }
         }
-        if (TermMatcher::any($itemName, $this->playbooks->terms('tool_battery_terms'))) {
-            return 'missing_tool_battery';
-        }
-        if (TermMatcher::any($itemName, $this->playbooks->terms('consumable_terms'))) {
-            return 'missing_consumable';
-        }
-        if (TermMatcher::any($itemName, $this->playbooks->terms('interchangeable_terms'))) {
-            return 'missing_interchangeable';
+        if ($names === []) {
+            return 'item';
         }
 
-        return null;
+        $shown = array_slice($names, 0, self::MAX_NAMED_ITEMS);
+        if (count($names) > self::MAX_NAMED_ITEMS) {
+            return implode(', ', $shown).' and other items';
+        }
+        if (count($shown) === 1) {
+            return $shown[0];
+        }
+
+        return implode(', ', array_slice($shown, 0, -1)).' and '.end($shown);
     }
 
-    private function withWeekendLine(ComposedReply $reply, IntakeFacts $facts, CarbonImmutable $now): ComposedReply
+    /** "Kitty Litter (bag)" -> "kitty litter"; keeps acronyms like "SCBA" and "K-Tool" readable. */
+    private function itemLabel(string $itemName): string
     {
-        $local = $now->setTimezone((string) config('ai_automation.timezone', 'America/New_York'));
-        $notes = implode(' ', array_map(static fn (Finding $finding): string => (string) $finding->note, $facts->findings)).' '.$facts->memberText;
+        $label = trim((string) preg_replace('/\s+/u', ' ', (string) preg_replace('/\s*\(.*?\)\s*/u', ' ', $itemName)));
+        $label = $label !== '' ? $label : trim($itemName);
+        $words = array_map(
+            static fn (string $word): string => preg_match('/^[A-Z0-9][A-Z0-9\-]+$/u', $word) === 1 ? $word : mb_strtolower($word),
+            explode(' ', $label),
+        );
 
-        if (! $local->isWeekend() || ! TermMatcher::any($notes, $this->playbooks->terms('urgency_terms'))) {
-            return $reply;
-        }
-
-        $line = $this->templateText('weekend_spare');
-
-        return new ComposedReply($reply->decision, $reply->text.' '.$line, $reply->riskTier, $reply->needsHuman,
-            $reply->templateKey, $reply->templateVersion, [...$reply->reasonCodes, 'weekend_needed_now']);
+        return mb_substr(implode(' ', $words), 0, 60);
     }
 
     private function isQuestion(string $text): bool
@@ -201,13 +249,15 @@ final class ResponseComposer
         return in_array(strtok($normalized, ' '), self::QUESTION_STARTS, true);
     }
 
-    /** "Kitty Litter (bag)" -> "kitty litter"; keeps the member's own item name, never invents one. */
-    private function itemLabel(string $itemName): string
+    private function append(ComposedReply $reply, string $key, string $reason): ComposedReply
     {
-        $label = trim((string) preg_replace('/\s*\(.*?\)\s*/u', ' ', $itemName));
-        $label = mb_strtolower($label !== '' ? $label : $itemName);
+        $line = trim($this->playbooks->template($key)['body']);
+        if ($line === '') {
+            return $reply;
+        }
 
-        return mb_substr($label, 0, 60);
+        return new ComposedReply($reply->decision, $reply->text.' '.$line, $reply->riskTier, $reply->needsHuman,
+            $reply->templateKey, $reply->templateVersion, [...$reply->reasonCodes, $reason], $reply->knowledgeRefs, $reply->modelCallId);
     }
 
     /**
@@ -232,10 +282,5 @@ final class ResponseComposer
         $text = trim(strtr($template['body'], $placeholders));
 
         return new ComposedReply($decision, $text, $tier, true, $key, $template['version'], $reasons);
-    }
-
-    private function templateText(string $key): string
-    {
-        return trim($this->playbooks->template($key)['body']);
     }
 }

@@ -280,7 +280,7 @@ final class SupportServicesAdapterTest extends TestCase
         $this->assertSame('employee_logistics_message', $record->type);
         $this->assertSame(EmployeeLogisticsMessage::SIDE_ASSISTANT, $reply->author_side);
         $this->assertNull($reply->author_user_id);
-        $this->assertSame('AI Response', $reply->author_name);
+        $this->assertSame('Support Services', $reply->author_name);
         $this->assertSame('Acknowledged.', $reply->body);
         $this->assertSame($intake->id, (int) $reply->ai_intake_event_id);
         $this->assertSame($message->thread_id, (int) $reply->thread_id);
@@ -425,9 +425,9 @@ final class SupportServicesAdapterTest extends TestCase
 
         Livewire::test(MyMessages::class)
             ->call('openThread', $message->thread_id)
-            ->assertSee('AI Response')
+            ->assertSee('Support Services')->assertDontSee('AI Response')
             ->assertSee('Acknowledged.')
-            ->assertSee('emsg-bubble--assistant', false)
+            ->assertDontSee('emsg-bubble--assistant', false)
             ->assertSee('Sent, awaiting reply');
     }
 
@@ -442,7 +442,7 @@ final class SupportServicesAdapterTest extends TestCase
         Livewire::test(EmployeeMessages::class)
             ->assertSee('Awaiting reply')
             ->call('openThread', $message->thread_id)
-            ->assertSee('AI Response')
+            ->assertSee('Support Services (automated)')
             ->assertSee('Acknowledged.')
             ->assertSee('Dropped off my gear')
             ->assertSee('Awaiting reply');

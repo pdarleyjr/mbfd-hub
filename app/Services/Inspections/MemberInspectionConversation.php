@@ -111,7 +111,7 @@ final class MemberInspectionConversation
                     'from_logistics' => $fromLogistics,
                     'from_captain5' => $message->isFromCaptain5(),
                     'from_assistant' => $assistant,
-                    'author' => $assistant ? ApparatusIssueMessage::ASSISTANT_LABEL : ($own ? 'You' : ($message->isFromCaptain5() ? 'Captain 5' : ($fromLogistics ? 'Logistics' : 'Crew member'))),
+                    'author' => $assistant ? ApparatusIssueMessage::assistantLabel() : ($own ? 'You' : ($message->isFromCaptain5() ? 'Captain 5' : ($fromLogistics ? 'Logistics' : 'Crew member'))),
                     'at' => CarbonImmutable::instance($message->created_at)->setTimezone(EmployeeInspectionHistoryService::TIMEZONE),
                 ];
             })

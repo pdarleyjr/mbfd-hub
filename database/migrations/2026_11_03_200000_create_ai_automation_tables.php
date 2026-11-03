@@ -132,6 +132,8 @@ return new class extends Migration
             $table->string('title', 200);
             $table->json('topic_tags')->nullable();
             $table->boolean('member_safe')->default(true);
+            // Standing guidance: sent with every AI-written answer, not only when a question matches it.
+            $table->boolean('always_include')->default(false);
             $table->unsignedBigInteger('published_version_id')->nullable();
             $table->timestampsTz();
         });

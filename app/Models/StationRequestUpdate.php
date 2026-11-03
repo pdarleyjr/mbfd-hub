@@ -11,9 +11,6 @@ use LogicException;
 
 class StationRequestUpdate extends Model
 {
-    /** The one sender name the member and staff see on an assistant receipt. */
-    public const AUTO_RECEIPT_SENDER = 'AI Response';
-
     public const AUTO_RECEIPT_EVENT = 'auto_receipt';
 
     protected $fillable = [
@@ -56,9 +53,15 @@ class StationRequestUpdate extends Model
     }
 
     /** Sender shown beside the update, or null for a normal staff/system row (callers keep their own wording). */
-    public function senderLabel(): ?string
+    public function senderLabel(bool $forStaff = false): ?string
     {
-        return $this->isAutoReceipt() ? self::AUTO_RECEIPT_SENDER : null;
+        return $this->isAutoReceipt() ? self::autoReceiptSender($forStaff) : null;
+    }
+
+    /** Members see the department name; staff screens mark it as automated. */
+    public static function autoReceiptSender(bool $forStaff = false): string
+    {
+        return (string) config($forStaff ? 'ai_automation.staff_label' : 'ai_automation.sender_label', 'Support Services');
     }
 
     /**

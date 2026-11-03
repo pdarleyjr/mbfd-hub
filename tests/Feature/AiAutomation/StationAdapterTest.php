@@ -255,9 +255,9 @@ final class StationAdapterTest extends TestCase
         $this->assertNull($receipt->internal_note);
         $this->assertSame((int) $intake->id, (int) $receipt->automation_intake_id);
         $this->assertSame('auto_receipt', $receipt->metadata['event']);
-        $this->assertSame(['intake_id' => (int) $intake->id, 'sender' => 'AI Response'], $receipt->metadata['automation']);
+        $this->assertSame(['intake_id' => (int) $intake->id, 'sender' => 'Support Services (automated)'], $receipt->metadata['automation']);
         $this->assertTrue($receipt->isAutoReceipt());
-        $this->assertSame('AI Response', $receipt->senderLabel());
+        $this->assertSame('Support Services', $receipt->senderLabel());
 
         $after = StationRequest::query()->findOrFail($request->id);
         foreach (['status', 'priority', 'acknowledged_at', 'acknowledged_by', 'current_public_response', 'assigned_to_user_id', 'completed_at'] as $column) {
@@ -320,7 +320,7 @@ final class StationAdapterTest extends TestCase
         $this->assertSame($heldDetail, $source->detail($staff, (string) $request->id)->issue->version);
 
         $timeline = collect($source->detail($staff, (string) $request->id)->timeline);
-        $this->assertSame('AI Response', $timeline->last()['actor']);
+        $this->assertSame('Support Services (automated)', $timeline->last()['actor']);
 
         $result = $source->perform($staff, (string) $request->id, 'acknowledge', ['public_note' => 'Looking at it.'], $held);
         $this->assertSame('done', $result->outcome, 'The assistant receipt must not cause a false conflict.');
@@ -334,13 +334,13 @@ final class StationAdapterTest extends TestCase
         $this->adapter()->writeReply($this->intake('station_request', $request->id), $this->facts(), 'Acknowledged. Forwarded to the appropriate personnel.');
 
         $list = $this->getJson("/api/public/stations/{$this->station->id}/requests")->assertOk();
-        $list->assertJsonPath('data.0.ai_receipt.sender', 'AI Response')
+        $list->assertJsonPath('data.0.ai_receipt.sender', 'Support Services')
             ->assertJsonPath('data.0.acknowledged_at', null)
             ->assertJsonPath('data.0.current_public_response', null)
             ->assertJsonPath('data.0.status', 'pending')
             ->assertJsonPath('data.0.updates.0.sender', null)
             ->assertJsonPath('data.0.updates.0.is_auto_receipt', false)
-            ->assertJsonPath('data.0.updates.1.sender', 'AI Response')
+            ->assertJsonPath('data.0.updates.1.sender', 'Support Services')
             ->assertJsonPath('data.0.updates.1.is_auto_receipt', true)
             ->assertJsonPath('data.0.updates.1.public_note', 'Acknowledged. Forwarded to the appropriate personnel.')
             ->assertJsonMissingPath('data.0.updates.1.changed_by_user_id')
@@ -348,10 +348,10 @@ final class StationAdapterTest extends TestCase
 
         $this->getJson("/api/public/station-requests/{$request->id}")
             ->assertOk()
-            ->assertJsonPath('data.ai_receipt.sender', 'AI Response');
+            ->assertJsonPath('data.ai_receipt.sender', 'Support Services');
 
         $overview = $this->getJson("/api/public/stations/{$this->station->id}/overview")->assertOk();
-        $this->assertSame('AI Response', $overview->json('requests.0.ai_receipt.sender'));
+        $this->assertSame('Support Services', $overview->json('requests.0.ai_receipt.sender'));
     }
 
     public function test_the_admin_request_page_shows_ai_response_as_the_sender(): void
@@ -364,7 +364,7 @@ final class StationAdapterTest extends TestCase
 
         \Livewire\Livewire::test(\App\Filament\Resources\StationRequestResource\Pages\ViewStationRequest::class, ['record' => $request->id])
             ->assertSuccessful()
-            ->assertSee('AI Response')
+            ->assertSee('Support Services (automated)')
             ->assertSee('Acknowledged.');
     }
 
@@ -396,7 +396,7 @@ final class StationAdapterTest extends TestCase
 
         $this->getJson("/api/v2/station-inventory/{$this->station->id}/supply-requests")
             ->assertOk()
-            ->assertJsonPath('requests.0.ai_response.sender', 'AI Response')
+            ->assertJsonPath('requests.0.ai_response.sender', 'Support Services')
             ->assertJsonPath('requests.0.ai_response.text', 'Received.')
             ->assertJsonPath('requests.0.public_response', null)
             ->assertJsonPath('requests.0.status', 'open');

@@ -657,7 +657,7 @@ export interface StationRequestUpdate {
   status: StationRequestStatus;
   public_note?: string | null;
   created_at: string;
-  /** 'AI Response' on the assistant's automatic receipt; null on staff and system rows. */
+  /** 'Support Services' on the automated receipt; null on staff and system rows. */
   sender?: string | null;
   is_auto_receipt?: boolean;
 }

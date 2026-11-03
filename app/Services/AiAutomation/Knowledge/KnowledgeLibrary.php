@@ -54,6 +54,7 @@ final class KnowledgeLibrary
                 'title' => $content['title'],
                 'topic_tags' => self::tags($data['topic_tags'] ?? []),
                 'member_safe' => (bool) ($data['member_safe'] ?? true),
+                'always_include' => (bool) ($data['always_include'] ?? false),
             ]);
             $this->newVersion($article, 1, Version::STATUS_DRAFT, $content, $editor);
 
@@ -76,6 +77,7 @@ final class KnowledgeLibrary
             $article->forceFill([
                 'topic_tags' => self::tags($data['topic_tags'] ?? $article->topic_tags ?? []),
                 'member_safe' => (bool) ($data['member_safe'] ?? $article->member_safe),
+                'always_include' => (bool) ($data['always_include'] ?? $article->always_include),
             ])->save();
 
             $open = $this->openDraft($article);
@@ -92,11 +94,15 @@ final class KnowledgeLibrary
     }
 
     /** Changes only the article-level tags and member-safe flag (no new version). */
-    public function updateSettings(AiKnowledgeArticle $article, mixed $tags, bool $memberSafe): AiKnowledgeArticle
+    public function updateSettings(AiKnowledgeArticle $article, mixed $tags, bool $memberSafe, ?bool $alwaysInclude = null): AiKnowledgeArticle
     {
-        return DB::transaction(function () use ($article, $tags, $memberSafe): AiKnowledgeArticle {
+        return DB::transaction(function () use ($article, $tags, $memberSafe, $alwaysInclude): AiKnowledgeArticle {
             $locked = $this->lockArticle($article);
-            $locked->forceFill(['topic_tags' => self::tags($tags), 'member_safe' => $memberSafe])->save();
+            $locked->forceFill([
+                'topic_tags' => self::tags($tags),
+                'member_safe' => $memberSafe,
+                'always_include' => $alwaysInclude ?? (bool) $locked->always_include,
+            ])->save();
 
             return $locked;
         });
@@ -183,7 +189,28 @@ final class KnowledgeLibrary
     }
 
     /**
-     * Published guidance relevant to the text, best first. Unrelated text returns an empty list.
+     * Standing guidance: published, member-safe, in-date articles marked "Use in every AI answer" (at most three).
+     *
+     * @return list<Version>
+     */
+    public function standing(): array
+    {
+        $today = $this->today();
+
+        return Version::query()
+            ->with('article')
+            ->where('status', Version::STATUS_PUBLISHED)
+            ->whereIn('id', AiKnowledgeArticle::query()->where('member_safe', true)->where('always_include', true)->whereNotNull('published_version_id')->select('published_version_id'))
+            ->where(fn ($q) => $q->whereNull('effective_date')->orWhereDate('effective_date', '<=', $today))
+            ->where(fn ($q) => $q->whereNull('review_date')->orWhereDate('review_date', '>=', $today))
+            ->orderBy('article_id')
+            ->limit(3)
+            ->get()
+            ->all();
+    }
+
+    /**
+     * Published, member-safe, in-date articles that best match the text; [] when nothing matches well enough.
      *
      * @return list<Version>
      */
@@ -246,6 +273,7 @@ final class KnowledgeLibrary
                     'title' => $section['title'],
                     'topic_tags' => $section['tags'],
                     'member_safe' => true,
+                    'always_include' => $section['always'],
                 ]);
                 $version = $this->newVersion($article, 1, Version::STATUS_PUBLISHED, [
                     'title' => $section['title'],
@@ -295,7 +323,7 @@ final class KnowledgeLibrary
         return $text;
     }
 
-    /** @return list<array{slug: string, title: string, tags: list<string>, review: ?string, body: string}> */
+    /** @return list<array{slug: string, title: string, tags: list<string>, review: ?string, always: bool, body: string}> */
     private function parseSeed(string $markdown): array
     {
         $lines = preg_split('/\R/', $markdown) ?: [];
@@ -352,6 +380,7 @@ final class KnowledgeLibrary
                 'title' => mb_substr($section['title'], 0, 200),
                 'tags' => self::tags(explode(',', $section['attributes']['tags'] ?? '')),
                 'review' => is_string($review) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $review) === 1 ? $review : null,
+                'always' => ($section['attributes']['always'] ?? '') === 'true',
                 'body' => $body,
             ];
         }

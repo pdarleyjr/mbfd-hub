@@ -116,7 +116,7 @@ final class PlaybookRepositoryTest extends TestCase
         $repo = new PlaybookRepository;
         $repo->ensureSeeded();
         $editor = $this->editor();
-        $playbook = AiAutomationPlaybook::query()->where('key', 'missing_consumable')->sole();
+        $playbook = AiAutomationPlaybook::query()->where('key', 'missing_item')->sole();
 
         $updated = $repo->update($playbook, "Check for extra {item}.\n", $editor);
 
@@ -128,7 +128,7 @@ final class PlaybookRepositoryTest extends TestCase
         self::assertSame('Check for extra {item}.', $revisions->last()->body);
         self::assertSame($editor->getKey(), $revisions->last()->edited_by_user_id);
         self::assertSame('Pat Example', $revisions->last()->edited_by_name);
-        self::assertSame('Check for extra {item}.', $repo->template('missing_consumable')['body']);
+        self::assertSame('Check for extra {item}.', $repo->template('missing_item')['body']);
     }
 
     public function test_saving_the_live_body_again_changes_nothing(): void
@@ -163,7 +163,7 @@ final class PlaybookRepositoryTest extends TestCase
     {
         return [
             'empty' => ['   '],
-            'too long' => [str_repeat('a', 321)],
+            'too long' => [str_repeat('a', 501)],
             'unknown placeholder' => ['Check {station} please.'],
             'stray brace' => ['Check {item please.'],
             'http link' => ['See https://example.com/help for details.'],
@@ -198,7 +198,7 @@ final class PlaybookRepositoryTest extends TestCase
     {
         $repo = new PlaybookRepository;
         $repo->ensureSeeded();
-        $playbook = AiAutomationPlaybook::query()->where('key', 'weekend_spare')->sole();
+        $playbook = AiAutomationPlaybook::query()->where('key', 'weekend_line')->sole();
 
         $updated = $repo->update($playbook, 'Ask 300 whether {item} is on the spare list at Station 2.', $this->editor());
 
