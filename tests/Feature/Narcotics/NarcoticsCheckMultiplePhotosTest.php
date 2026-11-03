@@ -118,6 +118,16 @@ final class NarcoticsCheckMultiplePhotosTest extends TestCase
         $this->sendPhotos($this->member, $this->threePhotos(), ['client_submission_id' => $id])->assertStatus(201);
     }
 
+    public function test_sending_photos_never_puts_a_time_limit_on_an_unlimited_process(): void
+    {
+        // The CLI, queue workers and the test runner have no limit; a limit set here would outlive the request.
+        $this->assertSame('0', (string) ini_get('max_execution_time'));
+
+        $this->sendPhotos($this->member, $this->threePhotos())->assertStatus(201);
+
+        $this->assertSame('0', (string) ini_get('max_execution_time'));
+    }
+
     public function test_more_photos_than_allowed_are_refused_before_anything_is_stored(): void
     {
         config()->set('narcotics_checks.max_photos', 2);
