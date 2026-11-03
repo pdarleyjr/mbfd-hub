@@ -1,6 +1,6 @@
 # TeleStaff Daily Roster
 
-TeleStaff emails `Dailyroster.xlsx` to `info@mbfdhub.com`. The Hub turns each trusted export into a read-only member roster and feeds the 300 and Captain 5 cards for display. Members see `/daily-roster`; administrators see **System > Roster Imports**. There is no manual import in the normal path.
+TeleStaff emails `Dailyroster.xlsx` to `info@mbfdhub.com` every few minutes. Its 7-day outlook (`Roster_Day_1.xlsx` to `Roster_Day_7.xlsx`) is covered in [telestaff-roster-outlook.md](telestaff-roster-outlook.md). The Hub turns each trusted export into a read-only member roster and feeds the 300 and Captain 5 cards for display. Members see `/daily-roster`; administrators see **System > Roster Imports**. There is no manual import in the normal path.
 
 ## Flow
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\DailyRoster;
 
 use App\Models\DailyRoster\RosterActiveVersion;
+use App\Models\DailyRoster\RosterImport;
 use App\Models\DailyRoster\RosterSnapshot;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -50,6 +51,8 @@ final class RosterRollbackService
                 'content_changed_at' => $now,
                 'pinned_at' => $now,
                 'pinned_by_user_id' => $actor->getKey(),
+                // Says whether the version chosen came from the outlook, so the page labels it truthfully.
+                'source' => RosterImport::query()->whereKey($snapshot->roster_import_id)->value('source'),
             ])->save();
 
             $this->recorder->appendEvent(null, RosterStateRecorder::ACTION_ROLLBACK_ACTIVATED, reason: $reason, context: [

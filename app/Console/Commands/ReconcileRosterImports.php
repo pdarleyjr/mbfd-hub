@@ -15,6 +15,7 @@ use App\Services\DailyRoster\RosterFreshnessResolver;
 use App\Services\DailyRoster\RosterImportCleanup;
 use App\Services\DailyRoster\RosterImportOperations;
 use App\Services\DailyRoster\RosterMoveDetector;
+use App\Services\DailyRoster\RosterOutlook;
 use App\Services\DailyRoster\RosterPipelineException;
 use App\Services\DailyRoster\RosterSeatWatch;
 use App\Services\DailyRoster\RosterStateRecorder;
@@ -175,7 +176,8 @@ final class ReconcileRosterImports extends Command
         $dutyDate = $calendar->dutyDate($now)->format('Y-m-d');
 
         if ($now->lessThan($freshness->lateFrom($dutyDate))
-            || RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->whereNotNull('roster_snapshot_id')->exists()
+            // An outlook covering the day does not mean the 5-minute export arrived.
+            || RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->whereNotNull('roster_snapshot_id')->whereNull('source')->exists()
             || ! RosterActiveVersion::query()->whereNotNull('roster_snapshot_id')->exists()) {
             return 0;
         }
@@ -209,7 +211,10 @@ final class ReconcileRosterImports extends Command
             return 0;
         }
 
-        $outage = (string) ($pointer->last_confirmed_at ?? $pointer->updated_at)?->getTimestamp();
+        // Each outlook email moves the time an outlook-covered day was last confirmed, so that outage is named once.
+        $outage = $pointer->source === RosterOutlook::SOURCE
+            ? RosterOutlook::SOURCE
+            : (string) ($pointer->last_confirmed_at ?? $pointer->updated_at)?->getTimestamp();
         $alerts->send('stale', $dutyDate, $outage);
 
         if (RosterEvent::query()->whereDate('duty_date', $dutyDate)->where('action', RosterStateRecorder::ACTION_STALE)->where('reason', $outage)->exists()) {
@@ -235,6 +240,8 @@ final class ReconcileRosterImports extends Command
 
         $held = RosterImport::query()
             ->whereIn('state', [RosterImport::STATE_NEEDS_REVIEW, RosterImport::STATE_REJECTED, RosterImport::STATE_PERMANENT_FAILED])
+            // Outlook trouble stays in the ledger; it must not use up the 5-minute export's alert for the day.
+            ->whereNull('source')
             ->where('state_changed_at', '>=', $now->subDay())
             ->where(static fn (Builder $code) => $code->whereNull('error_code')->orWhere('error_code', '!=', 'pinned'))
             ->select('state', 'duty_date')

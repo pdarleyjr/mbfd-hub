@@ -24,6 +24,8 @@ final readonly class TrainingRosterDuty
         /** Why no roster is available, in words for the planner; null when one is. */
         public ?string $unavailableReason,
         public ?string $warning,
+        // From TeleStaff's 7-day outlook: usable, but it may change before the 5-minute export replaces it.
+        public bool $isOutlook = false,
     ) {}
 
     public function isVerified(): bool

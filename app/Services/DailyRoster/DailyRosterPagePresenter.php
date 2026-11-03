@@ -44,7 +44,7 @@ final class DailyRosterPagePresenter
         $now = CarbonImmutable::now();
         $freshness = $this->freshness->pageStatus($now);
         $onDutyDate = $this->calendar->dutyDate($now)->format('Y-m-d');
-        $available = $this->reader->availableDutyDates();
+        $available = $this->reader->pageDutyDates();
         $date = in_array($requestedDate, $available, true) && $requestedDate !== $freshness->dutyDate ? $requestedDate : null;
 
         $view = $this->reader->forDutyDate($date ?? $freshness->dutyDate);
@@ -74,8 +74,10 @@ final class DailyRosterPagePresenter
             'requestedDate' => $date,
             'displayedDate' => $displayedDate,
             'displayedDateLabel' => $this->dateLabel($displayedDate, 'l, F j'),
-            'tag' => $this->tag($mode, $freshness, $displayedDate, $onDutyDate),
+            'tag' => $mode === self::MODE_DATED && $view->isOutlook ? ['label' => 'Outlook', 'class' => 'hub-tag--info'] : $this->tag($mode, $freshness, $displayedDate, $onDutyDate),
             'notice' => $this->notice($mode, $freshness, $displayedDate),
+            'outlookNote' => $view?->isOutlook ? $this->outlookNote($view, $mode, $now) : null,
+            'days' => $this->days($available, $displayedDate, $freshness->dutyDate, $now),
             // Null when the shift on duty has no roster, so nothing links to a page that cannot show it.
             'onDutyDate' => in_array($onDutyDate, $available, true) ? $onDutyDate : null,
             'nextShiftNote' => $mode === self::MODE_NEXT ? $this->nextShiftNote($view, $onDutyDate) : null,
@@ -169,6 +171,54 @@ final class DailyRosterPagePresenter
             in_array($mode, [self::MODE_CURRENT, self::MODE_NEXT], true) && $freshness->state === RosterFreshness::DELAYED => 'TeleStaff has stopped sending updates'.($freshness->asOf === null ? '' : ' since '.$this->localTime($freshness->asOf)).'. This roster may be out of date.',
             default => null,
         };
+    }
+
+    /** Where an outlook roster came from and how old it is. Its time is TeleStaff's latest outlook that carried it. */
+    private function outlookNote(RosterView $view, string $mode, CarbonImmutable $now): string
+    {
+        $asOf = $view->asOf ?? $view->snapshot->source_generated_at;
+        $when = $asOf === null ? '' : ' from '.$this->localTime($asOf);
+        if (in_array($mode, [self::MODE_CURRENT, self::MODE_NEXT], true)) {
+            return "TeleStaff's live roster has not arrived, so this is the 7-day outlook{$when}. It may change.";
+        }
+
+        $staleAfter = max(1, (int) config('daily_roster.outlook.stale_after_hours', 7));
+
+        return $asOf !== null && $asOf->lessThan($now->subHours($staleAfter))
+            ? "Outlook{$when}. TeleStaff has not updated it since, so it may be out of date."
+            : "Outlook{$when}. It may change before the shift.";
+    }
+
+    /**
+     * The day strip: the day TeleStaff is sending and the outlook's next six. Only while the outlook is on.
+     *
+     * @param  list<string>  $available
+     * @return list<array{date: string, label: string, spokenDate: string, href: ?string, isCurrent: bool}>
+     */
+    private function days(array $available, string $displayedDate, string $defaultDate, CarbonImmutable $now): array
+    {
+        if (! RosterOutlook::publishes()) {
+            return [];
+        }
+
+        $today = $now->setTimezone(HubTimezone::NAME)->format('Y-m-d');
+        $first = CarbonImmutable::createFromFormat('!Y-m-d', $defaultDate, HubTimezone::NAME);
+        $days = [];
+        foreach (range(0, RosterOutlook::maxDaysAhead() - 1) as $offset) {
+            $day = $first->addDays($offset);
+            $date = $day->format('Y-m-d');
+            $hasRoster = in_array($date, $available, true);
+            $days[] = [
+                'date' => $date,
+                'label' => $date === $today ? 'Today' : $day->format('D j'),
+                // Read after the visible label, so a screen reader hears the whole date and whether it can open.
+                'spokenDate' => $day->format('l, F j').($hasRoster ? '' : ', not available yet'),
+                'href' => $hasRoster ? route('daily-roster.show', $date === $defaultDate ? [] : ['date' => $date]) : null,
+                'isCurrent' => $date === $displayedDate,
+            ];
+        }
+
+        return $days;
     }
 
     /** Says plainly that the people on screen are not on duty yet, and who is. */

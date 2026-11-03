@@ -10,6 +10,7 @@ use App\Models\DailyRoster\RosterSection;
 use App\Models\DailyRoster\RosterSnapshot;
 use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * The only way consumers read the published roster. A read follows one pointer to one immutable
@@ -27,7 +28,7 @@ final class CurrentRosterReader
 
     public function forDutyDate(string $dutyDate): ?RosterView
     {
-        $pointer = RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->first();
+        $pointer = $this->pointers()->whereDate('duty_date', $dutyDate)->first();
         if ($pointer === null || $pointer->roster_snapshot_id === null) {
             return null;
         }
@@ -38,7 +39,7 @@ final class CurrentRosterReader
     /** The newest roster before the duty day containing $at. For stale display only, never for command cards. */
     public function latestBefore(CarbonInterface $at): ?RosterView
     {
-        $pointer = RosterActiveVersion::query()
+        $pointer = $this->pointers()
             ->whereNotNull('roster_snapshot_id')
             ->whereDate('duty_date', '<', $this->calendar->dutyDate($at)->format('Y-m-d'))
             ->orderByDesc('duty_date')
@@ -55,7 +56,7 @@ final class CurrentRosterReader
      */
     public function sectionsForRole(?CarbonInterface $at, string $role): array
     {
-        $pointer = RosterActiveVersion::query()
+        $pointer = $this->pointers()
             ->whereDate('duty_date', $this->calendar->dutyDate($at)->format('Y-m-d'))
             ->first();
         if ($pointer === null || $pointer->roster_snapshot_id === null) {
@@ -107,7 +108,7 @@ final class CurrentRosterReader
     /** @return list<string> Duty dates with a published roster, newest first */
     public function availableDutyDates(int $limit = 14): array
     {
-        return RosterActiveVersion::query()
+        return $this->pointers()
             ->whereNotNull('roster_snapshot_id')
             ->orderByDesc('duty_date')
             ->limit($limit)
@@ -115,6 +116,17 @@ final class CurrentRosterReader
             ->map(static fn (RosterActiveVersion $pointer): string => substr((string) $pointer->duty_date, 0, 10))
             ->values()
             ->all();
+    }
+
+    /**
+     * The dates the Daily Roster page and its member card reach: the 14 newest, plus the outlook's next days
+     * while it is on. One limit, so a card can never fall back to a different roster than the page shows.
+     *
+     * @return list<string> Newest first
+     */
+    public function pageDutyDates(): array
+    {
+        return $this->availableDutyDates(14 + (RosterOutlook::publishes() ? RosterOutlook::maxDaysAhead() : 0));
     }
 
     /** One stored version, whether or not it is showing: what an open page has, to compare with what is current. */
@@ -136,7 +148,23 @@ final class CurrentRosterReader
             $pointer->last_confirmed_at,
             $pointer->updated_at?->toImmutable(),
             $pointer->content_changed_at,
+            $pointer->source === RosterOutlook::SOURCE,
         );
+    }
+
+    /**
+     * Every date's pointer. While the outlook is off, its days after the shift on duty drop out at once. A
+     * current day the outlook is covering stays, as it does for every other reader, until the 5-minute export
+     * takes it back.
+     *
+     * @return Builder<RosterActiveVersion>
+     */
+    private function pointers(): Builder
+    {
+        $onDuty = $this->calendar->dutyDate()->format('Y-m-d');
+
+        return RosterActiveVersion::query()->when(! RosterOutlook::publishes(), static fn (Builder $pointers) => $pointers
+            ->where(static fn (Builder $shown) => $shown->whereNull('source')->orWhereDate('duty_date', '<=', $onDuty)));
     }
 
     /** @return list<RosterSectionView> */
