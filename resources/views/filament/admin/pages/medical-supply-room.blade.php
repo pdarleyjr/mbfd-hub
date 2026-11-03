@@ -383,6 +383,11 @@
             </x-filament::section>
         @endif
 
+        {{-- ============================== SUPPLY ROOM SCREEN ============================== --}}
+        @if ($this->tab === 'screen')
+            @include('filament.admin.partials.supply-room-screen')
+        @endif
+
         {{-- ============================== SNAPSHOTS ============================== --}}
         @if ($this->tab === 'snapshots')
             @if ($snapshotDetail === null)

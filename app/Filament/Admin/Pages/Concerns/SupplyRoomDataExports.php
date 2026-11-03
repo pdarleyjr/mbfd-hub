@@ -49,6 +49,14 @@ trait SupplyRoomDataExports
                 array_map(static fn (array $row): array => [$row['kind_text'], $row['when'], $row['status'], $row['scope_location_code'],
                     $row['started_by'], $row['finalized_name'], $row['line_count'], $row['counted_count'], $row['notes']], $data['snapshots']),
             ],
+            'screen' => [
+                ['When (Eastern)', 'Number', 'Member', 'Unit', 'Item', 'Quantity', 'Count due', 'Status', 'Note'],
+                collect($data['withdrawals'])->flatMap(static fn (array $w): array => array_map(
+                    static fn (array $line): array => [$w['taken_at'], $w['number'], $w['employee_name'], $w['unit_label'], $line['name'],
+                        trim($line['quantity'].' '.$line['unit_label']), $line['count_due'] ? 'Yes' : '', $w['status'] === 'undone' ? 'Undone' : 'Taken', $w['note']],
+                    $w['lines'] === [] ? [['name' => '', 'quantity' => '', 'unit_label' => '', 'count_due' => false]] : $w['lines'],
+                ))->values()->all(),
+            ],
             default => throw new \LogicException('Use the stock table export for the Stock tab.'),
         };
 

@@ -74,6 +74,7 @@ Route::prefix('ems/api')
         Route::middleware(EnsureEmsAccess::class.':inventory_read')->group(function (): void {
             Route::get('/meta', [StaffRequestController::class, 'meta'])->name('meta');
             Route::get('/supply/master', [MasterInventoryController::class, 'index'])->name('supply.master.index');
+            Route::get('/supply/screen', [MasterInventoryController::class, 'screen'])->name('supply.screen');
             Route::get('/supply/count-form/{uuid}/review', [MasterInventoryController::class, 'reviewCount'])->whereUuid('uuid')->name('supply.count-form.review');
         });
 

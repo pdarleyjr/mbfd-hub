@@ -111,6 +111,17 @@ Schedule::command('ems:stock-alerts')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// EMS supply room screen: one email a day of every withdrawal, and an alert when a paired screen goes silent.
+Schedule::command('ems:kiosk-daily-summary')
+    ->dailyAt('07:00')
+    ->timezone(\App\Support\HubTimezone::NAME)
+    ->withoutOverlapping(30)
+    ->onOneServer();
+Schedule::command('ems:kiosk-watch')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(5)
+    ->onOneServer();
+
 // EMS idempotency keys older than 30 days (a retry window, not history).
 Schedule::command('ems:prune-idempotency')
     ->dailyAt('03:50')
