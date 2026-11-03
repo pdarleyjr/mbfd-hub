@@ -20,7 +20,6 @@ use App\Services\DailyRoster\RosterFreshness;
 use App\Services\DailyRoster\RosterFreshnessResolver;
 use App\Services\DailyRoster\RosterImportActions;
 use App\Services\DailyRoster\RosterStateRecorder;
-use App\Services\Notifications\NotificationRecipientEvaluator;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Filesystem\Filesystem;
@@ -34,7 +33,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
-use RuntimeException;
 use Spatie\Health\Enums\Status;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -248,11 +246,13 @@ final class RosterImportAdminTest extends TestCase
     public function test_a_failed_send_forgets_the_alert_so_the_next_check_sends_it(): void
     {
         Exceptions::fake();
-        $this->mock(NotificationRecipientEvaluator::class, static fn ($mock) => $mock->shouldReceive('recipients')->once()->andThrow(new RuntimeException('push_down')));
+        $this->administrator();
+        // The in-app copy has nowhere to go, so the send fails after the alert was recorded.
+        Schema::drop('notifications');
 
         app(RosterAlerts::class)->send('delayed', '2026-10-30');
 
-        Exceptions::assertReported(static fn (RuntimeException $exception): bool => $exception->getMessage() === 'push_down');
+        Exceptions::assertReportedCount(1);
         self::assertSame(0, DB::table('roster_alert_deliveries')->count());
     }
 
