@@ -48,7 +48,7 @@ final class UnitStatusBoardFixture
         }
 
         return array_replace([
-            'schemaVersion' => 1,
+            'schemaVersion' => 2,
             'generatedAt' => '2026-11-02T21:58:30Z',
             'etag' => 'fixture-etag-1',
             'live' => true,
@@ -248,10 +248,10 @@ final class UnitStatusBoardFixture
      */
     private static function crew(string $state, string $label, array $onTruck, int $vacancies = 0): array
     {
-        $short = static fn (array $p): array => $p + ['short' => trim(($p['rank'] ?? '').' '.explode(',', $p['name'])[0])];
+        $short = static fn (array $p): array => ['rank' => $p['rank'] ?? null, 'short' => trim(($p['rank'] ?? '').' '.explode(',', $p['name'])[0])];
 
         return ['state' => $state, 'label' => $label, 'onTruck' => array_map($short, $onTruck),
-            'later' => $state === 'confirmed' ? [['rank' => 'FF', 'name' => 'Ruiz, Ana', 'short' => 'FF Ruiz', 'from' => '19:00', 'through' => '08:00']] : [],
+            'later' => $state === 'confirmed' ? [['rank' => 'FF', 'short' => 'FF Ruiz', 'from' => '19:00', 'through' => '08:00']] : [],
             'vacancies' => $vacancies, 'asOf' => '2026-11-02T12:30:00Z', 'note' => null];
     }
 }

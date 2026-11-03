@@ -327,7 +327,7 @@ final class UnitStatusV11Test extends UnitStatusTestCase
 
         $e2 = $this->unit($this->board(), 'E2');
 
-        self::assertSame(['2:16 PM', '10:25 AM', '8:30 AM'], array_column($e2['profile']['todayCalls'], 'timeLabel'));
+        self::assertSame(['2:16 PM ET', '10:25 AM ET', '8:30 AM ET'], array_column($e2['profile']['todayCalls'], 'timeLabel'));
         self::assertSame(['Medical Emergency', 'Structure Fire', 'Fire Alarm'], array_column($e2['profile']['todayCalls'], 'callType'));
         self::assertSame([false, true, false], array_column($e2['profile']['todayCalls'], 'current'));
         self::assertSame(['#2601100002', 'ID pending', '#2601100001'], array_column($e2['profile']['todayCalls'], 'idLabel'));
@@ -381,5 +381,57 @@ final class UnitStatusV11Test extends UnitStatusTestCase
             self::assertStringNotContainsString($leak, $json, $leak);
         }
         self::assertStringContainsString('Lt. Benson', $json);
+    }
+
+    // Review fixes (v1.1.1)
+
+    public function test_a_unit_added_late_to_an_older_call_gets_its_own_ten_minutes(): void
+    {
+        $this->markFeedFresh();
+        DailyRosterSnapshotFactory::publish(self::TODAY, ['Station 1 / Ladder 1' => [['employee_id' => 'EMP-1', 'name' => 'ALPHA, ANN']]]);
+        $this->storeCall(1, ['L1' => ['status' => '', 'joined' => now()->subMinutes(2)]], ['received_at' => now()->subMinutes(40)]);
+
+        $l1 = $this->unit($this->board(), 'L1');
+        self::assertSame('on_call', $l1['availability']['key']);
+        self::assertSame('Assigned', $l1['availability']['label']);
+
+        $this->travel(8)->minutes();
+        $this->markFeedFresh();
+        self::assertSame('on_call', $this->unit($this->board(), 'L1')['availability']['key'], 'exactly ten minutes since it joined');
+
+        $this->travel(1)->minutes();
+        $this->markFeedFresh();
+        $after = $this->unit($this->board(), 'L1');
+        self::assertSame([], $after['currentCalls']);
+        self::assertNotSame('on_call', $after['availability']['key']);
+    }
+
+    public function test_a_status_word_the_board_does_not_know_is_treated_as_waiting(): void
+    {
+        $this->markFeedFresh();
+        $this->storeCall(1, ['E1' => ['status' => 'Responding']], ['received_at' => now()->subMinutes(5)]);
+        $this->storeCall(2, ['E2' => ['status' => 'Responding']], ['received_at' => now()->subMinutes(11)]);
+
+        $board = $this->board();
+
+        self::assertSame('on_call', $this->unit($board, 'E1')['availability']['key']);
+        self::assertSame('Assigned', $this->unit($board, 'E1')['availability']['label']);
+        self::assertSame([], $this->unit($board, 'E2')['currentCalls']);
+    }
+
+    public function test_the_surname_never_comes_from_the_raw_name(): void
+    {
+        $this->markFeedFresh();
+        DailyRosterSnapshotFactory::publish(self::TODAY, ['Station 2 / Engine 2' => [
+            ['employee_id' => 'EMP-SECRET-1', 'name' => 'Mark Benson', 'rank' => 'Lieutenant'],
+        ]]);
+        DB::table('roster_assignments')->update(['raw_name' => 'Mark Benson (PARAMEDIC, ALS)']);
+
+        $crew = $this->unit($this->board(), 'E2')['crew'];
+
+        self::assertSame(['Lt. Benson'], array_column($crew['onTruck'], 'short'));
+        self::assertStringNotContainsString('PARAMEDIC', (string) json_encode($crew));
+        self::assertArrayNotHasKey('name', $crew['onTruck'][0]);
+        self::assertStringNotContainsString('Mark', (string) json_encode($crew));
     }
 }

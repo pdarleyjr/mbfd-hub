@@ -18,6 +18,9 @@ use Illuminate\Support\Facades\Cache;
 /** The one view-model builder behind the page, the refresh fragment and the JSON, so the numbers never diverge. */
 final class UnitStatusBoard
 {
+    /** Bumped whenever the payload shape changes; it is also part of the cache key, so a deploy never serves an old shape. */
+    public const SCHEMA_VERSION = 2;
+
     public const ADVISORY = 'PulsePoint is advisory. Verify with dispatch.';
 
     public const DEFINITION = 'A run is a PulsePoint call that listed this unit (an observed assignment). It is not proof the unit responded. Each call counts once per unit; status changes, repeat updates and page refreshes never add runs.';
@@ -56,7 +59,7 @@ final class UnitStatusBoard
         $state = UnitStatusSyncState::current();
         $roster = $this->rosterFreshness->status($now);
 
-        return 'unit-status:board:'.sha1(implode('|', [
+        return 'unit-status:board:v'.self::SCHEMA_VERSION.':'.sha1(implode('|', [
             (string) $state?->last_success_at?->getTimestamp(),
             (string) $state?->source_state,
             (int) $state?->consecutive_failures,
@@ -87,7 +90,7 @@ final class UnitStatusBoard
         }
 
         $body = [
-            'schemaVersion' => 1,
+            'schemaVersion' => self::SCHEMA_VERSION,
             'live' => $feed->fresh && $roster->isCurrent(),
             'advisory' => self::ADVISORY,
             'source' => $this->source($feed),
@@ -98,7 +101,7 @@ final class UnitStatusBoard
             'stations' => $stations,
         ];
 
-        return ['schemaVersion' => 1, 'generatedAt' => UnitStatusTime::iso($now), 'etag' => sha1((string) json_encode($body))] + $body;
+        return ['schemaVersion' => self::SCHEMA_VERSION, 'generatedAt' => UnitStatusTime::iso($now), 'etag' => sha1((string) json_encode($body))] + $body;
     }
 
     /** @return array<string, mixed> */

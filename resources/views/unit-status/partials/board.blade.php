@@ -17,6 +17,11 @@
     $totals = $board['totals'] ?? [];
     $busiest = $totals['busiest'] ?? null;
     $busiestRuns = (int) ($busiest['runs'] ?? 0);
+    try {
+        $build = substr(md5(\Illuminate\Support\Facades\Vite::asset('resources/css/unit-status.css')), 0, 12);
+    } catch (\Throwable) {
+        $build = '';
+    }
 
     $statusParts = [];
     if (! $live) {
@@ -40,6 +45,7 @@
     data-us-board
     data-etag="{{ $board['etag'] ?? '' }}"
     data-generated-at="{{ $board['generatedAt'] ?? '' }}"
+    data-build="{{ $build }}"
     data-live="{{ $live ? '1' : '0' }}"
     data-updated-label="{{ $updated }}"
 >
@@ -53,29 +59,29 @@
         @if($updated)<span data-us-updated>Updated {{ $updated }}</span>@endif
     </p>
 
-    <div class="us-totals" data-us-totals>
-        <section class="us-total" aria-labelledby="us-total-all">
-            <h2 class="us-total__label" id="us-total-all">Runs this shift</h2>
+    <section class="us-totals" data-us-totals aria-label="Shift totals">
+        <div class="us-total">
+            <p class="us-total__label">Runs this shift</p>
             <p class="us-total__figure">{{ $totals['total'] ?? 0 }}</p>
-        </section>
-        <section class="us-total" aria-labelledby="us-total-rescue">
-            <h2 class="us-total__label" id="us-total-rescue">Rescue</h2>
+        </div>
+        <div class="us-total">
+            <p class="us-total__label">Rescue</p>
             <p class="us-total__figure">{{ $totals['rescue'] ?? 0 }}</p>
-        </section>
-        <section class="us-total" aria-labelledby="us-total-combat">
-            <h2 class="us-total__label" id="us-total-combat">Combat</h2>
+        </div>
+        <div class="us-total">
+            <p class="us-total__label">Combat</p>
             <p class="us-total__figure">{{ $totals['combat'] ?? 0 }}</p>
-        </section>
-        <section class="us-total" aria-labelledby="us-total-busiest">
-            <h2 class="us-total__label" id="us-total-busiest">Busiest unit</h2>
+        </div>
+        <div class="us-total">
+            <p class="us-total__label">Busiest unit</p>
             @if(! empty($busiest['codes']))
                 <p class="us-total__figure us-total__figure--text">{{ implode(' · ', $busiest['codes']) }}</p>
                 <p class="us-total__sub">{{ $busiestRuns }} {{ $busiestRuns === 1 ? 'run' : 'runs' }}</p>
             @else
                 <p class="us-total__empty">No runs yet this shift</p>
             @endif
-        </section>
-    </div>
+        </div>
+    </section>
     @if(! empty($board['tracking']['note']))<p class="us-note-line">{{ $board['tracking']['note'] }}</p>@endif
     <p class="us-advisory">{{ $board['advisory'] ?? 'PulsePoint is advisory. Verify with dispatch.' }}</p>
 

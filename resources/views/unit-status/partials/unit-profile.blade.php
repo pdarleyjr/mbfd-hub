@@ -31,7 +31,7 @@
     $verified = $etTime($availability['observedAt'] ?? null)
         ?? $etTime($board['source']['lastSourceReadAt'] ?? null)
         ?? $etTime($board['generatedAt'] ?? null);
-    $short = static fn (array $p): string => trim((string) ($p['short'] ?? trim(($p['rank'] ?? '') . ' ' . ($p['name'] ?? ''))));
+    $short = static fn (array $p): string => trim((string) ($p['short'] ?? ''));
     $onTruck = collect($crew['onTruck'] ?? [])->map($short)->filter()->values();
     $shiftRuns = $profile['shiftRuns'] ?? ($unit['runs']['shift'] ?? 0);
     $lifetime = $profile['lifetimeRuns'] ?? ($unit['runs']['lifetime'] ?? 0);

@@ -15,7 +15,8 @@ use Carbon\CarbonImmutable;
  * the fact, so a unit is placed on a call only when all of these hold, none of which changes Command's data:
  *
  * 1. A "?" unit is never on a call (`unconfirmed_grace_minutes` = 0); a raised value allows it that many minutes.
- * 2. A confirmed unit still Dispatched, Acknowledged or blank `stalled_dispatch_minutes` after receipt has moved on.
+ * 2. A confirmed unit still Dispatched, Acknowledged, blank or unrecognised `stalled_dispatch_minutes` after it was
+ *    listed on the call (the later of the call's receipt and the unit joining) has moved on.
  * 3. A unit on two current calls is on the newer one only.
  * 4. A call open longer than `current_call_max_age_hours` is not evidence: the unit is "not confirmed", not available.
  *
@@ -67,15 +68,18 @@ final class CurrentCallFinder
         if (StatusFamily::isCleared($unit->status)) {
             return false;
         }
-        $receivedMinutesAgo = self::anchor($call)->diffInMinutes($now, false);
         if (! $unit->confirmed) {
             $grace = (int) config('unit_status.unconfirmed_grace_minutes', 0);
 
-            return $grace > 0 && $receivedMinutesAgo <= $grace;
+            return $grace > 0 && self::anchor($call)->diffInMinutes($now, false) <= $grace;
         }
-        $waiting = StatusFamily::family($unit->status) === 'dispatched' || trim($unit->status) === '';
+        // Waiting means Dispatched, Acknowledged, blank or any word the board does not recognise. The clock starts when
+        // the unit joined the call, so a unit added late to an older call is not dropped the moment it appears.
+        $family = StatusFamily::family($unit->status);
+        $waiting = $family === 'dispatched' || $family === StatusFamily::UNKNOWN;
+        $listedSince = max(self::anchor($call), $unit->first_seen_on_call_at);
 
-        return ! ($waiting && $receivedMinutesAgo > (int) config('unit_status.stalled_dispatch_minutes', 10));
+        return ! ($waiting && $listedSince->diffInMinutes($now, false) > (int) config('unit_status.stalled_dispatch_minutes', 10));
     }
 
     /** When the call was received; a call PulsePoint gave no time for is dated by when the Hub first saw it. */

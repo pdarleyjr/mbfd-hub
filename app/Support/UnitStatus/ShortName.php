@@ -5,33 +5,25 @@ declare(strict_types=1);
 namespace App\Support\UnitStatus;
 
 /**
- * "Lt. Benson": rank abbreviation plus surname. The surname is the text before the comma of TeleStaff's "Last, First"
- * name, so "Yacum Jr, David (cert/cert)" gives "Yacum Jr". Only the surname is taken from it; nothing else of the raw
- * name (first names, certification text) is ever returned.
+ * "Lt. Benson": rank abbreviation plus surname, from the roster's display name only. The raw TeleStaff name carries
+ * certification text that may itself contain commas, so it is never read here.
  */
 final class ShortName
 {
     private const SUFFIXES = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv'];
 
-    public static function from(?string $rank, string $rawName, string $displayName): string
+    public static function from(?string $rank, string $displayName): string
     {
-        $surname = self::surname($rawName, $displayName);
+        $surname = self::surname($displayName);
         $abbreviation = RankAbbreviator::abbreviate($rank);
 
         return $abbreviation === null ? $surname : trim($abbreviation.' '.$surname);
     }
 
-    public static function surname(string $rawName, string $displayName): string
+    /** From the display name alone: "Last, First" gives the part before the comma, "First Last" the last word. */
+    public static function surname(string $displayName): string
     {
-        $raw = self::beforeComma($rawName);
-        if ($raw !== null) {
-            // The display name carries the casing members read; use it when it names the same surname.
-            $shown = self::beforeComma($displayName);
-
-            return $shown !== null && strcasecmp($shown, $raw) === 0 ? $shown : $raw;
-        }
-
-        return self::lastTokens($displayName);
+        return self::beforeComma($displayName) ?? self::lastTokens($displayName);
     }
 
     private static function beforeComma(string $name): ?string

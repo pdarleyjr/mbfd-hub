@@ -98,7 +98,12 @@ final class UnitStatusLabelsTest extends UnitStatusTestCase
             $surfaces['board'] = (string) $this->get('/unit-status/board')->assertOk()->getContent();
         }
 
+        // The runs list shows confirmed runs only: R22 was only ever listed with a question mark.
+        self::assertSame([], json_decode($surfaces['runs'], true)['runs']);
+
         foreach ($surfaces as $name => $body) {
+            self::assertStringNotContainsString('"confirmed":false', str_replace(' ', '', $body), $name);
+            self::assertStringNotContainsString('"unitConfirmed":false', str_replace(' ', '', $body), $name);
             foreach (['unconfirmed', '?300', '?cpt5', '?r22', '?g9'] as $forbidden) {
                 self::assertStringNotContainsStringIgnoringCase($forbidden, $body, $name.' must not contain '.$forbidden);
             }

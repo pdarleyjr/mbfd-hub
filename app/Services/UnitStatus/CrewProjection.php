@@ -87,13 +87,12 @@ final class CrewProjection
             }
             $person = $assignment->employee_id !== null && $assignment->employee_id !== '' ? 'id:'.$assignment->employee_id : 'name:'.mb_strtolower($name);
             $rank = $this->rank($assignment);
-            $short = ShortName::from($rank, (string) $assignment->raw_name, $name);
+            $short = ShortName::from($rank, $name);
             if ($this->covers($assignment, $now)) {
-                $onTruck[$person] ??= ['rank' => $rank, 'name' => $name, 'short' => $short];
+                $onTruck[$person] ??= ['rank' => $rank, 'short' => $short];
             } elseif ($assignment->starts_at !== null && $assignment->starts_at->greaterThan($now)) {
                 $later[$person.'|'.$assignment->starts_at->getTimestamp()] ??= [
                     'rank' => $rank,
-                    'name' => $name,
                     'short' => $short,
                     'from' => UnitStatusTime::clock($assignment->starts_at),
                     'through' => UnitStatusTime::clock($assignment->ends_at),

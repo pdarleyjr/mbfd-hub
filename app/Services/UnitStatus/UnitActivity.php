@@ -120,7 +120,7 @@ final class UnitActivity
             $byUnit[$run->unit_code][] = [
                 'sourceCallId' => $run->source_call_id,
                 'attributedAt' => UnitStatusTime::iso($run->attributed_at),
-                'timeLabel' => UnitStatusTime::plainTime($run->attributed_at),
+                'timeLabel' => UnitStatusTime::time($run->attributed_at),
                 'callType' => $call !== null ? $call->call_type : '',
                 'idLabel' => $externalId !== null ? '#'.$externalId : 'ID pending',
                 'externalId' => $externalId,

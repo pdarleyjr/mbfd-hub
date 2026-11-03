@@ -1,14 +1,18 @@
 import {
     POLL_INTERVAL_MS,
+    RELOAD_NOTE,
+    ROW_SELECTOR,
     SIGN_IN_NOTE,
     STALE_CHECK_MS,
     bodyHasBoard,
+    buildMismatch,
     classifyResponse,
     describeChanges,
     failureNote,
     isStale,
     nextDelay,
     profileChanged,
+    snapshotRows,
     staleNote,
     toEntityTag,
 } from './unit-status/board-state.js';
@@ -45,6 +49,7 @@ function initUnitStatus(page) {
     let failed = false;
     let stale = false;
     let signedOut = false;
+    let reloadNeeded = false;
 
     /* ---------- profile dialog ---------- */
 
@@ -105,6 +110,10 @@ function initUnitStatus(page) {
             openProfile(open.dataset.usOpen, open);
             return;
         }
+        if (target?.closest('[data-us-reload]')) {
+            window.location.reload(); // only on this button: the member chooses when to lose their place
+            return;
+        }
         if (target?.closest('[data-us-dialog-close]')) {
             dialog?.close();
             return;
@@ -114,16 +123,14 @@ function initUnitStatus(page) {
     /* ---------- refresh ---------- */
 
     function snapshot() {
-        return [...page.querySelectorAll('[data-us-unit]')].map((row) => ({
-            code: row.dataset.unitCode,
-            status: row.dataset.status,
-            summary: row.dataset.summary,
-        }));
+        return snapshotRows(page.querySelectorAll(ROW_SELECTOR));
     }
 
     function renderNote() {
         let text = '';
-        if (signedOut) {
+        if (reloadNeeded) {
+            text = RELOAD_NOTE;
+        } else if (signedOut) {
             text = SIGN_IN_NOTE;
         } else if (stale) {
             text = staleNote(board()?.dataset.updatedLabel);
@@ -133,7 +140,14 @@ function initUnitStatus(page) {
         note.replaceChildren();
         if (text) {
             note.append(text);
-            if (signedOut) {
+            if (reloadNeeded) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'hub-btn hub-btn--secondary us-reload';
+                button.dataset.usReload = '';
+                button.textContent = 'Reload';
+                note.append(' ', button);
+            } else if (signedOut) {
                 const link = document.createElement('a');
                 link.href = loginUrl;
                 link.textContent = 'Sign in';
@@ -188,6 +202,13 @@ function initUnitStatus(page) {
         if (!next) {
             throw new Error('The response had no board.');
         }
+        if (buildMismatch(page.dataset.build, next.dataset.build)) {
+            reloadNeeded = true;
+            stopped = true;
+            window.clearTimeout(timer);
+            evaluateStale();
+            return false;
+        }
         const scrollY = window.scrollY;
         const active = document.activeElement;
         const focusId = active?.id && board().contains(active) ? active.id : null;
@@ -206,6 +227,7 @@ function initUnitStatus(page) {
         if (message && announce) {
             announce.textContent = message;
         }
+        return true;
     }
 
     function schedule(delay) {
@@ -262,7 +284,9 @@ function initUnitStatus(page) {
                     stop();
                     return;
                 }
-                swapBoard(html);
+                if (!swapBoard(html)) {
+                    return;
+                }
                 etag = toEntityTag(response.headers.get('ETag')) ?? toEntityTag(board()?.dataset.etag);
                 confirmedAt = Date.now();
             } else {

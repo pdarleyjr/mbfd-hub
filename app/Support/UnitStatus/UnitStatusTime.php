@@ -22,12 +22,6 @@ final class UnitStatusTime
         return self::format($moment, 'g:i A');
     }
 
-    /** "2:16 PM", Eastern, for a list that already says it is Eastern. */
-    public static function plainTime(?DateTimeInterface $moment): ?string
-    {
-        return $moment === null ? null : CarbonImmutable::instance($moment)->setTimezone(HubTimezone::NAME)->format('g:i A');
-    }
-
     /** "Nov 2, 4:58 PM ET" */
     public static function dateTime(?DateTimeInterface $moment): ?string
     {

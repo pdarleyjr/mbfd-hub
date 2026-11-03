@@ -175,7 +175,7 @@ final class UnitStatusHardeningTest extends UnitStatusTestCase
         $this->markFeedFresh();
         $this->actingAsCanonicalFixture();
 
-        $this->get('/unit-status/data', ['X-Hub-Background-Refresh' => '1'])->assertOk()->assertJsonPath('schemaVersion', 1);
+        $this->get('/unit-status/data', ['X-Hub-Background-Refresh' => '1'])->assertOk()->assertJsonPath('schemaVersion', 2);
     }
 
     // 3. Backlog

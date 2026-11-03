@@ -23,6 +23,8 @@ final class RunHistory
         $rows = UnitStatusRun::query()
             ->where('unit_code', $unit->code)
             ->whereNull('voided_at')
+            // Unconfirmed credits are never shown (contract 10.1).
+            ->where('confirmed', true)
             ->orderByDesc('attributed_at')
             ->orderByDesc('id')
             ->offset(($page - 1) * self::PER_PAGE)
@@ -53,7 +55,6 @@ final class RunHistory
                 'idLabel' => $externalId !== null ? '#'.$externalId : 'ID pending',
                 'externalId' => $externalId,
                 'unitStatus' => StatusFamily::label((string) ($statuses->get($run->source_call_id) ?? '')),
-                'confirmed' => $run->confirmed,
                 'provenance' => $run->provenance,
             ];
         }

@@ -47,7 +47,7 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
     {
         $board = $this->board();
 
-        self::assertSame(1, $board['schemaVersion']);
+        self::assertSame(2, $board['schemaVersion']);
         self::assertSame([1, 2, 3, 4, 6], array_column($board['stations'], 'number'));
         self::assertSame(['Station 1', 'Station 2', 'Station 3', 'Station 4', 'Station 6'], array_column($board['stations'], 'label'));
         $codes = array_merge(...array_map(static fn (array $station): array => array_column($station['units'], 'code'), $board['stations']));
@@ -174,7 +174,7 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
         self::assertSame('delayed', $board['roster']['state']);
         $r2 = $this->unit($board, 'R2');
         self::assertSame('delayed', $r2['crew']['state']);
-        self::assertSame('ALPHA, ANN', $r2['crew']['onTruck'][0]['name']);
+        self::assertSame('Lt. ALPHA', $r2['crew']['onTruck'][0]['short']);
         self::assertNotNull($r2['crew']['note']);
         self::assertSame('no_active_call', $r2['availability']['key']);
         self::assertFalse($board['live']);
@@ -301,8 +301,8 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
         $crew = $this->unit($this->board(), 'R1')['crew'];
 
         self::assertSame('confirmed', $crew['state']);
-        self::assertSame([['rank' => 'Captain', 'name' => 'ALPHA, ANN', 'short' => 'Capt. ALPHA'], ['rank' => 'Firefighter', 'name' => 'BRAVO, BOB', 'short' => 'FF BRAVO']], $crew['onTruck']);
-        self::assertSame([['rank' => 'Firefighter', 'name' => 'CHARLIE, CY', 'short' => 'FF CHARLIE', 'from' => '19:00', 'through' => '08:00']], $crew['later']);
+        self::assertSame([['rank' => 'Captain', 'short' => 'Capt. ALPHA'], ['rank' => 'Firefighter', 'short' => 'FF BRAVO']], $crew['onTruck']);
+        self::assertSame([['rank' => 'Firefighter', 'short' => 'FF CHARLIE', 'from' => '19:00', 'through' => '08:00']], $crew['later']);
         self::assertSame(1, $crew['vacancies']);
         self::assertNotNull($crew['asOf']);
     }
@@ -316,10 +316,10 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
         ]]);
 
         $this->travelTo(self::et('2026-11-02 13:59:59'));
-        self::assertSame(['ALPHA, ANN'], array_column($this->unit($this->board(), 'R1')['crew']['onTruck'], 'name'));
+        self::assertSame(['FF ALPHA'], array_column($this->unit($this->board(), 'R1')['crew']['onTruck'], 'short'));
         $this->travelTo(self::et('2026-11-02 14:00:00'));
         $this->markFeedFresh();
-        self::assertSame(['BRAVO, BOB'], array_column($this->unit($this->board(), 'R1')['crew']['onTruck'], 'name'));
+        self::assertSame(['FF BRAVO'], array_column($this->unit($this->board(), 'R1')['crew']['onTruck'], 'short'));
     }
 
     public function test_a_unit_whose_crew_is_all_off_is_not_staffed(): void
@@ -345,7 +345,8 @@ final class UnitStatusBoardTest extends UnitStatusTestCase
         foreach (['EMP-SECRET', 'employee_id', 'employeeId', 'raw_code', 'base_code', 'category', 'review_reasons', 'certifications', 'raw_name', 'SICK', 'PARAMEDIC', 'ZULU'] as $forbidden) {
             self::assertStringNotContainsString($forbidden, $json, $forbidden);
         }
-        self::assertStringContainsString('ALPHA, ANN', $json);
+        self::assertStringContainsString('Lt. ALPHA', $json);
+        self::assertStringNotContainsString('ANN', $json);
     }
 
     public function test_run_counts_cover_this_shift_lifetime_and_backfilled_and_never_count_unconfirmed(): void

@@ -184,7 +184,7 @@ One builder serves the page, the fragment and the JSON so the numbers never dive
 
 ```text
 {
-  schemaVersion: 1,
+  schemaVersion: 2,                    // v1.1.1: 2 (crew entries carry only rank and short; no name; runs list has no confirmed field)
   generatedAt: ISO,
   etag: string,                      // sha1 of the payload without generatedAt
   live: bool,                        // fresh feed AND roster current: only then is the "24-Hour Live Availability" subtitle shown
@@ -330,3 +330,7 @@ status is built (10.1); the label table above is the only source of status text;
 and a regression test renders the page, the fragment and the JSON from a feed containing `?` units and fails if
 "unconfirmed" (any case) or a `?`-prefixed designation appears anywhere in them. The pop-up's "other units" list shows
 only confirmed units.
+
+### 10.7 Review fixes (v1.1.1)
+
+`schemaVersion` is 2 and is part of the board cache key. Crew entries (`onTruck`, `later`) carry `rank`, `short` (and `from`/`through` for reliefs) and no `name`; the short name is built from the roster display name only. The stalled-dispatch clock (10.1 rule 2) starts at the later of the call being received and the unit joining it, and treats unrecognised status words like Dispatched. The runs endpoint lists confirmed runs only and has no `confirmed` field. `profile.todayCalls[].timeLabel` ends with " ET".

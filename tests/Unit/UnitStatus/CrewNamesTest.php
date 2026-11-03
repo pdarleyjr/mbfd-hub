@@ -43,36 +43,35 @@ final class CrewNamesTest extends TestCase
         self::assertSame($expected, RankAbbreviator::abbreviate($rank));
     }
 
-    /** @return array<string, array{0: ?string, 1: string, 2: string, 3: string}> */
+    /** @return array<string, array{0: ?string, 1: string, 2: string}> */
     public static function names(): array
     {
         return [
-            'comma' => ['Lieutenant', 'Benson, Mark', 'Benson, Mark', 'Lt. Benson'],
-            'suffix before the comma stays whole' => ['Firefighter DE', 'Yacum Jr, David (PARAMEDIC/ALS)', 'Yacum Jr, David', 'DE Yacum Jr'],
-            'no rank is surname only' => [null, 'Yacum Jr, David (PARAMEDIC/ALS)', 'Yacum Jr, David', 'Yacum Jr'],
-            'leading dot rank' => ['.Firefighter', 'Smith, Pat', 'Smith, Pat', 'FF Smith'],
-            'display casing is preferred' => ['Captain', 'BENSON, MARK', 'Benson, Mark', 'Capt. Benson'],
-            'raw casing kept when display differs' => ['Captain', 'BENSON, MARK', 'Mark Benson', 'Capt. BENSON'],
-            'no comma uses the last word' => ['Lieutenant', 'Mark Benson', 'Mark Benson', 'Lt. Benson'],
-            'no comma keeps Jr with the word before' => ['Firefighter DE', 'David Yacum Jr', 'David Yacum Jr', 'DE Yacum Jr'],
-            'no comma keeps Sr. with the word before' => [null, 'John Smith Sr.', 'John Smith Sr.', 'Smith Sr.'],
-            'no comma keeps III' => [null, 'Jo Smith III', 'Jo Smith III', 'Smith III'],
-            'single word' => ['Captain', 'Benson', 'Benson', 'Capt. Benson'],
-            'unknown rank as written' => ['Driver Engineer', 'Benson, Mark', 'Benson, Mark', 'Driver Engineer Benson'],
+            'comma' => ['Lieutenant', 'Benson, Mark', 'Lt. Benson'],
+            'suffix before the comma stays whole' => ['Firefighter DE', 'Yacum Jr, David', 'DE Yacum Jr'],
+            'no rank is surname only' => [null, 'Yacum Jr, David', 'Yacum Jr'],
+            'leading dot rank' => ['.Firefighter', 'Smith, Pat', 'FF Smith'],
+            'casing as written' => ['Captain', 'BENSON, MARK', 'Capt. BENSON'],
+            'no comma uses the last word' => ['Lieutenant', 'Mark Benson', 'Lt. Benson'],
+            'no comma keeps Jr with the word before' => ['Firefighter DE', 'David Yacum Jr', 'DE Yacum Jr'],
+            'no comma keeps Sr. with the word before' => [null, 'John Smith Sr.', 'Smith Sr.'],
+            'no comma keeps III' => [null, 'Jo Smith III', 'Smith III'],
+            'single word' => ['Captain', 'Benson', 'Capt. Benson'],
+            'unknown rank as written' => ['Driver Engineer', 'Benson, Mark', 'Driver Engineer Benson'],
         ];
     }
 
     #[DataProvider('names')]
-    public function test_short_names(?string $rank, string $raw, string $display, string $expected): void
+    public function test_short_names(?string $rank, string $display, string $expected): void
     {
-        self::assertSame($expected, ShortName::from($rank, $raw, $display));
+        self::assertSame($expected, ShortName::from($rank, $display));
     }
 
-    public function test_nothing_but_the_surname_comes_out_of_the_raw_name(): void
+    public function test_only_the_surname_comes_out(): void
     {
-        $short = ShortName::from('Firefighter', 'Yacum Jr, David Michael (PARAMEDIC/ALS/HAZMAT)', 'Yacum Jr, David');
+        $short = ShortName::from('Firefighter', 'Yacum Jr, David Michael');
 
-        foreach (['David', 'Michael', 'PARAMEDIC', 'HAZMAT', '(', ','] as $leak) {
+        foreach (['David', 'Michael', '(', ','] as $leak) {
             self::assertStringNotContainsString($leak, $short);
         }
     }

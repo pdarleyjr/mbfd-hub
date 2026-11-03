@@ -105,11 +105,11 @@ final class UnitStatusViewRenderTest extends TestCase
     {
         $html = $this->rows();
 
-        $this->assertSame(4, preg_match_all('/<section class="us-total"/', $html));
-        $this->assertMatchesRegularExpression('/Runs this shift<\/h2>\s*<p class="us-total__figure">9</', $html);
-        $this->assertMatchesRegularExpression('/Rescue<\/h2>\s*<p class="us-total__figure">5</', $html);
-        $this->assertMatchesRegularExpression('/Combat<\/h2>\s*<p class="us-total__figure">4</', $html);
-        $this->assertMatchesRegularExpression('/Busiest unit<\/h2>\s*<p class="us-total__figure us-total__figure--text">R2<\/p>\s*<p class="us-total__sub">4 runs</', $html);
+        $this->assertSame(4, preg_match_all('/<div class="us-total">/', $html));
+        $this->assertMatchesRegularExpression('/Runs this shift<\/p>\s*<p class="us-total__figure">9</', $html);
+        $this->assertMatchesRegularExpression('/Rescue<\/p>\s*<p class="us-total__figure">5</', $html);
+        $this->assertMatchesRegularExpression('/Combat<\/p>\s*<p class="us-total__figure">4</', $html);
+        $this->assertMatchesRegularExpression('/Busiest unit<\/p>\s*<p class="us-total__figure us-total__figure--text">R2<\/p>\s*<p class="us-total__sub">4 runs</', $html);
         $this->assertStringContainsString('Counts began Nov 2, 2026 at 8:00 AM and keep adding up from there.', $html);
     }
 
@@ -261,5 +261,50 @@ final class UnitStatusViewRenderTest extends TestCase
         $this->assertStringContainsString('data-board-url="'.url('/unit-status/board').'"', $html);
         $this->assertStringContainsString('data-us-dialog-close data-focus-key="close"', $html);
         $this->assertStringContainsString('data-etag="fixture-etag-1"', $html);
+    }
+
+    public function test_announcement_attributes_sit_on_the_row_button_the_script_reads(): void
+    {
+        $html = $this->rows();
+
+        preg_match_all('/<button\b[^>]*data-us-open="[^"]+"[^>]*>/s', $html, $buttons);
+        $this->assertCount(16, $buttons[0]);
+        foreach ($buttons[0] as $tag) {
+            $this->assertStringContainsString('data-unit-code="', $tag);
+            $this->assertStringContainsString('data-status="', $tag);
+            $this->assertStringContainsString('data-summary="', $tag);
+        }
+        // The list item carries none of them (the old selector read the wrong element).
+        $this->assertDoesNotMatchRegularExpression('/<li[^>]*data-unit-code/', $html);
+    }
+
+    public function test_heading_navigation_is_the_title_then_the_stations(): void
+    {
+        $page = view('unit-status.show', ['board' => UnitStatusBoardFixture::make()])->render();
+        $visible = preg_replace('/<template\b.*?<\/template>/s', '', $page) ?? '';
+        preg_match_all('/<h([1-6])\b[^>]*>(.*?)<\/h\1>/s', $visible, $headings);
+
+        $this->assertSame(['1', '2', '2', '2', '2', '2'], array_slice($headings[1], 0, 6));
+        $this->assertSame('Unit Status', trim($headings[2][0]));
+        $this->assertStringContainsString('Station 1', $headings[2][1]);
+        $this->assertStringContainsString('aria-label="Shift totals"', $page);
+    }
+
+    public function test_the_board_and_page_carry_the_same_build_marker(): void
+    {
+        $page = view('unit-status.show', ['board' => UnitStatusBoardFixture::make()])->render();
+
+        preg_match('/<main[^>]*data-build="([^"]*)"/s', $page, $main);
+        preg_match('/<div\s+class="us-board"[^>]*data-build="([^"]*)"/s', $page, $board);
+        $this->assertNotEmpty($main[1] ?? '');
+        $this->assertSame($main[1], $board[1] ?? null);
+    }
+
+    public function test_the_popup_reads_only_short_crew_strings(): void
+    {
+        $src = file_get_contents(resource_path('views/unit-status/partials/unit-profile.blade.php'));
+
+        $this->assertDoesNotMatchRegularExpression('/\$p\[.name.\]|\$later\[.name.\]/', (string) $src);
+        $this->assertStringContainsString('Lt. Benson, FF Miller', $this->popup('unit-e2'));
     }
 }
