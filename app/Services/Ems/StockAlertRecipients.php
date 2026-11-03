@@ -16,10 +16,15 @@ use Illuminate\Support\Facades\Log;
  */
 final class StockAlertRecipients
 {
-    /** @return Collection<int, StockAlertRecipient> */
+    /**
+     * The whole account is loaded, because the access check behind "will this person be alerted" reads more
+     * than the name; a partly loaded user answers no for a Captain 5 who can in fact read the supply room.
+     *
+     * @return Collection<int, StockAlertRecipient>
+     */
     public function all(): Collection
     {
-        return StockAlertRecipient::query()->with('user:id,name,account_status')->orderBy('id')->get();
+        return StockAlertRecipient::query()->with('user')->orderBy('id')->get();
     }
 
     /**
