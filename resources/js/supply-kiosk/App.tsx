@@ -328,7 +328,7 @@ export function App() {
         } catch (failure) {
             if (api.isRetryable(failure)) {
                 // No answer: keep trying from this screen until the Hub says put back, never arrived, or too late.
-                addPendingUndo(uuid, receipt.employeeName, Date.now());
+                addPendingUndo(uuid, Date.now());
                 setUndone('pending');
             } else {
                 setDoneError(api.plainMessage(failure));

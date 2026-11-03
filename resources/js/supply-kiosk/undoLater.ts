@@ -3,9 +3,9 @@
 // day without an answer, keeps the entry as "failed" so the ID screen can tell people to tell Captain 5.
 import { backoffMs, GIVE_UP_AFTER_MS, UNREACHABLE_MESSAGE } from './queue.ts';
 
+// Only the withdrawal's id and times: this list is plain localStorage, so it never holds a member's name or ID.
 export interface PendingUndo {
     uuid: string;
-    member_name: string;
     taken_at: number;
     attempts: number;
     next_try_at: number;
@@ -36,8 +36,8 @@ function save(entries: PendingUndo[]): void {
     }
 }
 
-export function addPendingUndo(uuid: string, memberName: string, takenAt: number): void {
-    const entry: PendingUndo = { uuid, member_name: memberName, taken_at: takenAt, attempts: 0, next_try_at: 0, failed: null };
+export function addPendingUndo(uuid: string, takenAt: number): void {
+    const entry: PendingUndo = { uuid, taken_at: takenAt, attempts: 0, next_try_at: 0, failed: null };
     save([...pendingUndos().filter(existing => existing.uuid !== uuid), entry]);
 }
 

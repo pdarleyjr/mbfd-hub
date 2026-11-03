@@ -29,7 +29,8 @@ export function withdrawalNotice(entry: QueuedWithdrawal): Notice {
 export function undoNotice(entry: PendingUndo): Notice {
     return {
         key: `u:${entry.uuid}`, kind: 'undo', uuid: entry.uuid,
-        text: `An undo from ${noticeTime(entry.taken_at)} by ${entry.member_name || 'a member'} could not be done: ${clause(entry.failed?.message ?? '')}. Tell Captain 5.`,
+        // No name: the undo list lives in plain browser storage, so it keeps nothing personal.
+        text: `An undo from ${noticeTime(entry.taken_at)} could not be done: ${clause(entry.failed?.message ?? '')}. Tell Captain 5.`,
     };
 }
 
