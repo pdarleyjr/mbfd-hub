@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Station;
 use App\Models\StationInventoryAudit;
 use App\Models\StationInventoryItem;
+use App\Models\StationRequestUpdate;
 use App\Models\StationSupplyRequest;
+use App\Services\AiAutomation\AiIntake;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Services\StationInventorySnapshotService;
 use Illuminate\Http\JsonResponse;
@@ -186,6 +188,12 @@ class StationInventoryV2Controller extends Controller
                     'request_text' => $req->request_text,
                     'status' => $req->status,
                     'public_response' => $req->public_response,
+                    // Additive: the assistant's receipt, separate from Support Services' own response above.
+                    'ai_response' => $req->ai_receipt_text === null ? null : [
+                        'sender' => StationRequestUpdate::AUTO_RECEIPT_SENDER,
+                        'text' => $req->ai_receipt_text,
+                        'at' => $req->ai_receipt_at?->toISOString(),
+                    ],
                     'created_by_name' => $req->created_by_name,
                     'created_by_shift' => $req->created_by_shift,
                     'created_at' => $req->created_at->toISOString(),
@@ -253,6 +261,9 @@ class StationInventoryV2Controller extends Controller
 
             return $supplyRequest;
         }, 3);
+
+        // After the commit; never throws and never slows or fails this save. A no-op while the AI switch is OFF.
+        AiIntake::record('station_supply_request', (int) $supplyRequest->id);
 
         return response()->json([
             'success' => true,

@@ -34,7 +34,7 @@ class StationContextController extends Controller
 
         $requestRelations = [
             'items:id,station_request_id,room_asset_id,item_name,category,quantity,reason,requested_action,condition',
-            'updates:id,station_request_id,status,public_note,created_at',
+            'updates:id,station_request_id,status,public_note,created_at,automation_intake_id',
         ];
         $room->load(['assets' => fn ($query) => $query->active()->orderBy('category')->orderBy('name')]);
         $openRequests = StationRequest::query()

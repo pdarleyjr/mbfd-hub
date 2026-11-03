@@ -217,7 +217,8 @@ class StationRequestResource extends Resource
                         ->schema([
                             Infolists\Components\TextEntry::make('created_at')->dateTime()->label('When'),
                             Infolists\Components\TextEntry::make('status')->badge(),
-                            Infolists\Components\TextEntry::make('changedBy.name')->label('Changed By')->placeholder('System'),
+                            Infolists\Components\TextEntry::make('changedBy.name')->label('Changed By')->placeholder('System')
+                                ->state(fn (\App\Models\StationRequestUpdate $record): ?string => $record->senderLabel() ?? $record->changedBy?->name),
                             Infolists\Components\TextEntry::make('public_note')->label('Public Note')->placeholder('—')->columnSpan(2),
                             Infolists\Components\TextEntry::make('internal_note')->label('Internal Note')->placeholder('—')->columnSpan(2),
                         ])->columns(4),

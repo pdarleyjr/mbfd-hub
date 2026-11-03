@@ -104,3 +104,25 @@ test('page-level back controls use browser history and never target the retired 
     assert.doesNotMatch(source, /navigate\('\/forms-hub'\)/);
   }
 });
+
+test('a repair request stores the category the member picked, not the item default', () => {
+  const wizard = read('resources/js/daily-checkout/src/components/forms/StationRequestWizard.tsx');
+
+  // The picker writes the form-level subjectType; the per-item category used to default to "appliance" and win.
+  assert.doesNotMatch(wizard, /category: type === 'repair_service' \? 'appliance'/);
+  assert.match(wizard, /category: requestType === 'repair_service' \? subjectType : \(item\.category \|\| subjectType\)/);
+});
+
+test('the station request views name the assistant receipt sender and keep it apart from staff acknowledgment', () => {
+  const detail = read('resources/js/daily-checkout/src/components/StationDetailPage.tsx');
+  const sheet = read('resources/js/daily-checkout/src/components/station/StationRequestSheet.tsx');
+  const types = read('resources/js/daily-checkout/src/types.ts');
+
+  assert.match(types, /ai_receipt\?: AiReceipt \| null/);
+  assert.match(detail, /req\.ai_receipt\.sender/);
+  assert.match(sheet, /request\.ai_receipt\.sender/);
+  for (const source of [detail, sheet]) {
+    assert.match(source, /update\.sender/);
+    assert.doesNotMatch(source, /ai_receipt[^;\n]*acknowledged_at/);
+  }
+});

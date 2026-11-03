@@ -8,6 +8,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
+use App\Services\AiAutomation\AiIntake;
 use App\Services\Captain5\Captain5IssueScope;
 use App\Services\Defects\DefectParticipants;
 use App\Services\Security\Captain5Access;
@@ -288,6 +289,13 @@ final class IssueMessageService
         }
         if ($notify) {
             $this->notifications->messagePosted($message, $data['kind'] ?? null, $inspection);
+        }
+        // A crew member's own new message on an issue thread gets the AI Response receipt (never a correction,
+        // never staff or Captain 5, never an internal note). Never throws and is a no-op while the switch is OFF.
+        if ($defect !== null && $original === null
+            && $authorContext === ApparatusIssueMessage::CONTEXT_MEMBER
+            && $visibility === ApparatusIssueMessage::VISIBILITY_MEMBER) {
+            AiIntake::record('apparatus_issue_message', (int) $message->getKey());
         }
 
         return $message;

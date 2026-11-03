@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $author_name
  * @property string $body
  * @property string $client_request_id
+ * @property int|null $ai_intake_event_id set only on assistant messages
  * @property \Illuminate\Support\Carbon|null $created_at
  */
 class EmployeeLogisticsMessage extends Model
@@ -27,6 +28,9 @@ class EmployeeLogisticsMessage extends Model
     public const SIDE_MEMBER = 'member';
 
     public const SIDE_LOGISTICS = 'logistics';
+
+    /** The AI Response assistant (docs/ai-response-automation.md): never a person on the team, never a staff user id. */
+    public const SIDE_ASSISTANT = 'assistant';
 
     protected $table = 'employee_logistics_messages';
 
@@ -50,5 +54,10 @@ class EmployeeLogisticsMessage extends Model
     public function isFromLogistics(): bool
     {
         return $this->author_side === self::SIDE_LOGISTICS;
+    }
+
+    public function isFromAssistant(): bool
+    {
+        return $this->author_side === self::SIDE_ASSISTANT;
     }
 }

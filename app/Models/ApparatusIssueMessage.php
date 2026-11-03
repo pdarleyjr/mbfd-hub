@@ -24,8 +24,20 @@ final class ApparatusIssueMessage extends Model
     /** Captain 5 EMS Operations Center (docs/captain5-ems-operations-center.md). */
     public const CONTEXT_CAPTAIN5 = 'captain5';
 
+    /**
+     * The AI Response assistant (docs/ai-response-automation.md): a receipt, never a staff reply. Written with
+     * no author user, and deliberately NOT in STAFF_CONTEXTS, so it is never a Logistics/Captain 5 response.
+     */
+    public const CONTEXT_ASSISTANT = 'assistant';
+
+    /** The one name the assistant is shown under, everywhere. */
+    public const ASSISTANT_LABEL = 'AI Response';
+
     /** Contexts that speak for the department (Logistics or Captain 5), not for a crew member. */
     public const STAFF_CONTEXTS = [self::CONTEXT_LOGISTICS, self::CONTEXT_CAPTAIN5];
+
+    /** Contexts that count as "somebody answered": the department, or the assistant's receipt. */
+    public const RESPONSE_CONTEXTS = [self::CONTEXT_LOGISTICS, self::CONTEXT_CAPTAIN5, self::CONTEXT_ASSISTANT];
 
     protected $guarded = ['id'];
 
@@ -59,6 +71,11 @@ final class ApparatusIssueMessage extends Model
     public function isFromStaff(): bool
     {
         return in_array($this->author_context, self::STAFF_CONTEXTS, true);
+    }
+
+    public function isFromAssistant(): bool
+    {
+        return $this->author_context === self::CONTEXT_ASSISTANT;
     }
 
     public function scopeMemberVisible(Builder $query): Builder

@@ -98,7 +98,9 @@ final class MemberInspectionConversation
         return $thread
             ->filter(static fn (ApparatusIssueMessage $message): bool => $message->visibility === ApparatusIssueMessage::VISIBILITY_MEMBER)
             ->map(function (ApparatusIssueMessage $message) use ($viewer): array {
-                $own = (int) $message->author_user_id === (int) $viewer->getKey();
+                $assistant = $message->isFromAssistant();
+                // The assistant has no author user, so it can never read as "You".
+                $own = ! $assistant && (int) $message->author_user_id === (int) $viewer->getKey();
                 // The audience label is the author's context when they wrote it, never their role today.
                 $fromLogistics = $message->isFromStaff();
 
@@ -108,7 +110,8 @@ final class MemberInspectionConversation
                     'own' => $own,
                     'from_logistics' => $fromLogistics,
                     'from_captain5' => $message->isFromCaptain5(),
-                    'author' => $own ? 'You' : ($message->isFromCaptain5() ? 'Captain 5' : ($fromLogistics ? 'Logistics' : 'Crew member')),
+                    'from_assistant' => $assistant,
+                    'author' => $assistant ? ApparatusIssueMessage::ASSISTANT_LABEL : ($own ? 'You' : ($message->isFromCaptain5() ? 'Captain 5' : ($fromLogistics ? 'Logistics' : 'Crew member'))),
                     'at' => CarbonImmutable::instance($message->created_at)->setTimezone(EmployeeInspectionHistoryService::TIMEZONE),
                 ];
             })

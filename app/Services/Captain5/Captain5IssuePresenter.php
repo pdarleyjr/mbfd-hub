@@ -244,6 +244,7 @@ final class Captain5IssuePresenter
         $name = $author instanceof User ? $this->name($author) : '';
 
         return match (true) {
+            $message->isFromAssistant() => ApparatusIssueMessage::ASSISTANT_LABEL,
             $message->isFromCaptain5() => $name !== '' ? 'Captain 5 · '.$name : 'Captain 5',
             $message->isFromLogistics() => $name !== '' ? 'Logistics · '.$name : 'Logistics',
             default => $name !== '' ? $name : 'Crew member',

@@ -78,6 +78,7 @@ final class ApplicationAccessRegistry
         $options['admin.email.view'] = 'Email — read the shared mailbox';
         $options['admin.email.send'] = 'Email — send and reply';
         $options['admin.email.manage'] = 'Email — trash and restore';
+        $options['admin.ai_automation.manage'] = 'AI Response automation — master switch, backlog, Knowledge Library and Playbooks';
         $options['admin.employee_messages.view'] = 'Support Services messages — view the inbox';
         $options['admin.employee_messages.reply'] = 'Support Services messages — view and reply';
         $options['admin.fleet.documents.sensitive'] = 'Fleet — access restricted vehicle documents';

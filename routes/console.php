@@ -269,3 +269,9 @@ Schedule::command('mbfd:nextcloud-access-sync')
     ->everyMinute()
     ->withoutOverlapping(10)
     ->onOneServer();
+
+// AI Response safety net: re-queues stalled automated replies. Does nothing while AI automations are OFF.
+Schedule::command('ai-automation:sweep')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();

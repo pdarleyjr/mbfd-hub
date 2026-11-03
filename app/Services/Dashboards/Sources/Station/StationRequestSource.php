@@ -110,7 +110,9 @@ final class StationRequestSource extends QueryBackedSource
     protected function prepareRows(Builder $query): void
     {
         $terminal = implode(',', array_map(fn (string $s): string => "'".$s."'", Status::terminalValues()));
-        $query->with('station:id,station_number,name')->withMax('updates', 'id')
+        // The newest staff/system row only: the assistant's receipt must never change the version an admin holds.
+        $query->with('station:id,station_number,name')
+            ->withMax(['updates as updates_max_id' => fn ($updates) => $updates->withoutAutoReceipts()], 'id')
             ->orderByRaw("CASE WHEN status IN ({$terminal}) THEN 1 ELSE 0 END")
             ->orderByRaw("CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
             ->orderByDesc('created_at')->orderByDesc('id');
@@ -159,7 +161,7 @@ final class StationRequestSource extends QueryBackedSource
         $status = Status::from($request->status);
         $timeline = $request->updates->map(fn (StationRequestUpdate $update): array => [
             'at' => CarbonImmutable::instance($update->created_at),
-            'actor' => $update->changedBy->name ?? 'System',
+            'actor' => $update->senderLabel() ?? $update->changedBy->name ?? 'System',
             'text' => collect([
                 'Status: '.(Status::tryFrom((string) $update->status)?->label() ?? (string) $update->status),
                 filled($update->public_note) ? 'Update to station: '.$update->public_note : null,
@@ -181,7 +183,7 @@ final class StationRequestSource extends QueryBackedSource
             filled($request->current_public_response) ? ['label' => 'Latest update to station', 'value' => (string) $request->current_public_response] : null,
         ]));
 
-        $issue = $this->toIssue($request->setAttribute('updates_max_id', $request->updates->max('id')), false);
+        $issue = $this->toIssue($request->setAttribute('updates_max_id', $request->updates->reject(fn (StationRequestUpdate $update): bool => $update->isAutoReceipt())->max('id')), false);
         $reason = match (true) {
             $request->isArchived() => 'This request is archived. Restore it from the full record to work on it.',
             ! $request->is_open => 'This request is '.strtolower($status->label()).'. Closed requests cannot be changed.',
@@ -206,7 +208,7 @@ final class StationRequestSource extends QueryBackedSource
             if (! $request instanceof StationRequest || $request->isArchived()) {
                 return ActionResult::gone('This request no longer exists or was archived.');
             }
-            $latest = StationRequestUpdate::query()->where('station_request_id', $request->getKey())->orderByDesc('id')->first();
+            $latest = StationRequestUpdate::query()->where('station_request_id', $request->getKey())->withoutAutoReceipts()->orderByDesc('id')->first();
             $data = $this->commandData($request, $action, $input);
 
             if (self::versionOf($request, (int) $latest?->getKey()) !== $expectedVersion) {

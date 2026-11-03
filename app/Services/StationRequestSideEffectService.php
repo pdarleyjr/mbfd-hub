@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\StationRequest;
 use App\Models\User;
 use App\Notifications\NewSubmissionNotification;
+use App\Services\AiAutomation\AiIntake;
 use App\Services\Display\DisplaySnapshotService;
 use App\Services\Notifications\NotificationDispatchService;
 use Illuminate\Support\Facades\Cache;
@@ -32,6 +33,10 @@ class StationRequestSideEffectService
             ),
             eventKey: $eventKey,
         );
+
+        // New rows only (this method is never called for an edit or a replayed submission). Records the intake for
+        // the AI Response receipt; it never throws, does nothing while the master switch is OFF, and runs after commit.
+        AiIntake::record('station_request', (int) $request->id);
     }
 
     public function requestChanged(StationRequest $request): void

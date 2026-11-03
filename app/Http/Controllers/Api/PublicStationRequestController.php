@@ -51,7 +51,7 @@ class PublicStationRequestController extends Controller
             ->with([
                 'room:id,station_id,name',
                 'items:id,station_request_id,room_asset_id,item_name,category,quantity,reason,requested_action,condition',
-                'updates' => fn ($query) => $query->select('id', 'station_request_id', 'status', 'public_note', 'created_at')
+                'updates' => fn ($query) => $query->select('id', 'station_request_id', 'status', 'public_note', 'created_at', 'automation_intake_id')
                     ->where(fn ($nested) => $nested->whereNotNull('public_note')->orWhereNotNull('status')),
             ])
             ->when(($validated['scope'] ?? 'open') === 'open', fn ($query) => $query->open())
@@ -69,12 +69,25 @@ class PublicStationRequestController extends Controller
         return PublicStationRequestResource::collection($records)->response();
     }
 
-    public function show(StationRequest $stationRequest): PublicStationRequestResource
+    /**
+     * One request by id. The station Requests tab reads the station-wide list above; nothing in the app calls this
+     * by-id read, so it is limited to the member who submitted the request and to staff who view station requests.
+     * Anyone else gets the same 404 as a request that does not exist, so ids cannot be probed.
+     */
+    public function show(Request $request, StationRequest $stationRequest): PublicStationRequestResource
     {
+        $user = $request->user();
+        abort_unless(
+            $user !== null
+                && ($stationRequest->actor_user_id !== null && (int) $stationRequest->actor_user_id === (int) $user->getKey()
+                    || $user->can('admin.stations.view', 'web')),
+            404,
+        );
+
         $stationRequest->load([
             'room:id,station_id,name',
             'items:id,station_request_id,room_asset_id,item_name,category,quantity,reason,requested_action,condition',
-            'updates' => fn ($query) => $query->select('id', 'station_request_id', 'status', 'public_note', 'created_at'),
+            'updates' => fn ($query) => $query->select('id', 'station_request_id', 'status', 'public_note', 'created_at', 'automation_intake_id'),
         ]);
 
         return new PublicStationRequestResource($stationRequest);

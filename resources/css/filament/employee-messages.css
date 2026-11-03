@@ -445,6 +445,25 @@
     color: rgb(var(--hub2-action));
 }
 
+/* AI Response: a third voice. Always on the received side, dashed edge so it never reads as a team reply. */
+.emsg-bubble--assistant {
+    align-self: flex-start;
+    background: transparent;
+    border-style: dashed;
+    border-color: rgb(var(--hub2-n-500) / .7);
+    border-radius: 14px 14px 14px 4px;
+}
+
+.emsg-bubble--assistant .emsg-bubble__side {
+    color: rgb(var(--hub2-n-600));
+    font-weight: 600;
+    letter-spacing: .01em;
+}
+
+.emsg-bubble--assistant .emsg-bubble__body {
+    color: rgb(var(--hub2-n-800));
+}
+
 .emsg-bubble__body {
     margin: 0;
     font-size: 14px;
@@ -638,6 +657,7 @@
 .dark .emsg-thread-scroll { background: rgb(var(--hub2-n-900)); }
 .dark .emsg-bubble { background: rgb(var(--hub2-n-800)); border-color: rgb(var(--hub2-n-500)); }
 .dark .emsg-bubble--mine { background: rgb(var(--hub2-action) / .35); }
+.dark .emsg-bubble--assistant { background: transparent; }
 .dark .emsg-input,
 .dark .emsg-textarea,
 .dark .emsg-search { background: rgb(var(--hub2-n-900)); border-color: rgb(var(--hub2-n-500)); }

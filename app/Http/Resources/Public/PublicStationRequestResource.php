@@ -57,7 +57,21 @@ class PublicStationRequestResource extends JsonResource
                 'status' => $update->status,
                 'public_note' => $update->public_note,
                 'created_at' => $update->created_at,
+                // Additive. 'AI Response' for the assistant's receipt, null for every staff/system row.
+                'sender' => $update->senderLabel(),
+                'is_auto_receipt' => $update->isAutoReceipt(),
             ])->all()),
+            // Additive "received by the assistant" indication. Not a human acknowledgment: acknowledged_at above
+            // is only ever set by staff.
+            'ai_receipt' => $this->whenLoaded('updates', function () use ($stationRequest): ?array {
+                /** @var StationRequestUpdate|null $receipt */
+                $receipt = $stationRequest->updates->first(fn (StationRequestUpdate $update): bool => $update->isAutoReceipt());
+
+                return $receipt === null ? null : [
+                    'sender' => StationRequestUpdate::AUTO_RECEIPT_SENDER,
+                    'at' => $receipt->created_at,
+                ];
+            }),
         ];
     }
 }

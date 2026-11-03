@@ -11,6 +11,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusInspectionReviewEvent;
+use App\Services\AiAutomation\AiIntake;
 use App\Services\Captain5\Captain5Notifier;
 use App\Services\Defects\DefectContinuityService;
 use App\Services\Defects\FindingsResult;
@@ -92,6 +93,8 @@ final class ApparatusInspectionProcessingService
             if (filled($apparatus->snipeit_asset_id)) {
                 AuditEquipmentAfterInspection::dispatch((int) $inspection->id, (int) $apparatus->id)->delay(now()->addSeconds(5));
             }
+            // AI Response receipt (docs/ai-response-automation.md): never throws, does nothing while the switch is OFF.
+            AiIntake::record('apparatus_inspection', (int) $inspection->id);
         });
     }
 

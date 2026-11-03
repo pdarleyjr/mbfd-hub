@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $last_message_at
  * @property int|null $last_member_message_id
  * @property int|null $last_logistics_message_id
+ * @property int|null $last_assistant_message_id newest AI Response message; never counts as a team reply
  * @property int|null $member_read_message_id
  * @property int|null $logistics_read_message_id
  * @property int|null $logistics_read_by_user_id
@@ -51,6 +52,7 @@ class EmployeeLogisticsThread extends Model
         'last_message_at' => 'datetime',
         'last_member_message_id' => 'integer',
         'last_logistics_message_id' => 'integer',
+        'last_assistant_message_id' => 'integer',
         'member_read_message_id' => 'integer',
         'logistics_read_message_id' => 'integer',
         'logistics_read_by_user_id' => 'integer',
@@ -73,11 +75,15 @@ class EmployeeLogisticsThread extends Model
         return $this->hasMany(EmployeeLogisticsMessage::class, 'thread_id');
     }
 
-    /** Logistics has replied since the member last opened this conversation. */
+    /**
+     * Logistics, or the AI Response assistant, has written since the member last opened this conversation.
+     * (The staff-side markers never look at the assistant: it is not a team reply.)
+     */
     public function isUnreadForMember(): bool
     {
-        return $this->last_logistics_message_id !== null
-            && $this->last_logistics_message_id > (int) $this->member_read_message_id;
+        $newest = max((int) $this->last_logistics_message_id, (int) $this->last_assistant_message_id);
+
+        return $newest > 0 && $newest > (int) $this->member_read_message_id;
     }
 
     /** The member has written since anyone on the Logistics team last opened or answered it. */
@@ -121,9 +127,10 @@ class EmployeeLogisticsThread extends Model
     /** @param Builder<self> $query */
     public function scopeUnreadForMember(Builder $query): void
     {
-        $query->whereNotNull('last_logistics_message_id')
+        $query->where(fn (Builder $q) => $q->whereNotNull('last_logistics_message_id')->orWhereNotNull('last_assistant_message_id'))
             ->where(fn (Builder $q) => $q->whereNull('member_read_message_id')
-                ->orWhereColumn('last_logistics_message_id', '>', 'member_read_message_id'));
+                ->orWhereColumn('last_logistics_message_id', '>', 'member_read_message_id')
+                ->orWhereColumn('last_assistant_message_id', '>', 'member_read_message_id'));
     }
 
     /** @param Builder<self> $query */

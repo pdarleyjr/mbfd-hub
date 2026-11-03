@@ -60,7 +60,9 @@ final class DailyCheckoutNotesFeed
         $query = DB::table('apparatus_issue_messages as m')
             ->leftJoin('apparatus_defects as d', 'd.id', '=', 'm.apparatus_defect_id')
             ->leftJoin('apparatus_inspections as i', 'i.id', '=', DB::raw('COALESCE(m.apparatus_inspection_id, d.first_reported_inspection_id, d.apparatus_inspection_id, d.last_observed_inspection_id)'))
-            ->leftJoin('users as u', 'u.id', '=', 'm.author_user_id');
+            ->leftJoin('users as u', 'u.id', '=', 'm.author_user_id')
+            // The AI Response receipt is not a note anyone has to act on; it stays on the inspection's own thread.
+            ->where('m.author_context', '<>', ApparatusIssueMessage::CONTEXT_ASSISTANT);
         self::scopeOpenOrRecent($query, 'm.created_at', $since, withIssue: true);
 
         return $query->select([
