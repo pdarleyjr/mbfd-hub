@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <x-hub.head />
-    <title>Daily Roster · MBFD Hub</title>
+    {{-- With the day strip, each day is its own page load, so its title names the day for screen readers. --}}
+    <title>Daily Roster{{ $roster['days'] !== [] ? ' · '.$roster['displayedDateLabel'] : '' }} · MBFD Hub</title>
     @vite(['resources/css/app.css', 'resources/css/daily-roster.css', 'resources/js/daily-roster.js'])
 </head>
 <body data-hub-ui="2" class="hub-page min-h-screen bg-hub-canvas text-hub-ink antialiased">

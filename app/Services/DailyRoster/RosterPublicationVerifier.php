@@ -124,7 +124,12 @@ final class RosterPublicationVerifier
 
     private function newerExportWon(RosterImport $import, string $dutyDate): bool
     {
-        $effective = RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->first()?->effective_generated_at;
+        $pointer = RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->first();
+        // The 5-minute export takes a date back from the outlook whatever its export time.
+        if ($import->source === RosterOutlook::SOURCE && $pointer !== null && $pointer->source === null) {
+            return true;
+        }
+        $effective = $pointer?->effective_generated_at;
 
         return $effective !== null && $import->source_generated_at !== null
             && $effective->greaterThanOrEqualTo($import->source_generated_at);

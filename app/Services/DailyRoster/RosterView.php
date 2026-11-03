@@ -16,5 +16,7 @@ final readonly class RosterView
         public ?CarbonImmutable $asOf,
         public ?CarbonImmutable $updatedAt = null,
         public ?CarbonImmutable $changedAt = null,
+        // From TeleStaff's 7-day outlook, not yet replaced by the 5-minute export.
+        public bool $isOutlook = false,
     ) {}
 }

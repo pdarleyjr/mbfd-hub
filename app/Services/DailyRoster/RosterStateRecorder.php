@@ -184,6 +184,8 @@ final class RosterStateRecorder
         $older = RosterImport::query()
             ->where('state', RosterImport::STATE_PERMANENT_FAILED)
             ->where('error_code', $newest->error_code)
+            // Each feed's failures are its own: an outlook failure never closes one in the 5-minute export.
+            ->where(static fn ($source) => $newest->source === null ? $source->whereNull('source') : $source->where('source', $newest->source))
             ->where('received_at', '<', $newest->received_at)
             ->whereKeyNot($newest->getKey())
             ->orderBy('id')

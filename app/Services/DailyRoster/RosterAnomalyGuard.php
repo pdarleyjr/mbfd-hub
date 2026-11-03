@@ -99,7 +99,7 @@ final class RosterAnomalyGuard
     /** @return list<string> */
     private function relativeReasons(RosterImport $import, TeleStaffRosterReport $report): array
     {
-        $baseline = $this->baseline($report->dutyDate, (int) $import->getKey());
+        $baseline = $this->baseline($report->dutyDate, (int) $import->getKey(), $import->source === null);
         if ($baseline->isEmpty()) {
             return [];
         }
@@ -141,14 +141,15 @@ final class RosterAnomalyGuard
     /**
      * Published snapshots to compare with, newest first: the pointer of each duty date up to this one,
      * or the nearest later dates when this export is older than everything published. Stored but never
-     * shown versions do not count, so a bad export cannot become the yardstick.
+     * shown versions do not count, so a bad export cannot become the yardstick. The 5-minute export compares
+     * only with its own rosters, so the outlook can never hold it.
      *
      * @return Collection<int, RosterSnapshot>
      */
-    private function baseline(string $dutyDate, int $importId): Collection
+    private function baseline(string $dutyDate, int $importId, bool $liveOnly): Collection
     {
         $window = max(1, (int) config('daily_roster.publication.median_window', 6));
-        $pointers = RosterActiveVersion::query()->whereNotNull('roster_snapshot_id')->limit($window);
+        $pointers = RosterActiveVersion::query()->whereNotNull('roster_snapshot_id')->when($liveOnly, static fn ($live) => $live->whereNull('source'))->limit($window);
 
         $snapshotIds = (clone $pointers)->whereDate('duty_date', '<=', $dutyDate)->orderByDesc('duty_date')->pluck('roster_snapshot_id');
         if ($snapshotIds->isEmpty()) {
