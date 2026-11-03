@@ -14,6 +14,12 @@ use LogicException;
 
 final class SessionRegistry
 {
+    /** A member signed out. */
+    public const MEMBER_SIGNED_OUT = 'logout';
+
+    /** A request arrived on a session that is no longer current: run out, revoked, or no longer matching. */
+    public const NO_LONGER_CURRENT = 'canonical session no longer current';
+
     public function register(
         User $user,
         string $laravelSessionId,
