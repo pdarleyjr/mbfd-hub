@@ -26,7 +26,7 @@ use App\Services\Notifications\NotificationCategoryRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use NotificationChannels\WebPush\WebPushChannel;
 use Spatie\Permission\Models\Role;
@@ -471,7 +471,7 @@ final class RosterMoveAlertsTest extends TestCase
         Notification::assertSentToTimes($admin, CriticalAlertNotification::class, 1);
 
         // A failed send clears its own marker (RosterAlerts), and then the next check sends it.
-        Cache::forget('daily_roster_alert:move_alerts_held:'.self::TODAY);
+        DB::table('roster_alert_deliveries')->where('alert_key', 'daily_roster_alert:move_alerts_held:'.self::TODAY)->delete();
         $this->detect();
         Notification::assertSentToTimes($admin, CriticalAlertNotification::class, 2);
     }
