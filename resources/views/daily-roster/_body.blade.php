@@ -1,7 +1,12 @@
 {{-- The part of the page that resources/js/daily-roster.js replaces when the roster version changes. --}}
 <div data-roster-body data-version="{{ $roster['version'] }}" data-etag="{{ $roster['etag'] }}" data-state="{{ $roster['state'] }}" data-snapshot="{{ $roster['snapshotId'] }}" data-live="{{ $roster['isLive'] ? '1' : '0' }}">
-    {{-- The owner wants the roster as high on the page as it can go: above it only the last update, and a warning when one applies. --}}
+    {{-- The owner wants the roster as high on the page as it can go: above it only the day strip (outlook on), the last update, and a warning when one applies. --}}
     <h1 class="sr-only">Daily Roster</h1>
+    {{-- With the 7-day outlook on, the owner wants the day strip at the top and the bottom of the roster. --}}
+    @if($roster['days'] !== [])
+        @include('daily-roster._days', ['days' => $roster['days'], 'label' => 'Roster days'])
+    @endif
+
     @if($roster['facts'] !== null)
         <p class="roster-last-updated">Last updated <strong data-roster-fact="updated">{{ $roster['facts']['updated'] }}</strong></p>
     @endif
@@ -9,6 +14,10 @@
 
     @if($roster['notice'] !== null)
         <p class="hub-callout hub-callout--warning roster-notice" data-roster-notice>{{ $roster['notice'] }}</p>
+    @endif
+
+    @if($roster['outlookNote'] !== null)
+        <p class="hub-callout roster-notice" data-roster-outlook><strong>Outlook.</strong> {{ $roster['outlookNote'] }}</p>
     @endif
 
     @if($roster['nextShiftNote'] !== null)
@@ -43,6 +52,10 @@
     @endif
 
     <footer class="roster-footer">
+        @if($roster['days'] !== [])
+            @include('daily-roster._days', ['days' => $roster['days'], 'label' => 'Roster days, end of roster'])
+        @endif
+
         @if(! $roster['isEmpty'] && ($roster['previousDate'] !== null || $roster['nextDate'] !== null))
             <nav class="roster-dates" aria-label="Roster dates">
                 @if($roster['previousDate'] !== null)

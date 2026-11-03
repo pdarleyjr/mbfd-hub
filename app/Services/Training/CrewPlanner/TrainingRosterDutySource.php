@@ -50,7 +50,7 @@ final class TrainingRosterDutySource
             return new TrainingRosterDuty($dutyDate, null, null, $scheduled, $scheduled !== null, null, [], $this->unavailableReason($dutyDate), null);
         }
 
-        return $this->duty($view->snapshot, $view->sections, $scheduled, $view->asOf ?? $view->snapshot->source_generated_at);
+        return $this->duty($view->snapshot, $view->sections, $scheduled, $view->asOf ?? $view->snapshot->source_generated_at, $view->isOutlook);
     }
 
     /** One stored version, to compare a plan's earlier roster against the one showing now. */
@@ -66,7 +66,7 @@ final class TrainingRosterDutySource
     }
 
     /** @param list<RosterSectionView> $sections */
-    private function duty(RosterSnapshot $snapshot, array $sections, ?string $scheduled, ?CarbonImmutable $asOf): TrainingRosterDuty
+    private function duty(RosterSnapshot $snapshot, array $sections, ?string $scheduled, ?CarbonImmutable $asOf, bool $isOutlook = false): TrainingRosterDuty
     {
         // Mirrors the 300 card: a roster that disagrees with the rotation cannot be trusted to say who is on.
         $mismatch = $scheduled !== null && $scheduled !== $snapshot->shift_letter;
@@ -83,6 +83,7 @@ final class TrainingRosterDutySource
         return new TrainingRosterDuty(
             $snapshot->duty_date->format('Y-m-d'), (int) $snapshot->getKey(), (int) $snapshot->version, $snapshot->shift_letter, false, $asOf, $staff, null,
             $mismatch ? 'This roster\'s shift does not match the department calendar, so nobody is treated as confirmed on duty. Check the daily roster.' : null,
+            $isOutlook,
         );
     }
 

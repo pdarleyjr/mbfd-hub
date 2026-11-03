@@ -76,6 +76,9 @@
     @if($roster['notice'] !== null)
         <p class="notice">{{ $roster['notice'] }}</p>
     @endif
+    @if(($roster['outlookNote'] ?? null) !== null)
+        <p class="notice">Outlook. {{ $roster['outlookNote'] }}</p>
+    @endif
 
     <table class="facts">
         <tr>

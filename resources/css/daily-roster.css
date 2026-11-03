@@ -155,6 +155,42 @@
 
 [data-hub-ui="2"] .roster-dates__next { margin-left: auto; }
 
+/* Day strip: the day TeleStaff is sending and the outlook's next six. Wraps on a narrow phone, so every day stays in sight. */
+
+[data-hub-ui="2"] .roster-days { min-width: 0; margin: 0 0 8px; }
+[data-hub-ui="2"] .roster-footer .roster-days { margin-bottom: 0; }
+[data-hub-ui="2"] .roster-days__list { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 2px; list-style: none; }
+
+[data-hub-ui="2"] .roster-days__day {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 56px;
+    min-height: 44px;
+    padding: 0 10px;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-well));
+    color: rgb(var(--hub2-n-900));
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+[data-hub-ui="2"] .roster-days__day:focus-visible { outline: 2px solid rgb(var(--hub2-focus)); outline-offset: 2px; }
+
+/* Selected is bold, outlined and underlined, not colour alone. */
+[data-hub-ui="2"] .roster-days__day[aria-current="date"] {
+    border: 2px solid rgb(var(--hub2-action));
+    background: rgb(var(--hub2-action-tint));
+    font-weight: 800;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+[data-hub-ui="2"] .roster-days__day--missing { border-style: dashed; background: none; color: rgb(var(--hub2-n-600)); font-weight: 500; }
+
 /* Legend */
 
 [data-hub-ui="2"] .roster-legend { margin-bottom: 12px; }
@@ -507,6 +543,7 @@
 /* Browser print: the shell hides itself in hub-shell.css; the controls go too. */
 @media print {
     [data-hub-ui="2"] .roster-dates,
+    [data-hub-ui="2"] .roster-days,
     [data-hub-ui="2"] .roster-footer__actions button,
     [data-hub-ui="2"] .roster-footer__actions a,
     [data-hub-ui="2"] .roster-connection { display: none !important; }
