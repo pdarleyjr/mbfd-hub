@@ -49,7 +49,9 @@ export default defineConfig({
   testDir: './tests/e2e',
   testMatch: /narcotics-check\.spec\.ts/,
   globalSetup: './tests/e2e/narcotics-check.setup.ts',
-  timeout: 120_000,
+  timeout: 180_000,
+  // `artisan serve` answers one request at a time and re-encodes every photo, so a first render or a send can pass 5 s.
+  expect: { timeout: 15_000 },
   retries: 0,
   workers: 1,
   outputDir: 'test-results/narcotics-check',

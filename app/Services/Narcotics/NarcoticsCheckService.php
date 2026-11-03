@@ -7,6 +7,7 @@ namespace App\Services\Narcotics;
 use App\Models\Employee;
 use App\Models\Narcotics\NarcoticsCheck;
 use App\Models\Narcotics\NarcoticsCheckEvent;
+use App\Models\Narcotics\NarcoticsCheckPhoto;
 use App\Models\User;
 use App\Services\Ems\EmsActor;
 use App\Services\Ems\EmsException;
@@ -41,12 +42,28 @@ final class NarcoticsCheckService
 
     // ------------------------------------------------------------------ member
 
+    /** The most photos one check may carry (config narcotics_checks.max_photos, at least 1). */
+    public static function maxPhotos(): int
+    {
+        return max(1, (int) config('narcotics_checks.max_photos', 10));
+    }
+
     /**
+     * @param  list<UploadedFile>  $photos  in the order the member added them; the first is photo 1 (on the check row)
      * @param  array<string, mixed>  $input  {client_submission_id, rescue_unit, rescue_unit_other?, seal_number, note?, resubmission_of?}
      * @return array{check: NarcoticsCheck, replayed: bool}
      */
-    public function submit(User $user, Employee $employee, UploadedFile $photo, array $input): array
+    public function submit(User $user, Employee $employee, array $photos, array $input): array
     {
+        $max = self::maxPhotos();
+        if ($photos === []) {
+            throw new EmsException('Choose or take a photo first.', 'photo_missing', 422, ['photo' => ['Choose or take a photo first.']]);
+        }
+        if (count($photos) > $max) {
+            $message = "A narcotics check can have at most {$max} photos. Remove some and send again.";
+
+            throw new EmsException($message, 'photo_too_many', 422, ['photo' => [$message]]);
+        }
         $note = config('narcotics_checks.note_max_length');
         // The unit is required on every new submission and checked against the server's list, never the browser's.
         // The seal number is required too: free text, trimmed, one line.
@@ -71,11 +88,40 @@ final class NarcoticsCheckService
         $previous = $this->resubmissionTarget($user, $data['resubmission_of'] ?? null);
         $this->guardPendingCap($user);
 
-        $processed = $this->images->process((string) $photo->getRealPath());
-        $stored = $this->store->put($processed);
+        // One photo at a time: processed, stored, then only its facts are kept, so ten photos never sit in
+        // memory together. A refused or unstorable photo removes the ones already stored: nothing is sent.
+        // Ten originals the browser could not shrink take a while to re-encode; a worker cut off midway would
+        // leave files with no row, so the request gets time for every photo. Only ever raised: an unlimited
+        // process (0: the CLI, a queue worker, a test runner) is left unlimited.
+        $this->allowTimeFor(count($photos));
+        $several = count($photos) > 1;
+        $kept = [];
+        $all = [];
+        foreach ($photos as $index => $photo) {
+            try {
+                $one = $this->images->process((string) $photo->getRealPath());
+                $kept[] = $this->store->put($one);
+                $all[] = ['mime' => $one->mime, 'width' => $one->width, 'height' => $one->height, 'bytes' => $one->bytes(), 'sha256' => $one->sha256()];
+                unset($one);
+            } catch (EmsException $refused) {
+                $this->store->discardAll($kept);
+                if (! $several) {
+                    throw $refused;
+                }
+                $message = 'Photo '.($index + 1).': '.$refused->getMessage();
+
+                throw new EmsException($message, $refused->errorCode, $refused->status, ['photo' => [$message]]);
+            } catch (Throwable $exception) {
+                $this->store->discardAll($kept);
+
+                throw $exception;
+            }
+        }
+        $processed = $all[0];
+        $stored = $kept[0];
 
         try {
-            $check = DB::transaction(function () use ($user, $employee, $data, $unit, $clientId, $previous, $processed, $stored): NarcoticsCheck {
+            $check = DB::transaction(function () use ($user, $employee, $data, $unit, $clientId, $previous, $processed, $stored, $all, $kept): NarcoticsCheck {
                 $actor = EmsActor::member($user);
                 $check = NarcoticsCheck::query()->create([
                     'uuid' => (string) Str::uuid(),
@@ -95,17 +141,34 @@ final class NarcoticsCheckService
                     'image_path' => $stored['image_path'],
                     'preview_path' => $stored['preview_path'],
                     'thumb_path' => $stored['thumb_path'],
-                    'image_mime' => $processed->mime,
-                    'image_width' => $processed->width,
-                    'image_height' => $processed->height,
-                    'image_bytes' => $processed->bytes(),
-                    'image_sha256' => $processed->sha256(),
+                    'image_mime' => $processed['mime'],
+                    'image_width' => $processed['width'],
+                    'image_height' => $processed['height'],
+                    'image_bytes' => $processed['bytes'],
+                    'image_sha256' => $processed['sha256'],
                 ]);
+                foreach (array_slice($all, 1, null, true) as $index => $extra) {
+                    NarcoticsCheckPhoto::query()->create([
+                        'narcotics_check_id' => $check->getKey(),
+                        'position' => $index + 1,
+                        'image_disk' => $kept[$index]['disk'],
+                        'image_path' => $kept[$index]['image_path'],
+                        'preview_path' => $kept[$index]['preview_path'],
+                        'thumb_path' => $kept[$index]['thumb_path'],
+                        'image_mime' => $extra['mime'],
+                        'image_width' => $extra['width'],
+                        'image_height' => $extra['height'],
+                        'image_bytes' => $extra['bytes'],
+                        'image_sha256' => $extra['sha256'],
+                    ]);
+                }
                 $this->event($check, $actor, NarcoticsCheckEvent::SUBMITTED, null, NarcoticsCheck::PENDING, [
                     'resubmission_of' => $previous?->uuid,
                     'rescue_unit' => ['choice' => $check->rescue_unit, 'other' => $check->rescue_unit_other, 'label' => $check->rescueUnitLabel()],
                     'seal_number' => $check->seal_number,
-                    'image' => ['mime' => $processed->mime, 'width' => $processed->width, 'height' => $processed->height, 'bytes' => $processed->bytes(), 'sha256' => $processed->sha256()],
+                    'image' => $processed,
+                    'photo_count' => count($all),
+                    'photos' => $all,
                 ]);
                 $this->notifier->checkSubmitted($check);
 
@@ -113,7 +176,7 @@ final class NarcoticsCheckService
             });
         } catch (UniqueConstraintViolationException) {
             // A double tap or a retry raced us: the first request won. Keep its row, drop our files.
-            $this->store->discard($stored);
+            $this->store->discardAll($kept);
             $winner = NarcoticsCheck::query()->where('client_submission_id', $clientId)->first();
             if ($winner !== null) {
                 return $this->replay($winner, $user);
@@ -121,7 +184,7 @@ final class NarcoticsCheckService
 
             throw EmsException::conflict('That rejected check was already sent again.', 'already_resubmitted');
         } catch (Throwable $exception) {
-            $this->store->discard($stored);
+            $this->store->discardAll($kept);
 
             throw $exception;
         }
@@ -306,6 +369,15 @@ final class NarcoticsCheckService
             'payload' => $payload === [] ? null : $payload,
             'created_at' => now(),
         ]);
+    }
+
+    private function allowTimeFor(int $photos): void
+    {
+        $current = (int) ini_get('max_execution_time');
+        $needed = 60 + 20 * $photos;
+        if ($current > 0 && $current < $needed && function_exists('set_time_limit')) {
+            @set_time_limit($needed);
+        }
     }
 
     private function clean(mixed $text): ?string

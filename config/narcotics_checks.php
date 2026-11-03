@@ -31,6 +31,10 @@ return [
         'jpeg_quality' => 88,
     ],
 
+    // Photos one check may carry. Each is sent and stored like the first (resized in the browser, re-encoded
+    // here); at ~1-3 MB each, the most a member sends in one request stays far under the 100 MB PHP limit.
+    'max_photos' => max(1, (int) env('NARCOTICS_CHECK_MAX_PHOTOS', 10)),
+
     'note_max_length' => 500,
     'rejection_note_max_length' => 500,
 

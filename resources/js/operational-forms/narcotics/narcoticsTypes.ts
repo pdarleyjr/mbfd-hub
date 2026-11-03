@@ -30,6 +30,8 @@ export interface NarcoticsFormDefinition {
     seal_number_max_length?: number;
     accepted_mime_types: string[];
     max_upload_bytes: number;
+    /** Photos one check may carry. Optional so an older answer still opens the form (one photo). */
+    max_photos?: number;
     max_edge: number;
     min_edge: number;
 }
@@ -43,6 +45,11 @@ export interface CheckImage {
     height: number;
     bytes: number;
     mime: string;
+}
+
+/** One photo of a check; position 1 is the first. */
+export interface CheckPhoto extends CheckImage {
+    position: number;
 }
 
 export interface CheckHistoryEntry {
@@ -79,7 +86,11 @@ export interface NarcoticsCheckSummary {
     resubmission_of: string | null;
     resubmitted_as: string | null;
     can_resubmit: boolean;
+    /** Photo 1. */
     image: CheckImage;
+    /** Every photo, photo 1 first. Optional so an older answer still shows photo 1. */
+    photo_count?: number;
+    photos?: CheckPhoto[];
 }
 
 export interface NarcoticsCheckDetail extends NarcoticsCheckSummary {
@@ -98,7 +109,8 @@ export interface PreparedPhoto {
 }
 
 export interface SendInput {
-    photo: PreparedPhoto;
+    /** In the order the member added them; the first is photo 1. */
+    photos: PreparedPhoto[];
     /** The option chosen, and the typed text only when that option is Other. */
     rescueUnit: string;
     rescueUnitOther: string | null;
