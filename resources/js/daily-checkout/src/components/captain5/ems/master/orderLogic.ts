@@ -4,6 +4,7 @@
  * Everything returns new values; nothing here changes its arguments.
  */
 import { formatQty, unitWord } from './logic.ts';
+import { isStockLevel, itemLines, levelFor } from './stockLevel.ts';
 import type { CountUnit, MasterItem, OpenOrderStatus, OrderState, OrderSummary, UnitOption } from './types.ts';
 
 /** The count units in the server's order, used when an older server sends no `units` list. */
@@ -71,8 +72,23 @@ export function normalizeItem(raw: MasterItem): MasterItem {
     expected,
     to_order: toOrder,
     open_order: openOrder,
+    ...levelFields(raw, expected),
   };
   return { ...base, order_state: STATES.includes(raw.order_state) ? raw.order_state : computeState(base) };
+}
+
+type LevelFields = Pick<MasterItem, 'level' | 'reorder_at' | 'critical_at' | 'reorder_at_auto' | 'critical_at_auto'>;
+
+/** The stock level fields as the server sent them; an older answer without them gets the presets and a worked-out level. */
+function levelFields(raw: MasterItem, expected: number | null): LevelFields {
+  const lines = itemLines({ expected, reorder_at: raw.reorder_at, critical_at: raw.critical_at });
+  return {
+    reorder_at: lines?.reorder ?? null,
+    critical_at: lines?.critical ?? null,
+    reorder_at_auto: typeof raw.reorder_at_auto === 'boolean' ? raw.reorder_at_auto : true,
+    critical_at_auto: typeof raw.critical_at_auto === 'boolean' ? raw.critical_at_auto : true,
+    level: raw.level === null || isStockLevel(raw.level) ? raw.level : levelFor(raw.on_hand, lines),
+  };
 }
 
 export function summarize(items: readonly Pick<MasterItem, 'order_state'>[]): OrderSummary {

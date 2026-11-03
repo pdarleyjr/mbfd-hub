@@ -105,6 +105,12 @@ Schedule::command('fleet:prune-take-home-uploads')
     ->withoutOverlapping()
     ->onOneServer();
 
+// EMS low-stock alerts: a safety net behind the check that follows every stock change.
+Schedule::command('ems:stock-alerts')
+    ->everyTenMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // EMS idempotency keys older than 30 days (a retry window, not history).
 Schedule::command('ems:prune-idempotency')
     ->dailyAt('03:50')

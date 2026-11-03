@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Ems;
 
+use App\Jobs\Ems\EvaluateStockAlerts;
 use App\Models\Ems\InventorySnapshot;
 use App\Models\Ems\InventorySnapshotLine;
 use App\Models\Ems\StockMovement;
@@ -40,6 +41,9 @@ final class StockLedger
         if (DB::table('ems_counters')->where('name', 'stock')->increment('value') < 1) {
             throw new RuntimeException('The EMS stock lock row could not be taken; refusing to change stock without it.');
         }
+        // Every change to stock or to an expected amount passes here, so this one hook keeps the low-stock alerts
+        // current. It runs only if the change commits; a rolled-back change asks for nothing.
+        DB::afterCommit(static fn () => EvaluateStockAlerts::soon());
     }
 
     /** @throws EmsException when a converted quantity is too large to store safely */
