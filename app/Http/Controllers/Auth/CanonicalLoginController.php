@@ -138,7 +138,7 @@ final class CanonicalLoginController extends Controller
             // A shared browser must not keep showing this member's alerts: the push devices enrolled
             // from this sign-in go with it. Other sign-ins of the member are untouched.
             app(PushSessionBinding::class)->detachForSessions($user, [$registryId]);
-            $sessions->revoke($user, $registryId, 'logout', CarbonImmutable::now());
+            $sessions->revoke($user, $registryId, SessionRegistry::MEMBER_SIGNED_OUT, CarbonImmutable::now());
             Log::info('canonical_authentication_logout', [
                 'user_id' => $user->id,
                 'authentication_session_id' => $registryId,

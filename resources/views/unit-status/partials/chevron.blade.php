@@ -1,0 +1,1 @@
+<svg class="{{ $class ?? 'us-chevron' }}" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 4l6 6-6 6"/></svg>

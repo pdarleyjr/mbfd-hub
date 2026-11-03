@@ -52,7 +52,7 @@ final readonly class EnsureCanonicalSessionIsCurrent
             return $next($request);
         }
 
-        return $this->reject($request, $user, $registered, 'canonical session no longer current');
+        return $this->reject($request, $user, $registered, SessionRegistry::NO_LONGER_CURRENT);
     }
 
     private function reject(

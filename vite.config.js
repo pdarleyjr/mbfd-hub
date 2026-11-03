@@ -39,6 +39,9 @@ export default defineConfig({
                 'resources/js/daily-roster.js',
                 // The Home greeting block's refresh (loaded only on Home).
                 'resources/js/home-duty.js',
+                // Unit Status board: grouped table/cards, profile dialog, in-place refresh.
+                'resources/css/unit-status.css',
+                'resources/js/unit-status.js',
             ],
             refresh: true,
         }),

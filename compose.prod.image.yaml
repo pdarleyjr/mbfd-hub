@@ -29,6 +29,7 @@ services:
     networks:
       - mbfd-net
       - policy-scanner
+      - cmd-feed
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -45,3 +46,8 @@ networks:
   policy-scanner:
     external: true
     name: "${POLICY_LIBRARY_SCANNER_NETWORK:-mbfd-workspace-internal}"
+  # Unit Status: private path to the Command feed (http://cmd-api:8200). An internal network whose only other
+  # member is Command's `cmd` container; created once on the host (mbfd-command docs/RELEASE.md section 13).
+  cmd-feed:
+    external: true
+    name: "${UNIT_STATUS_FEED_NETWORK:-mbfd-cmd-feed}"
