@@ -261,9 +261,9 @@ body.us-scroll-lock { overflow: hidden; }
 .us-main .us-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 
 .us-main .us-today { margin: 0; padding: 0; list-style: none; }
-.us-main .us-today li { display: grid; grid-template-columns: 76px minmax(0, 1fr); column-gap: 8px; padding: 6px 0; border-top: 1px solid rgb(var(--hub-border-soft)); font-size: 14px; line-height: 20px; }
+.us-main .us-today li { display: grid; grid-template-columns: 6.75em minmax(0, 1fr); column-gap: 10px; padding: 6px 0; border-top: 1px solid rgb(var(--hub-border-soft)); font-size: 14px; line-height: 20px; }
 .us-main .us-today li:first-child { border-top: 0; }
-.us-main .us-today__time { color: rgb(var(--hub-ink-secondary)); font-variant-numeric: tabular-nums; }
+.us-main .us-today__time { white-space: nowrap; color: rgb(var(--hub-ink-secondary)); font-variant-numeric: tabular-nums; }
 .us-main .us-today__what { overflow-wrap: anywhere; }
 .us-main .us-today__meta { grid-column: 2; color: rgb(var(--hub-muted)); font-size: 12px; line-height: 16px; }
 
