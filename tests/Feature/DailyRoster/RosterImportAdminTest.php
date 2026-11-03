@@ -20,14 +20,17 @@ use App\Services\DailyRoster\RosterFreshness;
 use App\Services\DailyRoster\RosterFreshnessResolver;
 use App\Services\DailyRoster\RosterImportActions;
 use App\Services\DailyRoster\RosterStateRecorder;
+use App\Services\Notifications\NotificationRecipientEvaluator;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -197,7 +200,7 @@ final class RosterImportAdminTest extends TestCase
         $this->artisan('daily-roster:reconcile')->assertExitCode(0);
         Notification::assertSentToTimes($admin, \Filament\Notifications\DatabaseNotification::class, 1);
 
-        Cache::forget('daily_roster_alert:delayed:2026-10-30');
+        DB::table('roster_alert_deliveries')->where('alert_key', 'daily_roster_alert:delayed:2026-10-30')->delete();
         $this->artisan('daily-roster:reconcile')->assertExitCode(0);
         Notification::assertSentToTimes($admin, \Filament\Notifications\DatabaseNotification::class, 2);
 
@@ -217,15 +220,55 @@ final class RosterImportAdminTest extends TestCase
         self::assertSame(0, RosterEvent::query()->where('action', RosterStateRecorder::ACTION_DELAYED)->count());
     }
 
-    public function test_a_cache_outage_never_stops_the_caller(): void
+    public function test_a_sent_alert_is_not_sent_again_after_a_deploy_clears_the_cache(): void
+    {
+        Notification::fake();
+        $admin = $this->administrator();
+
+        app(RosterAlerts::class)->send('rejected', '2026-10-30');
+        Cache::flush();
+        app(RosterAlerts::class)->send('rejected', '2026-10-30');
+
+        Notification::assertSentToTimes($admin, \Filament\Notifications\DatabaseNotification::class, 1);
+    }
+
+    public function test_a_remembered_alert_can_go_again_once_it_expires(): void
+    {
+        Notification::fake();
+        $admin = $this->administrator();
+
+        app(RosterAlerts::class)->send('delayed', '2026-10-30');
+        $this->travel(2)->days();
+        app(RosterAlerts::class)->send('delayed', '2026-10-30');
+
+        Notification::assertSentToTimes($admin, \Filament\Notifications\DatabaseNotification::class, 2);
+        self::assertSame(1, DB::table('roster_alert_deliveries')->count());
+    }
+
+    public function test_a_failed_send_forgets_the_alert_so_the_next_check_sends_it(): void
     {
         Exceptions::fake();
-        Cache::shouldReceive('add')->once()->andThrow(new RuntimeException('cache_down'));
-        Cache::shouldReceive('forget')->once()->andThrow(new RuntimeException('cache_down'));
+        $this->mock(NotificationRecipientEvaluator::class, static fn ($mock) => $mock->shouldReceive('recipients')->once()->andThrow(new RuntimeException('push_down')));
 
         app(RosterAlerts::class)->send('delayed', '2026-10-30');
 
-        Exceptions::assertReported(static fn (RuntimeException $exception): bool => $exception->getMessage() === 'cache_down');
+        Exceptions::assertReported(static fn (RuntimeException $exception): bool => $exception->getMessage() === 'push_down');
+        self::assertSame(0, DB::table('roster_alert_deliveries')->count());
+    }
+
+    public function test_a_database_failure_never_stops_the_caller_or_spoils_its_transaction(): void
+    {
+        Exceptions::fake();
+        Schema::drop('roster_alert_deliveries');
+
+        DB::transaction(function (): void {
+            app(RosterAlerts::class)->send('delayed', '2026-10-30');
+
+            // The caller's own work in the same transaction still goes through.
+            self::assertSame(0, RosterEvent::query()->count());
+        });
+
+        Exceptions::assertReportedCount(1);
     }
 
     public function test_an_unknown_alert_kind_sends_nothing(): void
