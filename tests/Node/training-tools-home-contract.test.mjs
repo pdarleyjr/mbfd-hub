@@ -41,10 +41,19 @@ test('the sandbox link is a Hub route that opens in this window; only the extern
 });
 
 test('the disclosure is native details/summary and keeps the Home layout hooks and the separate @vite line', () => {
-  assert.match(home, /<details data-training-tools class="[^"]*hub-additional[^"]*">\s*<summary class="hub-additional__summary">/);
+  assert.match(home, /<details data-training-tools class="[^"]*hub-additional[^"]*" id="training-tools">\s*<summary class="hub-additional__summary">/);
   assert.match(home, /<ul class="hub-additional__list" aria-label="Training Tools">/);
   assert.match(home, /@vite\('resources\/css\/app\.css'\)\r?\n/, 'the brand contract needs the stylesheet on its own @vite line');
   assert.ok(home.indexOf('data-training-tools') < home.indexOf('data-additional-links'), 'Training Tools comes before Additional Links');
+});
+
+test('/#training-tools, the way back from the sandbox, opens the Training Tools list on Home', () => {
+  const script = readFileSync(resolve(root, 'resources/js/home-duty.js'), 'utf8');
+  assert.equal(home.split('id="training-tools"').length - 1, 1, 'one element carries the fragment');
+  assert.match(script, /window\.location\.hash !== '#training-tools'/);
+  assert.match(script, /getElementById\('training-tools'\)[\s\S]*?details\.open = true;/);
+  assert.match(script, /addEventListener\('hashchange', openTrainingToolsFromHash\)/);
+  assert.match(home, /@vite\('resources\/js\/home-duty\.js'\)/, 'Home loads the script that opens it');
 });
 
 test('every row of the shared disclosure is at least 44px tall and has a visible focus ring', () => {

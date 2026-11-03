@@ -27,6 +27,15 @@ with nothing (`tests/Feature/TrainingTools/CommandBoardSandboxRouteTest.php` pin
 `mbfd-command` must be exactly `/training-tools/command-board/`; the vendoring command refuses a page whose asset URLs
 are anywhere else.
 
+### Ways back to the Hub
+
+The sandbox carries its own way out, because the page has no Hub chrome. Exit (always on its bar) and Exit Training go
+to `/` (Hub Home). Training Tools goes to `/#training-tools`, the `id` on the Home Training Tools disclosure;
+`resources/js/home-duty.js` opens that disclosure when the page is reached with that fragment. Each is a same-window
+link or `location.assign` and asks first when there is practice work (`mbfd-command` docs/TRAINING_SANDBOX_CONTRACT.md).
+The practice map is inline SVG drawn by the page, so it needs no image, font or connection allowance: the policy below
+is unchanged.
+
 ## Eligibility
 
 Same audience as the Home Quick Access card that links to it: a signed-in Hub member whose account is allowed to sign in.
