@@ -297,6 +297,18 @@ body[data-hub-ui="2"] {
 
 [data-hub-ui="2"] .hub-btn--secondary:hover { background: rgb(var(--hub2-n-50)); }
 
+/* Branded companion to the primary button (Home's top actions): a quiet Hub-blue tint with navy text, so the row
+   reads as one set next to the solid Vehicle Checkout button without competing with it. */
+[data-hub-ui="2"] .hub-btn--brand {
+    border-color: rgb(var(--hub2-action) / 0.3);
+    background: rgb(var(--hub2-action-tint));
+    color: rgb(var(--hub2-header));
+}
+
+[data-hub-ui="2"] .hub-btn--brand .hub-btn__icon { color: rgb(var(--hub2-action)); }
+[data-hub-ui="2"] .hub-btn--brand:hover { border-color: rgb(var(--hub2-action) / 0.55); background: rgb(var(--hub2-action) / 0.12); }
+[data-hub-ui="2"] .hub-btn--brand:active { background: rgb(var(--hub2-action) / 0.18); }
+
 [data-hub-ui="2"] .hub-btn--tertiary {
     background: transparent;
     color: rgb(var(--hub2-action));

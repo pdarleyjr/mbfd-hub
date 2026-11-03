@@ -27,6 +27,8 @@
         // so the shell navigation hands them the inspection as their own entry.
         $takeHomeFallback = collect($hubNavigation['moreNavigation'])->firstWhere('key', 'take-home-inspection');
         $showDailyRoster = app(\App\Services\Security\DailyRosterAccess::class)->canSeeHomeEntry($currentUser);
+        // Unit Status shows on-duty names, so it follows the Daily Roster's own access rule (and its feature flag).
+        $showUnitStatus = (bool) config('unit_status.enabled') && app(\App\Services\Security\DailyRosterAccess::class)->canView($currentUser);
         $quickAccessItems = [
             [
                 'title' => 'Station / Vehicles / Equipment',
@@ -145,7 +147,7 @@
     <main id="main-content" class="hub-page">
         <section class="home-today" aria-labelledby="home-greeting">
             <x-hub.home-duty :lines="$dutyLines" />
-            @if($showEmployeePortal || $showDailyRoster || $commandBoardUrl !== null)
+            @if($showEmployeePortal || $showDailyRoster || $showUnitStatus || $commandBoardUrl !== null)
                 <div class="hub-page-header__actions">
                     @if($showEmployeePortal)
                     <a href="{{ url('/daily/vehicle-inspections') }}" data-important-target class="hub-btn hub-btn--primary hub-btn--field">
@@ -154,14 +156,20 @@
                     </a>
                     @endif
                     @if($showDailyRoster)
-                        <a href="{{ route('daily-roster.show') }}" data-important-target data-home-daily-roster class="hub-btn hub-btn--secondary hub-btn--field">
+                        <a href="{{ route('daily-roster.show') }}" data-important-target data-home-daily-roster class="hub-btn hub-btn--brand hub-btn--field">
                             <x-heroicon-o-calendar-days class="hub-btn__icon" aria-hidden="true" />
                             Daily Roster
                         </a>
                     @endif
+                    @if($showUnitStatus)
+                        <a href="{{ route('unit-status.show') }}" data-important-target data-home-unit-status class="hub-btn hub-btn--brand hub-btn--field">
+                            <x-heroicon-o-signal class="hub-btn__icon" aria-hidden="true" />
+                            Unit Status
+                        </a>
+                    @endif
                     {{-- Only for members Command300Access admits. The board's own Hub sign-in checks the same rule again. --}}
                     @if($commandBoardUrl !== null)
-                        <a href="{{ $commandBoardUrl }}" target="_blank" rel="noopener noreferrer" data-important-target data-home-command-board class="hub-btn hub-btn--secondary hub-btn--field">
+                        <a href="{{ $commandBoardUrl }}" target="_blank" rel="noopener noreferrer" data-important-target data-home-command-board class="hub-btn hub-btn--brand hub-btn--field">
                             <x-heroicon-o-squares-2x2 class="hub-btn__icon" aria-hidden="true" />
                             Command Board<span class="hub-visually-hidden"> (opens in a new tab)</span>
                         </a>
