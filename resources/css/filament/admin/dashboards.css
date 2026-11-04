@@ -1097,6 +1097,11 @@ a.mbfd-dash-activity__link:focus-visible { outline: 2px solid rgb(var(--hub-blue
     .mbfd-dash-activity__item:nth-child(n + 6) { display: none; }
 }
 
+/* Phones and tablets: every control is a 44px touch target. */
+@media (max-width: 1023.98px) {
+    .mbfd-dash-activity__kind-button { min-height: 2.75rem; }
+}
+
 /* Short desktop windows: three one-line events, so the lanes keep their room. */
 @media (min-width: 1024px) and (min-height: 600px) and (max-height: 820px) {
     .mbfd-dash-activity__list { max-height: 6.75rem; }
