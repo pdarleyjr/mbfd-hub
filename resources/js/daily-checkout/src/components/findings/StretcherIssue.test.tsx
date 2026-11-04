@@ -208,7 +208,7 @@ describe('StretcherIssueForm', () => {
 
     await user.upload(screen.getByLabelText('Photo (optional)'), new File(['x'], 'clip.gif', { type: 'image/gif' }));
 
-    expect(await screen.findByText('Choose a JPEG, PNG, HEIC or WebP photo under 10 MB.')).toBeInTheDocument();
+    expect(await screen.findByText('Choose a JPEG, PNG or WebP photo under 10 MB.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove photo' })).not.toBeInTheDocument();
   });
 
@@ -229,12 +229,13 @@ describe('StretcherIssueForm', () => {
 });
 
 describe('stretcherPhotoProblem', () => {
-  it('accepts JPEG, PNG, HEIC and WebP under 10 MB, including a HEIC with no type', () => {
+  it('accepts JPEG, PNG and WebP under 10 MB (what the server stores), including one with no type, and refuses HEIC', () => {
     expect(stretcherPhotoProblem({ name: 'a.jpg', type: 'image/jpeg', size: 100 })).toBeNull();
     expect(stretcherPhotoProblem({ name: 'a.png', type: 'image/png', size: 100 })).toBeNull();
-    expect(stretcherPhotoProblem({ name: 'a.heic', type: 'image/heic', size: 100 })).toBeNull();
+    expect(stretcherPhotoProblem({ name: 'a.heic', type: 'image/heic', size: 100 })).not.toBeNull();
     expect(stretcherPhotoProblem({ name: 'a.webp', type: 'image/webp', size: 100 })).toBeNull();
-    expect(stretcherPhotoProblem({ name: 'IMG_1.HEIC', type: '', size: 100 })).toBeNull();
+    expect(stretcherPhotoProblem({ name: 'IMG_1.HEIC', type: '', size: 100 })).not.toBeNull();
+    expect(stretcherPhotoProblem({ name: 'IMG_1.jpg', type: '', size: 100 })).toBeNull();
   });
 
   it('refuses other formats and anything over 10 MB', () => {

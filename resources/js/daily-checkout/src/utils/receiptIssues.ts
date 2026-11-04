@@ -14,7 +14,8 @@ export const reportedIssuesFor = (
   submission: Pick<InspectionSubmission, 'defects' | 'concerns' | 'review_flag' | 'scheduled_tasks'>,
 ): ReportedIssues => {
   const hasDefects = submission.defects.length > 0;
-  const hasConcerns = (submission.concerns?.length ?? 0) > 0;
+  // A "note for the record" asks for no action and the server files no finding for it, so it is not an issue.
+  const hasConcerns = (submission.concerns ?? []).some((concern) => concern.kind === 'issue');
   const hasUndoneDuty = (submission.scheduled_tasks ?? []).some((task) => !DONE_TASK_STATUSES.includes(task.status));
 
   return hasDefects || hasConcerns || hasUndoneDuty || submission.review_flag !== undefined ? 'some' : 'none';

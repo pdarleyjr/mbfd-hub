@@ -140,6 +140,8 @@ export async function resolveStationRequest(requestId: number, input: ResolveInp
     throw new StationRequestResolveError(isOffline() ? OFFLINE_RESOLVE_MESSAGE : UNREACHABLE_RESOLVE_MESSAGE, 0);
   }
   const payload = asRecord(await response.json().catch(() => null));
+  // The service worker answers a dropped POST with 503 { offline: true }: the outcome is unknown, so keep the form.
+  if (payload.offline === true) throw new StationRequestResolveError(UNREACHABLE_RESOLVE_MESSAGE, 0);
   if (!response.ok) throw failureFor(response.status, payload);
 
   const data = asRecord(payload.data);

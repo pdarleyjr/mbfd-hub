@@ -15,7 +15,7 @@ export const STRETCHER_PROBLEMS: ReadonlyArray<{ value: StretcherProblem; label:
 
 export const PROBLEM_REQUIRED = 'Choose the kind of problem.';
 export const DESCRIPTION_TOO_SHORT = `Write at least ${STRETCHER_TEXT_MIN} characters about what is wrong.`;
-export const PHOTO_FORMAT_PROBLEM = 'Choose a JPEG, PNG, HEIC or WebP photo under 10 MB.';
+export const PHOTO_FORMAT_PROBLEM = 'Choose a JPEG, PNG or WebP photo under 10 MB.';
 
 export interface StretcherFields {
   problem: StretcherProblem | null;
@@ -37,10 +37,10 @@ export function validateStretcher(fields: StretcherFields): StretcherFieldErrors
   return errors;
 }
 
-const PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/heic', 'image/webp']);
-const PHOTO_EXTENSION = /\.(?:jpe?g|png|heic|webp)$/i;
+const PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const PHOTO_EXTENSION = /\.(?:jpe?g|png|webp)$/i;
 
-/** Null when the file can be sent. Some phones give a HEIC photo no type at all, so the name stands in. */
+/** Null when the file can be sent. Some phones give a photo no type at all, so the name stands in. */
 export function stretcherPhotoProblem(file: Pick<File, 'name' | 'type' | 'size'>): string | null {
   if (file.size > STRETCHER_PHOTO_MAX_BYTES) return PHOTO_FORMAT_PROBLEM;
   const type = file.type.toLowerCase();

@@ -96,6 +96,8 @@ async function send(path: string, init: RequestInit): Promise<Record<string, unk
     throw new MemberIssueActionError(typeof navigator !== 'undefined' && navigator.onLine === false ? OFFLINE_ACTION_MESSAGE : UNREACHABLE_ACTION_MESSAGE, 0);
   }
   const payload = asRecord(await response.json().catch(() => null));
+  // The service worker answers a dropped POST with 503 { offline: true }: no answer from the server, outcome unknown.
+  if (payload.offline === true) throw new MemberIssueActionError(UNREACHABLE_ACTION_MESSAGE, 0);
   if (!response.ok) throw failureFor(response.status, payload);
 
   return payload;

@@ -64,9 +64,13 @@ describe('reportedIssuesFor', () => {
     expect(reportedIssuesFor({ ...base, concerns: [], scheduled_tasks: [{ id: 't', status: 'Completed' }] })).toBe('none');
   });
 
+  it('is none for a note for the record: it asks for no action and the server files no finding', () => {
+    expect(reportedIssuesFor({ ...base, concerns: [{ kind: 'note', description: 'Port rail scratched' } as never] })).toBe('none');
+  });
+
   it('is some for a Missing or Damaged item, a concern, a review flag or an undone duty', () => {
     expect(reportedIssuesFor({ ...base, defects: [defect] })).toBe('some');
-    expect(reportedIssuesFor({ ...base, concerns: [{ kind: 'note', description: 'Noise' } as never] })).toBe('some');
+    expect(reportedIssuesFor({ ...base, concerns: [{ kind: 'issue', description: 'Noise' } as never] })).toBe('some');
     expect(reportedIssuesFor({ ...base, review_flag: { explanation: 'Look at this', items: [] } })).toBe('some');
     expect(reportedIssuesFor({ ...base, scheduled_tasks: [{ id: 't', status: 'Not Completed' }] })).toBe('some');
   });
