@@ -13,6 +13,8 @@
         </div>
     </div>
 
+    @include('filament.employee.partials.my-activity-card', ['items' => $activity])
+
     @if($bidAssignment)
         <section class="ep-bid-assignment ep-panel" aria-labelledby="bid-assignment-heading" data-bid-assignment>
             <div class="ep-panel-header">
@@ -104,8 +106,6 @@
         <a href="{{ \App\Filament\Employee\Pages\VideoConferencing::getUrl(panel: 'employee') }}">Video conferencing</a>
         <a href="{{ route('account.show') }}">My account</a>
     </nav>
-
-    @include('filament.employee.partials.my-activity-card', ['items' => $activity])
 
     {{-- Two columns: Recent Equipment + Recent Requests --}}
     <div class="ep-two-col">
