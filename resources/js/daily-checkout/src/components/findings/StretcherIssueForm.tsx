@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import type { Apparatus } from '../../types';
 import { useOffline } from '../../hooks/useOffline';
 import { setUnsavedWork } from '../../pwa/draftBusy.ts';
+import { readPhotoFile } from '../../utils/photoFile';
 import {
   MemberIssueActionError, STRETCHER_TEXT_MAX, newClientId, submitStretcherIssue,
   type StretcherIssueResult, type StretcherProblem,
@@ -26,15 +27,6 @@ interface Props {
  * Report a stretcher problem on one unit. One client_submission_id per form: a retry after a dropped answer sends
  * the same id, so the server returns the first result instead of recording the report twice.
  */
-/** A preview URL from URL.createObjectURL, accepted only when it really is a blob: URL. */
-function safeBlobUrl(url: string): string | null {
-  try {
-    return new URL(url).protocol === 'blob:' ? url : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function StretcherIssueForm({ apparatus, onChangeUnit }: Props) {
   const id = useId();
   const offline = useOffline();
@@ -65,14 +57,14 @@ export default function StretcherIssueForm({ apparatus, onChangeUnit }: Props) {
   }, []);
 
   useEffect(() => {
-    if (photo === null || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+    // The same preview the other Daily Checkout forms use: the shared reader's data URL, never a URL built from text.
+    if (photo === null) {
       setPreviewUrl(null);
       return undefined;
     }
-    const url = URL.createObjectURL(photo);
-    // Only a same-document blob: URL may become an <img src>; anything else is dropped.
-    setPreviewUrl(safeBlobUrl(url));
-    return () => URL.revokeObjectURL(url);
+    let current = true;
+    readPhotoFile(photo).then(url => { if (current) setPreviewUrl(url); }).catch(() => { if (current) setPreviewUrl(null); });
+    return () => { current = false; };
   }, [photo]);
 
   useEffect(() => {
