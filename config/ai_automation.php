@@ -156,7 +156,7 @@ return [
         'missing_low' => [
             'label' => 'LOW: one missing item',
             'help' => 'Low-cost items. {item} is replaced with the item name from the checkout.',
-            'body' => "Please check around the station and other apparatus to make sure the {item} wasn't misplaced. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.",
+            'body' => 'Please check around the station and other apparatus for the {item} first. If nothing turns up, call or text before coming by Station 2 so we can check on a replacement.',
         ],
         'missing_low_multi' => [
             'label' => 'LOW: several missing items',
@@ -196,7 +196,7 @@ return [
         'medium_detection' => [
             'label' => 'MEDIUM: gas meter or detection device',
             'help' => 'Gas meters and detectors.',
-            'body' => 'Acknowledged. Coordinate a replacement with Support Services or the appropriate equipment technician. Call or text first so availability can be confirmed.',
+            'body' => 'Acknowledged. Coordinate a replacement gas meter or detector with Support Services or the appropriate equipment technician. Call or text first so availability can be confirmed.',
         ],
         'medium_air_tech' => [
             'label' => 'MEDIUM: SCBA component or cylinder (Air Tech)',

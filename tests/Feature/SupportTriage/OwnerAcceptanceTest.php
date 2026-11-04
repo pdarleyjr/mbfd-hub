@@ -141,7 +141,7 @@ final class OwnerAcceptanceTest extends TestCase
         $defect = ApparatusDefect::query()->sole();
         $this->assertSame(C::LOW, $this->dashboardLevel($defect));
         $this->assertSame(
-            "Please check around the station and other apparatus to make sure the Kitty Litter wasn't misplaced. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.",
+            'Please check around the station and other apparatus for the Kitty Litter first. If nothing turns up, call or text before coming by Station 2 so we can check on a replacement.',
             $this->onlyReply(),
         );
         $this->assertNoEmailAnywhere();
@@ -154,7 +154,7 @@ final class OwnerAcceptanceTest extends TestCase
 
         $this->assertSame(C::LOW, $this->dashboardLevel(ApparatusDefect::query()->sole()));
         $reply = $this->onlyReply();
-        $this->assertStringContainsString("Hose Clamps wasn't misplaced", $reply);
+        $this->assertStringContainsString('for the Hose Clamps first', $reply);
         $this->assertStringContainsString('call or text before coming by Station 2', $reply);
         $this->assertNoEmailAnywhere();
     }
@@ -193,7 +193,7 @@ final class OwnerAcceptanceTest extends TestCase
         $this->checkout('engine2', [['Gas Meter']]);
         $this->assertSame(C::MEDIUM, $this->dashboardLevel(ApparatusDefect::query()->sole()));
         $missing = $this->onlyReply();
-        $this->assertStringContainsString('Coordinate a replacement with Support Services or the appropriate equipment technician', $missing);
+        $this->assertStringContainsString('Coordinate a replacement gas meter or detector with Support Services or the appropriate equipment technician', $missing);
         $this->assertStringContainsString('Call or text first', $missing);
 
         $this->checkout('engine', [['Dreager Gas Meter', 'Damaged', ['notes' => 'Display is cracked.']]]);
@@ -465,7 +465,7 @@ final class OwnerAcceptanceTest extends TestCase
     {
         $this->on();
         $this->checkout('engine2', [['Hose Clamps']]);
-        $this->assertStringContainsString('wasn\'t misplaced', $this->onlyReply());
+        $this->assertStringContainsString('If nothing turns up', $this->onlyReply());
 
         $playbook = \App\Models\AiAutomation\AiAutomationPlaybook::query()->where('key', 'missing_low')->sole();
         app(PlaybookRepository::class)->update($playbook, 'Look in the supply closet first, then text Support Services about the {item}.', $this->vehicleStaff());
@@ -751,7 +751,7 @@ final class OwnerAcceptanceTest extends TestCase
         $this->checkout('engine2', [['Gaskets/Out of Service Tags']]);
 
         $this->assertSame(C::LOW, $this->dashboardLevel(ApparatusDefect::query()->sole()));
-        $this->assertStringContainsString("wasn't misplaced", $this->onlyReply());
+        $this->assertStringContainsString('If nothing turns up', $this->onlyReply());
         $this->assertNotSame('critical', AiIntakeEvent::query()->sole()->risk_tier);
 
         // What the member writes about the item is still checked for danger words.

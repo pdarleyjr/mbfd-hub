@@ -26,7 +26,7 @@ final class ResponseComposerTest extends TestCase
 
     private const SATURDAY = '2026-11-07 15:00:00';
 
-    private const LOW_MISSING = "Please check around the station and other apparatus to make sure the %s wasn't misplaced. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.";
+    private const LOW_MISSING = 'Please check around the station and other apparatus for the %s first. If nothing turns up, call or text before coming by Station 2 so we can check on a replacement.';
 
     private const LOW_MULTI = "Please check around the station and other apparatus to make sure the %s weren't misplaced. If anything is still missing, call or text before coming by Station 2 so we can check on replacements.";
 
@@ -64,9 +64,9 @@ final class ResponseComposerTest extends TestCase
 
     public function test_item_names_are_trimmed_and_never_shout(): void
     {
-        $this->assertStringContainsString('the Spanner Wrench wasn', $this->findings([new Finding('Spanner Wrench (rear compartment)', 'missing')])->text);
-        $this->assertStringContainsString('the Kitty Litter wasn', $this->findings([new Finding('KITTY LITTER', 'missing')])->text);
-        $this->assertStringContainsString('the Hydrant Wrench wasn', $this->findings([new Finding('HYDRANT WRENCH', 'missing')])->text);
+        $this->assertStringContainsString('for the Spanner Wrench first', $this->findings([new Finding('Spanner Wrench (rear compartment)', 'missing')])->text);
+        $this->assertStringContainsString('for the Kitty Litter first', $this->findings([new Finding('KITTY LITTER', 'missing')])->text);
+        $this->assertStringContainsString('for the Hydrant Wrench first', $this->findings([new Finding('HYDRANT WRENCH', 'missing')])->text);
     }
 
     public function test_a_missing_dewalt_battery_is_pointed_at_chargers_and_other_tools(): void
@@ -125,7 +125,7 @@ final class ResponseComposerTest extends TestCase
 
     public function test_gas_meter_scba_component_and_captain5_replies(): void
     {
-        $this->assertSame('Acknowledged. Coordinate a replacement with Support Services or the appropriate equipment technician. Call or text first so availability can be confirmed.', $this->findings([new Finding('Four Gas Meter', 'missing')])->text);
+        $this->assertSame('Acknowledged. Coordinate a replacement gas meter or detector with Support Services or the appropriate equipment technician. Call or text first so availability can be confirmed.', $this->findings([new Finding('Four Gas Meter', 'missing')])->text);
 
         $air = $this->findings([new Finding('SCBA Regulator', 'damaged')]);
         $this->assertSame('Acknowledged. Coordinate with the on-duty Air Tech to have the item checked or swapped out. Notify your officer and contact 300 if immediate assistance or after-hours coordination is needed.', $air->text);

@@ -142,7 +142,7 @@ final class EndToEndTest extends TestCase
         $this->assertCount(1, $messages);
         $this->assertSame((int) $inspection->id, (int) $messages[0]->apparatus_inspection_id);
         $this->assertSame('member', $messages[0]->visibility);
-        $this->assertStringContainsString("Yellow Safety Tape/Duct Tape wasn't misplaced", $messages[0]->body);
+        $this->assertStringContainsString('for the Yellow Safety Tape/Duct Tape first', $messages[0]->body);
         $this->assertStringContainsString('call or text before coming by Station 2', $messages[0]->body);
 
         $row = AiIntakeEvent::query()->where('source_type', 'apparatus_inspection')->sole();
@@ -250,7 +250,7 @@ final class EndToEndTest extends TestCase
 
         $message = ApparatusIssueMessage::query()->where('author_context', 'assistant')->sole();
         $this->assertSame((int) $inspection->id, (int) $message->apparatus_inspection_id);
-        $this->assertSame("Please check around the station and other apparatus to make sure the Kitty Litter wasn't misplaced. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.", $message->body);
+        $this->assertSame('Please check around the station and other apparatus for the Kitty Litter first. If nothing turns up, call or text before coming by Station 2 so we can check on a replacement.', $message->body);
     }
 
     public function test_the_station_reply_leaves_status_priority_acknowledgment_and_public_response_alone(): void

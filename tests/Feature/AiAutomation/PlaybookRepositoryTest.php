@@ -268,7 +268,7 @@ final class PlaybookRepositoryTest extends TestCase
     {
         $repo = new PlaybookRepository;
 
-        self::assertStringStartsWith("Please check around the station and other apparatus to make sure the {item} wasn't misplaced.", $repo->template('missing_low')['body']);
+        self::assertStringStartsWith('Please check around the station and other apparatus for the {item} first.', $repo->template('missing_low')['body']);
         self::assertSame('Acknowledged. Notify your officer and 300 right away.', $repo->template('readiness')['body']);
         self::assertSame('Acknowledged. Contact Captain 5 to coordinate a replacement and pickup.', $repo->template('captain5_low')['body']);
         // Only the {item} placeholder is allowed, so every default must validate as it ships.
