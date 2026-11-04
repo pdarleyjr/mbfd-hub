@@ -23,7 +23,7 @@
         "laravel/tinker": "^2.9",
         "league/flysystem-aws-s3-v3": "^3.25",
         "phpoffice/phpspreadsheet": "^5.10",
-        "pxlrbt/filament-spotlight": "^1.3",
+        "pxlrbt/filament-spotlight": "^2.1",
         "sentry/sentry-laravel": "^4.20.1",
         "shuvroroy/filament-spatie-laravel-health": "^2.0",
         "smalot/pdfparser": "^2",
