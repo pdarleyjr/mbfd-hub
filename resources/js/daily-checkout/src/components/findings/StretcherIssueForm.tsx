@@ -26,6 +26,15 @@ interface Props {
  * Report a stretcher problem on one unit. One client_submission_id per form: a retry after a dropped answer sends
  * the same id, so the server returns the first result instead of recording the report twice.
  */
+/** A preview URL from URL.createObjectURL, accepted only when it really is a blob: URL. */
+function safeBlobUrl(url: string): string | null {
+  try {
+    return new URL(url).protocol === 'blob:' ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function StretcherIssueForm({ apparatus, onChangeUnit }: Props) {
   const id = useId();
   const offline = useOffline();
@@ -61,7 +70,8 @@ export default function StretcherIssueForm({ apparatus, onChangeUnit }: Props) {
       return undefined;
     }
     const url = URL.createObjectURL(photo);
-    setPreviewUrl(url);
+    // Only a same-document blob: URL may become an <img src>; anything else is dropped.
+    setPreviewUrl(safeBlobUrl(url));
     return () => URL.revokeObjectURL(url);
   }, [photo]);
 
