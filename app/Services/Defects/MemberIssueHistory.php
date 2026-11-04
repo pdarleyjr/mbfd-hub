@@ -42,6 +42,9 @@ final class MemberIssueHistory
     /** What the person reporting wrote. These say what was seen; they are not the department acting on it. */
     private const REPORT_EVENTS = ['reported', 'observed_again', 'appears_corrected'];
 
+    /** Staff routing between Captain 5 and Logistics: never part of the crew's story of an issue. */
+    private const STAFF_ONLY_EVENTS = ['owner_transferred'];
+
     /** Never internal_note: it is not even read. */
     private const EVENT_COLUMNS = [
         'id', 'apparatus_defect_id', 'apparatus_inspection_id', 'actor_user_id', 'event_type',
@@ -150,7 +153,7 @@ final class MemberIssueHistory
                 'history_count' => $counts[(int) $defect->id] ?? 0,
                 // Who works it, and whether a member can say it is fixed (docs/unified-activity-and-ownership.md).
                 'owner' => $defect->getAttribute('responsible_owner') ?? app(DefectOwnership::class)->ownerOf($defect),
-                'member_correction' => DefectMemberCorrection::stateFor($defect),
+                'member_correction' => DefectMemberCorrection::stateFor($defect, $defect->latestObservation),
             ];
         })->all();
     }
@@ -188,7 +191,7 @@ final class MemberIssueHistory
      */
     private function latestActions(array $ids): array
     {
-        $excluded = [...ApparatusDefectEvent::PAGE_ONLY_EVENTS, ...self::REPORT_EVENTS];
+        $excluded = [...ApparatusDefectEvent::PAGE_ONLY_EVENTS, ...self::REPORT_EVENTS, ...self::STAFF_ONLY_EVENTS];
         $events = ApparatusDefectEvent::query()
             ->whereIn('id', static fn ($newest) => $newest->selectRaw('MAX(id)')->from('apparatus_defect_events')
                 ->whereIn('apparatus_defect_id', $ids)->whereNotIn('event_type', $excluded)->groupBy('apparatus_defect_id'))
@@ -239,7 +242,7 @@ final class MemberIssueHistory
     private function historyCounts(array $ids): array
     {
         $events = ApparatusDefectEvent::query()->selectRaw('apparatus_defect_id, COUNT(*) AS total')
-            ->whereIn('apparatus_defect_id', $ids)->whereNotIn('event_type', ApparatusDefectEvent::PAGE_ONLY_EVENTS)
+            ->whereIn('apparatus_defect_id', $ids)->whereNotIn('event_type', [...ApparatusDefectEvent::PAGE_ONLY_EVENTS, ...self::STAFF_ONLY_EVENTS])
             ->groupBy('apparatus_defect_id')->pluck('total', 'apparatus_defect_id');
         $messages = ApparatusIssueMessage::query()->selectRaw('apparatus_defect_id, COUNT(*) AS total')
             ->whereIn('apparatus_defect_id', $ids)->memberVisible()->fromStaff()
@@ -282,7 +285,7 @@ final class MemberIssueHistory
     private function eventEntries(ApparatusDefect $defect): array
     {
         $events = ApparatusDefectEvent::query()
-            ->where('apparatus_defect_id', $defect->id)->changingTheIssue()
+            ->where('apparatus_defect_id', $defect->id)->changingTheIssue()->whereNotIn('event_type', self::STAFF_ONLY_EVENTS)
             ->with('actor:id,name,display_name')
             ->orderBy('created_at')->orderBy('id')
             ->get(self::EVENT_COLUMNS);

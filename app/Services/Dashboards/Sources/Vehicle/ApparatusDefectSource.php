@@ -228,6 +228,10 @@ final class ApparatusDefectSource extends VehicleIssueSource
             return [new IssueAction('reopen', 'Reopen', 'secondary', [self::textarea('reason', 'Reason for reopening', true, 5000), ...$messages])];
         }
         if (DefectOwnership::isCaptain5Owned($defect)) {
+            if ((string) $defect->compartment_key === ApparatusDefect::STRETCHER_REPORT_COMPARTMENT) {
+                return []; // stretcher reports always stay with Captain 5; DefectOwnership::transfer refuses the move
+            }
+
             // Captain 5 works it; from here Logistics can only take it over (one queue per issue).
             return [new IssueAction('take_for_logistics', 'Take for Logistics', 'secondary', [
                 self::textarea('internal_note', 'Why Logistics should handle it (staff only, optional)', max: 4000),

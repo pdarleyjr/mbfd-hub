@@ -12,6 +12,7 @@ use App\Models\RoomAsset;
 use App\Models\Station;
 use App\Models\StationRequest;
 use App\Models\User;
+use App\Services\Activity\MemberActivityFeed;
 use App\Services\Dashboards\Sources\Station\StationRequestSource;
 use App\Support\Dashboards\DashboardQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -117,6 +118,20 @@ final class StationRequestMemberResolveTest extends TestCase
         $this->assertFalse($request->updates()->sole()->metadata['resolver_is_requester']);
         // Station staff and the requester each get one alert.
         Queue::assertPushed(FanOutNotification::class, 2);
+    }
+
+    public function test_another_members_resolution_reads_as_a_crew_member_in_the_requesters_activity(): void
+    {
+        Queue::fake();
+        $this->actingAsCanonicalUser($this->other);
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed', 'note' => 'Replaced the faucet washer.'])->assertOk();
+
+        $requester = $this->requester->fresh();
+        $item = collect(app(MemberActivityFeed::class)->forPage($requester, $requester->employeeProfile))
+            ->firstWhere('key', 'station_request:'.$this->request->id);
+
+        $this->assertNotNull($item);
+        $this->assertSame('A crew member', $item->latestUpdate?->authorLabel);
     }
 
     public function test_bad_input_is_refused_without_writing(): void

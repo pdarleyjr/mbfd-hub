@@ -84,11 +84,14 @@ final class DefectMemberCorrection
     }
 
     /** @return array{eligible: bool, closes_immediately: bool, pending: array{at: string}|null} */
-    public static function stateFor(ApparatusDefect $defect): array
+    public static function stateFor(ApparatusDefect $defect, ?\App\Models\ApparatusDefectObservation $latest = null): array
     {
         $open = ! DefectActionStatus::isClosed($defect->action_status);
-        $pending = $open && $defect->correction_reported_at !== null
-            ? ['at' => $defect->correction_reported_at->toIso8601String()]
+        $reported = $defect->correction_reported_at;
+        // A later checkout that still finds the item missing or damaged outranks the earlier "it is fixed".
+        $stale = $reported !== null && $latest !== null && $latest->created_at->greaterThan($reported);
+        $pending = $open && $reported !== null && ! $stale
+            ? ['at' => $reported->toIso8601String()]
             : null;
 
         return ['eligible' => $open && $pending === null, 'closes_immediately' => self::closesImmediately($defect), 'pending' => $pending];

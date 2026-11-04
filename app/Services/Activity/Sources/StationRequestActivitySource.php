@@ -32,7 +32,7 @@ final class StationRequestActivitySource implements MemberActivitySource
         $requests = StationRequest::query()
             ->active()
             ->select([
-                'id', 'request_number', 'station_id', 'title', 'status', 'current_public_response',
+                'id', 'request_number', 'station_id', 'title', 'status', 'status_detail', 'current_public_response',
                 'completed_at', 'denied_at', 'cancelled_at', 'created_at', 'updated_at',
             ])
             ->where(fn (Builder $mine) => $mine
@@ -59,7 +59,7 @@ final class StationRequestActivitySource implements MemberActivitySource
             if ($latest === null && filled($request->current_public_response)) {
                 $latest = new MemberActivityUpdate(
                     MemberActivityText::excerpt($request->current_public_response),
-                    MemberActivityText::DEPARTMENT,
+                    $request->status_detail === 'member_resolved' ? 'A crew member' : MemberActivityText::DEPARTMENT,
                     MemberActivityText::moment($request->updated_at ?? $request->created_at),
                 );
             }
@@ -102,11 +102,13 @@ final class StationRequestActivitySource implements MemberActivitySource
         $people = (clone $shown)->whereNull('automation_intake_id')->whereNotNull('changed_by_user_id');
 
         $signals = [];
-        foreach (LatestPerGroup::newest($shown, 'station_request_id')->get(['id', 'station_request_id', 'public_note', 'automation_intake_id', 'created_at']) as $update) {
+        foreach (LatestPerGroup::newest($shown, 'station_request_id')->get(['id', 'station_request_id', 'public_note', 'automation_intake_id', 'metadata', 'created_at']) as $update) {
             $automated = $update->isAutoReceipt();
+            // Another member marking it resolved is a crew member talking, not Support Services.
+            $byCrew = ! $automated && data_get($update->metadata, 'event') === 'member_resolved';
             $signals[(int) $update->station_request_id] = new ActivitySignal(new MemberActivityUpdate(
                 MemberActivityText::excerpt((string) $update->public_note),
-                $automated ? StationRequestUpdate::autoReceiptSender() : MemberActivityText::DEPARTMENT,
+                $automated ? StationRequestUpdate::autoReceiptSender() : ($byCrew ? 'A crew member' : MemberActivityText::DEPARTMENT),
                 MemberActivityText::moment($update->created_at),
                 $automated,
             ));

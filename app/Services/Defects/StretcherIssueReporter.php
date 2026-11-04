@@ -43,14 +43,14 @@ final class StretcherIssueReporter
     {
         $existing = StretcherIssueReport::query()->where('client_submission_id', $data['client_submission_id'])->first();
         if ($existing instanceof StretcherIssueReport) {
-            return $this->replay($existing, $member);
+            return $this->replay($existing, $member, $apparatus, $data);
         }
 
         try {
             return PostgresLockRetry::run(fn (): array => DB::transaction(fn (): array => $this->record($member, $apparatus, $data), 3));
         } catch (UniqueConstraintViolationException) {
             // Two sends of the same form raced; the first one won.
-            return $this->replay(StretcherIssueReport::query()->where('client_submission_id', $data['client_submission_id'])->firstOrFail(), $member);
+            return $this->replay(StretcherIssueReport::query()->where('client_submission_id', $data['client_submission_id'])->firstOrFail(), $member, $apparatus, $data);
         }
     }
 
@@ -137,11 +137,20 @@ final class StretcherIssueReporter
         return ['report' => $report, 'defect' => $defect->refresh(), 'replayed' => false];
     }
 
-    /** @return array{report: StretcherIssueReport, defect: ApparatusDefect, replayed: bool} */
-    private function replay(StretcherIssueReport $report, User $member): array
+    /**
+     * @param  array{client_submission_id: string, problem: string, description: string, unusable: bool, photo_path: ?string}  $data
+     * @return array{report: StretcherIssueReport, defect: ApparatusDefect, replayed: bool}
+     */
+    private function replay(StretcherIssueReport $report, User $member, Apparatus $apparatus, array $data): array
     {
         if ((int) $report->reporter_user_id !== (int) $member->getKey()) {
             throw new ConflictHttpException('That report id was already used. Reload the form and send it again.');
+        }
+        // The same id with a different unit, problem or "cannot be used" answer is a different report, never a retry.
+        if ((int) $report->apparatus_id !== (int) $apparatus->getKey()
+            || $report->problem !== $data['problem']
+            || (bool) $report->unusable !== (bool) $data['unusable']) {
+            throw new ConflictHttpException('That report id was already used for a different report. Reload the form and send it again.');
         }
 
         return ['report' => $report, 'defect' => ApparatusDefect::query()->findOrFail($report->apparatus_defect_id), 'replayed' => true];
