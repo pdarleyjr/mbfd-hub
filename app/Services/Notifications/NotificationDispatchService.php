@@ -103,6 +103,12 @@ final class NotificationDispatchService
             }
         }
 
+        // Optional triage alerts only: skip people who turned this record's priority level off. This only removes
+        // recipients; channels and eligibility are decided above and by the notification itself.
+        if ($notification instanceof TriageGated && ($subject = $notification->triageSubject()) !== null) {
+            $recipients = app(SupportAlertLevelFilter::class)->filter($recipients, $subject['type'], $subject['id']);
+        }
+
         $claimed = [];
         if ($eventKey !== null) {
             $recipients = $recipients->filter(function (User $user) use ($categoryKey, $eventKey, &$claimed): bool {

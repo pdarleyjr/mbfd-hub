@@ -24,6 +24,7 @@ use App\Notifications\Inspections\InspectionNotificationKind as Kind;
 use App\Services\Captain5\Captain5Notifier;
 use App\Services\Inventory\InventoryCorrectionReason;
 use App\Services\Notifications\NotificationRecipientEvaluator;
+use App\Services\Notifications\SupportAlertLevelFilter;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectSeverityCorrection;
 use App\Support\Fleet\InspectionReviewers;
@@ -107,6 +108,8 @@ final class InspectionNotificationDispatcher
                     'body' => "{$operator} reported significant damage to {$item} on ".$this->date($inspection->completed_at ?? $inspection->created_at).'.',
                     'url' => $this->adminUrl((int) $inspection->getKey(), 'issue-'.$defect->getKey()),
                 ],
+                null,
+                ['type' => 'apparatus_defect', 'id' => (int) $defect->getKey()],
             );
         });
     }
@@ -532,17 +535,21 @@ final class InspectionNotificationDispatcher
     /**
      * @param  Collection<int, User>  $candidates
      * @param  Closure(User): array{title: string, body: string, url: string}  $content
+     * @param  array{type: string, id: int}|null  $triage  Set only for an OPTIONAL staff triage alert about one record: people
+     *                                                     who turned that record's priority level off are not sent it (and get no
+     *                                                     ledger row). Mandatory alerts (approvals, holds, replies, updates on a
+     *                                                     member's own report) never pass it.
      */
-    private function queue(string $eventKey, string $kind, Collection $candidates, Closure $content, ?User $actor = null): void
+    private function queue(string $eventKey, string $kind, Collection $candidates, Closure $content, ?User $actor = null, ?array $triage = null): void
     {
         if ($this->replay !== null) {
-            $this->deliverReplay($kind, $candidates, $content, $actor);
+            $this->deliverReplay($kind, $candidates, $content, $actor, $triage);
 
             return;
         }
 
         $fresh = [];
-        foreach ($this->distinctRecipients($candidates, $actor, $kind, $eventKey) as $recipient) {
+        foreach ($this->withinTriageLevels($this->distinctRecipients($candidates, $actor, $kind, $eventKey), $triage) as $recipient) {
             $inserted = DB::table('inspection_notification_deliveries')->insertOrIgnore([
                 'event_key' => $eventKey,
                 'recipient_user_id' => $recipient->getKey(),
@@ -677,10 +684,11 @@ final class InspectionNotificationDispatcher
     /**
      * @param  Collection<int, User>  $candidates
      * @param  Closure(User): array{title: string, body: string, url: string}  $content
+     * @param  array{type: string, id: int}|null  $triage
      */
-    private function deliverReplay(string $kind, Collection $candidates, Closure $content, ?User $actor): void
+    private function deliverReplay(string $kind, Collection $candidates, Closure $content, ?User $actor, ?array $triage = null): void
     {
-        $recipient = $this->distinctRecipients($candidates, $actor, $kind, $this->replay['key'])
+        $recipient = $this->withinTriageLevels($this->distinctRecipients($candidates, $actor, $kind, $this->replay['key']), $triage)
             ->first(fn (User $user): bool => (int) $user->getKey() === $this->replay['user']);
         if ($recipient === null) {
             return; // no longer an eligible recipient (inactive, now the actor, or no longer following)
@@ -697,6 +705,21 @@ final class InspectionNotificationDispatcher
                 'exception' => $exception->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Drops people who turned this record's priority level off. Evaluated here, while the alert is being decided (inside
+     * the domain transaction, before the ledger row), so the record's own current data decides its level.
+     *
+     * @param  Collection<int, User>  $recipients
+     * @param  array{type: string, id: int}|null  $triage
+     * @return Collection<int, User>
+     */
+    private function withinTriageLevels(Collection $recipients, ?array $triage): Collection
+    {
+        return $triage === null
+            ? $recipients
+            : app(SupportAlertLevelFilter::class)->filter($recipients, $triage['type'], $triage['id']);
     }
 
     private function markDelivery(string $eventKey, User $recipient, string $status): void

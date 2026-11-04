@@ -18,6 +18,7 @@ export default function StationRequestSheet({ request, onClose, returnFocusTo }:
           <p className="text-[13px] leading-5 text-hub-n-600">{request.room?.name || request.room_name_snapshot || 'Station-wide'} · Submitted {formatHubDate(request.created_at)}</p>
           {request.description && <p className="whitespace-pre-wrap break-words text-sm text-hub-n-800">{request.description}</p>}
           {request.current_public_response && <p className="rounded-hub-control border border-hub-info-border bg-hub-info-bg p-3 text-sm text-hub-n-800"><span className="font-semibold">Latest response:</span> {request.current_public_response}</p>}
+          {request.ai_receipt && <p className="text-[13px] leading-5 text-hub-n-600" data-testid="station-request-ai-receipt"><span className="font-semibold text-hub-ink">{request.ai_receipt.sender}:</span> {request.updates?.find((update) => update.is_auto_receipt)?.public_note || 'Received'}</p>}
           {(request.items?.length ?? 0) > 0 && (
             <section aria-label="Requested items">
               <h3 className="mb-2 font-heading text-base font-semibold text-hub-ink">Items</h3>
@@ -37,7 +38,7 @@ export default function StationRequestSheet({ request, onClose, returnFocusTo }:
               <ol className="space-y-2 border-l-2 border-hub-n-200 pl-4">
                 {request.updates?.map((update) => (
                   <li key={update.id} className="text-sm text-hub-n-600">
-                    <span className="font-semibold text-hub-ink">{humanize(update.status)}</span> · {formatHubDate(update.created_at)}
+                    <span className="font-semibold text-hub-ink">{humanize(update.status)}</span> · {formatHubDate(update.created_at)}{update.sender ? <> · <span className="font-semibold text-hub-ink">{update.sender}</span></> : null}
                     {update.public_note && <p className="mt-0.5 break-words">{update.public_note}</p>}
                   </li>
                 ))}

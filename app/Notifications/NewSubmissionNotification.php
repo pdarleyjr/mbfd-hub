@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\Channels\BudgetedMailChannel;
 use App\Notifications\Concerns\EvaluatesDelivery;
 use App\Services\Notifications\PushPrivacy;
+use App\Services\Notifications\TriageGated;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -19,10 +20,18 @@ use Throwable;
  * channels, is decided only by the notification evaluator (current eligibility,
  * then the member's saved choices); a saved choice never makes someone eligible.
  */
-class NewSubmissionNotification extends Notification implements ShouldQueue
+class NewSubmissionNotification extends Notification implements ShouldQueue, TriageGated
 {
     use EvaluatesDelivery;
     use Queueable;
+
+    /**
+     * The triaged record this alert is about, when it is an optional Support Services triage alert. Declared with a
+     * default (not promoted) so a job queued before this property existed still unserializes.
+     *
+     * @var array{type: string, id: int}|null
+     */
+    private ?array $triageSubject = null;
 
     /**
      * @param  string|null  $eventKey  Idempotency key (category + subject + event) recorded as provenance.
@@ -40,6 +49,22 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
         private bool $messageBearing = false,
         private ?string $pushSubject = null,
     ) {}
+
+    /**
+     * Marks this alert as an optional triage alert: recipients who turned this record's priority level off on
+     * Notification Settings are skipped when it is fanned out. Channels and eligibility are not affected.
+     */
+    public function forTriageSubject(string $type, int $id): static
+    {
+        $this->triageSubject = ['type' => $type, 'id' => $id];
+
+        return $this;
+    }
+
+    public function triageSubject(): ?array
+    {
+        return $this->triageSubject ?? null;
+    }
 
     protected function deliveryCategory(): ?string
     {

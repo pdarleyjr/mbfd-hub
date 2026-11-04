@@ -11,6 +11,7 @@ use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
+use App\Services\SupportTriage\TriageSql;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
 use App\Support\Fleet\DefectNoActionClosure;
@@ -121,10 +122,15 @@ class DefectResource extends Resource
             ]);
     }
 
+    /** Used when an issue has no projected priority yet (same rule the dashboards fall back to). */
+    private const PRIORITY_FALLBACK = "CASE WHEN apparatus_defects.issue_type IN ('missing', 'damaged') OR apparatus_defects.operational_impact = 'needs_repair' THEN 'medium' ELSE 'low' END";
+
     public static function table(Table $table): Table
     {
         return static::withExportActions(self::applyEnterpriseDefaults($table)
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['serviceTicket', 'latestStatusEvent.actor:id,name,display_name']))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['serviceTicket', 'latestStatusEvent.actor:id,name,display_name'])
+                ->select('apparatus_defects.*')
+                ->selectRaw('('.TriageSql::defectLevel(self::PRIORITY_FALLBACK).') AS priority_level'))
             ->columns([
                 Tables\Columns\TextColumn::make('apparatus.name')
                     ->wrap()
@@ -154,6 +160,18 @@ class DefectResource extends Resource
 
                 Tables\Columns\TextColumn::make('item')->visibleFrom('md')
                     ->searchable(),
+
+                // Low / Medium / High from the equipment priorities (staff may change one per issue).
+                Tables\Columns\TextColumn::make('priority_level')
+                    ->label('Priority')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => ucfirst((string) $state))
+                    ->color(fn (?string $state): string => match ($state) {
+                        'high' => 'danger',
+                        'medium' => 'warning',
+                        default => 'gray',
+                    })
+                    ->placeholder('—'),
 
                 // From action_status: "Resolved" (fixed) and "Closed — no action required" are different outcomes.
                 Tables\Columns\TextColumn::make('action_status')->visibleFrom('md')
@@ -227,6 +245,13 @@ class DefectResource extends Resource
 
                         return $query->where('resolved', ! $data['value']);
                     }),
+
+                SelectFilter::make('priority_level')
+                    ->label('Priority')
+                    ->options(['low' => 'Low', 'medium' => 'Medium', 'high' => 'High'])
+                    ->query(fn (Builder $query, array $data): Builder => blank($data['value'] ?? null)
+                        ? $query
+                        : $query->whereRaw('('.TriageSql::defectLevel(self::PRIORITY_FALLBACK).') = ?', [$data['value']])),
 
                 SelectFilter::make('follow_up')
                     ->label('Follow-up')

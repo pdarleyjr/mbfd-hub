@@ -380,6 +380,7 @@ export default function StationDetailPage() {
                       </div>
                     </div>
                     {req.current_public_response && <LatestResponse label="Latest response" text={req.current_public_response} />}
+                    {req.ai_receipt && <p className={`mt-3 ${SECONDARY}`} data-testid="ai-receipt"><span className="font-semibold text-hub-ink">{req.ai_receipt.sender}:</span> {req.updates?.find((update) => update.is_auto_receipt)?.public_note || 'Received'}</p>}
                     <p className={`mt-3 ${SECONDARY}`}>{req.room?.name || req.room_name_snapshot || 'Station-wide'} · Submitted {formatDate(req.created_at)}</p>
                     {req.updates && req.updates.length > 1 && <UpdateHistory summary={`View ${req.updates.length} updates`} updates={req.updates} />}
                   </li>
@@ -518,14 +519,14 @@ function LatestResponse({ label, text }: { label: string; text: string }) {
   return <p className="mt-3 rounded-hub-control border border-hub-info-border bg-hub-info-bg p-3 text-sm text-hub-n-800"><span className="font-semibold">{label}:</span> {text}</p>;
 }
 
-function UpdateHistory({ summary, updates }: { summary: string; updates: Array<{ id: number; status: string; created_at: string; public_note?: string | null }> }) {
+function UpdateHistory({ summary, updates }: { summary: string; updates: Array<{ id: number; status: string; created_at: string; public_note?: string | null; sender?: string | null }> }) {
   return (
     <details className="mt-3">
       <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-hub-blue">{summary}</summary>
       <ol className="mt-2 space-y-2 border-l-2 border-hub-n-200 pl-4">
         {updates.map((update) => (
           <li key={update.id} className="text-sm text-hub-n-600">
-            <span className="font-semibold text-hub-ink">{humanize(update.status)}</span> · {formatDate(update.created_at)}
+            <span className="font-semibold text-hub-ink">{humanize(update.status)}</span> · {formatDate(update.created_at)}{update.sender ? <> · <span className="font-semibold text-hub-ink">{update.sender}</span></> : null}
             {update.public_note && <p className="mt-0.5">{update.public_note}</p>}
           </li>
         ))}

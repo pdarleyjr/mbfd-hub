@@ -212,7 +212,7 @@ final class StationOverviewService
             ->with([
                 'room:id,station_id,name',
                 'items:id,station_request_id,room_asset_id,item_name,category,quantity,reason,requested_action,condition',
-                'updates' => fn ($updates) => $updates->select('id', 'station_request_id', 'status', 'public_note', 'created_at')
+                'updates' => fn ($updates) => $updates->select('id', 'station_request_id', 'status', 'public_note', 'created_at', 'automation_intake_id')
                     ->where(fn ($nested) => $nested->whereNotNull('public_note')->orWhereNotNull('status')),
             ])
             // Open requests first, so the cap can only ever drop closed ones before an open one.

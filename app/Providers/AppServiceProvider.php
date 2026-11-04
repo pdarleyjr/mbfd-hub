@@ -43,6 +43,8 @@ class AppServiceProvider extends ServiceProvider
     {
         // One messaging access decision per user per request (navigation, badge and page all ask).
         $this->app->scoped(\App\Services\Security\EmployeeLogisticsMessagingAccess::class);
+        // Support Services equipment priorities: one catalog read per request (docs/support-services-triage.md).
+        $this->app->scoped(\App\Services\SupportTriage\Contracts\EquipmentClassifier::class, \App\Services\SupportTriage\CatalogEquipmentClassifier::class);
         // Lucide icons Heroicons lacks (e.g. the EMS navigation group's medical bag), as lucide-* blade icons.
         $this->callAfterResolving(\BladeUI\Icons\Factory::class, static function (\BladeUI\Icons\Factory $icons): void {
             $icons->add('lucide', ['path' => resource_path('svg/lucide'), 'prefix' => 'lucide']);

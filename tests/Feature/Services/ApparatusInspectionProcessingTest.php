@@ -176,8 +176,11 @@ final class ApparatusInspectionProcessingTest extends TestCase
         $this->process($apparatus, $inspection, $token);
 
         // One batched lookup for the 60 submitted items, plus recordDefect()'s
-        // own lookup for the single newly reported finding (Item 3).
-        $this->assertSame(2, $defectSelects);
+        // own lookup for the single newly reported finding (Item 3), plus one batched
+        // load that sets the Support Services priority of the new and confirmed issues
+        // before reviewer alerts are filtered (docs/support-services-triage.md). Still
+        // constant: none of these grows with the number of checklist items.
+        $this->assertSame(3, $defectSelects);
         $observations = ApparatusDefectObservation::query()
             ->join('apparatus_defects', 'apparatus_defects.id', '=', 'apparatus_defect_observations.apparatus_defect_id')
             ->pluck('observation', 'apparatus_defects.item')->all();
