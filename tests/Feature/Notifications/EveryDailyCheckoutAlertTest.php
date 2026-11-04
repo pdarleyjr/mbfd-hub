@@ -36,13 +36,13 @@ final class EveryDailyCheckoutAlertTest extends TestCase
         return $this->inspectionBy($this->rig(), $by ?? $this->member('Riley Reporter'));
     }
 
-    public function test_the_category_shows_in_the_bell_by_default_keeps_phone_and_email_off_and_is_for_reviewers_only(): void
+    public function test_the_category_is_opt_in_on_every_channel_and_is_for_reviewers_only(): void
     {
         $category = app(NotificationCategoryRegistry::class)->get(self::KEY);
 
         $this->assertNotNull($category);
         $this->assertSame("Every Daily Checkout as it's submitted", $category->label);
-        $this->assertSame(['database' => true, 'webpush' => false, 'email' => false], $category->defaults, 'bell on, phone off so one alert per checkout does not bury real alerts');
+        $this->assertSame(['database' => false, 'webpush' => false, 'email' => false], $category->defaults, 'opt-in everywhere so one alert per checkout does not bury real alerts');
         $this->assertSame([], $category->locked, 'nothing is forced on');
         $this->assertSame('routine', $category->significance);
         $this->assertSame(['database', 'webpush', 'email'], $category->channels);
@@ -68,20 +68,81 @@ final class EveryDailyCheckoutAlertTest extends TestCase
         $this->assertGreaterThan(0, $inspection->id);
     }
 
-    public function test_an_eligible_reviewer_is_told_in_the_bell_unless_they_turned_it_off(): void
+    public function test_nobody_is_told_unless_they_saved_a_choice_turning_it_on(): void
     {
         $noRow = $this->reviewer();
-        $allOff = $this->reviewer();
-        $this->optIn($allOff, false, false, false);
+        $explicitOn = $this->reviewer();
+        $this->optIn($explicitOn);
+        $explicitOff = $this->reviewer();
+        $this->optIn($explicitOff, false, false, false);
         // The OLD category's saved choice has no say here; only a saved choice about THIS category counts.
         $oldChoiceOnly = $this->reviewer();
-        $this->optIn($oldChoiceOnly, false, false, false, 'vehicle_inspections');
+        $this->optIn($oldChoiceOnly, true, true, true, 'vehicle_inspections');
 
         $this->submit();
 
-        $this->assertSame(1, $noRow->notifications()->count(), 'the bell is on by default');
-        $this->assertSame(1, $oldChoiceOnly->notifications()->count(), 'the old category choice does not turn this one off');
-        $this->assertSame(0, $allOff->notifications()->count(), 'a saved all-off choice is respected');
+        $this->assertSame(0, $noRow->notifications()->count(), 'no saved choice means no bell');
+        $this->assertSame(1, $explicitOn->notifications()->count(), 'a saved ON choice is honored');
+        $this->assertSame(0, $explicitOff->notifications()->count(), 'a saved all-off choice is respected');
+        $this->assertSame(0, $oldChoiceOnly->notifications()->count(), 'the old category choice does not turn this one on');
+    }
+
+    public function test_a_clean_checkout_never_rings_the_new_daily_checkout_bell_for_anyone_who_did_not_opt_in(): void
+    {
+        $reviewers = [$this->reviewer(), $this->reviewer(), $this->reviewer()];
+        $bystander = $this->member('Pat Member');
+
+        $this->submit();
+
+        foreach ([...$reviewers, $bystander] as $person) {
+            $this->assertSame(0, $person->notifications()->count());
+        }
+        $this->assertSame(0, DB::table('notifications')->where('data', 'like', '%New Daily Checkout%')->count());
+    }
+
+    public function test_a_row_saved_before_the_default_changed_is_still_honored(): void
+    {
+        // An existing opt-in row (with the push and email columns as saved) keeps working untouched.
+        $reviewer = $this->reviewer();
+        DB::table('user_notification_subscriptions')->insert([
+            'user_id' => $reviewer->id, 'event_key' => self::KEY,
+            'database_enabled' => true, 'webpush_enabled' => false, 'email_enabled' => false,
+            'created_at' => '2026-10-24 12:00:00', 'updated_at' => '2026-10-24 12:00:00',
+        ]);
+
+        $this->submit();
+
+        $this->assertSame(1, $reviewer->notifications()->count());
+        $row = DB::table('user_notification_subscriptions')->where('user_id', $reviewer->id)->where('event_key', self::KEY)->first();
+        $this->assertSame('2026-10-24 12:00:00', (string) $row->updated_at, 'the row was not rewritten');
+    }
+
+    public function test_the_settings_page_offers_the_category_off_and_saving_it_on_creates_a_row(): void
+    {
+        $this->withoutVite();
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('employee'));
+        $reviewer = $this->reviewer();
+        $this->actingAs($reviewer);
+
+        \Livewire\Livewire::test(\App\Filament\Pages\NotificationSettings::class)
+            ->assertSuccessful()
+            ->assertFormFieldExists(self::KEY.'.database')
+            ->assertFormFieldExists(self::KEY.'.webpush')
+            ->assertFormFieldExists(self::KEY.'.email')
+            ->assertSet('data.'.self::KEY.'.database', false)
+            ->call('save');
+        $this->assertSame(0, $reviewer->notificationSubscriptions()->where('event_key', self::KEY)->count(), 'leaving it off stays unset');
+
+        \Livewire\Livewire::test(\App\Filament\Pages\NotificationSettings::class)
+            ->set('data.'.self::KEY.'.database', true)
+            ->call('save');
+
+        $row = $reviewer->notificationSubscriptions()->where('event_key', self::KEY)->sole();
+        $this->assertTrue((bool) $row->database_enabled);
+        $this->assertFalse((bool) $row->webpush_enabled);
+
+        $this->submit();
+        $this->assertSame(1, $reviewer->notifications()->count());
     }
 
     public function test_an_opted_in_person_who_is_no_longer_a_reviewer_is_not_told(): void
@@ -161,7 +222,7 @@ final class EveryDailyCheckoutAlertTest extends TestCase
 
         $this->assertTrue($decision->eligible);
         $this->assertSame(['database'], $decision->channels, 'push needs a healthy device and email needs a city address');
-        $this->assertSame(['database'], $evaluator->decide($this->reviewer(), self::KEY)->channels, 'no row means the bell only');
+        $this->assertSame([], $evaluator->decide($this->reviewer(), self::KEY)->channels, 'no row means nothing is sent');
     }
 
     // ------------------------------------------------------------------ data migration

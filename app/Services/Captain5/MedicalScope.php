@@ -23,8 +23,8 @@ final class MedicalScope
 
     public const UNCLASSIFIED = 'unclassified';
 
-    /** Templates whose medical portion Captain 5 oversees. */
-    public const MEDICAL_ONLY_TYPES = ['engine', 'engine2', 'ladder1', 'ladder3'];
+    /** Templates whose medical portion Captain 5 oversees (a Rescue's tools and SCBA are Logistics'). */
+    public const MEDICAL_ONLY_TYPES = ['engine', 'engine2', 'ladder1', 'ladder3', 'rescue', 'fireboat6'];
 
     /** @var array<string, array<string, string>>|null checklist_type => item_key => classification */
     private ?array $decisions = null;

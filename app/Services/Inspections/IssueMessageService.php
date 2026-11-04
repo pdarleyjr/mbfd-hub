@@ -371,7 +371,10 @@ final class IssueMessageService
     /** A Captain 5 officer may read this thread (in-scope issue, or a Rescue / in-scope inspection). */
     private function captain5Reads(User $user, ?ApparatusInspection $inspection, ?ApparatusDefect $defect): bool
     {
-        return $this->captain5Access->decide($user)->canViewData && $this->captain5Covers($inspection, $defect);
+        // An open issue Captain 5 sent to Logistics stays readable from the Captain 5 page (for Bring back), never writable.
+        $sentToLogistics = $defect !== null && \App\Services\Captain5\Captain5IssueClearing::isCleared($defect) && ! $defect->resolved;
+
+        return $this->captain5Access->decide($user)->canViewData && ($sentToLogistics || $this->captain5Covers($inspection, $defect));
     }
 
     /** A Captain 5 actor (not a reviewer, who already writes everywhere) may write to this thread. */

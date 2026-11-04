@@ -87,7 +87,8 @@ final class VehicleAdapter implements DomainAdapter
         $id = (int) $intake->source_id;
 
         return match ($intake->source_type) {
-            self::SOURCE_INSPECTION => $this->inspectionFacts($id),
+            // Only a live row can earn the clean receipt; a backlog row (or the backlog scan) never does.
+            self::SOURCE_INSPECTION => $this->inspectionFacts($id, $intake->origin === AiIntakeEvent::ORIGIN_LIVE),
             self::SOURCE_ISSUE_MESSAGE => $this->messageFacts($id),
             default => $this->unusable(self::KIND_FINDINGS, 'unknown_source'),
         };
@@ -187,7 +188,11 @@ final class VehicleAdapter implements DomainAdapter
 
     // ------------------------------------------------------------------ inspection facts
 
-    private function inspectionFacts(int $id): IntakeFacts
+    /**
+     * @param  bool  $allowClean  a live checkout with no new and no confirmed-again finding is answered with the
+     *                            deterministic clean receipt (empty findings); never true for backlog work
+     */
+    private function inspectionFacts(int $id, bool $allowClean = false): IntakeFacts
     {
         $inspection = ApparatusInspection::query()->find($id);
         if ($inspection === null) {
@@ -219,7 +224,18 @@ final class VehicleAdapter implements DomainAdapter
             ->orderBy('id')
             ->get();
         if ($observations->isEmpty()) {
-            return $refuse('no_findings');
+            if (! $allowClean) {
+                return $refuse('no_findings');
+            }
+
+            // Nothing new to answer: the one-line receipt, unless staff or the assistant already wrote on the checkout's thread.
+            return new IntakeFacts(
+                domain: $this->domain(),
+                kind: self::KIND_FINDINGS,
+                requesterUserId: $requester,
+                alreadyAnswered: $this->inspectionAnswered($inspection, [], new Collection),
+                submittedAt: $submittedAt,
+            );
         }
 
         $defects = ApparatusDefect::query()->whereIn('id', $observations->pluck('apparatus_defect_id')->all())->get()->keyBy('id');

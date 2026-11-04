@@ -18,6 +18,7 @@ use App\Http\Controllers\Auth\MemberBootstrapOnboardingController;
 use App\Http\Controllers\Auth\MemberOnboardingInvitationController;
 use App\Http\Controllers\Auth\MemberSelfServiceActivationController;
 use App\Http\Controllers\DepartmentUpdateController;
+use App\Http\Controllers\Employee\MemberActivityOpenController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
 use App\Http\Controllers\Employee\OperationalForms\FormGenerationController;
@@ -270,6 +271,13 @@ Route::prefix('employee')
             ->middleware('throttle:30,1')
             ->name('attachments.download');
     });
+
+// My activity: opening an item marks it seen for the signed-in member, then redirects to the record.
+// The controller resolves the key from the member's own records only; anyone else's key is a 404.
+Route::get('employee/activity/open/{key}', MemberActivityOpenController::class)
+    ->middleware([EnsureEmployeeAuthenticated::class, 'throttle:120,1'])
+    ->where('key', '[a-z_]{3,32}:[0-9]{1,12}')
+    ->name('employee.activity.open');
 
 // Employee > Resources library files. Streamed from private storage; unpublished or deleted documents are 404.
 Route::prefix('employee/resources')

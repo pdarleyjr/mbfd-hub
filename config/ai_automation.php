@@ -148,6 +148,11 @@ return [
             'help' => 'Default reply when nothing more is useful.',
             'body' => 'Acknowledged.',
         ],
+        'clean_receipt' => [
+            'label' => 'Clean checkout receipt',
+            'help' => 'Live vehicle checkouts that report no new issue and confirm no earlier one. One line in the checkout thread, never a bell.',
+            'body' => 'Inspection received and recorded. No new issues reported.',
+        ],
         'receipt_forwarded' => [
             'label' => 'Acknowledgment, forwarded',
             'help' => 'Station requests that reached the staff work list.',

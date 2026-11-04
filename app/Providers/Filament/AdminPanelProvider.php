@@ -135,6 +135,7 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Admin\Pages\MediaControlMedia::class,
                 \App\Filament\Training\Pages\TrainingCrewPlanner::class,
                 KnowledgeBase::class,
+                \App\Filament\Admin\Pages\OperationsActivity::class,
             ])
             ->widgets([
                 FleetStatsWidget::class,

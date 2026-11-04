@@ -111,7 +111,8 @@ final class Captain5Controller extends Controller
     public function issue(Request $request, int $defect): JsonResponse
     {
         $user = $this->user($request);
-        $model = $this->inScope($defect);
+        // Also an open issue Captain 5 sent to Logistics: shown for reference and Bring back (no other action applies).
+        $model = $this->inScope($defect, allowSentToLogistics: true);
 
         return $this->json(['issue' => $this->presenter()->detail($model, $user, $this->access()->decide($user))]);
     }
@@ -219,10 +220,11 @@ final class Captain5Controller extends Controller
         return app(OnDutyOfficerDisplayResolver::class)->resolve(Captain5ActingRequest::ROLE_CAPTAIN_5)->toArray();
     }
 
-    private function inScope(int $defectId): ApparatusDefect
+    private function inScope(int $defectId, bool $allowSentToLogistics = false): ApparatusDefect
     {
         $defect = ApparatusDefect::query()->with('firstReporter')->find($defectId);
-        if ($defect === null || ! $this->scope()->inScope($defect)) {
+        $sent = $allowSentToLogistics && $defect !== null && \App\Services\Captain5\Captain5IssueClearing::isCleared($defect);
+        if ($defect === null || (! $sent && ! $this->scope()->inScope($defect))) {
             throw new AuthorizationException('Not available.');
         }
         $this->scope()->attachApparatus(collect([$defect]));

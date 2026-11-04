@@ -89,7 +89,7 @@ final class Captain5AdministrationService
     {
         $this->authorize($actor);
         if (! in_array($checklistType, MedicalScope::MEDICAL_ONLY_TYPES, true)) {
-            throw ValidationException::withMessages(['checklist_type' => 'Only Engine and Ladder templates have a medical classification.']);
+            throw ValidationException::withMessages(['checklist_type' => 'This checklist has no medical classification.']);
         }
         if (! in_array($classification, [Captain5ItemClassification::MEDICAL, Captain5ItemClassification::NOT_MEDICAL], true)) {
             throw ValidationException::withMessages(['classification' => 'Choose medical or not medical.']);
@@ -128,6 +128,10 @@ final class Captain5AdministrationService
             'classification' => $classification,
         ]);
         $this->medical->flush();
+        // The decision moves open issues on that item to the right queue now, with an owner_transferred event each.
+        app(\App\Services\Captain5\Captain5IssueScope::class)->flush();
+        $moved = app(\App\Services\Defects\DefectOwnership::class)->reproject(false, null, $checklistType, $itemKey);
+        Log::info('captain5.medical_scope_reprojected', ['checklist_type' => $checklistType, 'item_key' => $itemKey, ...$moved]);
 
         return $row;
     }

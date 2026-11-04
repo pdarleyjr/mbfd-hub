@@ -138,7 +138,9 @@ final class MemberIssueHistory
                 'reporter_name' => $this->text($defect->getAttribute('reporter_name')),
                 'first_reported_at' => $this->at($defect->first_reported_at),
                 'action_status' => $status,
-                'action_label' => DefectActionStatus::label($status),
+                'action_label' => $status === DefectActionStatus::ACKNOWLEDGED && $defect->getAttribute('responsible_owner') === ApparatusDefect::OWNER_CAPTAIN5
+                    ? 'Acknowledged by Captain 5'
+                    : DefectActionStatus::label($status),
                 'closure_kind' => DefectActionStatus::closureKind($status),
                 'latest_action' => $latest[(int) $defect->id] ?? null,
                 'last_observation' => $defect->latestObservation?->observation,
@@ -146,6 +148,9 @@ final class MemberIssueHistory
                 'service_status' => $defect->serviceTicket?->status,
                 'recurrence_of_defect_id' => $defect->recurrence_of_defect_id !== null ? (int) $defect->recurrence_of_defect_id : null,
                 'history_count' => $counts[(int) $defect->id] ?? 0,
+                // Who works it, and whether a member can say it is fixed (docs/unified-activity-and-ownership.md).
+                'owner' => $defect->getAttribute('responsible_owner') ?? app(DefectOwnership::class)->ownerOf($defect),
+                'member_correction' => DefectMemberCorrection::stateFor($defect),
             ];
         })->all();
     }

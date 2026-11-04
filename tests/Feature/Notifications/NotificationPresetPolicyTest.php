@@ -33,7 +33,8 @@ final class NotificationPresetPolicyTest extends TestCase
         'member_request_updates' => [true, true, true],
         'department_updates' => [true, true, false],
         'vehicle_inspections' => [true, true, false],
-        'daily_checkout_every_submission' => [true, false, false],
+        // Opt-in on every channel: nothing, bell included, until a member saves a choice (2026-11-04).
+        'daily_checkout_every_submission' => [false, false, false],
         'vehicle_swap_reports' => [true, true, true],
         'vehicle_identification_reports' => [true, true, true],
         'fleet_operational_alerts' => [true, false, false],
@@ -127,7 +128,7 @@ final class NotificationPresetPolicyTest extends TestCase
                     $this->assertFalse($category->defaults[$channel], "{$category->key} cannot send {$channel}");
                 }
             }
-            $this->assertTrue($category->defaults['database'], "{$category->key}: the bell is on");
+            $this->assertSame(! in_array($category->key, ['daily_checkout_every_submission'], true), $category->defaults['database'], "{$category->key}: the bell is on (except the opt-in category)");
         }
     }
 
@@ -165,7 +166,7 @@ final class NotificationPresetPolicyTest extends TestCase
     {
         $user = $this->member();
         $this->assertSame(['database_enabled' => true, 'webpush_enabled' => true, 'email_enabled' => true], UserNotificationSubscription::presetFor('member_request_updates'));
-        $this->assertSame(['database_enabled' => true, 'webpush_enabled' => false, 'email_enabled' => false], UserNotificationSubscription::presetFor('daily_checkout_every_submission'));
+        $this->assertSame(['database_enabled' => false, 'webpush_enabled' => false, 'email_enabled' => false], UserNotificationSubscription::presetFor('daily_checkout_every_submission'));
 
         UserNotificationSubscription::ensureVehicleSwapForUser($user->id);
         $this->assertSame([true, true, true], $this->stored($user, 'vehicle_swap_reports'));

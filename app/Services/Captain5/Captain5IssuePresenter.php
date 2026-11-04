@@ -11,6 +11,7 @@ use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Services\Defects\DefectCorrectiveActionService;
+use App\Services\Defects\DefectMemberCorrection;
 use App\Services\Inspections\IssueMessageService;
 use App\Services\Security\Captain5AccessDecision;
 use App\Support\Captain5\EventActorLabel;
@@ -83,7 +84,7 @@ final class Captain5IssuePresenter
             'details' => array_intersect_key($details, array_flip(Captain5ActorContext::DETAIL_KEYS)),
             'expected_delivery' => $expected,
             'overdue' => $open && $expected !== null && $expected < $today,
-            'awaiting_verification' => $open && $latest?->observation === 'appears_corrected',
+            'awaiting_verification' => DefectMemberCorrection::awaitingVerification($defect, $latest),
             'first_reported_at' => $this->iso($defect->first_reported_at ?? $defect->created_at),
             'first_reported_by' => $reporter instanceof User ? $this->name($reporter) : null,
             'last_observed_at' => $this->iso($defect->last_observed_at),
@@ -147,7 +148,7 @@ final class Captain5IssuePresenter
             'at' => $this->iso($message->created_at),
         ])->values()->all();
 
-        $actions = $this->allowedActions($defect, $decision, $latest?->observation === 'appears_corrected');
+        $actions = $this->allowedActions($defect, $decision, DefectMemberCorrection::awaitingVerification($defect, $latest instanceof ApparatusDefectObservation ? $latest : null));
 
         return [
             ...$this->summary($defect, $latest instanceof ApparatusDefectObservation ? $latest : null),
@@ -201,7 +202,9 @@ final class Captain5IssuePresenter
         if ($decision->canDismiss) {
             $actions[] = 'dismiss';
         }
-        $actions[] = Captain5IssueClearing::ACTION_CLEAR;
+        if ((string) $defect->compartment_key !== ApparatusDefect::STRETCHER_REPORT_COMPARTMENT) {
+            $actions[] = Captain5IssueClearing::ACTION_CLEAR; // stretcher reports always stay with Captain 5
+        }
 
         return $actions;
     }

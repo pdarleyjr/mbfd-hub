@@ -105,6 +105,8 @@
         <a href="{{ route('account.show') }}">My account</a>
     </nav>
 
+    @include('filament.employee.partials.my-activity-card', ['items' => $activity])
+
     {{-- Two columns: Recent Equipment + Recent Requests --}}
     <div class="ep-two-col">
         {{-- Recent Equipment --}}

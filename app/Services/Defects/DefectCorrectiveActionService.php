@@ -352,10 +352,16 @@ final class DefectCorrectiveActionService
             $defect->resolved_by_user_id = null;
             $defect->resolution_type = null;
             $defect->resolution_notes = null;
-            // Open again means back on every queue that covers it, Captain 5's included.
+            // Open again means back with the owner its equipment belongs to: a person's earlier move does not stick.
             $defect->captain5_cleared_at = null;
             $defect->captain5_cleared_by_user_id = null;
+            $defect->correction_reported_at = null;
+            $defect->correction_reported_by_user_id = null;
+            if ($defect->owner_basis === DefectOwnership::BASIS_MANUAL) {
+                $defect->owner_basis = null;
+            }
             $defect->save();
+            app(DefectOwnership::class)->project($defect, 'reopened');
 
             return $this->spec('reopened', $from, $to, $data, ['reason' => trim($data['reason']), ...$previous]);
         });
@@ -387,6 +393,21 @@ final class DefectCorrectiveActionService
                 ->where('apparatus_defect_id', $defect->getKey())
                 ->orderByDesc('id')
                 ->first();
+            $reported = $defect->correction_reported_at;
+            $memberReportIsNewer = $reported !== null && ($latest === null || $reported->greaterThanOrEqualTo($latest->created_at));
+            if ($memberReportIsNewer) {
+                // A member said it is fixed outside a checkout (docs/unified-activity-and-ownership.md section 3).
+                return $this->close(
+                    $defect,
+                    $actor,
+                    DefectActionStatus::RESOLVED,
+                    'correction_verified',
+                    $data['resolution_type'] ?? 'item_located',
+                    $data['notes'] ?? 'Correction verified: a member reported the item fixed.',
+                    $data,
+                    ['verified_member_report_at' => $reported->toIso8601String()],
+                );
+            }
             if ($latest === null || $latest->observation !== 'appears_corrected') {
                 throw ValidationException::withMessages([
                     'defect' => 'The latest inspection did not report this item as present, so there is no correction to verify.',

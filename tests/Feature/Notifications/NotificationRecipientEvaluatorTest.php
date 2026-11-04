@@ -80,7 +80,7 @@ final class NotificationRecipientEvaluatorTest extends TestCase
         $this->assertTrue($registry->get('department_updates')->defaults['webpush'], 'department notices keep their existing push default');
         $this->assertSame(['database' => true, 'webpush' => true, 'email' => true], $registry->get('vehicle_swap_reports')->defaults);
         $this->assertSame(['database' => true, 'webpush' => true, 'email' => true], $registry->get('vehicle_identification_reports')->defaults);
-        $this->assertSame(['database' => true, 'webpush' => false, 'email' => false], $registry->get('daily_checkout_every_submission')->defaults, 'the bell only: one phone alert per checkout would bury real alerts');
+        $this->assertSame(['database' => false, 'webpush' => false, 'email' => false], $registry->get('daily_checkout_every_submission')->defaults, 'opt-in on every channel: one alert per checkout would bury real alerts');
     }
 
     public function test_an_unknown_category_and_an_inactive_account_get_a_machine_reason(): void

@@ -40,6 +40,8 @@ class PublicStationRequestResource extends JsonResource
             'current_public_response' => $stationRequest->current_public_response,
             'acknowledged_at' => $stationRequest->acknowledged_at,
             'completed_at' => $stationRequest->completed_at,
+            // Whether this member may mark it resolved (docs/unified-activity-and-ownership.md section 3). Server-decided.
+            'member_resolution' => \App\Support\Stations\StationRequestMemberAccess::resolutionFor($request->user(), $stationRequest),
             'created_at' => $stationRequest->created_at,
             'updated_at' => $stationRequest->updated_at,
             'items' => $this->whenLoaded('items', fn () => $stationRequest->items->map(fn (StationRequestItem $item): array => [

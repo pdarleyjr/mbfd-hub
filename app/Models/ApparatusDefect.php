@@ -99,7 +99,26 @@ class ApparatusDefect extends Model
         'last_observed_at' => 'datetime',
         'acknowledged_at' => 'datetime',
         'captain5_cleared_at' => 'datetime',
+        'owner_set_at' => 'datetime',
+        'correction_reported_at' => 'datetime',
     ];
+
+    /** Captain 5's queue. Written only by App\Services\Defects\DefectOwnership. */
+    public const OWNER_CAPTAIN5 = 'captain5';
+
+    /** Logistics / Support Services (the Admin queues). */
+    public const OWNER_LOGISTICS = 'logistics';
+
+    /** Pseudo-compartment of a standalone stretcher report (no inspection; always Captain 5). */
+    public const STRETCHER_REPORT_COMPARTMENT = 'stretcher_report';
+
+    /** Issues in the Logistics work queues: everything not owned by Captain 5 (unprojected rows included). */
+    public function scopeLogisticsQueue(Builder $query): Builder
+    {
+        $column = $query->getModel()->qualifyColumn('responsible_owner');
+
+        return $query->where(fn (Builder $owner) => $owner->whereNull($column)->orWhere($column, '<>', self::OWNER_CAPTAIN5));
+    }
 
     public function scopeUnresolved(Builder $query): Builder
     {

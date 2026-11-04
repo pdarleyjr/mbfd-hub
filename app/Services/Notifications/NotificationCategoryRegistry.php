@@ -191,14 +191,14 @@ final class NotificationCategoryRegistry
                     ? 'inspection_reviewer' : null,
                 candidates: $fleetReviewers,
             ),
-            // Restores the old "tell me when a vehicle inspection is submitted" choice. The bell is on by default;
-            // phone alerts stay off (one per apparatus checkout a day would bury real alerts, see
-            // NotificationPresetPolicy). A saved choice never grants access: a person who stops being a
-            // reviewer stops receiving it at once.
+            // Restores the old "tell me when a vehicle inspection is submitted" choice. Opt-in on every channel
+            // (one per apparatus checkout a day would bury real alerts, see NotificationPresetPolicy): nobody gets
+            // it until they save a choice, and saved choices are always honored. A saved choice never grants
+            // access: a person who stops being a reviewer stops receiving it at once.
             new NotificationCategory(
                 key: User::NOTIFICATION_PREFERENCE_DAILY_CHECKOUT_EVERY_SUBMISSION,
                 label: "Every Daily Checkout as it's submitted",
-                description: 'A message each time a crew submits a Daily Checkout, even when nothing is wrong. It shows in the bell; phone alerts for it are off unless you turn them on.',
+                description: 'A message each time a crew submits a Daily Checkout, even when nothing is wrong. Everything is off until you turn on the bell, phone or email here.',
                 group: self::GROUP_FLEET,
                 channels: $all,
                 locked: [],

@@ -28,7 +28,7 @@ final class Captain5CloseNoActionTest extends TestCase
     use BuildsCaptain5World;
     use RefreshDatabase;
 
-    private const RESCUE_ITEM = 'compartment_c-item-3'; // Bolt Cutters (Rescue: always in scope)
+    private const RESCUE_ITEM = 'patient_compartment-item-5'; // LifePak 15 (Rescue medical: Captain 5's)
 
     private const REASON = 'Entered against the wrong Rescue by mistake.';
 

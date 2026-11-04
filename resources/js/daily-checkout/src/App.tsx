@@ -12,6 +12,7 @@ import SavedWorkElsewhereNotice from './pwa/SavedWorkElsewhereNotice';
 const ApparatusList = lazy(() => import('./components/ApparatusList'));
 const InspectionWizard = lazy(() => import('./components/InspectionWizard'));
 const ApparatusIssuesPage = lazy(() => import('./components/findings/ApparatusIssuesPage'));
+const StretcherIssuePage = lazy(() => import('./components/findings/StretcherIssuePage'));
 const StationListPage = lazy(() => import('./components/StationListPage'));
 const StationDetailPage = lazy(() => import('./components/StationDetailPage'));
 const Command300Page = lazy(() => import('./components/Command300Page'));
@@ -69,6 +70,8 @@ function DailyShell() {
             <Route path="/vehicle-inspections/:slug" element={<InspectionWizard />} />
             {/* Read-only: open issues, their history and earlier closed issues for one apparatus. */}
             <Route path="/vehicle-inspections/:slug/issues" element={<ApparatusIssuesPage />} />
+            {/* Stretcher report: from a unit's issues page (unit known) or the Forms Hub (unit chosen first). */}
+            <Route path="/vehicle-inspections/:slug/stretcher-issue" element={<StretcherIssuePage />} />
             <Route path="/vehicle-inspections/success" element={<SuccessPage />} />
             {/* Legacy apparatus routes */}
             <Route path="/apparatuses" element={<ApparatusList />} />
@@ -90,6 +93,7 @@ function DailyShell() {
             {/* Forms Hub Routes */}
             <Route path="/forms-hub" element={<FormsHub />} />
             <Route path="/forms-hub/station-request" element={<StationRequestWizard />} />
+            <Route path="/forms-hub/stretcher-issue" element={<StretcherIssuePage />} />
             <Route path="/forms-hub/big-ticket-request" element={<LegacyStationRequestRedirect type="repair_service" />} />
             <Route path="/forms-hub/station-inventory" element={<StationInventoryForm />} />
             <Route path="/forms-hub/equipment-request" element={<LegacyStationRequestRedirect type="equipment" />} />

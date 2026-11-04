@@ -79,10 +79,9 @@ final class Captain5Workspace
     /** @return Collection<int, ApparatusDefect> open issues Captain 5 cleared for Logistics; a closed one is in History instead */
     public function clearedIssues(): Collection
     {
-        [$issues] = $this->scope->collect(
-            $this->scope->candidateQuery()->where('resolved', false)->whereNotNull('captain5_cleared_at')->with(['firstReporter', 'captain5ClearedBy']),
-            self::OPEN_LIMIT,
-        );
+        // Moved to Logistics, so no longer in scope: listed as they are, newest first, for Bring back.
+        $issues = $this->scope->sentToLogisticsQuery()->with(['firstReporter', 'captain5ClearedBy'])
+            ->orderByDesc('id')->limit(self::OPEN_LIMIT)->get();
 
         return $this->scope->attachApparatus($issues);
     }
@@ -140,7 +139,9 @@ final class Captain5Workspace
             ->orderByDesc('id')
             ->get(['id', 'apparatus_id', 'operator_name', 'rank', 'created_at', 'completed_at', 'processing_status', 'review_status'])
             ->unique('apparatus_id')->keyBy('apparatus_id');
-        $openCounts = ApparatusDefect::query()->whereIn('apparatus_id', $ids)->where('resolved', false)->whereNull('captain5_cleared_at')
+        $openCounts = ApparatusDefect::query()->whereIn('apparatus_id', $ids)->where('resolved', false)
+            ->where(fn ($owned) => $owned->where('responsible_owner', ApparatusDefect::OWNER_CAPTAIN5)
+                ->orWhere(fn ($unprojected) => $unprojected->whereNull('responsible_owner')->whereNull('captain5_cleared_at')))
             ->selectRaw('apparatus_id, count(*) as open_count')->groupBy('apparatus_id')->pluck('open_count', 'apparatus_id');
 
         return $rescues->map(function (Apparatus $apparatus) use ($inspections, $openCounts): array {

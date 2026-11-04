@@ -28,7 +28,7 @@ final class Captain5AuditVisibilityTest extends TestCase
     use BuildsCaptain5World;
     use RefreshDatabase;
 
-    private const RESCUE_ITEM = 'compartment_c-item-3'; // Bolt Cutters (Rescue: always in scope)
+    private const RESCUE_ITEM = 'patient_compartment-item-5'; // LifePak 15 (Rescue medical: Captain 5's)
 
     private User $captain;
 
@@ -59,7 +59,7 @@ final class Captain5AuditVisibilityTest extends TestCase
         $this->actAs($this->newReviewer('Logistics Reviewer'));
 
         $this->get('/admin/inspections/'.$this->defect->first_reported_inspection_id)->assertOk()
-            ->assertSee('Acknowledged: Bolt Cutters')
+            ->assertSee('Acknowledged: LifePak 15')
             ->assertSee('Captain 5 (on shift) · Captain Alpha');
     }
 

@@ -25,7 +25,7 @@ final class Captain5MessagingAndInvariantsTest extends TestCase
     use BuildsCaptain5World;
     use RefreshDatabase;
 
-    private const RESCUE_ITEM = 'compartment_c-item-3';
+    private const RESCUE_ITEM = 'patient_compartment-item-5'; // LifePak 15 (Rescue medical: Captain 5's)
 
     private User $captainA;
 
@@ -93,8 +93,15 @@ final class Captain5MessagingAndInvariantsTest extends TestCase
         $captainCopy = DB::table('inspection_notification_deliveries')->where('event_key', 'captain5:message:'.$reply->id.':reply')->pluck('recipient_user_id')->all();
         self::assertSame([(int) $this->captainA->id], array_map('intval', $captainCopy));
         $reviewerCopy = DB::table('inspection_notification_deliveries')->where('event_key', 'message:'.$reply->id.':notify')->pluck('recipient_user_id')->all();
-        self::assertContains((int) $reviewer->id, array_map('intval', $reviewerCopy), 'Existing reviewer routing is unchanged');
+        // One owner, one alert: a Logistics reviewer who never touched Captain 5's issue is not told (they used to be).
+        self::assertNotContains((int) $reviewer->id, array_map('intval', $reviewerCopy), 'Logistics is not alerted about Captain 5\'s issue');
         self::assertNotContains((int) $reviewer->id, array_map('intval', $captainCopy), 'No duplicate for reviewers');
+
+        // A reviewer who did join the conversation keeps hearing the replies.
+        app(IssueMessageService::class)->post($reviewer, ['defect_id' => $defect->id, 'body' => 'Logistics has a spare in the bay.', 'client_message_id' => (string) Str::uuid(), 'visibility' => 'member']);
+        $second = app(IssueMessageService::class)->post($reporter->fresh(), ['defect_id' => $defect->id, 'body' => 'Thanks, picking it up.', 'client_message_id' => (string) Str::uuid()]);
+        $joined = DB::table('inspection_notification_deliveries')->where('event_key', 'message:'.$second->id.':notify')->pluck('recipient_user_id')->all();
+        self::assertContains((int) $reviewer->id, array_map('intval', $joined));
     }
 
     public function test_clarification_request_and_internal_note_visibility(): void
@@ -151,7 +158,7 @@ final class Captain5MessagingAndInvariantsTest extends TestCase
 
         // Every submission still reaches the admin queue (canonical inspection page renders).
         $this->actAs($reviewer);
-        $this->get('/admin/inspections/'.$rescueDefect->first_reported_inspection_id)->assertOk()->assertSee('Bolt Cutters');
+        $this->get('/admin/inspections/'.$rescueDefect->first_reported_inspection_id)->assertOk()->assertSee('LifePak 15');
     }
 
     public function test_significant_damage_alerts_admin_reviewers_and_the_captain5_side_once(): void

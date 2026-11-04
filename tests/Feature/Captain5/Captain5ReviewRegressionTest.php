@@ -28,7 +28,7 @@ final class Captain5ReviewRegressionTest extends TestCase
     use BuildsCaptain5World;
     use RefreshDatabase;
 
-    private const RESCUE_ITEM = 'compartment_c-item-3';
+    private const RESCUE_ITEM = 'patient_compartment-item-5'; // LifePak 15 (Rescue medical: Captain 5's)
 
     protected function setUp(): void
     {
@@ -79,7 +79,7 @@ final class Captain5ReviewRegressionTest extends TestCase
         ]);
         $defect = ApparatusDefect::query()->create([
             'apparatus_id' => $reserve->id, 'apparatus_inspection_id' => $inspection->id, 'first_reported_inspection_id' => $inspection->id,
-            'compartment' => 'L2', 'item' => 'Bolt Cutters', 'item_key' => self::RESCUE_ITEM, 'status' => 'open', 'issue_type' => 'missing',
+            'compartment' => 'Patient Compartment', 'item' => 'LifePak 15', 'item_key' => self::RESCUE_ITEM, 'status' => 'open', 'issue_type' => 'missing',
         ]);
         $this->forgetCaptain5Memo();
 

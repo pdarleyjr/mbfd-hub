@@ -60,7 +60,9 @@ final class ResponseComposer
     private function forFindings(IntakeFacts $facts, bool $weekend): ComposedReply
     {
         if ($facts->findings === []) {
-            return $this->receipt(['no_findings']);
+            // An eligible checkout with nothing to answer (VehicleAdapter only builds this for a live row): the fixed
+            // one-line receipt. Template path only, no model call, no weekend line.
+            return $this->template('clean_receipt', ComposedReply::RECEIPT_ONLY, ['clean_checkout']);
         }
 
         $assessed = [];
