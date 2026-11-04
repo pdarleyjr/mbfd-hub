@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\AiAutomation;
 
+use App\Models\ApparatusDefect;
 use App\Services\AiAutomation\Knowledge\KnowledgeLibrary;
 use App\Services\AiAutomation\Model\WorkersAiClient;
+use App\Services\Defects\DefectOwnership;
 use App\Services\SupportTriage\Contracts\EquipmentClassifier;
 use App\Services\SupportTriage\EquipmentClassification;
 use App\Services\SupportTriage\TriageProjector;
@@ -100,7 +102,7 @@ final class ResponseComposer
      */
     private function assess(Finding $finding, int $index): array
     {
-        $cls = $this->classifier->classifyItem($finding->itemName, $finding->note, $finding->apparatusType, $finding->significant, $finding->condition);
+        $cls = $this->ownedBy($this->classifier->classifyItem($finding->itemName, $finding->note, $finding->apparatusType, $finding->significant, $finding->condition), $finding->defectId);
         // The defect's projected level is what staff see (including a staff override); the catalog fills in the rest.
         $level = $this->projectedLevel($finding->defectId) ?? $cls->level;
         $leak = preg_match(self::LEAK_WORDS, $finding->itemName.' '.($finding->note ?? '')) === 1;
@@ -190,7 +192,7 @@ final class ResponseComposer
         $best = $this->classifier->classifyText($text, 'support');
         $bestChoice = $this->selector->choose($best, $best->level, 'message');
         foreach ($findings as $finding) {
-            $cls = $this->classifier->classifyItem($finding->itemName, $finding->note ?? $text, $finding->apparatusType, $finding->significant, $finding->condition);
+            $cls = $this->ownedBy($this->classifier->classifyItem($finding->itemName, $finding->note ?? $text, $finding->apparatusType, $finding->significant, $finding->condition), $finding->defectId);
             $level = $this->projectedLevel($finding->defectId) ?? $cls->level;
             if (EquipmentClassification::rank($level) > EquipmentClassification::rank($best->level) || ($best->unclassified && ! $cls->unclassified)) {
                 $best = $cls;
@@ -294,6 +296,31 @@ final class ResponseComposer
         $age = $now->getTimestamp() - $facts->submittedAt->getTimestamp();
 
         return $age >= -3600 && $age <= (int) config('ai_automation.reply.weekend_line_max_age_hours', 48) * 3600;
+    }
+
+    /**
+     * One owner per equipment issue (docs/unified-activity-and-ownership.md section 1): when the finding is recorded on
+     * a defect, its responsible owner decides between Captain 5 and Support Services wording, not the catalog's
+     * keyword guess. Air tech, fleet, station and 300 handlers are Logistics' own specialists and are kept.
+     */
+    private function ownedBy(EquipmentClassification $cls, ?int $defectId): EquipmentClassification
+    {
+        if ($defectId === null) {
+            return $cls;
+        }
+
+        try {
+            $defect = ApparatusDefect::query()->find($defectId);
+            $owner = $defect instanceof ApparatusDefect ? app(DefectOwnership::class)->ownerOf($defect) : null;
+        } catch (Throwable) {
+            return $cls; // an ownership problem must never stop the member being answered
+        }
+
+        return match (true) {
+            $owner === ApparatusDefect::OWNER_CAPTAIN5 && $cls->handler !== 'captain5' => $cls->withHandler('captain5', 'owner_captain5'),
+            $owner === ApparatusDefect::OWNER_LOGISTICS && $cls->handler === 'captain5' => $cls->withHandler('support_services', 'owner_logistics'),
+            default => $cls,
+        };
     }
 
     /** The triage level staff see for this defect, or null when it has no projection row yet (the catalog level is used). */

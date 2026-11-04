@@ -93,7 +93,9 @@ final class ApparatusDefectSource extends VehicleIssueSource
         // One responsible queue: Captain 5's issues are worked in the Captain 5 workspace, not here. They stay in the
         // apparatus, inspection and Defects history, and Latest Activity shows them read-only.
         $query->where(fn (Builder $owner) => $owner->whereNull('apparatus_defects.responsible_owner')
-            ->orWhere('apparatus_defects.responsible_owner', '<>', ApparatusDefect::OWNER_CAPTAIN5));
+            ->orWhere('apparatus_defects.responsible_owner', '<>', ApparatusDefect::OWNER_CAPTAIN5)
+            // Cleared to Logistics by the previous image and not adopted yet: Logistics' work, never in neither queue.
+            ->orWhere(fn (Builder $clear) => DefectOwnership::whereUnadoptedClear($clear, 'apparatus_defects')));
         $query->where(fn (Builder $board) => $board
             ->where('apparatus_defects.resolved', false)
             ->orWhere(fn (Builder $closed) => $closed

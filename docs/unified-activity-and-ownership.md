@@ -49,7 +49,10 @@ unprojected row:
 - Admin Overview `ApparatusDefectSource` excludes `responsible_owner = 'captain5'` from its work rows.
   The issue stays visible in apparatus, station, inspection and Defects history for authorized staff.
 - `ApparatusDefectObserver` admin alert, `Captain5Notifier`, `InspectionNotificationDispatcher::issueEscalated`.
-- AI replies pick Captain 5 wording when the owner is `captain5`.
+- AI replies pick Captain 5 wording when the owner is `captain5`, and Support Services wording when a catalog
+  "Captain 5" item is owned by Logistics (`ResponseComposer::ownedBy`, reason codes `owner_captain5` /
+  `owner_logistics`). Air tech, fleet, station and 300 handlers are kept.
+- Member issue history never shows `owner_transferred`: routing between Captain 5 and Logistics is staff-only.
 
 Priority (Low/Medium/High in `support_triage_levels`) is a separate concept and is unchanged.
 
@@ -64,8 +67,20 @@ classifies an item records `owner_transferred` with `details.basis` and no actor
 
 Reconciliation: `php artisan defects:project-ownership --dry-run` prints old (Rescue-wide) versus new owner per
 open issue, misrouted Rescue items, medical items on Engines/Ladders, cleared-but-open Captain 5 items, and rows
-without item keys. Without `--dry-run` it writes owners idempotently. A cleared Captain 5 issue becomes
-`logistics` / `manual`.
+without item keys (`--summary` prints the counts only). Without `--dry-run` it writes owners idempotently and quietly
+(no `owner_transferred` event, no alert). A cleared Captain 5 issue becomes `logistics` / `manual`. `--verify` fails
+unless every open issue has a stored owner and no clear waits to be adopted.
+
+Release (`.github/workflows/deploy.yml`, "Migrate and activate prebuilt Hub image"): in maintenance mode, after the
+verified pre-activation `pg_dump` and `migrate --force`, the new image's one-off container writes the full per-issue
+dry run to `storage/app/private/release-evidence/ownership-dry-run-<sha>.txt` on the host (the Actions log is public
+and shows counts only), projects, and runs `--verify` before the container switch; after the switch the running image
+runs `--pending` (rows the previous image's workers wrote meanwhile) and `--verify` again. The scheduled `--pending`
+job stays the safety net for a rollback window.
+
+Until a clear made by the previous image is adopted, the Logistics queues (Admin Overview and Captain 5 "Sent to
+Logistics") read it as Logistics' work (`DefectOwnership::whereUnadoptedClear`), so it is never in neither queue. A unit
+whose checklist type has no medical scope is `logistics` / `not_medical`, not `unclassified`.
 
 ## 2. Quiet routine inspections
 

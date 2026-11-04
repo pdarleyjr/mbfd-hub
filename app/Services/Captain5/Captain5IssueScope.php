@@ -8,6 +8,7 @@ use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Services\DailyCheckoutChecklistResolver;
+use App\Services\Defects\DefectOwnership;
 use App\Services\InspectionPaperFields;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -125,7 +126,8 @@ final class Captain5IssueScope
     public function sentToLogisticsQuery(): Builder
     {
         return ApparatusDefect::query()->where('resolved', false)->whereNotNull('captain5_cleared_at')
-            ->where(fn (Builder $query) => $query->whereNull('responsible_owner')->orWhere('responsible_owner', ApparatusDefect::OWNER_LOGISTICS));
+            ->where(fn (Builder $query) => $query->whereNull('responsible_owner')->orWhere('responsible_owner', ApparatusDefect::OWNER_LOGISTICS)
+                ->orWhere(fn (Builder $clear) => DefectOwnership::whereUnadoptedClear($clear)));
     }
 
     /**

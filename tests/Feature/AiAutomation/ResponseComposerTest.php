@@ -6,6 +6,8 @@ namespace Tests\Feature\AiAutomation;
 
 use App\Models\AiAutomation\AiKnowledgeArticle;
 use App\Models\AiAutomation\AiKnowledgeArticleVersion;
+use App\Models\Apparatus;
+use App\Models\ApparatusDefect;
 use App\Services\AiAutomation\ComposedReply;
 use App\Services\AiAutomation\Finding;
 use App\Services\AiAutomation\IntakeFacts;
@@ -447,6 +449,30 @@ final class ResponseComposerTest extends TestCase
     }
 
     /** @param  list<Finding>  $findings */
+    public function test_the_stored_equipment_owner_decides_between_captain5_and_support_services_wording(): void
+    {
+        $apparatus = Apparatus::query()->create([
+            'unit_id' => 'R2-'.uniqid(), 'name' => 'Rescue 2', 'type' => 'Rescue', 'vehicle_number' => 'R2',
+            'designation' => 'R2', 'slug' => 'r2-'.uniqid(), 'status' => 'In Service',
+        ]);
+        $defect = fn (string $item, string $owner): int => tap(ApparatusDefect::query()->create([
+            'apparatus_id' => $apparatus->id, 'compartment' => 'A', 'item' => $item, 'status' => 'open', 'issue_type' => 'missing', 'reported_date' => now(),
+        ]), fn (ApparatusDefect $row) => $row->forceFill(['responsible_owner' => $owner, 'owner_basis' => 'manual'])->save())->id;
+
+        // The catalog guesses Captain 5 for a LifePak; an administrator moved this one to Logistics.
+        $logistics = $this->findings([new Finding('LifePak 15', 'missing', defectId: $defect('LifePak 15', ApparatusDefect::OWNER_LOGISTICS))]);
+        $this->assertStringNotContainsString('captain5', (string) $logistics->templateKey);
+        $this->assertContains('owner_logistics', $logistics->reasonCodes);
+
+        // The catalog guesses Support Services for a wrench; it is recorded on a Captain 5 issue.
+        $captain5 = $this->findings([new Finding('Spanner Wrench', 'missing', defectId: $defect('Spanner Wrench', ApparatusDefect::OWNER_CAPTAIN5))]);
+        $this->assertStringStartsWith('captain5_', (string) $captain5->templateKey);
+        $this->assertContains('owner_captain5', $captain5->reasonCodes);
+
+        // Without a recorded defect the catalog still decides.
+        $this->assertStringStartsWith('captain5_', (string) $this->findings([new Finding('LifePak 15', 'missing')])->templateKey);
+    }
+
     private function findings(array $findings, string $now = self::TUESDAY): ComposedReply
     {
         return app(ResponseComposer::class)->compose(

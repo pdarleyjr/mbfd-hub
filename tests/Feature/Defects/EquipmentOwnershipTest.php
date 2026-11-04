@@ -11,7 +11,9 @@ use App\Models\ApparatusInspection;
 use App\Models\StretcherIssueReport;
 use App\Models\User;
 use App\Services\Captain5\Captain5AdministrationService;
+use App\Services\Captain5\Captain5IssueScope;
 use App\Services\Defects\DefectCorrectiveActionService;
+use App\Services\Defects\DefectOwnership;
 use App\Support\Dashboards\DashboardQuery;
 use App\Support\Dashboards\IssueSourceRegistry;
 use App\Support\OperationalDisplayWindow;
@@ -160,10 +162,15 @@ final class EquipmentOwnershipTest extends TestCase
         ApparatusDefect::query()->whereKey($ids)->update(['responsible_owner' => null, 'owner_basis' => null]);
         ApparatusDefect::query()->whereKey($lifepak->id)->update(['captain5_cleared_at' => now(), 'captain5_cleared_by_user_id' => $this->captain->id]);
 
-        $this->artisan('defects:project-ownership', ['--dry-run' => true])->assertSuccessful()->expectsOutputToContain('DRY RUN');
+        $this->artisan('defects:project-ownership', ['--verify' => true])->assertFailed();
+        $this->artisan('defects:project-ownership', ['--dry-run' => true])->assertSuccessful()->expectsOutputToContain('DRY RUN')
+            ->expectsOutputToContain('Issues whose queue changes');
+        $this->artisan('defects:project-ownership', ['--dry-run' => true, '--summary' => true])->assertSuccessful()
+            ->expectsOutputToContain('DRY RUN')->doesntExpectOutputToContain('Issues whose queue changes');
         self::assertSame(3, ApparatusDefect::query()->whereKey($ids)->whereNull('responsible_owner')->count(), 'A dry run writes nothing');
 
-        $this->artisan('defects:project-ownership')->assertSuccessful();
+        $this->artisan('defects:project-ownership', ['--summary' => true])->assertSuccessful();
+        $this->artisan('defects:project-ownership', ['--verify' => true])->assertSuccessful()->expectsOutputToContain('Every open issue has exactly one owner.');
         self::assertSame(ApparatusDefect::OWNER_CAPTAIN5, $stretcher->fresh()->responsible_owner);
         self::assertSame(ApparatusDefect::OWNER_LOGISTICS, $dewalt->fresh()->responsible_owner);
         self::assertSame([ApparatusDefect::OWNER_LOGISTICS, 'manual'], [$lifepak->fresh()->responsible_owner, $lifepak->fresh()->owner_basis], 'A person\'s clear stands');
@@ -323,6 +330,30 @@ final class EquipmentOwnershipTest extends TestCase
         self::assertSame([], $this->captain5QueueIds());
         self::assertContains('apparatus_defect:'.$lifepak->id, $this->logisticsBoardRefs(), 'In exactly one queue, never neither');
         $this->artisan('defects:project-ownership', ['--pending' => true])->assertSuccessful()->doesntExpectOutputToContain('Owners written');
+    }
+
+    public function test_before_the_projection_adopts_it_a_clear_by_the_previous_image_is_logistics_work_not_in_neither_queue(): void
+    {
+        [$lifepak] = $this->reportMissing($this->unit, $this->newMember('Engine Crew'), [self::ENGINE2_LIFEPAK]);
+        $this->travel(1)->minutes();
+        ApparatusDefect::query()->whereKey($lifepak->id)->update(['captain5_cleared_at' => now(), 'captain5_cleared_by_user_id' => $this->captain->id]);
+
+        self::assertSame(ApparatusDefect::OWNER_CAPTAIN5, $lifepak->fresh()->responsible_owner, 'Not adopted yet');
+        self::assertSame([], $this->captain5QueueIds());
+        self::assertContains('apparatus_defect:'.$lifepak->id, $this->logisticsBoardRefs());
+        self::assertContains($lifepak->id, app(Captain5IssueScope::class)->sentToLogisticsQuery()->pluck('id')->all(), 'Captain 5 can still bring it back');
+    }
+
+    public function test_an_issue_on_a_unit_outside_captain5s_checklist_types_is_logistics_by_rule_not_unclassified(): void
+    {
+        // The reserve engine uses the "default" checklist, which has no medical scope.
+        $defect = ApparatusDefect::query()->create([
+            'apparatus_id' => $this->reserve->id, 'compartment' => 'Cab', 'item' => 'Radio mount', 'status' => 'open', 'issue_type' => 'damaged', 'reported_date' => now(),
+        ]);
+
+        $decision = app(DefectOwnership::class)->decide($defect);
+
+        self::assertSame([ApparatusDefect::OWNER_LOGISTICS, DefectOwnership::BASIS_NOT_MEDICAL], [$decision->owner, $decision->basis]);
     }
 
     public function test_a_row_written_by_the_previous_image_is_owned_by_the_scheduled_projection(): void

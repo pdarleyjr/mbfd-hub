@@ -20,12 +20,17 @@ final class ProjectDefectOwnership extends Command
 {
     protected $signature = 'defects:project-ownership
         {--dry-run : Report old versus new owner without writing anything}
-        {--pending : Only issues with no owner yet or an unadopted clear (scheduled; quiet when there are none)}';
+        {--pending : Only issues with no owner yet or an unadopted clear (scheduled; quiet when there are none)}
+        {--summary : Print the counts only, not the per-issue table (release logs)}
+        {--verify : Fail unless every open issue has exactly one stored owner and no clear waits to be adopted}';
 
     protected $description = 'Give every open equipment issue exactly one owner (Captain 5 or Logistics) from its equipment';
 
     public function handle(DefectOwnership $ownership, Captain5IssueScope $scope): int
     {
+        if ($this->option('verify')) {
+            return $this->verify();
+        }
         if ($this->option('pending') && ! $this->option('dry-run')) {
             return $this->projectPending($ownership);
         }
@@ -70,10 +75,38 @@ final class ProjectDefectOwnership extends Command
 
         $this->info(($dryRun ? 'DRY RUN, nothing written. ' : '').'Open issues: '.$counts['open']);
         $this->table(['Measure', 'Count'], collect($counts)->map(fn (int $value, string $key): array => [$key, $value])->values()->all());
-        if ($rows !== []) {
+        if ($rows !== [] && ! $this->option('summary')) {
             $this->info('Issues whose queue changes (old routing -> per-equipment owner):');
             $this->table(['Issue', 'Apparatus', 'Checklist', 'Item', 'Old', 'New', 'Basis'], $rows);
         }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * The release check after the projection: every open issue has a stored owner (captain5 or logistics) and no clear
+     * made by the previous image waits to be adopted, so no issue is in both work queues or in neither. Writes nothing.
+     */
+    private function verify(): int
+    {
+        $open = ApparatusDefect::query()->where('resolved', false);
+        $byOwner = (clone $open)->selectRaw('responsible_owner, COUNT(*) AS total')->groupBy('responsible_owner')->pluck('total', 'responsible_owner');
+        $pending = DefectOwnership::pendingQuery()->count();
+        $unknown = (clone $open)->whereNotNull('responsible_owner')->whereNotIn('responsible_owner', DefectOwnership::OWNERS)->count();
+
+        $this->table(['Measure', 'Count'], [
+            ['open', (int) (clone $open)->count()],
+            ['owner_captain5', (int) ($byOwner[ApparatusDefect::OWNER_CAPTAIN5] ?? 0)],
+            ['owner_logistics', (int) ($byOwner[ApparatusDefect::OWNER_LOGISTICS] ?? 0)],
+            ['pending_projection', $pending],
+            ['unknown_owner', $unknown],
+        ]);
+        if ($pending > 0 || $unknown > 0) {
+            $this->error('Ownership is not complete: run defects:project-ownership (or --pending) before activation.');
+
+            return self::FAILURE;
+        }
+        $this->info('Every open issue has exactly one owner.');
 
         return self::SUCCESS;
     }

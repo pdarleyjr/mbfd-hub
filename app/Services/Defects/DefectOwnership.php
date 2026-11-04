@@ -53,6 +53,10 @@ final class DefectOwnership
         if ($result->reason === 'non_equipment') {
             return new OwnerDecision(ApparatusDefect::OWNER_LOGISTICS, self::BASIS_NOT_EQUIPMENT, $result->checklistType, $result->itemKey);
         }
+        if ($result->reason === 'not_captain5_apparatus') {
+            // Fleet units outside Captain 5's checklist types carry no medical scope: Logistics by rule, not "unclassified".
+            return new OwnerDecision(ApparatusDefect::OWNER_LOGISTICS, self::BASIS_NOT_MEDICAL, $result->checklistType, $result->itemKey);
+        }
 
         return match ($result->classification) {
             MedicalScope::MEDICAL => new OwnerDecision(ApparatusDefect::OWNER_CAPTAIN5, self::BASIS_MEDICAL, $result->checklistType, $result->itemKey),
@@ -209,9 +213,23 @@ final class DefectOwnership
     {
         return ApparatusDefect::query()->where('resolved', false)->where(fn ($query) => $query
             ->whereNull('responsible_owner')
-            ->orWhere(fn ($clear) => $clear->whereNotNull('captain5_cleared_at')
-                ->where(fn ($basis) => $basis->whereNull('owner_basis')->orWhere('owner_basis', '<>', self::BASIS_MANUAL))
-                ->where(fn ($set) => $set->whereNull('owner_set_at')->orWhereColumn('captain5_cleared_at', '>', 'owner_set_at'))));
+            ->orWhere(fn ($clear) => self::whereUnadoptedClear($clear)));
+    }
+
+    /**
+     * Captain 5 cleared it ("this is for Logistics") through the previous image, after the stored owner was set, and no
+     * projection has adopted that clear yet. Until --pending adopts it, the clear is the person's latest word: the
+     * issue is Logistics' work, so the Logistics queues read it that way and it is never in neither queue.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<*>|\Illuminate\Database\Query\Builder  $query
+     */
+    public static function whereUnadoptedClear(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $query, string $table = ''): void
+    {
+        $column = static fn (string $name): string => $table === '' ? $name : $table.'.'.$name;
+
+        $query->whereNotNull($column('captain5_cleared_at'))
+            ->where(fn ($basis) => $basis->whereNull($column('owner_basis'))->orWhere($column('owner_basis'), '<>', self::BASIS_MANUAL))
+            ->where(fn ($set) => $set->whereNull($column('owner_set_at'))->orWhereColumn($column('captain5_cleared_at'), '>', $column('owner_set_at')));
     }
 
     /**
