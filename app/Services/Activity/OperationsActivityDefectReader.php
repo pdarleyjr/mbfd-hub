@@ -9,6 +9,7 @@ use App\Filament\Support\DefectCorrectiveActions;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectEvent;
+use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Services\Dashboards\Support\ApparatusClass;
@@ -33,8 +34,6 @@ final class OperationsActivityDefectReader
         'owner_transferred', 'correction_reported', 'member_resolved',
     ];
 
-    private const APPARATUS = 'apparatus:id,unit_id,name,designation';
-
     private const CAPTAIN5 = 'captain5';
 
     public static function canRead(User $user): bool
@@ -53,8 +52,11 @@ final class OperationsActivityDefectReader
             ->whereIn('event_type', self::EVENTS)
             ->whereNotIn('event_type', ApparatusDefectEvent::PAGE_ONLY_EVENTS)
             ->where('created_at', '>=', $since)
-            ->with(['defect.'.self::APPARATUS, 'defect.firstReporter:id,name,display_name', 'actor:id,name,display_name'])
+            ->with(['defect', 'defect.firstReporter:id,name,display_name', 'actor:id,name,display_name'])
             ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get();
+        $apparatuses = ApparatusLookup::load($rows->map(
+            static fn (ApparatusDefectEvent $row): mixed => $row->defect instanceof ApparatusDefect ? $row->defect->apparatus_id : null,
+        ));
 
         $staffBodies = [];
         $out = [];
@@ -62,7 +64,7 @@ final class OperationsActivityDefectReader
             if (filled($row->member_message)) {
                 $staffBodies[$row->apparatus_defect_id.'|'.trim((string) $row->member_message)] = true;
             }
-            $event = $this->fromEvent($row, $manage);
+            $event = $this->fromEvent($row, $manage, $apparatuses);
             if ($event !== null) {
                 $out[] = $event;
             }
@@ -71,7 +73,7 @@ final class OperationsActivityDefectReader
         return [...$out, ...$this->messages($since, $limit, $manage, $staffBodies)];
     }
 
-    private function fromEvent(ApparatusDefectEvent $event, bool $manage): ?OperationsActivityEvent
+    private function fromEvent(ApparatusDefectEvent $event, bool $manage, ApparatusLookup $apparatuses): ?OperationsActivityEvent
     {
         $defect = $event->defect;
         if (! $defect instanceof ApparatusDefect) {
@@ -94,7 +96,7 @@ final class OperationsActivityDefectReader
             key: 'apparatus_defect_events:'.$event->getKey(),
             domain: OperationsActivityEvent::DOMAIN_APPARATUS,
             kind: self::kindOf($type, $details, $memberResolved),
-            subject: ApparatusClass::label($defect->apparatus),
+            subject: ApparatusClass::label($apparatuses->find($defect->apparatus_id)),
             summary: $type === 'reported'
                 ? OperationsActivityText::lead(str((string) $defect->issue_type)->replace('_', ' ')->headline()->toString(), $item)
                 : OperationsActivityText::lead($item, $body),
@@ -121,9 +123,13 @@ final class OperationsActivityDefectReader
         $messages = ApparatusIssueMessage::query()
             ->where('created_at', '>=', $since)
             ->when(! $manage, static fn ($query) => $query->where('visibility', ApparatusIssueMessage::VISIBILITY_MEMBER))
-            ->with(['author:id,name,display_name', 'defect.'.self::APPARATUS, 'inspection:id,apparatus_id,review_status', 'inspection.'.self::APPARATUS])
+            ->with(['author:id,name,display_name', 'defect', 'inspection:id,apparatus_id,review_status'])
             ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get();
         $answered = $this->lastResponseIds($messages->all());
+        $apparatuses = ApparatusLookup::load($messages->flatMap(static fn (ApparatusIssueMessage $message): array => [
+            $message->defect instanceof ApparatusDefect ? $message->defect->apparatus_id : null,
+            $message->inspection instanceof ApparatusInspection ? $message->inspection->apparatus_id : null,
+        ]));
 
         $out = [];
         foreach ($messages as $message) {
@@ -131,17 +137,17 @@ final class OperationsActivityDefectReader
             if (! $internal && $message->isFromStaff() && isset($staffBodies[$message->apparatus_defect_id.'|'.trim((string) $message->body)])) {
                 continue;
             }
-            $out[] = $this->fromMessage($message, $internal, $answered);
+            $out[] = $this->fromMessage($message, $internal, $answered, $apparatuses);
         }
 
         return $out;
     }
 
     /** @param array<string, int> $answered thread key => newest member-visible reply id */
-    private function fromMessage(ApparatusIssueMessage $message, bool $internal, array $answered): OperationsActivityEvent
+    private function fromMessage(ApparatusIssueMessage $message, bool $internal, array $answered, ApparatusLookup $apparatuses): OperationsActivityEvent
     {
         $defect = $message->defect;
-        $apparatus = $defect?->apparatus ?? $message->inspection?->apparatus;
+        $apparatus = $apparatuses->find($defect?->apparatus_id) ?? $apparatuses->find($message->inspection?->apparatus_id);
         $context = (string) $message->author_context;
         $automated = $context === ApparatusIssueMessage::CONTEXT_ASSISTANT;
         $fromMember = $context === ApparatusIssueMessage::CONTEXT_MEMBER && ! $internal;

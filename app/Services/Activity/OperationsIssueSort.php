@@ -75,7 +75,7 @@ final class OperationsIssueSort
     private static function order(array $rows, array $byRef, array $byGroup, string $sort): array
     {
         $keyed = [];
-        foreach (array_values($rows) as $position => $row) {
+        foreach ($rows as $position => $row) {
             $ref = (string) ($row['ref'] ?? '');
             $members = $byGroup[$ref] ?? (isset($byRef[$ref]) ? [$byRef[$ref]] : []);
             $keyed[] = ['row' => $row, 'position' => $position, 'facts' => self::facts($members)];

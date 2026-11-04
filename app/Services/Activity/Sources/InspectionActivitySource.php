@@ -10,6 +10,7 @@ use App\Models\ApparatusInspectionException;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\Activity\ActivitySignal;
+use App\Services\Activity\ApparatusLookup;
 use App\Services\Activity\MemberActivityItem;
 use App\Services\Activity\MemberActivitySource;
 use App\Services\Activity\MemberActivityText;
@@ -42,7 +43,6 @@ final class InspectionActivitySource implements MemberActivitySource
                 ->where('apparatus_inspections.created_at', '>=', $since)
                 ->orWhere('apparatus_inspections.updated_at', '>=', $since)
                 ->orWhere('apparatus_inspections.review_status', 'pending_review'))
-            ->with('apparatus:id,designation,name,unit_id')
             ->orderByDesc('apparatus_inspections.id')
             ->limit($limit)
             ->get();
@@ -57,7 +57,9 @@ final class InspectionActivitySource implements MemberActivitySource
             ->whereIn('apparatus_inspection_id', $ids)->where('status', 'revision_requested')
             ->distinct()->pluck('apparatus_inspection_id')->map(fn ($id): int => (int) $id)->all());
 
-        return $inspections->map(function (ApparatusInspection $inspection) use ($signals, $waiting): MemberActivityItem {
+        $apparatuses = ApparatusLookup::load($inspections->pluck('apparatus_id'));
+
+        return $inspections->map(function (ApparatusInspection $inspection) use ($signals, $waiting, $apparatuses): MemberActivityItem {
             $id = (int) $inspection->getKey();
             $signal = $signals[$id] ?? ActivitySignal::none();
             $pending = $inspection->review_status === 'pending_review';
@@ -70,7 +72,7 @@ final class InspectionActivitySource implements MemberActivitySource
             return new MemberActivityItem(
                 key: 'inspection:'.$id,
                 category: 'Vehicle inspection',
-                subject: MemberActivityText::unitLabel($inspection->apparatus, $inspection->designation_at_time),
+                subject: MemberActivityText::unitLabel($apparatuses->find($inspection->apparatus_id), $inspection->designation_at_time),
                 description: 'Daily checkout '.($inspection->inspection_reference ?: '#'.$id),
                 statusLabel: $this->history->reviewStatusLabel($inspection->review_status),
                 isOpen: $pending || $needsResponse,

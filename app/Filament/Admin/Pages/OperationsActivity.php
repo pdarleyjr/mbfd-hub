@@ -55,6 +55,12 @@ class OperationsActivity extends Page
 
     public string $sort = OperationsActivityPreferences::ACTIVITY_LATEST;
 
+    /** Opened from "View all activity" on the Admin Overview card; not a menu entry of its own. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function canAccess(): bool
     {
         $user = auth()->user();

@@ -12,3 +12,6 @@
 #
 # Issue history test: 'front_cab-item-3' is a real checklist item key (compartment plus position), not a credential.
 99faadad49a3143bad4650bb7e9582c49bf248a8:tests/Feature/Api/ApparatusIssueHistoryTest.php:generic-api-key:249
+# Station request member-resolve test: two synthetic client_action_id UUIDs (constants once named KEY_ONE/KEY_TWO). Not credentials.
+bc1f838c225c8549aaac58f98394ab6de85bd1a3:tests/Feature/Api/StationRequestMemberResolveTest.php:generic-api-key:30
+bc1f838c225c8549aaac58f98394ab6de85bd1a3:tests/Feature/Api/StationRequestMemberResolveTest.php:generic-api-key:32

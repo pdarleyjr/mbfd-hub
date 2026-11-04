@@ -28,6 +28,10 @@ final class LatestPerGroup
             ->selectRaw('MAX('.$key.')')
             ->groupBy($group);
 
-        return $model->newQuery()->whereIn($key, $newestIds);
+        // A clone keeps the builder's own model type (and its global scopes); only the filters are replaced.
+        return $rows->clone()
+            ->withoutEagerLoads()
+            ->setQuery($model->newQueryWithoutScopes()->getQuery())
+            ->whereIn($key, $newestIds);
     }
 }

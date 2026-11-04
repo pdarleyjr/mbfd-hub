@@ -27,9 +27,9 @@ final class StationRequestMemberResolveTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const KEY_ONE = '0b1f6f3e-6a0a-4d1a-9d39-2f1d7f8a1111';
+    private const FIRST_ACTION_ID = '0b1f6f3e-6a0a-4d1a-9d39-2f1d7f8a1111';
 
-    private const KEY_TWO = '0b1f6f3e-6a0a-4d1a-9d39-2f1d7f8a2222';
+    private const SECOND_ACTION_ID = '0b1f6f3e-6a0a-4d1a-9d39-2f1d7f8a2222';
 
     private Station $station;
 
@@ -59,7 +59,7 @@ final class StationRequestMemberResolveTest extends TestCase
         Queue::fake();
         $this->actingAsCanonicalUser($this->requester);
 
-        $first = $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed'])
+        $first = $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed'])
             ->assertOk()
             ->assertJsonPath('data.status', 'completed')
             ->assertJsonPath('data.status_label', 'Completed');
@@ -75,13 +75,13 @@ final class StationRequestMemberResolveTest extends TestCase
         $this->assertSame($this->requester->id, $update->changed_by_user_id);
         $this->assertSame('member_resolved', $update->metadata['event']);
         $this->assertSame('fixed', $update->metadata['outcome']);
-        $this->assertSame(self::KEY_ONE, $update->metadata['client_action_id']);
+        $this->assertSame(self::FIRST_ACTION_ID, $update->metadata['client_action_id']);
         $this->assertTrue($update->metadata['resolver_is_requester']);
 
         // The requester resolved it, so only station staff are told.
         Queue::assertPushed(FanOutNotification::class, 1);
 
-        $retry = $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed'])->assertOk();
+        $retry = $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed'])->assertOk();
         $this->assertSame($first->json(), $retry->json());
         $this->assertSame(1, $request->updates()->count());
         Queue::assertPushed(FanOutNotification::class, 1);
@@ -92,7 +92,7 @@ final class StationRequestMemberResolveTest extends TestCase
         $this->request->forceFill(['actor_user_id' => null, 'requested_by_employee_id' => $this->requester->employee_profile_id])->save();
         $this->actingAsCanonicalUser($this->requester);
 
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'no_longer_needed'])->assertOk();
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'no_longer_needed'])->assertOk();
 
         $this->assertSame('Marked resolved by Pat Requester: No longer needed.', $this->request->fresh()->current_public_response);
     }
@@ -102,14 +102,14 @@ final class StationRequestMemberResolveTest extends TestCase
         Queue::fake();
         $this->actingAsCanonicalUser($this->other);
 
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed'])
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed'])
             ->assertUnprocessable()->assertJsonValidationErrors('note');
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed', 'note' => 'ok'])
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed', 'note' => 'ok'])
             ->assertUnprocessable()->assertJsonValidationErrors('note');
         $this->assertSame('pending', $this->request->fresh()->status);
         $this->assertSame(0, $this->request->updates()->count());
 
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed', 'note' => 'Replaced the  faucet washer.'])
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed', 'note' => 'Replaced the  faucet washer.'])
             ->assertOk()->assertJsonPath('data.status', 'completed');
 
         $request = $this->request->fresh();
@@ -123,9 +123,9 @@ final class StationRequestMemberResolveTest extends TestCase
     {
         $this->actingAsCanonicalUser($this->requester);
 
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed', 'note' => str_repeat('a', 1001)])
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed', 'note' => str_repeat('a', 1001)])
             ->assertUnprocessable()->assertJsonValidationErrors('note');
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'banana'])
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'banana'])
             ->assertUnprocessable()->assertJsonValidationErrors('outcome');
         $this->resolve(['client_action_id' => 'not-a-uuid', 'outcome' => 'fixed'])
             ->assertUnprocessable()->assertJsonValidationErrors('client_action_id');
@@ -137,17 +137,17 @@ final class StationRequestMemberResolveTest extends TestCase
     {
         $noProfile = User::factory()->create(['employee_profile_id' => null, 'employee_id' => null]);
         $this->actingAsCanonicalUser($noProfile);
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed', 'note' => 'Fixed it myself.'])->assertForbidden();
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed', 'note' => 'Fixed it myself.'])->assertForbidden();
 
         $trainingOnly = User::factory()->create(['employee_profile_id' => null, 'employee_id' => null]);
         $trainingOnly->assignRole(Role::query()->firstOrCreate(['name' => 'training_admin', 'guard_name' => 'web']));
         $this->actingAsCanonicalUser($trainingOnly);
-        $this->resolve(['client_action_id' => self::KEY_TWO, 'outcome' => 'fixed', 'note' => 'Fixed it myself.'])->assertForbidden();
+        $this->resolve(['client_action_id' => self::SECOND_ACTION_ID, 'outcome' => 'fixed', 'note' => 'Fixed it myself.'])->assertForbidden();
 
         $this->actingAsCanonicalUser($this->other);
         $this->other->forceFill(['account_status' => AccountStatus::Disabled])->save();
         $this->assertContains(
-            $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed', 'note' => 'Fixed it myself.'])->status(),
+            $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed', 'note' => 'Fixed it myself.'])->status(),
             [401, 403],
         );
 
@@ -160,7 +160,7 @@ final class StationRequestMemberResolveTest extends TestCase
         $this->actingAsCanonicalUser($this->requester);
         $closed = $this->makeRequest(['status' => 'denied', 'denied_at' => now()]);
 
-        $this->postJson("/api/public/station-requests/{$closed->id}/member-resolve", ['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed'])
+        $this->postJson("/api/public/station-requests/{$closed->id}/member-resolve", ['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed'])
             ->assertStatus(409)
             ->assertJsonPath('code', 'REQUEST_CLOSED')
             ->assertJsonPath('status', 'denied')
@@ -168,17 +168,17 @@ final class StationRequestMemberResolveTest extends TestCase
         $this->assertSame(0, $closed->updates()->count());
 
         $this->request->forceFill(['archived_at' => now()])->save();
-        $this->resolve(['client_action_id' => self::KEY_TWO, 'outcome' => 'fixed'])
+        $this->resolve(['client_action_id' => self::SECOND_ACTION_ID, 'outcome' => 'fixed'])
             ->assertStatus(409)->assertJsonPath('code', 'REQUEST_CLOSED');
     }
 
     public function test_a_second_resolve_after_the_first_is_a_conflict_not_a_second_row(): void
     {
         $this->actingAsCanonicalUser($this->requester);
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed'])->assertOk();
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed'])->assertOk();
 
         $this->actingAsCanonicalUser($this->other);
-        $this->resolve(['client_action_id' => self::KEY_TWO, 'outcome' => 'fixed', 'note' => 'Also fixed it.'])
+        $this->resolve(['client_action_id' => self::SECOND_ACTION_ID, 'outcome' => 'fixed', 'note' => 'Also fixed it.'])
             ->assertStatus(409)
             ->assertJsonPath('code', 'REQUEST_CLOSED')
             ->assertJsonPath('status', 'completed');
@@ -188,10 +188,10 @@ final class StationRequestMemberResolveTest extends TestCase
     public function test_the_same_action_id_from_a_different_member_is_a_conflict(): void
     {
         $this->actingAsCanonicalUser($this->requester);
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed'])->assertOk();
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed'])->assertOk();
 
         $this->actingAsCanonicalUser($this->other);
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed', 'note' => 'Same key, other person.'])
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed', 'note' => 'Same key, other person.'])
             ->assertStatus(409)->assertJsonPath('code', 'CLIENT_ACTION_CONFLICT');
         $this->assertSame(1, $this->request->updates()->count());
     }
@@ -205,7 +205,7 @@ final class StationRequestMemberResolveTest extends TestCase
         $this->assertNotNull($before);
 
         $this->actingAsCanonicalUser($this->requester);
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'received'])->assertOk();
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'received'])->assertOk();
 
         $this->actingAsCanonicalUser($staff);
         $after = $source->detail($staff, (string) $this->request->id);
@@ -220,7 +220,7 @@ final class StationRequestMemberResolveTest extends TestCase
     public function test_staff_may_reopen_a_member_resolved_request_but_not_an_ordinary_completed_one(): void
     {
         $this->actingAsCanonicalUser($this->requester);
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed'])->assertOk();
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed'])->assertOk();
 
         $this->actingAsCanonicalUser($this->staff());
         $this->patchJson("/api/admin/station-requests/{$this->request->id}/transition", [
@@ -262,7 +262,7 @@ final class StationRequestMemberResolveTest extends TestCase
     public function test_a_member_cannot_use_the_admin_transition_endpoint(): void
     {
         $this->actingAsCanonicalUser($this->requester);
-        $this->resolve(['client_action_id' => self::KEY_ONE, 'outcome' => 'fixed'])->assertOk();
+        $this->resolve(['client_action_id' => self::FIRST_ACTION_ID, 'outcome' => 'fixed'])->assertOk();
 
         $this->patchJson("/api/admin/station-requests/{$this->request->id}/transition", ['status' => 'in_progress'])
             ->assertForbidden();

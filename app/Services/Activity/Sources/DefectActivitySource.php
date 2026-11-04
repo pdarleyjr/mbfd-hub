@@ -6,11 +6,13 @@ namespace App\Services\Activity\Sources;
 
 use App\Filament\Employee\Pages\MyVehicleInspections;
 use App\Filament\Employee\Pages\MyVehicleInspectionView;
+use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectParticipant;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\Activity\ActivitySignal;
+use App\Services\Activity\ApparatusLookup;
 use App\Services\Activity\MemberActivityItem;
 use App\Services\Activity\MemberActivitySource;
 use App\Services\Activity\MemberActivityText;
@@ -60,7 +62,6 @@ final class DefectActivitySource implements MemberActivitySource
                 ->where('resolved', false)
                 ->orWhere('created_at', '>=', $since)
                 ->orWhere('updated_at', '>=', $since))
-            ->with('apparatus:id,designation,name,unit_id,slug')
             ->orderByDesc('id')
             ->limit($limit)
             ->get();
@@ -71,9 +72,11 @@ final class DefectActivitySource implements MemberActivitySource
         $ids = array_map('intval', $defects->modelKeys());
         $signals = $this->signals($user, $ids);
         $viewOn = $this->inspectionsToOpen($user, $userId, $employeeId, $defects, $ids);
+        $apparatuses = ApparatusLookup::load($defects->pluck('apparatus_id'));
 
-        return $defects->map(function (ApparatusDefect $defect) use ($signals, $viewOn): MemberActivityItem {
+        return $defects->map(function (ApparatusDefect $defect) use ($signals, $viewOn, $apparatuses): MemberActivityItem {
             $id = (int) $defect->getKey();
+            $apparatus = $apparatuses->find($defect->apparatus_id);
             $signal = $signals[$id] ?? ActivitySignal::none();
             $closed = (bool) $defect->resolved || DefectActionStatus::isClosed($defect->action_status);
             $at = MemberActivityText::moment($defect->first_reported_at ?? $defect->created_at);
@@ -88,7 +91,7 @@ final class DefectActivitySource implements MemberActivitySource
             return new MemberActivityItem(
                 key: 'defect:'.$id,
                 category: 'Equipment issue',
-                subject: MemberActivityText::unitLabel($defect->apparatus),
+                subject: MemberActivityText::unitLabel($apparatus),
                 description: trim(($defect->issue_type ? str((string) $defect->issue_type)->headline().': ' : '').$defect->item),
                 statusLabel: MemberActivityText::defectStatus($closed, $defect->action_status, $defect->getAttribute('correction_reported_at') !== null),
                 isOpen: ! $closed,
@@ -97,7 +100,7 @@ final class DefectActivitySource implements MemberActivitySource
                 at: $at,
                 url: $viewing !== null
                     ? MyVehicleInspectionView::getUrl(['inspection' => $viewing], panel: 'employee').'#issue-'.$id
-                    : $this->issuePageUrl($defect),
+                    : $this->issuePageUrl($apparatus),
                 unreadAt: $signal->humanAt,
                 // Nests under the checkout that first reported it, when that checkout is the member's own.
                 parentKey: $first !== null && $viewing === (int) $first ? 'inspection:'.(int) $first : null,
@@ -171,9 +174,9 @@ final class DefectActivitySource implements MemberActivitySource
     }
 
     /** The Daily Checkout issue page for the apparatus, when the member has no inspection of their own to open. */
-    private function issuePageUrl(ApparatusDefect $defect): string
+    private function issuePageUrl(?Apparatus $apparatus): string
     {
-        $slug = $defect->apparatus?->slug;
+        $slug = $apparatus?->slug;
 
         return filled($slug) ? '/daily/vehicle-inspections/'.$slug.'/issues' : MyVehicleInspections::getUrl(panel: 'employee');
     }

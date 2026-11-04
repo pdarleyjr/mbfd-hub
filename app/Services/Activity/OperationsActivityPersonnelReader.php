@@ -9,6 +9,7 @@ use App\Filament\Admin\Pages\EmployeeMessages;
 use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRequestResource;
 use App\Models\Employee;
 use App\Models\EmployeeMessaging\EmployeeLogisticsMessage;
+use App\Models\EmployeeMessaging\EmployeeLogisticsThread;
 use App\Models\PersonnelRequest;
 use App\Models\PersonnelRequestUpdate;
 use App\Models\User;
@@ -77,7 +78,7 @@ final class OperationsActivityPersonnelReader
     {
         $request = $update->request;
         $event = (string) $update->event;
-        $status = $request->status instanceof PersonnelRequestStatus ? $request->status : PersonnelRequestStatus::tryFrom((string) $request->status);
+        $status = $request->status;
         $visible = trim((string) $update->employee_visible_note);
         $internalNote = trim((string) $update->internal_note);
         $terminal = in_array($status, [PersonnelRequestStatus::Completed, PersonnelRequestStatus::Denied, PersonnelRequestStatus::Cancelled], true);
@@ -99,10 +100,10 @@ final class OperationsActivityPersonnelReader
                 default => 'Items update',
             },
             subject: trim((string) $request->request_number) ?: null,
-            summary: OperationsActivityText::lead($request->type?->label() ?? 'Request', $visible !== '' ? $visible : ($internalNote !== '' ? $internalNote : (string) $request->beneficiary_name)),
+            summary: OperationsActivityText::lead($request->type->label(), $visible !== '' ? $visible : ($internalNote !== '' ? $internalNote : (string) $request->beneficiary_name)),
             actorLabel: OperationsActivityText::person($admin) ?? ($employee !== '' ? $employee : ($event === 'submitted' ? (trim((string) $request->requester_name) ?: 'Member') : 'System')),
             at: CarbonImmutable::instance($update->created_at),
-            statusLabel: $status?->label() ?? (string) $request->status,
+            statusLabel: $status->label(),
             actionRequired: ($event === 'submitted' && $status === PersonnelRequestStatus::Pending)
                 || ($event === 'employee_responded' && ! $terminal && (int) $update->getKey() > ($answered[$update->personnel_request_id] ?? 0)),
             internal: $visible === '' && $internalNote !== '',
@@ -143,8 +144,8 @@ final class OperationsActivityPersonnelReader
 
         $out = [];
         foreach ($messages as $message) {
-            $thread = $message->thread;
-            if ($thread === null) {
+            $thread = $message->getRelationValue('thread');
+            if (! $thread instanceof EmployeeLogisticsThread) {
                 continue;
             }
             $automated = $message->isFromAssistant();

@@ -44,7 +44,7 @@ final class MemberActivityText
 
     public static function unitLabel(?Apparatus $apparatus, ?string $snapshot = null): string
     {
-        $label = trim((string) ($snapshot ?: ($apparatus?->designation ?: ($apparatus?->name ?: $apparatus?->unit_id))));
+        $label = trim((string) ($snapshot ?: ($apparatus?->designation ?: ($apparatus?->name ?: $apparatus?->getAttribute('unit_id')))));
 
         return $label !== '' ? $label : 'Apparatus';
     }

@@ -109,7 +109,10 @@ final class StretcherReportActivitySource implements MemberActivitySource
             return [];
         }
 
-        return DB::table('apparatus_defects')->whereIn('id', $defectIds)->whereNotNull('correction_reported_at')
-            ->pluck('id')->mapWithKeys(fn ($id): array => [(int) $id => true])->all();
+        return array_fill_keys(
+            DB::table('apparatus_defects')->whereIn('id', $defectIds)->whereNotNull('correction_reported_at')
+                ->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+            true,
+        );
     }
 }

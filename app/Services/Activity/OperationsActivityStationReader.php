@@ -51,7 +51,8 @@ final class OperationsActivityStationReader
     private function fromUpdate(StationRequestUpdate $update, StationRequest $request, bool $isFirst): OperationsActivityEvent
     {
         $automated = $update->isAutoReceipt();
-        $metadata = is_array($update->metadata) ? $update->metadata : [];
+        $stored = $update->getAttribute('metadata');
+        $metadata = is_array($stored) ? $stored : [];
         $memberResolved = ($metadata['event'] ?? null) === 'member_resolved';
         $isNew = $isFirst && $update->status === StationRequestStatus::Pending->value && ! $automated;
         $public = trim((string) $update->public_note);

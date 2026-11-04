@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Employee;
 use App\Models\StationRequest;
 use App\Models\StationRequestUpdate;
 use App\Models\User;
@@ -99,7 +100,9 @@ class StationRequestSideEffectService
         }
 
         $eventKey = NotificationDispatchService::eventKey(User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES, 'station_request', $request->id, 'member_resolved:'.$update->id);
-        $name = trim((string) ($resolver->employeeProfile?->name ?? $resolver->name));
+        $profile = $resolver->getRelationValue('employeeProfile');
+        $profileName = $profile instanceof Employee ? $profile->name : null;
+        $name = trim((string) ($profileName ?? $resolver->name));
 
         app(NotificationDispatchService::class)->dispatch(
             User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES,

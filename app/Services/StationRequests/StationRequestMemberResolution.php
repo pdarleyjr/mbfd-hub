@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\StationRequests;
 
 use App\Enums\StationRequestStatus;
+use App\Models\Employee;
 use App\Models\StationRequest;
 use App\Models\StationRequestUpdate;
 use App\Models\User;
@@ -127,7 +128,9 @@ class StationRequestMemberResolution
     /** "Marked resolved by Pat Smith: Fixed. Replaced the bulb." */
     private function publicLine(User $member, string $outcome, ?string $note): string
     {
-        $name = trim((string) ($member->employeeProfile?->name ?? $member->name));
+        $profile = $member->getRelationValue('employeeProfile');
+        $profileName = $profile instanceof Employee ? $profile->name : null;
+        $name = trim((string) ($profileName ?? $member->name));
         $line = sprintf('Marked resolved by %s: %s.', $name !== '' ? $name : 'a member', self::OUTCOMES[$outcome]);
 
         return $note === null ? $line : $line.' '.$note;
