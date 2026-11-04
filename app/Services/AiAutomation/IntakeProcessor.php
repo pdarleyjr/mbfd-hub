@@ -58,11 +58,16 @@ final class IntakeProcessor
             ]);
         }
 
+        // A chatty conversation is the team's to answer, so a second automated reply soon after the first is
+        // skipped. A new report that is high priority or a hazard is never hidden by that (finding F).
         if ($this->recentReplyInThread($intake, $facts->threadKey)) {
-            return $this->finish($intake, AiIntakeEvent::STATE_SKIPPED, [
-                'thread_key' => $facts->threadKey,
-                'reason_codes' => ['recent_ai_reply_in_thread'],
-            ]);
+            $preview = $this->composer->compose($facts, CarbonImmutable::now(), false);
+            if ($preview->riskTier === 'routine') {
+                return $this->finish($intake, AiIntakeEvent::STATE_SKIPPED, [
+                    'thread_key' => $facts->threadKey,
+                    'reason_codes' => ['recent_ai_reply_in_thread'],
+                ]);
+            }
         }
 
         $allowModel = $intake->origin === AiIntakeEvent::ORIGIN_LIVE;
@@ -118,7 +123,7 @@ final class IntakeProcessor
         return $state;
     }
 
-    /** One automated reply per conversation per day: a chatty thread is the staff's to answer, not a loop. */
+    /** At most one routine automated reply per conversation within the cooldown window (default two hours). */
     private function recentReplyInThread(AiIntakeEvent $intake, ?string $threadKey): bool
     {
         if ($threadKey === null || $threadKey === '') {
@@ -129,7 +134,7 @@ final class IntakeProcessor
             ->whereKeyNot($intake->getKey())
             ->where('thread_key', $threadKey)
             ->where('state', AiIntakeEvent::STATE_SENT)
-            ->where('processed_at', '>=', now()->subHours((int) config('ai_automation.processing.thread_cooldown_hours', 24)))
+            ->where('processed_at', '>=', now()->subMinutes((int) config('ai_automation.processing.thread_cooldown_minutes', 120)))
             ->exists();
     }
 

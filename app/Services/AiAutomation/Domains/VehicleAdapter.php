@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\AiAutomation\Domains;
 
 use App\Models\AiAutomation\AiIntakeEvent;
+use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectEvent;
 use App\Models\ApparatusDefectObservation;
@@ -16,9 +17,7 @@ use App\Services\AiAutomation\Contracts\DomainAdapter;
 use App\Services\AiAutomation\Finding;
 use App\Services\AiAutomation\IntakeFacts;
 use App\Services\AiAutomation\ReplyRecord;
-use App\Services\Captain5\Captain5IssueScope;
-use App\Services\Captain5\MedicalScope;
-use App\Services\Defects\InspectionConcernRecorder;
+use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Inspections\InspectionNotificationDispatcher;
 use App\Services\Inspections\IssueMessageService;
 use App\Support\Fleet\DefectActionStatus;
@@ -33,9 +32,13 @@ use Throwable;
 /**
  * Vehicle findings on a Daily Checkout, and a crew member's message on one of those issue threads.
  *
- * Read side: re-derives everything from the database on every call. Rescue units and the medical portion of
- * Engine/Ladder (Captain 5 scope, including items nobody has classified yet) are never in scope; only
- * member-reported concerns are accepted from the unclassified group, because Logistics owns those.
+ * Read side: re-derives everything from the database on every call. Every equipment finding is in scope,
+ * including Rescue checkouts and the medical items of Engine/Ladder checkouts (owner decision: a simple Support
+ * Services acknowledgment, and a Captain 5 referral where the shared classification says so, inside the existing
+ * checkout conversation only). Only scheduled duties are not equipment and stay out. The adapter never reads the
+ * Captain 5 scope tables, the EMS inventory or any Captain 5 workflow state; the only thing it learns about a unit
+ * is its checklist type (a DailyCheckoutChecklistResolver lookup on the apparatus row), which it hands to the
+ * shared classifier as Finding::$apparatusType.
  *
  * Write side: appends ONE `assistant` message through the model, never through IssueMessageService::post, so
  * no staff or follower notification fires. It touches no defect, inspection, unit or readiness field.
@@ -58,6 +61,12 @@ final class VehicleAdapter implements DomainAdapter
 
     /** Observations that say "this item is a problem on this checkout"; appears_corrected is the member saying Present. */
     private const FINDING_OBSERVATIONS = ['first_reported', 'confirmed_again'];
+
+    /** Pseudo-compartment for scheduled duties (Fire Boat v2): a duty done or not done, never equipment. */
+    private const NON_EQUIPMENT_COMPARTMENTS = ['scheduled_duties'];
+
+    /** What DailyCheckoutChecklistResolver::checklistTypeFor() answers for a unit it cannot map. */
+    private const UNMAPPED_TYPE = 'unmapped';
 
     private const NOTE_LIMIT = 300;
 
@@ -227,7 +236,9 @@ final class VehicleAdapter implements DomainAdapter
 
         $defectIds = $open->pluck('apparatus_defect_id')->map(static fn ($id): int => (int) $id)->all();
         $significant = $this->significantDefectIds($inspection, $defectIds);
-        $findings = $open->map(fn (ApparatusDefectObservation $row): Finding => $this->finding($row, $defects->get($row->apparatus_defect_id), $significant))->all();
+        // The checklist the member just answered: the inspected unit's, which is what matters on a swapped or reserve truck.
+        $type = $this->checklistTypeOf((int) $inspection->apparatus_id);
+        $findings = $open->map(fn (ApparatusDefectObservation $row): Finding => $this->finding($row, $defects->get($row->apparatus_defect_id), $significant, $type))->all();
         $answered = $this->inspectionAnswered($inspection, $defectIds, $defects);
 
         if ($open->every(static fn (ApparatusDefectObservation $row): bool => $row->observation !== 'first_reported')
@@ -246,18 +257,36 @@ final class VehicleAdapter implements DomainAdapter
         );
     }
 
-    /** Rescue and medical (Captain 5) are out; unclassified Engine/Ladder items are out too, except a member's own free-text concern. */
+    /**
+     * Every equipment finding is in scope: Logistics items, Rescue and the medical items of Engine/Ladder, and items
+     * nobody has classified yet. Only scheduled duties are out. Nothing here reads Captain 5 or EMS data.
+     */
     private function inVehicleScope(ApparatusDefect $defect): bool
     {
-        $result = app(Captain5IssueScope::class)->classify($defect);
-        if ($result->inScope || $result->reason === 'non_equipment') {
-            return false;
-        }
-        if ($result->classification === MedicalScope::UNCLASSIFIED) {
-            return $defect->compartment_key === InspectionConcernRecorder::COMPARTMENT_ID;
-        }
+        return ! in_array((string) $defect->compartment_key, self::NON_EQUIPMENT_COMPARTMENTS, true);
+    }
 
-        return true;
+    /** The checklist type of a unit, or null when the unit is gone or has no checklist mapping yet. */
+    private function checklistTypeOf(int $apparatusId): ?string
+    {
+        $apparatus = Apparatus::query()->find($apparatusId);
+        if (! $apparatus instanceof Apparatus) {
+            return null;
+        }
+        $type = app(DailyCheckoutChecklistResolver::class)->checklistTypeFor($apparatus);
+
+        return $type === '' || $type === self::UNMAPPED_TYPE ? null : $type;
+    }
+
+    /** The unit whose checklist a defect was recorded against: its first inspection's unit, else the truck it sits on. */
+    private function checklistTypeOfDefect(ApparatusDefect $defect): ?string
+    {
+        $inspectionId = $defect->first_reported_inspection_id ?? $defect->apparatus_inspection_id;
+        $inspected = $inspectionId !== null
+            ? ApparatusInspection::query()->whereKey($inspectionId)->value('apparatus_id')
+            : null;
+
+        return $this->checklistTypeOf((int) ($inspected ?? $defect->apparatus_id));
     }
 
     /** @param  list<int>  $defectIds */
@@ -276,7 +305,7 @@ final class VehicleAdapter implements DomainAdapter
     }
 
     /** @param  list<int>  $significant */
-    private function finding(ApparatusDefectObservation $row, ApparatusDefect $defect, array $significant): Finding
+    private function finding(ApparatusDefectObservation $row, ApparatusDefect $defect, array $significant, ?string $apparatusType): Finding
     {
         $reported = strtolower((string) ($row->reported_status ?: $defect->issue_type));
         $note = trim((string) $row->notes);
@@ -287,6 +316,8 @@ final class VehicleAdapter implements DomainAdapter
             significant: in_array((int) $defect->getKey(), $significant, true),
             isNew: $row->observation === 'first_reported',
             note: $note === '' ? null : mb_substr($note, 0, self::NOTE_LIMIT),
+            apparatusType: $apparatusType,
+            defectId: (int) $defect->getKey(),
         );
     }
 
@@ -429,6 +460,8 @@ final class VehicleAdapter implements DomainAdapter
                 condition: in_array($reported, ['missing', 'damaged'], true) ? $reported : 'other',
                 significant: $defect->severity === 'significant',
                 isNew: false,
+                apparatusType: $this->checklistTypeOfDefect($defect),
+                defectId: (int) $defect->getKey(),
             )],
             memberText: mb_substr((string) $message->body, 0, self::TEXT_LIMIT),
             alreadyAnswered: $this->messageAnswered($message),

@@ -16,5 +16,9 @@ final readonly class Finding
         public bool $significant = false,
         public bool $isNew = true,
         public ?string $note = null,
+        // Checklist type of the unit (engine, engine2, ladder1, ladder3, rescue, fireboat6, default) when known.
+        public ?string $apparatusType = null,
+        // The defect this finding is recorded on, so the reply engine reads the same triage level staff see.
+        public ?int $defectId = null,
     ) {}
 }

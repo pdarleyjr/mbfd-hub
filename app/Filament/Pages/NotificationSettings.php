@@ -9,7 +9,9 @@ use App\Services\Notifications\NotificationCategory;
 use App\Services\Notifications\NotificationCategoryRegistry;
 use App\Services\Notifications\NotificationRecipientEvaluator;
 use App\Services\Notifications\PushDeviceRemovals;
+use App\Services\Notifications\SupportAlertLevelPreferences;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
@@ -49,6 +51,9 @@ class NotificationSettings extends Page implements HasForms
     protected static ?int $navigationSort = 90;
 
     protected static ?string $slug = 'notification-settings';
+
+    /** Form state key for the Support Services priority-level checkboxes (not a notification category). */
+    private const LEVELS_KEY = 'support_alert_levels';
 
     public ?array $data = [];
 
@@ -93,7 +98,31 @@ class NotificationSettings extends Page implements HasForms
             ->values()
             ->all();
 
+        if ($user instanceof User && app(SupportAlertLevelPreferences::class)->isAvailableTo($user)) {
+            $sections[] = $this->priorityLevelsSection();
+        }
+
         return $form->schema($sections)->statePath('data');
+    }
+
+    /** Which Support Services priority levels send this staff member the optional new-issue and new-request alerts. */
+    private function priorityLevelsSection(): Section
+    {
+        return Section::make('Support Services alerts: priority levels')
+            ->description('Approvals, safety holds, and updates on things you submitted always notify you, whatever you choose here.')
+            ->schema([
+                Checkbox::make(self::LEVELS_KEY.'.low')
+                    ->label('Low priority')
+                    ->helperText('Routine supplies and minor items.'),
+                Checkbox::make(self::LEVELS_KEY.'.medium')
+                    ->label('Medium priority')
+                    ->helperText('Specialized gear and anything not yet sorted.'),
+                Checkbox::make(self::LEVELS_KEY.'.high')
+                    ->label('High priority')
+                    ->helperText('Safety gear, equipment out of service and urgent requests.'),
+            ])
+            ->columns(3)
+            ->collapsible(false);
     }
 
     /** @param  array<string, string|null>  $notes */
@@ -153,6 +182,11 @@ class NotificationSettings extends Page implements HasForms
             );
         }
 
+        $levels = app(SupportAlertLevelPreferences::class);
+        if ($levels->isAvailableTo($user)) {
+            $state[self::LEVELS_KEY] = $levels->for($user);
+        }
+
         return $state;
     }
 
@@ -175,10 +209,12 @@ class NotificationSettings extends Page implements HasForms
 
         // Anything submitted for a category the member cannot receive is dropped and noted. Only
         // channel choices count: each category's description field ("{key}_about") holds no choice.
+        $levels = app(SupportAlertLevelPreferences::class);
+        $levelsAvailable = $levels->isAvailableTo($user);
         $submittedState = (array) $this->data;
         $unavailable = collect(array_keys($submittedState))
             ->filter(fn (mixed $key): bool => is_array($submittedState[$key] ?? null))
-            ->reject(fn (mixed $key): bool => is_string($key) && $eligible->has($key))
+            ->reject(fn (mixed $key): bool => is_string($key) && ($eligible->has($key) || ($levelsAvailable && $key === self::LEVELS_KEY)))
             ->values();
         if ($unavailable->isNotEmpty()) {
             Log::warning('Notification settings save ignored categories the member is not eligible for', [
@@ -208,6 +244,10 @@ class NotificationSettings extends Page implements HasForms
                 'webpush_enabled' => $desired[NotificationCategory::CHANNEL_WEBPUSH],
                 'email_enabled' => $desired[NotificationCategory::CHANNEL_EMAIL],
             ]);
+        }
+
+        if ($levelsAvailable) {
+            $levels->save($user, (array) ($data[self::LEVELS_KEY] ?? []));
         }
 
         $notification = Notification::make()->title('Notification preferences saved');

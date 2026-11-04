@@ -25,19 +25,7 @@ final class KnowledgeLibrary
 
     public const UPLOAD_MAX_BYTES = 204800;
 
-    private const MIN_SCORE = 4;
-
-    private const MIN_DISTINCT_MATCHES = 2;
-
-    private const STOP_WORDS = [
-        'the', 'and', 'for', 'are', 'but', 'not', 'you', 'your', 'yours', 'can', 'could', 'should', 'would', 'will', 'shall', 'has', 'have', 'had',
-        'was', 'were', 'been', 'being', 'does', 'did', 'doing', 'done', 'this', 'that', 'these', 'those', 'there', 'their', 'them', 'they', 'then',
-        'than', 'with', 'without', 'from', 'into', 'onto', 'about', 'what', 'when', 'where', 'which', 'who', 'whom', 'whose', 'why', 'how', 'any',
-        'all', 'some', 'out', 'off', 'our', 'ours', 'its', 'his', 'her', 'she', 'him', 'let', 'get', 'got', 'need', 'needs', 'want', 'wants', 'like',
-        'please', 'thanks', 'thank', 'hello', 'hey', 'just', 'also', 'very', 'much', 'many', 'more', 'most', 'other', 'over', 'under', 'again',
-        'know', 'tell', 'make', 'made', 'use', 'used', 'using', 'one', 'two', 'new', 'old', 'time', 'help', 'someone', 'anyone', 'person', 'thing',
-        'things', 'able', 'way', 'who', 'is', 'am', 'be', 'do', 'it', 'of', 'to', 'in', 'on', 'at', 'by', 'or', 'as', 'an', 'if', 'so', 'we', 'me', 'my',
-    ];
+    private ?KnowledgeRetriever $retriever = null;
 
     /** @param array<string, mixed> $data slug, title, body, topic_tags, member_safe, change_summary, source_note, effective_date, review_date */
     public function createArticle(array $data, User $editor): AiKnowledgeArticle
@@ -211,41 +199,103 @@ final class KnowledgeLibrary
 
     /**
      * Published, member-safe, in-date articles that best match the text; [] when nothing matches well enough.
+     * A second article is only included when it scores close to the first, so the model prompt stays small.
      *
      * @return list<Version>
      */
     public function retrieve(string $text, int $limit = 2): array
     {
-        $queryTokens = self::tokens($text);
-        if ($queryTokens === [] || $limit < 1) {
+        return $this->versionsFrom($this->retriever()->rank($text), $limit);
+    }
+
+    /**
+     * Like retrieve(), but only articles that match strongly (a whole tag or sample phrase, or three or more
+     * words). Used for free text that is not a question: a weak match there is not worth a model call.
+     *
+     * @return list<Version>
+     */
+    public function retrieveStrong(string $text, int $limit = 2): array
+    {
+        return $this->versionsFrom(array_values(array_filter(
+            $this->retriever()->rank($text),
+            static fn (array $row): bool => $row['strong'],
+        )), $limit);
+    }
+
+    /**
+     * What the engine would find for a piece of text, and why. For the admin preview: the best candidates
+     * (even ones that fall below the threshold), whether each would be used, and the words that matched.
+     *
+     * @return list<array{article_id: int, version_id: int, slug: string, title: string, score: int, retrieved: bool, strong: bool, matched_words: list<string>, synonym_words: list<string>, phrases: list<string>, fts_rank: float|null}>
+     */
+    public function previewRetrieval(string $text, int $limit = 5): array
+    {
+        return array_map(static fn (array $row): array => [
+            'article_id' => (int) $row['article']->getKey(),
+            'version_id' => (int) $row['version']->getKey(),
+            'slug' => (string) $row['article']->slug,
+            'title' => (string) $row['version']->title,
+            'score' => $row['score'],
+            'retrieved' => $row['retrieved'],
+            'strong' => $row['strong'],
+            'matched_words' => $row['matched'],
+            'synonym_words' => $row['expanded'],
+            'phrases' => $row['phrases'],
+            'fts_rank' => $row['fts_rank'],
+        ], array_slice($this->retriever()->rank($text), 0, max(1, $limit)));
+    }
+
+    /**
+     * Does this version answer the phrases members are expected to use? Tests each sample phrase, each multi-word
+     * tag and a title of two or more content words as if a member had typed it. `retrieved` means this article
+     * clears the match threshold; `top` means no other published article scores higher, so the phrase would not
+     * be answered from the wrong article. Run it before publishing and fix tags or sample phrases that fail.
+     *
+     * @return list<array{phrase: string, source: 'sample'|'title'|'tag', retrieved: bool, top: bool, score: int, competitor: ?string}>
+     */
+    public function selfRetrievalCheck(Version $version): array
+    {
+        $article = $version->article()->first();
+        if ($article === null) {
             return [];
         }
-        $lowerText = ' '.implode(' ', $queryTokens).' ';
-        $today = $this->today();
 
-        $candidates = Version::query()
-            ->with('article')
-            ->where('status', Version::STATUS_PUBLISHED)
-            ->whereIn('id', AiKnowledgeArticle::query()->where('member_safe', true)->whereNotNull('published_version_id')->select('published_version_id'))
-            ->where(fn ($q) => $q->whereNull('effective_date')->orWhereDate('effective_date', '<=', $today))
-            ->where(fn ($q) => $q->whereNull('review_date')->orWhereDate('review_date', '>=', $today))
-            ->get();
-
-        $scored = [];
-        foreach ($candidates as $version) {
-            $article = $version->article;
-            if ($article === null || (int) $article->published_version_id !== (int) $version->getKey()) {
-                continue;
-            }
-            $score = $this->score($queryTokens, $lowerText, $version, $article);
-            if ($score !== null) {
-                $scored[] = [$score, (int) $article->getKey(), $version];
+        $phrases = [];
+        foreach (KnowledgeRetriever::samplePhrases($version) as $phrase) {
+            $phrases[$phrase] ??= 'sample';
+        }
+        if (count(KnowledgeRetriever::tokens((string) $version->title)) > 1) {
+            $phrases[(string) $version->title] ??= 'title';
+        }
+        foreach ($article->tags() as $tag) {
+            if (count(KnowledgeRetriever::tokens($tag)) > 1) {
+                $phrases[$tag] ??= 'tag'; // tags are often shared between articles, so a rival here is only a hint
             }
         }
 
-        usort($scored, static fn (array $a, array $b): int => [$b[0], $a[1]] <=> [$a[0], $b[1]]);
+        $report = [];
+        foreach ($phrases as $phrase => $source) {
+            $phrase = (string) $phrase;
+            $own = $this->retriever()->scoreOne($phrase, $version, $article);
+            $rival = null;
+            foreach ($this->retriever()->rank($phrase) as $row) {
+                if ((int) $row['article']->getKey() !== (int) $article->getKey() && $row['retrieved']) {
+                    $rival = $row;
+                    break;
+                }
+            }
+            $beaten = $rival !== null && $rival['score'] > $own['score'];
+            $report[] = [
+                'phrase' => $phrase,
+                'source' => $source,
+                'retrieved' => $own['retrieved'],
+                'top' => $own['retrieved'] && ! $beaten,
+                'score' => $own['score'],
+                'competitor' => $beaten ? (string) $rival['article']->slug : null,
+            ];
+        }
 
-        return array_map(static fn (array $row): Version => $row[2], array_slice($scored, 0, $limit));
+        return $report;
     }
 
     /**
@@ -282,6 +332,7 @@ final class KnowledgeLibrary
                     'source_note' => self::SEED_SOURCE_NOTE,
                     'effective_date' => null,
                     'review_date' => $section['review'],
+                    'sample_phrases' => self::phrases($section['samples']),
                     'published_by_name' => self::SEED_NAME,
                     'published_at' => now(),
                 ], null, self::SEED_NAME);
@@ -323,7 +374,7 @@ final class KnowledgeLibrary
         return $text;
     }
 
-    /** @return list<array{slug: string, title: string, tags: list<string>, review: ?string, always: bool, body: string}> */
+    /** @return list<array{slug: string, title: string, tags: list<string>, samples: list<string>, review: ?string, always: bool, body: string}> */
     private function parseSeed(string $markdown): array
     {
         $lines = preg_split('/\R/', $markdown) ?: [];
@@ -379,6 +430,8 @@ final class KnowledgeLibrary
                 'slug' => $slug,
                 'title' => mb_substr($section['title'], 0, 200),
                 'tags' => self::tags(explode(',', $section['attributes']['tags'] ?? '')),
+                // samples="phrase one|phrase two": what a member might type to reach this article
+                'samples' => array_values(array_filter(array_map('trim', explode('|', $section['attributes']['samples'] ?? '')))),
                 'review' => is_string($review) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $review) === 1 ? $review : null,
                 'always' => ($section['attributes']['always'] ?? '') === 'true',
                 'body' => $body,
@@ -388,68 +441,26 @@ final class KnowledgeLibrary
         return $parsed;
     }
 
-    /**
-     * @param  list<string>  $queryTokens
-     */
-    private function score(array $queryTokens, string $lowerText, Version $version, AiKnowledgeArticle $article): ?int
+    private function retriever(): KnowledgeRetriever
     {
-        $titleTokens = array_flip(self::tokens((string) $version->title));
-        $tagTokens = array_flip(self::tokens(implode(' ', $article->tags())));
-        $bodyTokens = array_flip(self::tokens((string) $version->body));
-
-        $score = 0;
-        $matched = 0;
-        foreach (array_unique($queryTokens) as $token) {
-            $points = 0;
-            if (isset($titleTokens[$token])) {
-                $points += 3;
-            }
-            if (isset($tagTokens[$token])) {
-                $points += 3;
-            }
-            if (isset($bodyTokens[$token])) {
-                $points += 1;
-            }
-            if ($points > 0) {
-                $matched++;
-                $score += $points;
-            }
-        }
-
-        // A whole multi-word tag phrase ("kitty litter") is a strong signal on its own. Single-word tags
-        // ("saturday", "who") are too common to carry a match without a second overlapping word.
-        $phraseHit = false;
-        foreach ($article->tags() as $tag) {
-            $words = self::tokens($tag);
-            $phrase = implode(' ', $words);
-            if ($phrase !== '' && str_contains($lowerText, ' '.$phrase.' ')) {
-                $score += 6;
-                $phraseHit = $phraseHit || count($words) > 1;
-            }
-        }
-
-        if ($score < self::MIN_SCORE || ($matched < self::MIN_DISTINCT_MATCHES && ! $phraseHit)) {
-            return null;
-        }
-
-        return $score;
+        return $this->retriever ??= new KnowledgeRetriever;
     }
 
-    /** @return list<string> lower-case words, plural "s" folded, stop words and very short words removed */
-    private static function tokens(string $text): array
+    /**
+     * @param  list<array{version: Version, score: int, retrieved: bool}>  $ranked
+     * @return list<Version>
+     */
+    private function versionsFrom(array $ranked, int $limit): array
     {
-        $out = [];
-        foreach (preg_split('/[^a-z0-9]+/', mb_strtolower($text), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
-            if (strlen($word) < 3 || in_array($word, self::STOP_WORDS, true)) {
-                continue;
-            }
-            if (strlen($word) > 3 && str_ends_with($word, 's') && ! str_ends_with($word, 'ss')) {
-                $word = substr($word, 0, -1);
-            }
-            $out[] = $word;
+        $retrieved = array_values(array_filter($ranked, static fn (array $row): bool => $row['retrieved']));
+        if ($retrieved === [] || $limit < 1) {
+            return [];
         }
 
-        return $out;
+        $top = $retrieved[0]['score'];
+        $picked = array_filter($retrieved, static fn (array $row): bool => $top * 3 <= $row['score'] * 5);
+
+        return array_map(static fn (array $row): Version => $row['version'], array_slice(array_values($picked), 0, $limit));
     }
 
     /** @return list<string> */
@@ -469,7 +480,7 @@ final class KnowledgeLibrary
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{title: string, body: string, change_summary: ?string, source_note: ?string, effective_date: ?string, review_date: ?string}
+     * @return array{title: string, body: string, change_summary: ?string, source_note: ?string, effective_date: ?string, review_date: ?string, sample_phrases: ?string}
      */
     private function versionFields(array $data): array
     {
@@ -492,7 +503,23 @@ final class KnowledgeLibrary
             'source_note' => self::limited($data['source_note'] ?? null, 5000),
             'effective_date' => $effective,
             'review_date' => $review,
+            'sample_phrases' => self::phrases($data['sample_phrases'] ?? null),
         ];
+    }
+
+    /** Up to 10 short phrases members might type to reach this article, stored as JSON (null when none). */
+    private static function phrases(mixed $raw): ?string
+    {
+        $list = is_string($raw) ? (preg_split('/\R/', $raw) ?: []) : (array) $raw;
+        $phrases = [];
+        foreach ($list as $phrase) {
+            $clean = mb_substr(trim((string) preg_replace('/\s+/u', ' ', (string) $phrase)), 0, 120);
+            if ($clean !== '') {
+                $phrases[mb_strtolower($clean)] = $clean;
+            }
+        }
+
+        return $phrases === [] ? null : (string) json_encode(array_slice(array_values($phrases), 0, 10), JSON_UNESCAPED_UNICODE);
     }
 
     /**

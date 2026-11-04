@@ -264,6 +264,12 @@ class StationInventoryV2Controller extends Controller
 
         // After the commit; never throws and never slows or fails this save. A no-op while the AI switch is OFF.
         AiIntake::record('station_supply_request', (int) $supplyRequest->id);
+        // Staff triage level for the new request (reads the equipment catalog; sends nothing). Never fails the save.
+        try {
+            app(\App\Services\SupportTriage\TriageProjector::class)->refreshSupplyRequest($supplyRequest);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
         return response()->json([
             'success' => true,

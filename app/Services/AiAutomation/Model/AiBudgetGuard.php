@@ -45,6 +45,10 @@ final class AiBudgetGuard
                 if ($dailyLimit < 1 || $budgetMicro < 1) {
                     return null;
                 }
+                // Fail closed: a model with no listed price cannot be metered, so it is never called.
+                if ($this->priceFor($model) === null) {
+                    return null;
+                }
 
                 $now = $this->now();
                 $today = $now->toDateString();
@@ -56,7 +60,7 @@ final class AiBudgetGuard
                 }
 
                 $inputTokens = max(0, $estimatedInputTokens ?? self::DEFAULT_INPUT_ALLOWANCE_TOKENS);
-                $estimate = $this->costMicroUsd($inputTokens, $this->maxOutputTokens());
+                $estimate = $this->costMicroUsd($inputTokens, $this->maxOutputTokens(), $model);
 
                 $spent = (int) AiModelCall::query()
                     ->whereDate('call_date', '>=', $now->startOfMonth()->toDateString())
@@ -92,7 +96,7 @@ final class AiBudgetGuard
             'state' => AiModelCall::STATE_COMPLETED,
             'input_tokens' => $inputTokens,
             'output_tokens' => $outputTokens,
-            'cost_micro_usd' => $this->costMicroUsd($inputTokens, $outputTokens),
+            'cost_micro_usd' => $this->costMicroUsd($inputTokens, $outputTokens, (string) $call->model),
             'latency_ms' => max(0, $latencyMs),
             'error_class' => null,
         ])->save();
@@ -143,14 +147,39 @@ final class AiBudgetGuard
         return max(1, min($configured, self::OUTPUT_TOKEN_CEILING));
     }
 
-    /** Whole micro-USD, rounded up so the meter never undercounts. */
-    public function costMicroUsd(int $inputTokens, int $outputTokens): int
+    /**
+     * USD per million tokens for a model, from config('ai_automation.model.prices'). Null when the model is not
+     * listed (or is listed with a negative or non-numeric price): such a model is refused, never guessed at.
+     *
+     * @return array{in: float, out: float}|null
+     */
+    public function priceFor(?string $model = null): ?array
     {
-        $priceIn = max(0.0, (float) config('ai_automation.model.price_input_per_million', 0));
-        $priceOut = max(0.0, (float) config('ai_automation.model.price_output_per_million', 0));
+        $model ??= (string) config('ai_automation.model.model', '');
+        $entry = config('ai_automation.model.prices', [])[$model] ?? null;
+        if (! is_array($entry) || ! is_numeric($entry['in'] ?? null) || ! is_numeric($entry['out'] ?? null)) {
+            return null;
+        }
+        if ((float) $entry['in'] < 0 || (float) $entry['out'] < 0) {
+            return null;
+        }
+
+        return ['in' => (float) $entry['in'], 'out' => (float) $entry['out']];
+    }
+
+    /**
+     * Whole micro-USD, rounded up so the meter never undercounts. Priced by the given model (default: the
+     * configured one); an unpriced model costs 0 here because it can never be called.
+     */
+    public function costMicroUsd(int $inputTokens, int $outputTokens, ?string $model = null): int
+    {
+        $price = $this->priceFor($model);
+        if ($price === null) {
+            return 0;
+        }
 
         // round() first so float noise (72.00000000000001) never bumps the ceiling by a whole micro-dollar.
-        return (int) ceil(round(max(0, $inputTokens) * $priceIn + max(0, $outputTokens) * $priceOut, 6));
+        return (int) ceil(round(max(0, $inputTokens) * $price['in'] + max(0, $outputTokens) * $price['out'], 6));
     }
 
     /** Rough token count (4 bytes per token) used when the provider returns no usage. */

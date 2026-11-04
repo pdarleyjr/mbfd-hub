@@ -9,10 +9,13 @@ use App\Filament\Support\DefectCorrectiveActions;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectEvent;
+use App\Models\SupportTriage\SupportTriageLevel;
 use App\Models\User;
 use App\Services\Dashboards\Support\ApparatusClass;
 use App\Services\Dashboards\Support\VehicleIssueSource;
 use App\Services\Defects\DefectCorrectiveActionService;
+use App\Services\SupportTriage\TriageProjector;
+use App\Services\SupportTriage\TriageSql;
 use App\Support\Captain5\EventActorLabel;
 use App\Support\Dashboards\ActionResult;
 use App\Support\Dashboards\DashboardIssue;
@@ -38,7 +41,9 @@ use Illuminate\Validation\ValidationException;
  * Visibility: the DefectResource rule (policy viewAny). Actions: manageCorrectiveAction
  * (InspectionReviewers), enforced again inside the service.
  *
- * Severity (from the record's own fields):
+ * Severity is the Low/Medium/High priority from the equipment catalog (support_triage_levels, which a staff member may
+ * override): high whenever severity = significant or operational_impact = out_of_service, otherwise the projected
+ * level. Rows not projected yet fall back to the older rule so nothing disappears before the first backfill:
  *  - high:   severity = significant, or operational_impact = out_of_service;
  *  - medium: issue_type missing or damaged, or operational_impact = needs_repair;
  *  - low:    everything else (expired, low quantity, other).
@@ -56,8 +61,10 @@ use Illuminate\Validation\ValidationException;
  */
 final class ApparatusDefectSource extends VehicleIssueSource
 {
-    private const SEVERITY = "CASE WHEN apparatus_defects.severity = 'significant' OR apparatus_defects.operational_impact = 'out_of_service' THEN 'high'"
-        ." WHEN apparatus_defects.issue_type IN ('missing', 'damaged') OR apparatus_defects.operational_impact = 'needs_repair' THEN 'medium' ELSE 'low' END";
+    private const SEVERITY_FALLBACK = "CASE WHEN apparatus_defects.issue_type IN ('missing', 'damaged') OR apparatus_defects.operational_impact = 'needs_repair' THEN 'medium' ELSE 'low' END";
+
+    /** Staff may change the priority an equipment issue shows; "auto" goes back to the equipment priorities. */
+    private const PRIORITY_CHOICES = ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High', 'auto' => 'Use the equipment priority'];
 
     private const STAGE = "CASE WHEN apparatus_defects.action_status IS NULL OR apparatus_defects.action_status = 'reported' THEN 'awaiting_response'"
         ." WHEN apparatus_defects.action_status = 'resolved' THEN 'resolved' WHEN apparatus_defects.action_status = 'dismissed' THEN 'other' ELSE 'in_progress' END";
@@ -92,7 +99,7 @@ final class ApparatusDefectSource extends VehicleIssueSource
 
     protected function severitySql(): string
     {
-        return self::SEVERITY;
+        return TriageSql::defectLevel(self::SEVERITY_FALLBACK);
     }
 
     protected function stageSql(): string
@@ -168,6 +175,7 @@ final class ApparatusDefectSource extends VehicleIssueSource
             ['label' => 'Where', 'value' => trim((string) $defect->compartment)],
             ['label' => 'Item', 'value' => trim((string) $defect->item)],
             ['label' => 'Problem', 'value' => str((string) $defect->issue_type)->replace('_', ' ')->headline()->toString()],
+            ['label' => 'Priority', 'value' => $this->priorityLabel($defect, (string) $fresh['issue']->severity)],
             ['label' => 'Severity', 'value' => DefectSeverityCorrection::label($defect->severity)],
             ['label' => 'Operational impact', 'value' => DefectCorrectiveActions::IMPACT_LABELS[(string) $defect->operational_impact] ?? 'Not classified yet'],
             ['label' => 'Status', 'value' => DefectActionStatus::label($defect->action_status)],
@@ -233,6 +241,7 @@ final class ApparatusDefectSource extends VehicleIssueSource
                 ? new IssueAction('verify', 'Verify correction', 'primary', [self::textarea('notes', 'Notes (optional)', max: 5000), ...$messages])
                 : null,
             new IssueAction('classify_impact', 'Classify impact', 'secondary', [self::select('operational_impact', 'Operational impact', DefectCorrectiveActions::IMPACT_LABELS), ...$messages]),
+            new IssueAction('set_priority', 'Change priority', 'secondary', [self::select('level', 'Priority', self::PRIORITY_CHOICES)]),
             new IssueAction('resolve', 'Resolve', 'primary', [
                 self::select('resolution_type', 'How was it resolved?', DefectCorrectiveActions::RESOLUTION_OPTIONS),
                 self::textarea('resolution_notes', 'Resolution notes', true, 5000),
@@ -245,6 +254,33 @@ final class ApparatusDefectSource extends VehicleIssueSource
                 ], DefectNoActionClosure::DIALOG_TEXT, IssueAction::BULK_FORM)
                 : null,
         ]));
+    }
+
+    /** "Medium (set by equipment priorities)" or "High (changed by Pat Smith)". */
+    private function priorityLabel(ApparatusDefect $defect, string $fallback): string
+    {
+        $row = SupportTriageLevel::query()->where('subject_type', TriageProjector::DEFECT)->where('subject_id', $defect->getKey())
+            ->with('overriddenBy:id,name,display_name')->first();
+        $label = ucfirst($row instanceof SupportTriageLevel ? $row->level : $fallback);
+        if ($defect->severity === 'significant' || $defect->operational_impact === 'out_of_service') {
+            return $label.' (issue is flagged significant or out of service)';
+        }
+        if ($row instanceof SupportTriageLevel && $row->override_level !== null) {
+            return $label.' (changed by '.(self::personName($row->overriddenBy) ?: 'staff').')';
+        }
+
+        return $label.' (set by equipment priorities)';
+    }
+
+    private function setPriority(ApparatusDefect $defect, User $user, array $input): ActionResult
+    {
+        $choice = is_string($input['level'] ?? null) ? $input['level'] : '';
+        if (! array_key_exists($choice, self::PRIORITY_CHOICES)) {
+            return ActionResult::invalid(['level' => 'Choose Low, Medium or High.'], 'Choose Low, Medium or High.');
+        }
+        app(TriageProjector::class)->setOverride(TriageProjector::DEFECT, (int) $defect->getKey(), $choice === 'auto' ? null : $choice, $user);
+
+        return ActionResult::done($choice === 'auto' ? 'Priority set back to the equipment priority.' : 'Priority saved.');
     }
 
     private function assigneeLabel(mixed $assigned): string
@@ -292,6 +328,7 @@ final class ApparatusDefectSource extends VehicleIssueSource
                     ...$messages,
                 ]), 'Issue assigned.'),
                 'verify' => $this->done($service->verifyCorrection($key, $user, ['notes' => self::text($input, 'notes'), ...$messages]), 'Correction verified and issue resolved.'),
+                'set_priority' => $this->setPriority($defect, $user, $input),
                 'classify_impact' => $this->done($service->classifyImpact($key, $user, ['operational_impact' => $input['operational_impact'] ?? null, ...$messages]), 'Operational impact saved.'),
                 'resolve' => $this->done($service->resolve($key, $user, [
                     'resolution_type' => $input['resolution_type'] ?? null,

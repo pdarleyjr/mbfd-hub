@@ -6,6 +6,7 @@ namespace App\Console\Commands\AiAutomation;
 
 use App\Services\AiAutomation\Knowledge\KnowledgeLibrary;
 use App\Services\AiAutomation\PlaybookRepository;
+use App\Services\SupportTriage\EquipmentRuleService;
 use Illuminate\Console\Command;
 
 /**
@@ -21,6 +22,7 @@ final class SeedAiAutomationContent extends Command
     public function handle(PlaybookRepository $playbooks, KnowledgeLibrary $library): int
     {
         $this->info('Playbooks added: '.$playbooks->ensureSeeded());
+        $this->info('Equipment priority rules added: '.app(EquipmentRuleService::class)->seedDefaults());
 
         $path = resource_path('ai/knowledge/mbfd-support-services-guidance.md');
         if (! is_file($path)) {

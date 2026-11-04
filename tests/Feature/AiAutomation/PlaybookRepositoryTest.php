@@ -38,7 +38,7 @@ final class PlaybookRepositoryTest extends TestCase
         $repo = new PlaybookRepository;
 
         self::assertSame(['body' => 'Acknowledged.', 'version' => 0], $repo->template('receipt'));
-        self::assertContains('scba', $repo->terms('safety_terms'));
+        self::assertContains('asap', $repo->terms('urgency_terms'));
     }
 
     public function test_unknown_keys_throw(): void
@@ -60,7 +60,7 @@ final class PlaybookRepositoryTest extends TestCase
         (new PlaybookRepository)->ensureSeeded();
 
         $this->expectException(InvalidArgumentException::class);
-        (new PlaybookRepository)->template('safety_terms');
+        (new PlaybookRepository)->template('urgency_terms');
     }
 
     public function test_seeding_inserts_everything_once_and_never_overwrites(): void
@@ -83,10 +83,10 @@ final class PlaybookRepositoryTest extends TestCase
     {
         (new PlaybookRepository)->ensureSeeded();
 
-        $list = AiAutomationPlaybook::query()->where('key', 'safety_terms')->sole();
+        $list = AiAutomationPlaybook::query()->where('key', 'urgency_terms')->sole();
         self::assertSame('list', $list->kind);
         self::assertNotSame('', $list->label);
-        self::assertStringContainsString("scba\nair pack", $list->body);
+        self::assertStringContainsString("asap\nurgent", $list->body);
         self::assertSame(1, $list->version);
         self::assertSame('template', AiAutomationPlaybook::query()->where('key', 'receipt')->sole()->kind);
     }
@@ -116,7 +116,7 @@ final class PlaybookRepositoryTest extends TestCase
         $repo = new PlaybookRepository;
         $repo->ensureSeeded();
         $editor = $this->editor();
-        $playbook = AiAutomationPlaybook::query()->where('key', 'missing_item')->sole();
+        $playbook = AiAutomationPlaybook::query()->where('key', 'missing_low')->sole();
 
         $updated = $repo->update($playbook, "Check for extra {item}.\n", $editor);
 
@@ -128,7 +128,7 @@ final class PlaybookRepositoryTest extends TestCase
         self::assertSame('Check for extra {item}.', $revisions->last()->body);
         self::assertSame($editor->getKey(), $revisions->last()->edited_by_user_id);
         self::assertSame('Pat Example', $revisions->last()->edited_by_name);
-        self::assertSame('Check for extra {item}.', $repo->template('missing_item')['body']);
+        self::assertSame('Check for extra {item}.', $repo->template('missing_low')['body']);
     }
 
     public function test_saving_the_live_body_again_changes_nothing(): void
@@ -228,14 +228,54 @@ final class PlaybookRepositoryTest extends TestCase
         self::assertCount(300, $repo->terms('urgency_terms'));
     }
 
-    public function test_the_safety_list_cannot_be_emptied(): void
+    public function test_the_exposure_list_cannot_be_emptied(): void
     {
         $repo = new PlaybookRepository;
         $repo->ensureSeeded();
-        $playbook = AiAutomationPlaybook::query()->where('key', 'safety_terms')->sole();
+        $playbook = AiAutomationPlaybook::query()->where('key', 'exposure_terms')->sole();
 
         $this->expectException(InvalidArgumentException::class);
         $repo->update($playbook, " \n \n", $this->editor());
+    }
+
+    public function test_the_catalog_replaced_the_old_importance_lists_and_templates(): void
+    {
+        $repo = new PlaybookRepository;
+        $repo->ensureSeeded();
+
+        foreach (['safety_terms', 'expensive_terms', 'battery_terms', 'missing_item', 'missing_items', 'damaged_item', 'readiness_line'] as $retired) {
+            self::assertFalse(AiAutomationPlaybook::query()->where('key', $retired)->exists(), $retired);
+        }
+        foreach (['missing_low', 'missing_low_multi', 'missing_battery_dewalt', 'missing_battery', 'damaged_low', 'medium_tool', 'medium_urgent_line', 'medium_detection',
+            'medium_air_tech', 'medium_cylinder_leak', 'captain5_medium', 'captain5_low', 'high_ppe', 'readiness', 'hazard_station', 'weekend_line'] as $key) {
+            self::assertSame('template', AiAutomationPlaybook::query()->where('key', $key)->sole()->kind, $key);
+        }
+    }
+
+    public function test_seeding_retires_unedited_old_defaults_but_keeps_an_admin_edit(): void
+    {
+        foreach (['missing_item' => 1, 'readiness_line' => 3] as $key => $version) {
+            AiAutomationPlaybook::query()->create(['key' => $key, 'kind' => 'template', 'label' => $key, 'body' => 'Old text', 'version' => $version]);
+        }
+
+        (new PlaybookRepository)->ensureSeeded();
+
+        self::assertFalse(AiAutomationPlaybook::query()->where('key', 'missing_item')->exists(), 'never edited: removed');
+        self::assertSame('Old text', AiAutomationPlaybook::query()->where('key', 'readiness_line')->sole()->body, 'edited by an admin: kept');
+    }
+
+    public function test_every_default_message_follows_the_owner_wording(): void
+    {
+        $repo = new PlaybookRepository;
+
+        self::assertStringStartsWith("Please check around the station and other apparatus to make sure the {item} wasn't misplaced.", $repo->template('missing_low')['body']);
+        self::assertSame('Acknowledged. Notify your officer and 300 right away.', $repo->template('readiness')['body']);
+        self::assertSame('Acknowledged. Contact Captain 5 to coordinate a replacement and pickup.', $repo->template('captain5_low')['body']);
+        // Only the {item} placeholder is allowed, so every default must validate as it ships.
+        foreach (array_keys((array) config('ai_automation.templates')) as $key) {
+            $body = $repo->template($key)['body'];
+            self::assertSame($body, $repo->validate(new AiAutomationPlaybook(['key' => $key, 'kind' => 'template']), $body), $key);
+        }
     }
 
     public function test_playbook_resource_screens_require_the_capability(): void
@@ -244,7 +284,7 @@ final class PlaybookRepositoryTest extends TestCase
         $playbook = AiAutomationPlaybook::query()->where('key', 'receipt')->sole();
 
         $this->actingAs($this->user(super: true));
-        $this->get('/admin/ai-playbooks')->assertOk()->assertSee('Response Playbooks');
+        $this->get('/admin/ai-playbooks')->assertOk()->assertSee('Response Messages');
         $this->get('/admin/ai-playbooks/'.$playbook->getKey().'/edit')->assertOk();
 
         $this->actingAs($this->user(permissions: ['admin.access', 'admin.ai_automation.manage']));

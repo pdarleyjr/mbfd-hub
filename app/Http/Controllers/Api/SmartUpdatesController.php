@@ -16,8 +16,8 @@ class SmartUpdatesController extends Controller
     {
         try {
             $workerUrl = config('services.cloudflare.worker_url');
-
-            if (! $workerUrl) {
+            
+            if (!$workerUrl) {
                 return response()->json([
                     'error' => 'Cloudflare Worker URL not configured',
                     'summary_markdown' => 'Smart updates service is not configured.',
@@ -32,7 +32,7 @@ class SmartUpdatesController extends Controller
 
             if ($response->successful()) {
                 $data = $response->json();
-
+                
                 // Ensure required fields exist
                 return response()->json([
                     'summary_markdown' => $data['summary_markdown'] ?? 'No summary available',

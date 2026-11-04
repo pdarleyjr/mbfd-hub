@@ -80,6 +80,7 @@ final class ApparatusInspectionProcessingService
         $batch = $concerns->begin($inspection, $apparatus, $evidence['concerns'] ?? []);
         $findings = app(DefectContinuityService::class)->recordFindings($inspection, $apparatus, [...$observations, ...$batch->compartments], $definitions, $evidence);
         $findings = $concerns->finish($batch, $inspection, $apparatus, $findings);
+        $this->projectTriage($findings);
         $this->carryEquipmentNumbers($inspection, $apparatus, $checklist, $evidence);
 
         $this->recordNonMeterHolds($inspection, $apparatus, $findings);
@@ -96,6 +97,29 @@ final class ApparatusInspectionProcessingService
             // AI Response receipt (docs/ai-response-automation.md): never throws, does nothing while the switch is OFF.
             AiIntake::record('apparatus_inspection', (int) $inspection->id);
         });
+    }
+
+    /**
+     * Staff triage level (Low, Medium, High) for the issues this checkout created or confirmed. Done now, before the
+     * reviewer alerts below are filtered by level. It reads the equipment catalog and sends nothing; the savepoint
+     * keeps a problem here from costing the member their checkout.
+     */
+    private function projectTriage(FindingsResult $findings): void
+    {
+        $ids = array_values(array_unique([...$findings->newDefectIds, ...$findings->confirmedDefectIds, ...$findings->significantNewOrEscalatedDefectIds]));
+        if ($ids === []) {
+            return;
+        }
+        try {
+            DB::transaction(function () use ($ids): void {
+                $projector = app(\App\Services\SupportTriage\TriageProjector::class);
+                foreach (ApparatusDefect::query()->whereIn('id', $ids)->get() as $defect) {
+                    $projector->refreshDefect($defect);
+                }
+            });
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**

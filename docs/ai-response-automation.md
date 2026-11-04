@@ -1,96 +1,83 @@
-# AI Response automation
+# Support Services Automation (automated replies)
 
-The Hub posts one short automated reply, signed **Support Services**, when a member submits something in three areas:
+When a member submits something in three areas, the Hub posts one short reply signed **Support Services**:
 
 | Area | What gets a reply | Where the member sees it |
 |---|---|---|
-| Vehicle | A daily checkout that records Missing, Damaged or other equipment findings; a member message on a vehicle issue thread | The checkout's issue conversation |
-| Station requests | A new station request (equipment, supplies, appliance or facility maintenance) and a station supply request | The member's request, as an update from Support Services |
-| Support Services | A member message to Support Services (My Messages) | The message thread |
+| Vehicle | A daily checkout with Missing, Damaged or other findings (Engine, Ladder, Rescue, reserve units); a member message on a vehicle issue thread | The checkout's issue conversation |
+| Station requests | A new station request and a station supply request | The member's request, as an update from Support Services |
+| Support Services | A member message in My Messages | The thread |
 
-Nothing else is touched: no EMS or medical inventory, Captain 5, narcotics, rosters, staffing, incidents, personnel or uniform workflows, training, IT tickets or email. Clean checkouts get no reply.
+Nothing else is touched: no EMS or medical inventory, narcotics, Captain 5 workflows, rosters, staffing, incidents, personnel or uniform workflows, training or IT. Rescue and medical items on a vehicle checkout only get an acknowledgment and a "coordinate with Captain 5" referral inside that checkout conversation; no Captain 5 or EMS record is read or written. Clean checkouts and repeat reports already answered get no reply.
 
-A reply means *received by the Hub*. It never means reviewed, approved, ordered, repaired or fixed. Every submission stays exactly where it was in the staff lists, with its status, priority and acknowledgment fields untouched. Staff keep answering, acknowledging and closing items the normal way. The feature sends **no email and no push**; the member gets the reply on the record itself and one in-app bell notification (new submissions only), sent through the normal "Updates on things I submitted" category with push and email masked off.
+A reply means *received*. It never means reviewed, approved, ordered, repaired or ready for service. Every submission stays where it was in the staff lists with its status, priority, acknowledgment and resolution fields untouched. The feature sends **no email and no push**; the member gets the reply on the record and one in-app bell notification (new submissions only). Members see the sender as **Support Services**, styled like any Support Services reply; staff screens show **Support Services (automated)**.
 
-## The master switch
+Everything is in **Admin > Support Services Automation**: Overview, Equipment Priorities, Knowledge & Instructions, Response Messages, Activity & History. Who can use it: super administrators and anyone granted `admin.ai_automation.manage` (grantable from the access screen). A plain-language guide for administrators is `docs/support-services-automation-admin-guide.md`.
 
-**Admin > AI Response Automation > AI Automations.** The large card at the top reads **AI AUTOMATIONS ON** or **OFF**.
+## The master switch (Overview)
 
-- **Turn OFF** is one tap with no confirmation. It stops every automated acknowledgment, reply, backlog batch and model call at once, including work already queued or in progress. Manual Hub workflows are unaffected.
-- **Turn ON** asks for confirmation. From then on, *new* submissions get replies. Nothing older is answered until someone presses **Process Pending Backlog**, and work stopped by an earlier OFF is never revived by itself.
-- It starts **OFF** after installation. Every change is listed under **Switch history** (who, when, how many queued replies an OFF stopped).
+The large **AI AUTOMATIONS ON/OFF** card at the top. **Turn OFF** is one tap and stops every automated reply, backlog batch and AI model call at once, including queued and in-progress work; manual Hub workflows keep working. **Turn ON** asks for confirmation; only new submissions are answered until someone presses **Process Pending Backlog**, and work stopped by an earlier OFF is never revived by itself. Every change is in Switch history.
 
-Who can use it: super administrators, and anyone granted the `admin.ai_automation.manage` permission. The permission exists after deployment but is granted to nobody.
+Emergency from the server: `docker exec -u sail mbfd-hub-laravel php artisan ai-automation:switch off`. `AI_AUTOMATION_HARD_DISABLED=true` disables the whole feature; `AI_AUTOMATION_MODEL_ENABLED=false` stops model calls but keeps the standard replies.
 
-**Emergency, from the server** (same switch, recorded as "from the server"):
+How OFF is enforced: the switch lives in the database (never cache). Every ON/OFF bumps an epoch; queued work is checked when a worker claims it, after any model call, and under a row lock inside the transaction that writes the reply, so nothing posts after OFF and a reply queued before an OFF never posts after a later ON. The bell is also suppressed if OFF lands right after a reply.
 
-```bash
-docker exec -u sail mbfd-hub-laravel php artisan ai-automation:switch off
-```
+## Priorities decide the reply
 
-To turn the whole feature off regardless of the admin switch, set `AI_AUTOMATION_HARD_DISABLED=true` in the production environment and restart the container. Remove it to hand control back to the admin switch.
+Every item, request and message gets LOW, MEDIUM or HIGH from the equipment catalog (Equipment Priorities); the same priority drives the staff dashboards and staff alerts. Details: `docs/support-services-triage.md`.
 
-### How OFF is enforced
-
-The switch lives in the database (`ai_automation_settings`), never in cache, so deploys and restarts cannot reset it. Each ON or OFF increases an *epoch* number. Every queued reply remembers its epoch and is checked three times: when a worker picks it up, after any model call, and inside the database transaction that writes the reply, holding a lock on the switch row. An OFF therefore either lands before the write (and nothing is posted) or waits for that single in-flight write to finish. A reply queued before an OFF can never post after a later ON.
-
-## What the replies say
-
-Members see the sender as **Support Services**, styled like any Support Services reply (owner decision: no "AI" title). Staff screens show **Support Services (automated)** so the team can tell it apart. Replies come from **Response Playbooks** (editable, versioned). The defaults:
+Default replies (all editable in **Response Messages**; `{item}` is the item name from the checkout):
 
 | Situation | Reply |
 |---|---|
-| A missing vehicle item (any item) | `Acknowledged. Please make sure the {item} hasn't been misplaced and isn't somewhere around the station, on another apparatus, or left on a spare truck during a recent truck swap. If it's still missing, call or text us before heading to Station 2 so we can confirm we have a spare ready.` |
-| A missing battery | Same, also asking them to check chargers and other tools such as the station blower |
-| Several missing items | One reply naming them ("kitty litter, spanner wrench and K-tool"), plus the battery reminder if one is a battery |
-| A readiness or safety item (SCBA, radios, monitors, lighting, brakes, tires, pump, aerial, PPE, saws…) or anything marked significant | Same reply, plus `If this affects your unit's readiness, notify your officer and 300 right away.` |
-| Damaged item | `Acknowledged. We'll follow up if needed.` (readiness items: `Acknowledged.` plus the readiness line) |
-| Station request that reached the staff work list | `Acknowledged. Forwarded to the appropriate personnel.` |
-| Anything else, including bunker gear drop-offs | `Acknowledged.` |
-| Saturday or Sunday (Eastern) — vehicle and station submissions, and Support Services messages that say it's needed now | Adds `Support Services staff are off this weekend. If this can't wait, contact 300. Otherwise we'll follow up on the next weekday.` (replaces the readiness line, since 300 covers it) |
+| LOW missing item (kitty litter, hand tools, hardware, consumables) | Please check around the station and other apparatus to make sure the {item} wasn't misplaced. If it's still missing, call or text before coming by Station 2 so we can check on a replacement. |
+| Several LOW missing items | Same, naming up to three items ("A, B and C", then "and other items"); adds the battery reminder if one is a battery |
+| Missing DeWalt battery | Check the chargers and other DeWalt tools, including the station blower. If it's still missing, call or text before coming by Station 2 so we can check on a replacement. |
+| Other missing battery | Check the chargers and other tools, including the station blower, to make sure the {item} wasn't left behind. If it's still missing, call or text before coming by Station 2 so we can check on a replacement. |
+| LOW damaged item | Acknowledged. We'll follow up if needed. |
+| MEDIUM expensive or specialized tool | Acknowledged. Call or text before coming by Station 2 so we can check whether a replacement is available. (+ "If it's needed right away, notify your officer and coordinate through 300." when the member says it's urgent) |
+| MEDIUM gas meter / detection | Acknowledged. Coordinate a replacement with Support Services or the appropriate equipment technician. Call or text first so availability can be confirmed. |
+| MEDIUM SCBA component or cylinder (Air Tech) | Acknowledged. Coordinate with the on-duty Air Tech to have the item checked or swapped out. Notify your officer and contact 300 if immediate assistance or after-hours coordination is needed. |
+| Cylinder leak | Acknowledged. Remove the leaking cylinder from use and contact the on-duty Air Tech to have it assessed or swapped out. Notify your officer, and coordinate through 300 if immediate or after-hours assistance is needed. |
+| Lifepak and expensive Rescue equipment (Captain 5, MEDIUM) | Acknowledged. Coordinate with Captain 5 to arrange a replacement or pickup. Confirm availability before coming by. |
+| Splints, backboards and similar (Captain 5, LOW) | Acknowledged. Contact Captain 5 to coordinate a replacement and pickup. |
+| HIGH PPE (complete SCBA, facepiece, hood, helmet, bunker coat or pants) | Acknowledged. Notify your officer immediately and coordinate with Support Services or 300 for further direction. |
+| Hazard or readiness (flagged significant or out of service, sparking, uncontrolled leak, gas smell…) | Acknowledged. Notify your officer and 300 right away. (station hazards: "Acknowledged. If there is an immediate hazard, notify your officer and 300 right away.") |
+| Station request on the staff work list | Acknowledged. Forwarded to the appropriate personnel. |
+| Supply request, bunker gear drop-off, anything else | Acknowledged. |
+| An item with its own message in Equipment Priorities | That message |
 
-Why: missing equipment is usually misplaced, on another truck or left on a swap truck. The reply gets crews looking first and calling ahead before driving to Station 2, so staff can confirm a spare is actually on hand. Weekends have no administrative staff; 300, the on-shift Division Chief, has supply room access.
+Weekend line, Saturday and Sunday Eastern time, only for routine Support Services replies to submissions from the last 48 hours (never for old backlog items, Air Tech, Captain 5 or HIGH replies, which already route to 300): "Support Services staff are off this weekend. If this can't wait, contact 300. Otherwise we'll follow up on the next weekday."
 
-A conversation (a Support Services thread or a vehicle issue thread) gets at most one automated reply per 24 hours. Unit and place names such as "Engine 2" or "Fire Station 4" are ignored when looking for safety words. The word lists (readiness and safety items, expensive items, batteries, urgency words, bunker drop-off, exposure) are on the Playbooks screen, one term per line.
+One reply per checkout, driven by its highest-priority finding. A conversation gets at most one routine automated reply per two hours; a new HIGH or hazard report is still answered.
 
-## Questions and the AI model
+## Knowledge & Instructions and the AI model
 
-When a member asks a question (in a Support Services message, on a vehicle issue thread, or in a station request) and a published Knowledge Library article matches, Cloudflare Workers AI (`@cf/openai/gpt-oss-120b`) writes a 1-3 sentence answer from that article plus every article marked **Use in every AI answer**. The answer is checked before it is sent: short, no greetings or promises, no document names, contact details or links, numbers must come from the article, and most of its words must come from the article. Anything that fails becomes `Acknowledged.`. Questions about readiness or safety items never go to the model. The historical backlog never uses the model.
+Plain-language instruction articles by topic: Add, Edit, Preview, Publish, Restore previous; import Word (.docx), PDF or text (up to 5 MB, text only, the file is not stored). "Use this in every automated answer" marks standing facts (weekends and 300, calling ahead to Station 2) sent with every AI answer; "Example messages this should answer" lets the preview prove an article is found; "Test a message" shows which instructions would be used and why. Changes are live immediately.
 
-Spend limits: 100 calls a day and $10 a month, reserved before each call (`AI_AUTOMATION_MODEL_DAILY_CALLS`, `AI_AUTOMATION_MODEL_MONTHLY_USD`). Today's calls and the month's spend are on the AI Automations page. Production settings (values only in the server environment): `AI_AUTOMATION_MODEL_ENABLED=true`, `AI_AUTOMATION_CF_ACCOUNT_ID`, `AI_AUTOMATION_CF_API_TOKEN` — a dedicated Cloudflare token (id `be014d3f92c830d518dc2671f0f7a0c1`, name `mbfd-hub-ai-response-2026-11-03`) with only Workers AI Read and Write on the MBFD account. Set `AI_AUTOMATION_MODEL_ENABLED=false` to stop model calls while keeping playbook replies.
-## Knowledge Library
+Standard reports ("Missing Lifepak", "SCBA cylinder leaking", "AC not working") are answered by the messages above with **no AI call**. The AI (Cloudflare Workers AI, `@cf/meta/llama-3.3-70b-instruct-fp8-fast`) is used only for a member's question, or free text the catalog can't classify, when a published article clearly matches; never for HIGH, hazard or PPE items, never for the backlog, never to say "Acknowledged.". Retrieval stays in the Hub database (keyword and synonym scoring from the equipment catalog, plus PostgreSQL full-text ranking); only the matched article text and the member's words go to Cloudflare.
 
-**Admin > AI Response Automation > Knowledge Library.** Short Support Services guidance articles in Markdown. Edit in the browser or upload a `.md`/`.txt` file, **Save draft**, **Preview**, **Submit for review**, **Approve & publish**, or **Withdraw**. Publishing takes effect immediately; no code deployment. Every version is kept with its editor, publisher and dates. The *Internal source note* records which procedure or owner decision an article came from and is never shown to members.
+Answers are checked before sending: 1-3 short sentences, no greetings or promises, no document names, contacts or links, numbers only from the article, and the answer must stick to words from the article or the member's message; anything failing becomes "Acknowledged.".
 
-The starter guide is `resources/ai/knowledge/mbfd-support-services-guidance.md`; `php artisan ai-automation:seed` imports it (and the Playbooks defaults) once and never overwrites anything an administrator has edited. The internal source map is `docs/ai-response-automation/sog-crosswalk.md`.
+Model choice (benchmark of 27 anonymized samples, 2026-11-03): Llama 3.3 70B fast 85% correct, 1.0 s typical, about $0.21 per 1,000 answers; gpt-oss-20b 74%; gpt-oss-120b 59%; Qwen3 30B 56%; Gemma 4 26B 26%. Re-run with `php artisan ai-automation:benchmark --model=... --run` before switching (`AI_AUTOMATION_MODEL`). Prices are per model in `config/ai_automation.php`; an unpriced model is refused. Hard caps: 100 calls a day and $10 a month, reserved before each call. Production settings (values only in the server environment): `AI_AUTOMATION_MODEL_ENABLED`, `AI_AUTOMATION_CF_ACCOUNT_ID`, `AI_AUTOMATION_CF_API_TOKEN` (dedicated token `mbfd-hub-ai-response-2026-11-03`, id `be014d3f92c830d518dc2671f0f7a0c1`, Workers AI Read and Write only). Expected use: a few questions a day, well under the free daily Workers AI allowance.
 
-**Use in every AI answer** marks standing facts (weekends and 300, calling ahead to Station 2, looking for missing items first) that every AI-written answer must follow; the starter guide's "How Support Services Handles Submissions" article is marked this way. Update it whenever how you work changes. Articles are only used to answer a member's question (not a report). Only published, member-safe articles inside their review date are used; withdrawn, stale or unmatched articles mean the member gets `Acknowledged.`. Library content stays in the Hub database; there is no external index to keep in sync.
+## Historical backlog (Overview)
 
-## Historical backlog
+**Preview Pending Backlog** (background, sends nothing) counts older unanswered submissions by area, why others are excluded, and the exact replies. **Process Pending Backlog** (switch ON only) sends one reply per submission in batches of 10 about every 20 seconds, templates only, no notifications, re-checking each record first; OFF or Pause stops it and Resume continues. Optional age limit `AI_AUTOMATION_BACKLOG_MAX_AGE_DAYS` (default none).
 
-Older submissions that never got a staff or assistant response:
+## Activity & History
 
-1. **Preview Pending Backlog** counts them by area, shows why others are excluded (already answered, closed, test data, out of scope…), the oldest date and the exact replies that would go out. Nothing is sent.
-2. Turn AI automations **ON**, then **Process Pending Backlog**. Batches of 10 run about every 20 seconds, one reply per submission, templates only (no model), no notifications. Every record is re-checked just before its reply, so anything answered by staff since the preview is skipped.
-3. **OFF** (or **Pause**) stops it at once; the button then reads **Resume Pending Backlog** and continues where it stopped. Nothing is ever answered twice.
-
-Start with the preview, process, and spot-check a few replies in Activity and on the member's screen before letting it finish.
-
-## Activity
-
-Every automated decision: when, area, record, live or backlog, sent / skipped / stopped by OFF / failed, the exact reply text, risk, why, and which playbook version or library articles were used. The underlying submission always stays with staff. **Test a response** previews a made-up submission without saving or sending anything.
+Every decision: when, area, record, live or backlog, priority, sent / skipped / stopped by OFF / failed, the exact reply, whether a standard message or the AI produced it, the instructions used, and that the item stays with staff. Exportable.
 
 ## Operations
 
-- Queue: dedicated supervisord program `ai-automation-worker` (`queue:work --queue=ai-automation,ai-backlog --tries=1 --timeout=80`), so it never delays operational forms or notifications. Retries are tracked on the ledger row (`ai_intake_events`), at most three attempts.
-- Safety net: `ai-automation:sweep` every five minutes re-queues stalled work while ON and does nothing while OFF.
-- Tables: `ai_automation_settings`, `ai_automation_switch_events`, `ai_intake_events` (unique per source event), `ai_backlog_runs`, `ai_model_calls`, `ai_automation_playbooks` + revisions, `ai_knowledge_articles` + versions. Migrations are additive.
-- Rollback: turn the switch OFF, then redeploy the previous image digest. Older code ignores the new tables and keeps working. Replies already posted stay visible: on vehicle threads they read as an unlabelled message, on station requests as an update from "System", and in Support Services threads the older page draws them like a member bubble labelled "Member". Staff queues are unaffected. The new columns are nullable and the migrations are additive, so no database rollback is needed.
-- Permission: `admin.ai_automation.manage` can be granted from the normal member access administration screen.
+- Queue: supervisord program `ai-automation-worker` (`--queue=ai-automation,ai-backlog --tries=1 --timeout=80`); production Redis `retry_after` is 90 s. Ledger `ai_intake_events` (unique per source event, at most three attempts). `ai-automation:sweep` every five minutes (no-op while OFF).
+- Deploy steps: migrations (additive), then `php artisan ai-automation:seed` (messages, starter instructions, equipment catalog; never overwrites edits), then `php artisan support-triage:backfill` (priorities for open records, no notifications). The switch stays OFF until an administrator turns it on.
+- Rollback: turn the switch OFF, redeploy the previous image digest. Older code ignores the new tables. Replies already posted stay visible; the older pages label them differently (vehicle threads "Crew member", station requests "System", Support Services threads a member-style bubble "Member · Support Services"). Staff queues are unaffected; no database rollback needed.
 
 ## Verifying after a release
 
-1. Switch shows OFF. Activity is empty.
-2. Turn ON. Submit a test checkout with a missing routine item on a test unit, a test station request and a Support Services message from a test account; each gets one reply from Support Services on the member's screen, the staff lists still show them as unanswered, and no email is sent.
-3. Turn OFF; submit again; nothing is posted and Activity shows nothing new.
-4. Preview the backlog; process a small batch only after reviewing the preview.
+1. Overview shows OFF. Equipment Priorities lists the seeded catalog; "Not classified yet" shows the few ambiguous items.
+2. Try a message: Kitty Litter (LOW), DeWalt battery, gas meter, SCBA cylinder leak, helmet, Lifepak on Rescue; check the priority and reply.
+3. Turn ON; one real or test submission per area gets one Support Services reply; staff lists still show it unanswered; no email.
+4. Turn OFF; nothing more posts. Preview the backlog, process a small batch, review, then the rest.

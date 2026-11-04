@@ -10,6 +10,7 @@ use App\Notifications\NewSubmissionNotification;
 use App\Services\AiAutomation\AiIntake;
 use App\Services\Display\DisplaySnapshotService;
 use App\Services\Notifications\NotificationDispatchService;
+use App\Services\SupportTriage\TriageProjector;
 use Illuminate\Support\Facades\Cache;
 
 class StationRequestSideEffectService
@@ -17,6 +18,8 @@ class StationRequestSideEffectService
     public function requestCreated(StationRequest $request): void
     {
         $this->forgetReadModels($request);
+        // Staff triage level, computed now (before the alert below is filtered by level). Never breaks the save.
+        $this->refreshTriage($request);
 
         $eventKey = NotificationDispatchService::eventKey(User::NOTIFICATION_PREFERENCE_STATION_REQUESTS, 'station_request', $request->id, 'created');
 
@@ -30,7 +33,7 @@ class StationRequestSideEffectService
                 body: "{$request->request_number}: {$request->title}",
                 actionUrl: '/admin/station-requests/'.$request->id,
                 eventKey: $eventKey,
-            ),
+            )->forTriageSubject('station_request', (int) $request->id),
             eventKey: $eventKey,
         );
 
@@ -42,6 +45,16 @@ class StationRequestSideEffectService
     public function requestChanged(StationRequest $request): void
     {
         $this->forgetReadModels($request);
+        $this->refreshTriage($request);
+    }
+
+    private function refreshTriage(StationRequest $request): void
+    {
+        try {
+            app(TriageProjector::class)->refreshStationRequest($request->loadMissing('items:id,station_request_id,item_name'));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function forgetReadModels(StationRequest $request): void

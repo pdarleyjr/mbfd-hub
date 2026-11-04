@@ -6,37 +6,49 @@ namespace App\Services\AiAutomation;
 
 use App\Services\AiAutomation\Knowledge\KnowledgeLibrary;
 use App\Services\AiAutomation\Model\WorkersAiClient;
+use App\Services\SupportTriage\Contracts\EquipmentClassifier;
+use App\Services\SupportTriage\EquipmentClassification;
+use App\Services\SupportTriage\TriageProjector;
 use Carbon\CarbonImmutable;
+use Throwable;
 
 /**
- * Deterministic-first reply selection. The Playbooks templates decide every report (missing or damaged
- * equipment, station requests, plain statements) with no model call. The model is only asked to phrase an
- * answer to a member's question when a published Knowledge Library article matches; risk set by the rules
- * can never be lowered by the model.
+ * Deterministic-first reply selection. The equipment catalog (EquipmentClassifier) is the one opinion about
+ * importance: it decides LOW, MEDIUM or HIGH and who handles the item, and ReplySelector turns that into one of
+ * the editable Playbooks templates. A checkout finding that already has a defect row uses the level staff see
+ * (TriageProjector), so the member reply always matches the staff screens. No model is involved in any
+ * statement about equipment.
  *
- * Owner decisions (2026-11-03): every missing vehicle item gets the "look for it first, then call or text
- * before heading to Station 2" reply naming the item; readiness items add "notify your officer and 300";
- * on Saturday and Sunday, with no Support Services staff on duty, replies add the 300 weekend line.
+ * The model is only asked to phrase an answer when a member asks a question, or writes free text the catalog
+ * cannot classify, AND a published Knowledge Library article matches (strongly, for non-questions). Hazard,
+ * protective-equipment and critical reports never reach it, and nothing it writes can lower a risk tier.
  */
 final class ResponseComposer
 {
     private const QUESTION_STARTS = ['how', 'where', 'what', 'when', 'who', 'which', 'why', 'can', 'could', 'should', 'do', 'does', 'is', 'are', 'will', 'would'];
 
-    private const MAX_NAMED_ITEMS = 3;
+    private const LEAK_WORDS = '/\bleak(?:s|ed|ing|y)?\b/iu';
+
+    private const DEWALT_WORDS = '/\b(?:dewalt|flexvolt)\b/iu';
 
     /** Why the last question got no grounded answer (recorded in Activity). */
     private string $lastQuestionReason = 'question_no_published_guidance';
+
+    private readonly ReplySelector $selector;
 
     public function __construct(
         private readonly PlaybookRepository $playbooks,
         private readonly KnowledgeLibrary $library,
         private readonly WorkersAiClient $model,
         private readonly ReplyValidator $validator,
-    ) {}
+        private readonly EquipmentClassifier $classifier,
+    ) {
+        $this->selector = new ReplySelector;
+    }
 
     public function compose(IntakeFacts $facts, CarbonImmutable $now, bool $allowModel = true): ComposedReply
     {
-        $weekend = $now->setTimezone((string) config('ai_automation.timezone', 'America/New_York'))->isWeekend();
+        $weekend = $this->weekendLineApplies($facts, $now);
 
         return match ($facts->kind) {
             'inspection_findings' => $this->forFindings($facts, $weekend),
@@ -51,74 +63,91 @@ final class ResponseComposer
             return $this->receipt(['no_findings']);
         }
 
-        $safety = $this->playbooks->terms('safety_terms');
-        $critical = false;
-        $missing = [];
-        $damaged = 0;
-        foreach ($facts->findings as $finding) {
-            if ($finding->significant || TermMatcher::any($finding->itemName.' '.($finding->note ?? ''), $safety)) {
-                $critical = true;
+        $assessed = [];
+        foreach ($facts->findings as $index => $finding) {
+            $assessed[] = $this->assess($finding, $index);
+        }
+        // Highest level first; within a level, missing items before damaged ones, then checklist order.
+        usort($assessed, static fn (array $a, array $b): int => [EquipmentClassification::rank($b['level']), $a['order']] <=> [EquipmentClassification::rank($a['level']), $b['order']]);
+
+        $driver = $assessed[0];
+        $group = array_values(array_filter($assessed, fn (array $row): bool => $this->groupOf($row['choice']) === $this->groupOf($driver['choice'])
+            && $row['choice']->tier === $driver['choice']->tier));
+        $names = array_map(static fn (array $row): string => $row['finding']->itemName, $group);
+        $key = $this->groupKey($driver['choice']->key, $names);
+
+        $reply = $this->fromChoice($driver['choice'], $key, ItemNamer::join($names), $driver['cls']);
+        if ($key === 'missing_low_multi') {
+            $batteries = array_filter($group, static fn (array $row): bool => $row['cls']->category === 'battery');
+            if ($batteries !== []) {
+                $reply = $this->append($reply, 'battery_line', 'battery');
             }
-            match ($finding->condition) {
-                'missing' => $missing[] = $finding,
-                'damaged' => $damaged++,
-                default => null,
-            };
         }
 
-        $tier = $critical ? 'critical' : 'routine';
-        $decision = $critical ? ComposedReply::RECEIPT_AND_HUMAN_FLAG : ComposedReply::RECEIPT_PLUS_GUIDANCE;
-
-        if ($missing !== []) {
-            $batteries = array_filter($missing, fn (Finding $finding): bool => TermMatcher::any($finding->itemName.' '.($finding->note ?? ''), $this->playbooks->terms('battery_terms')));
-            $names = $this->itemList($missing);
-            if (count($missing) === 1) {
-                $key = $batteries !== [] ? 'missing_battery' : 'missing_item';
-                $reply = $this->template($key, $decision, [$critical ? 'missing_readiness_item' : 'missing_item'], ['{item}' => $names], $tier);
-            } else {
-                $reply = $this->template('missing_items', $decision, [$critical ? 'missing_readiness_items' : 'missing_items'], ['{item}' => $names], $tier);
-                if ($batteries !== []) {
-                    $reply = $this->append($reply, 'battery_line', 'battery');
-                }
-            }
-        } elseif ($damaged > 0) {
-            $reply = $critical
-                ? $this->receipt(['damaged_readiness_item'], 'critical')
-                : $this->template('damaged_item', ComposedReply::RECEIPT_ONLY, ['damaged_item']);
-        } else {
-            $reply = $this->receipt(['other_condition'], $tier);
+        $urgent = $key === 'medium_tool' && $driver['cls']->contact300 !== 'never'
+            && TermMatcher::any(implode(' ', array_map(static fn (array $row): string => $row['finding']->itemName.' '.($row['finding']->note ?? ''), $group)), $this->playbooks->terms('urgency_terms'));
+        if ($urgent) {
+            return $this->append($reply, 'medium_urgent_line', 'urgent');
         }
 
-        // 300 already covers readiness on the weekend; on weekdays the officer and 300 line stands on its own.
-        if ($weekend) {
-            return $this->append($reply, 'weekend_line', 'weekend');
+        return $weekend && $driver['choice']->supportServices && $driver['choice']->tier === 'routine' ? $this->append($reply, 'weekend_line', 'weekend') : $reply;
+    }
+
+    /**
+     * @return array{finding: Finding, cls: EquipmentClassification, level: string, choice: ReplyChoice, order: int}
+     */
+    private function assess(Finding $finding, int $index): array
+    {
+        $cls = $this->classifier->classifyItem($finding->itemName, $finding->note, $finding->apparatusType, $finding->significant, $finding->condition);
+        // The defect's projected level is what staff see (including a staff override); the catalog fills in the rest.
+        $level = $this->projectedLevel($finding->defectId) ?? $cls->level;
+        $leak = preg_match(self::LEAK_WORDS, $finding->itemName.' '.($finding->note ?? '')) === 1;
+        $dewalt = preg_match(self::DEWALT_WORDS, $finding->itemName) === 1;
+        $choice = $this->selector->choose($cls, $level, 'item', $finding->condition, $leak, $dewalt);
+
+        return ['finding' => $finding, 'cls' => $cls, 'level' => $level, 'choice' => $choice, 'order' => ($finding->condition === 'missing' ? 0 : 1000) + $index];
+    }
+
+    /** Several low missing items read as one list whichever of them is a battery. */
+    private function groupOf(ReplyChoice $choice): string
+    {
+        return str_starts_with($choice->key, 'missing_') ? 'missing_low' : $choice->key;
+    }
+
+    /** @param  list<string>  $names */
+    private function groupKey(string $key, array $names): string
+    {
+        if (! str_starts_with($key, 'missing_')) {
+            return $key;
         }
 
-        return $critical ? $this->append($reply, 'readiness_line', 'readiness') : $reply;
+        return ItemNamer::distinctCount($names) > 1 ? 'missing_low_multi' : $key;
     }
 
     private function forStationRequest(IntakeFacts $facts, bool $weekend, bool $allowModel): ComposedReply
     {
-        $text = ($facts->category ?? '').' '.($facts->memberText ?? '');
-        if (TermMatcher::any($text, $this->playbooks->terms('safety_terms'))) {
-            $reply = $this->receipt(['safety_term'], 'critical');
-        } elseif ($this->isQuestion((string) $facts->memberText) && ($answer = $this->answerQuestion((string) $facts->memberText, $allowModel)) !== null) {
+        $text = trim(($facts->category ?? '').' '.($facts->memberText ?? ''));
+        $cls = $this->classifier->classifyText($text, $facts->kind === 'supply_request' ? 'supply' : 'station');
+        $choice = $this->selector->choose($cls, $cls->level, 'station', 'other', preg_match(self::LEAK_WORDS, $text) === 1);
+
+        if ($choice->key !== ReplySelector::PLAIN) {
+            $reply = $this->fromChoice($choice, $choice->key, '', $cls);
+        } elseif ($this->canAskModel($cls) && $this->isQuestion((string) $facts->memberText) && ($answer = $this->answerFromLibrary((string) $facts->memberText, $allowModel, false)) !== null) {
             return $answer;
         } elseif ($facts->routed) {
             // "Forwarded" is only true when the adapter confirmed an existing staff work list received it.
-            $reply = $this->template('receipt_forwarded', ComposedReply::RECEIPT_ONLY, ['routed']);
+            $reply = $this->template('receipt_forwarded', ComposedReply::RECEIPT_ONLY, ['routed', ...$choice->reasons], [], $choice->tier);
         } else {
-            $reply = $this->receipt(['not_routed']);
+            $reply = $this->receipt(['not_routed', ...$choice->reasons], $choice->tier);
         }
 
-        return $weekend ? $this->append($reply, 'weekend_line', 'weekend') : $reply;
+        return $weekend && $choice->supportServices && $choice->tier === 'routine' ? $this->append($reply, 'weekend_line', 'weekend') : $reply;
     }
 
     private function forMessage(IntakeFacts $facts, bool $weekend, bool $allowModel): ComposedReply
     {
         $text = (string) $facts->memberText;
-        $urgentWeekend = $weekend && TermMatcher::any($text, $this->playbooks->terms('urgency_terms'));
-        $finish = fn (ComposedReply $reply): ComposedReply => $urgentWeekend ? $this->append($reply, 'weekend_line', 'weekend') : $reply;
+        $urgent = TermMatcher::any($text, $this->playbooks->terms('urgency_terms'));
 
         if ($facts->kind === 'support_message' && TermMatcher::any($text, $this->playbooks->terms('bunker_dropoff_terms'))) {
             // Gear words are safety words, so drop-offs are judged on exposure or damage instead.
@@ -128,25 +157,63 @@ final class ResponseComposer
         }
 
         // A message on an issue thread is judged together with the item the thread is about.
-        $context = $text.' '.implode(' ', array_map(static fn (Finding $finding): string => $finding->itemName, $facts->findings));
-        $significant = array_filter($facts->findings, static fn (Finding $finding): bool => $finding->significant) !== [];
-        if ($significant || TermMatcher::any($context, $this->playbooks->terms('safety_terms'))) {
-            return $finish($this->receipt(['safety_term'], 'critical'));
-        }
-        if (TermMatcher::any($context, $this->playbooks->terms('expensive_terms'))) {
-            return $finish($this->receipt(['expensive_item'], 'elevated'));
-        }
-        if (! $this->isQuestion($text)) {
-            return $finish($this->receipt(['statement']));
+        [$cls, $choice] = $this->strongest($text, $facts->findings);
+        $leak = preg_match(self::LEAK_WORDS, $text.' '.implode(' ', array_map(static fn (Finding $f): string => $f->itemName, $facts->findings))) === 1;
+        if ($leak) {
+            $choice = $this->selector->choose($cls, $cls->level, 'message', 'other', true);
         }
 
-        return $this->answerQuestion($text, $allowModel) ?? $finish($this->receipt([$this->lastQuestionReason]));
+        if ($choice->key !== ReplySelector::PLAIN) {
+            $reply = $this->fromChoice($choice, $choice->key, '', $cls);
+        } else {
+            $question = $this->isQuestion($text);
+            if ($this->canAskModel($cls) && ($question || $cls->unclassified)
+                && ($answer = $this->answerFromLibrary($text, $allowModel, ! $question)) !== null) {
+                return $answer;
+            }
+            $reply = $this->receipt([$question ? $this->lastQuestionReason : 'statement', ...$choice->reasons], $choice->tier);
+        }
+
+        return $weekend && $urgent && $choice->supportServices && $choice->tier === 'routine' ? $this->append($reply, 'weekend_line', 'weekend') : $reply;
     }
 
-    /** A grounded 1-3 sentence answer, or null so the caller falls back to its acknowledgment. */
-    private function answerQuestion(string $text, bool $allowModel): ?ComposedReply
+    /**
+     * The most important reading of a message: its own text, or any item on the thread it belongs to.
+     *
+     * @param  list<Finding>  $findings
+     * @return array{0: EquipmentClassification, 1: ReplyChoice}
+     */
+    private function strongest(string $text, array $findings): array
     {
-        $articles = $this->library->retrieve($text);
+        $best = $this->classifier->classifyText($text, 'support');
+        $bestChoice = $this->selector->choose($best, $best->level, 'message');
+        foreach ($findings as $finding) {
+            $cls = $this->classifier->classifyItem($finding->itemName, $finding->note ?? $text, $finding->apparatusType, $finding->significant, $finding->condition);
+            $level = $this->projectedLevel($finding->defectId) ?? $cls->level;
+            if (EquipmentClassification::rank($level) > EquipmentClassification::rank($best->level) || ($best->unclassified && ! $cls->unclassified)) {
+                $best = $cls;
+                $bestChoice = $this->selector->choose($cls, $level, 'message');
+            }
+        }
+
+        return [$best, $bestChoice];
+    }
+
+    /** Only low or unknown, non-protective, non-hazard text may be phrased by the model. */
+    private function canAskModel(EquipmentClassification $cls): bool
+    {
+        return ! $cls->hazard && ! $cls->isPpe && ! $cls->isCritical
+            && ($cls->level === EquipmentClassification::LOW || $cls->unclassified);
+    }
+
+    /**
+     * A grounded 1-3 sentence answer, or null so the caller falls back to its acknowledgment.
+     *
+     * @param  bool  $strongOnly  free text that is not a question needs a strong article match before a model is used
+     */
+    private function answerFromLibrary(string $text, bool $allowModel, bool $strongOnly): ?ComposedReply
+    {
+        $articles = $strongOnly ? $this->library->retrieveStrong($text) : $this->library->retrieve($text);
         if ($articles === []) {
             $this->lastQuestionReason = 'question_no_published_guidance';
 
@@ -181,8 +248,9 @@ final class ResponseComposer
             return null;
         }
 
-        $answer = $this->validator->validateModelAnswer($reply->text, $guidanceText);
+        $answer = $this->validator->validateModelAnswer($reply->text, $guidanceText, $text);
         if ($answer === null) {
+            $this->lastQuestionReason = 'model_answer_rejected';
             $receipt = $this->receipt(['model_answer_rejected']);
 
             return new ComposedReply($receipt->decision, $receipt->text, 'routine', true, $receipt->templateKey,
@@ -194,46 +262,52 @@ final class ResponseComposer
     }
 
     /**
-     * "spanner wrench", "spanner wrench and kitty litter", "spanner wrench, kitty litter and K-tool",
-     * "spanner wrench, kitty litter, K-tool and other items". The member's own item names, never invented.
-     *
-     * @param  list<Finding>  $findings
+     * Builds the reply for a choice: the catalog's own member text if the administrator wrote one, else the
+     * Playbooks template, with the item names filled in.
      */
-    private function itemList(array $findings): string
+    private function fromChoice(ReplyChoice $choice, string $key, string $names, EquipmentClassification $cls): ComposedReply
     {
-        $names = [];
-        foreach ($findings as $finding) {
-            $label = $this->itemLabel($finding->itemName);
-            if ($label !== '' && ! in_array($label, $names, true)) {
-                $names[] = $label;
-            }
+        $decision = $choice->tier === 'routine' ? ComposedReply::RECEIPT_PLUS_GUIDANCE : ComposedReply::RECEIPT_AND_HUMAN_FLAG;
+        $reasons = ['catalog_reply', ...$choice->reasons];
+
+        if ($choice->key === ReplySelector::CUSTOM) {
+            $text = trim(strtr((string) $cls->memberResponse, ['{item}' => $names !== '' ? $names : 'item']));
+
+            return new ComposedReply($decision, $text, $choice->tier, true, ReplySelector::CUSTOM, null, [...$reasons, 'catalog_member_response', ...($cls->ruleId !== null ? ['rule_'.$cls->ruleId] : [])]);
         }
-        if ($names === []) {
-            return 'item';
+        if (in_array($key, ['damaged_low', 'receipt'], true)) {
+            $decision = ComposedReply::RECEIPT_ONLY;
         }
 
-        $shown = array_slice($names, 0, self::MAX_NAMED_ITEMS);
-        if (count($names) > self::MAX_NAMED_ITEMS) {
-            return implode(', ', $shown).' and other items';
-        }
-        if (count($shown) === 1) {
-            return $shown[0];
-        }
-
-        return implode(', ', array_slice($shown, 0, -1)).' and '.end($shown);
+        return $this->template($key, $decision, $reasons, ['{item}' => $names !== '' ? $names : 'item'], $choice->tier);
     }
 
-    /** "Kitty Litter (bag)" -> "kitty litter"; keeps acronyms like "SCBA" and "K-Tool" readable. */
-    private function itemLabel(string $itemName): string
+    /** Weekend line: a weekend now AND the submission itself made in the last 48 hours (never on old backlog). */
+    private function weekendLineApplies(IntakeFacts $facts, CarbonImmutable $now): bool
     {
-        $label = trim((string) preg_replace('/\s+/u', ' ', (string) preg_replace('/\s*\(.*?\)\s*/u', ' ', $itemName)));
-        $label = $label !== '' ? $label : trim($itemName);
-        $words = array_map(
-            static fn (string $word): string => preg_match('/^[A-Z0-9][A-Z0-9\-]+$/u', $word) === 1 ? $word : mb_strtolower($word),
-            explode(' ', $label),
-        );
+        if (! $now->setTimezone((string) config('ai_automation.timezone', 'America/New_York'))->isWeekend() || $facts->submittedAt === null) {
+            return false;
+        }
 
-        return mb_substr(implode(' ', $words), 0, 60);
+        $age = $now->getTimestamp() - $facts->submittedAt->getTimestamp();
+
+        return $age >= -3600 && $age <= (int) config('ai_automation.reply.weekend_line_max_age_hours', 48) * 3600;
+    }
+
+    /** The triage level staff see for this defect, or null when it has no projection row yet (the catalog level is used). */
+    private function projectedLevel(?int $defectId): ?string
+    {
+        if ($defectId === null) {
+            return null;
+        }
+
+        try {
+            $level = app(TriageProjector::class)->levelFor('apparatus_defect', $defectId);
+        } catch (Throwable) {
+            return null; // a projection problem must never stop the member being answered
+        }
+
+        return $level !== null && in_array($level, EquipmentClassification::LEVELS, true) ? $level : null;
     }
 
     private function isQuestion(string $text): bool

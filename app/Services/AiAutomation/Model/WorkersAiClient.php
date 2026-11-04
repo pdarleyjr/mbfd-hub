@@ -36,7 +36,10 @@ final class WorkersAiClient
             return false;
         }
 
-        return $this->accountId() !== null && $this->token() !== null && $this->modelId() !== null;
+        $model = $this->modelId();
+
+        // An unpriced model cannot be metered, so it counts as unavailable (fail closed).
+        return $this->accountId() !== null && $this->token() !== null && $model !== null && $this->guard->priceFor($model) !== null;
     }
 
     public function compose(string $systemPrompt, string $userContent): ?ModelReply

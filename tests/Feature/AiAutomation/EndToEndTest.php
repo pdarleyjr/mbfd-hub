@@ -89,6 +89,8 @@ final class EndToEndTest extends TestCase
         parent::setUp();
         // Replies add a 300 line on Saturdays and Sundays; pin a Tuesday so the wording checks never depend on the run day.
         $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-03 15:00:00', 'America/New_York'));
+        // Production seeds the equipment priorities before automation is turned on; so do these tests.
+        app(\App\Services\SupportTriage\EquipmentRuleService::class)->seedDefaults();
         Mail::fake();
         $this->buildWorld();
         RateLimiter::clear('employee-logistics-message:1');
@@ -140,8 +142,8 @@ final class EndToEndTest extends TestCase
         $this->assertCount(1, $messages);
         $this->assertSame((int) $inspection->id, (int) $messages[0]->apparatus_inspection_id);
         $this->assertSame('member', $messages[0]->visibility);
-        $this->assertStringContainsString("hasn't been misplaced", $messages[0]->body);
-        $this->assertStringContainsString('call or text us before heading to Station 2', $messages[0]->body);
+        $this->assertStringContainsString("Yellow Safety Tape/Duct Tape wasn't misplaced", $messages[0]->body);
+        $this->assertStringContainsString('call or text before coming by Station 2', $messages[0]->body);
 
         $row = AiIntakeEvent::query()->where('source_type', 'apparatus_inspection')->sole();
         $this->assertSame(AiIntakeEvent::STATE_SENT, $row->state);
@@ -248,7 +250,7 @@ final class EndToEndTest extends TestCase
 
         $message = ApparatusIssueMessage::query()->where('author_context', 'assistant')->sole();
         $this->assertSame((int) $inspection->id, (int) $message->apparatus_inspection_id);
-        $this->assertSame("Acknowledged. Please make sure the kitty litter hasn't been misplaced and isn't somewhere around the station, on another apparatus, or left on a spare truck during a recent truck swap. If it's still missing, call or text us before heading to Station 2 so we can confirm we have a spare ready.", $message->body);
+        $this->assertSame("Please check around the station and other apparatus to make sure the Kitty Litter wasn't misplaced. If it's still missing, call or text before coming by Station 2 so we can check on a replacement.", $message->body);
     }
 
     public function test_the_station_reply_leaves_status_priority_acknowledgment_and_public_response_alone(): void
@@ -291,7 +293,7 @@ final class EndToEndTest extends TestCase
 
     // ================================================================================== 3. critical item
 
-    public function test_a_missing_scba_item_gets_the_readiness_line_and_is_flagged_critical(): void
+    public function test_a_missing_scba_gets_the_high_ppe_reply_and_is_flagged_critical(): void
     {
         $this->switchOn();
 
@@ -299,8 +301,8 @@ final class EndToEndTest extends TestCase
 
         $message = ApparatusIssueMessage::query()->where('author_context', 'assistant')->sole();
         $this->assertSame((int) $inspection->id, (int) $message->apparatus_inspection_id);
-        $this->assertStringContainsString("make sure the SCBA hasn't been misplaced", $message->body);
-        $this->assertStringEndsWith("If this affects your unit's readiness, notify your officer and 300 right away.", $message->body);
+        // A complete SCBA is HIGH protective equipment: officer first, no Station 2 replacement guidance.
+        $this->assertSame('Acknowledged. Notify your officer immediately and coordinate with Support Services or 300 for further direction.', $message->body);
         $row = AiIntakeEvent::query()->where('source_type', 'apparatus_inspection')->sole();
         $this->assertSame($message->body, $row->reply_text);
         $this->assertSame('critical', $row->risk_tier);
@@ -662,7 +664,7 @@ final class EndToEndTest extends TestCase
         $switch = app(AiAutomationSwitch::class);
 
         $this->assertTrue(AiResponseAutomation::canAccess());
-        $this->get('/admin/ai-response-automation')->assertOk()->assertSee('AI Response Automation');
+        $this->get('/admin/ai-response-automation')->assertOk()->assertSee('Support Services Automation');
 
         $page = Livewire::test(AiResponseAutomation::class)->assertSuccessful();
         $page->callAction('turnOn')->assertHasNoActionErrors();

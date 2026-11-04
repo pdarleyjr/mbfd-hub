@@ -289,8 +289,15 @@ final class KnowledgeLibraryTest extends TestCase
         $article = $this->library->createArticle($this->data(['slug' => 'gear-general', 'title' => 'Gear overview', 'body' => 'General notes about gear and drop-off times.', 'topic_tags' => ['gear']]), $editor);
         $this->library->publish(Version::query()->where('article_id', $article->getKey())->sole(), $editor);
 
+        // Ranked: the drop-off article first, the loosely related one second (visible in the preview).
+        $preview = $this->library->previewRetrieval('Where do I drop off my bunker gear?');
+        self::assertSame('bunker-gear-drop-off', $preview[0]['slug']);
+        self::assertSame('gear-general', $preview[1]['slug']);
+        self::assertGreaterThan($preview[1]['score'], $preview[0]['score']);
+
+        // Only an article that scores close to the best one rides along, so the model prompt stays small.
         $found = $this->library->retrieve('Where do I drop off my bunker gear?', 2);
-        self::assertSame(['bunker-gear-drop-off', 'gear-general'], array_map(static fn (Version $v): string => $v->article->slug, $found));
+        self::assertSame('bunker-gear-drop-off', $found[0]->article->slug);
         self::assertCount(1, $this->library->retrieve('Where do I drop off my bunker gear?', 1));
         self::assertSame(
             array_map(static fn (Version $v): int => $v->getKey(), $found),
@@ -348,13 +355,13 @@ final class KnowledgeLibraryTest extends TestCase
         foreach ([$this->user(super: true), $this->user(permissions: ['admin.access', 'admin.ai_automation.manage'])] as $allowed) {
             $this->actingAs($allowed);
             self::assertTrue(AiKnowledgeArticleResource::canViewAny());
-            $this->get($paths[0])->assertOk()->assertSee('Knowledge Library');
+            $this->get($paths[0])->assertOk()->assertSee('Knowledge & Instructions');
             Livewire::test(ListAiKnowledgeArticles::class)->loadTable()->assertCanSeeTableRecords([$article])->assertSee('Bunker gear drop-off')
                 ->searchTable('bunker')->assertCanSeeTableRecords([$article])
                 ->searchTable('zzzz-nothing')->assertCanNotSeeTableRecords([$article])
                 ->searchTable('turnout')->assertCanSeeTableRecords([$article]);
             $this->get($paths[1])->assertOk();
-            $this->get($paths[2])->assertOk()->assertSee('Internal source note (never shown to members)');
+            $this->get($paths[2])->assertOk()->assertSee('Where this came from (only staff see this)');
         }
 
         foreach ([['admin.access'], ['admin.ai_automation.manage'], []] as $permissions) {
@@ -395,7 +402,6 @@ final class KnowledgeLibraryTest extends TestCase
         Livewire::test(CreateAiKnowledgeArticle::class)
             ->fillForm([
                 'title' => 'Key fob requests',
-                'slug' => 'key-fob-requests',
                 'topic_tags' => ['key fob'],
                 'member_safe' => true,
                 'body' => 'Ask the station officer to request a new key fob.',
@@ -408,9 +414,8 @@ final class KnowledgeLibraryTest extends TestCase
         self::assertNull($article->published_version_id);
 
         $edit = Livewire::test(EditAiKnowledgeArticle::class, ['record' => $article->getKey()])
-            ->assertFormSet(['title' => 'Key fob requests', 'body' => 'Ask the station officer to request a new key fob.', 'slug' => 'key-fob-requests'])
-            ->callAction('submitForReview');
-        self::assertSame(Version::STATUS_IN_REVIEW, Version::query()->where('article_id', $article->getKey())->sole()->status);
+            ->assertFormSet(['title' => 'Key fob requests', 'body' => 'Ask the station officer to request a new key fob.']);
+        self::assertSame(Version::STATUS_DRAFT, Version::query()->where('article_id', $article->getKey())->sole()->status);
 
         $edit->callAction('publish');
         $article->refresh();

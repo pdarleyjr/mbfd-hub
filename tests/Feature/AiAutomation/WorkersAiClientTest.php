@@ -49,8 +49,10 @@ final class WorkersAiClientTest extends TestCase
             'max_output_tokens' => 300,
             'daily_call_limit' => 100,
             'monthly_budget_usd' => 10,
-            'price_input_per_million' => 0.35,
-            'price_output_per_million' => 0.75,
+            'prices' => [
+                '@cf/openai/gpt-oss-120b' => ['in' => 0.35, 'out' => 0.75],
+                '@cf/openai/gpt-oss-20b' => ['in' => 0.20, 'out' => 0.30],
+            ],
         ]);
     }
 
@@ -461,5 +463,69 @@ final class WorkersAiClientTest extends TestCase
             ->once()
             ->withArgs(fn (string $message, array $context): bool => $message === 'ai_automation.model_call_failed'
                 && $context === ['error' => 'http_5xx', 'status' => 503]);
+    }
+
+    public function test_cost_follows_the_model_that_made_the_call(): void
+    {
+        $guard = $this->app->make(AiBudgetGuard::class);
+
+        // 1,000,000 tokens in and out: the price is the cost, in micro-dollars.
+        $this->assertSame(1_100_000, $guard->costMicroUsd(1_000_000, 1_000_000, '@cf/openai/gpt-oss-120b'));
+        $this->assertSame(500_000, $guard->costMicroUsd(1_000_000, 1_000_000, '@cf/openai/gpt-oss-20b'));
+
+        config()->set('ai_automation.model.model', '@cf/openai/gpt-oss-20b');
+        $this->assertSame(500_000, $guard->costMicroUsd(1_000_000, 1_000_000), 'the configured model is the default');
+    }
+
+    public function test_switching_the_model_switches_the_ledger_cost(): void
+    {
+        Http::fake(['api.cloudflare.com/*' => Http::response($this->chatResult())]);
+
+        $expensive = $this->client()->compose(self::SYSTEM, self::USER);
+        config()->set('ai_automation.model.model', '@cf/openai/gpt-oss-20b');
+        $cheap = $this->client()->compose(self::SYSTEM, self::USER);
+
+        $this->assertNotNull($expensive);
+        $this->assertNotNull($cheap);
+        $this->assertSame(72, (int) AiModelCall::query()->findOrFail($expensive->modelCallId)->cost_micro_usd);
+        $this->assertSame(36, (int) AiModelCall::query()->findOrFail($cheap->modelCallId)->cost_micro_usd, '120 in x 0.20 + 40 out x 0.30');
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), '/ai/run/@cf/openai/gpt-oss-20b'));
+    }
+
+    public function test_a_model_with_no_price_is_refused_before_any_request(): void
+    {
+        config()->set('ai_automation.model.model', '@cf/vendor/brand-new-model');
+        Http::fake();
+
+        $this->assertFalse($this->client()->available());
+        $this->assertNull($this->client()->compose(self::SYSTEM, self::USER));
+        $this->assertNull($this->app->make(AiBudgetGuard::class)->reserve('@cf/vendor/brand-new-model', 100));
+        Http::assertNothingSent();
+        $this->assertSame(0, AiModelCall::query()->count());
+    }
+
+    public function test_a_malformed_price_counts_as_unpriced(): void
+    {
+        config()->set('ai_automation.model.prices', ['@cf/openai/gpt-oss-120b' => ['in' => 'free', 'out' => 0.75]]);
+
+        $this->assertNull($this->app->make(AiBudgetGuard::class)->priceFor('@cf/openai/gpt-oss-120b'));
+        $this->assertFalse($this->client()->available());
+    }
+
+    public function test_every_listed_default_price_is_complete(): void
+    {
+        // The shipped defaults, not the test overrides from setUp.
+        $defaults = require config_path('ai_automation.php');
+        config()->set('ai_automation.model.prices', $defaults['model']['prices']);
+        $guard = $this->app->make(AiBudgetGuard::class);
+
+        foreach (array_keys($defaults['model']['prices']) as $model) {
+            $price = $guard->priceFor($model);
+            $this->assertNotNull($price, $model);
+            $this->assertGreaterThan(0.0, $price['in'], $model);
+            $this->assertGreaterThan(0.0, $price['out'], $model);
+        }
+        $this->assertNotNull($guard->priceFor('@cf/openai/gpt-oss-120b'));
+        $this->assertArrayHasKey((string) env('AI_AUTOMATION_MODEL', '@cf/openai/gpt-oss-120b'), $defaults['model']['prices'], 'the default model must be priced');
     }
 }

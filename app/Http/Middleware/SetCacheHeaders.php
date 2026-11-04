@@ -20,7 +20,7 @@ class SetCacheHeaders
             $response->headers->set('Cache-Control', 'public, max-age=31536000, immutable');
         }
         // For /daily/index.html and /daily/ - no-store
-        elseif (str_starts_with($request->path(), 'daily') &&
+        elseif (str_starts_with($request->path(), 'daily') && 
                 (str_ends_with($request->path(), '.html') || $request->path() === 'daily')) {
             $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
             $response->headers->set('Pragma', 'no-cache');

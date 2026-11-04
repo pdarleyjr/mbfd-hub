@@ -24,8 +24,8 @@ final class PlaybookRepository
 
     public const LIST_TERM_MAX_CHARS = 60;
 
-    /** Lists that must never be emptied: an empty list would silently stop escalating. */
-    private const NON_EMPTY_LISTS = ['safety_terms'];
+    /** Lists that must never be emptied: an empty list would silently stop flagging exposure. */
+    private const NON_EMPTY_LISTS = ['exposure_terms'];
 
     /** @return array{body: string, version: int} */
     public function template(string $key): array
@@ -59,9 +59,14 @@ final class PlaybookRepository
         return self::parseTerms(implode("\n", array_map('strval', $default)));
     }
 
-    /** Inserts the config defaults that have no row yet. Never overwrites an edited row. Returns rows inserted. */
+    /**
+     * Inserts the config defaults that have no row yet. Never overwrites an edited row. Returns rows inserted.
+     * Defaults the repository has retired (config ai_automation.retired_playbooks) are removed first, but only
+     * while still at version 1, i.e. never edited by an administrator.
+     */
     public function ensureSeeded(): int
     {
+        $this->retireUnusedDefaults();
         $inserted = 0;
 
         foreach ((array) config('ai_automation.templates', []) as $key => $definition) {
@@ -72,6 +77,23 @@ final class PlaybookRepository
         }
 
         return $inserted;
+    }
+
+    /** Removes retired default rows nobody edited (and their revisions). Returns the number removed. */
+    public function retireUnusedDefaults(): int
+    {
+        $keys = array_values(array_diff(
+            array_map('strval', (array) config('ai_automation.retired_playbooks', [])),
+            array_keys((array) config('ai_automation.templates', [])),
+            array_keys((array) config('ai_automation.lists', [])),
+        ));
+        if ($keys === []) {
+            return 0;
+        }
+
+        return AiAutomationPlaybook::query()->whereIn('key', $keys)->where('version', '<=', 1)->get()
+            ->each(static fn (AiAutomationPlaybook $row) => $row->delete())
+            ->count();
     }
 
     /**
