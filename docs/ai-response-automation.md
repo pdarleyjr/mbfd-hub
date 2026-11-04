@@ -30,13 +30,13 @@ Default replies (all editable in **Response Messages**; `{item}` is the item nam
 
 | Situation | Reply |
 |---|---|
-| LOW missing item (kitty litter, hand tools, hardware, consumables) | Please check around the station and other apparatus to make sure the {item} wasn't misplaced. If it's still missing, call or text before coming by Station 2 so we can check on a replacement. |
+| LOW missing item (kitty litter, hand tools, hardware, consumables) | Please check around the station and other apparatus for the {item} first. If nothing turns up, call or text before coming by Station 2 so we can check on a replacement. |
 | Several LOW missing items | Same, naming up to three items ("A, B and C", then "and other items"); adds the battery reminder if one is a battery |
 | Missing DeWalt battery | Check the chargers and other DeWalt tools, including the station blower. If it's still missing, call or text before coming by Station 2 so we can check on a replacement. |
 | Other missing battery | Check the chargers and other tools, including the station blower, to make sure the {item} wasn't left behind. If it's still missing, call or text before coming by Station 2 so we can check on a replacement. |
 | LOW damaged item | Acknowledged. We'll follow up if needed. |
 | MEDIUM expensive or specialized tool | Acknowledged. Call or text before coming by Station 2 so we can check whether a replacement is available. (+ "If it's needed right away, notify your officer and coordinate through 300." when the member says it's urgent) |
-| MEDIUM gas meter / detection | Acknowledged. Coordinate a replacement with Support Services or the appropriate equipment technician. Call or text first so availability can be confirmed. |
+| MEDIUM gas meter / detection | Acknowledged. Coordinate a replacement gas meter or detector with Support Services or the appropriate equipment technician. Call or text first so availability can be confirmed. |
 | MEDIUM SCBA component or cylinder (Air Tech) | Acknowledged. Coordinate with the on-duty Air Tech to have the item checked or swapped out. Notify your officer and contact 300 if immediate assistance or after-hours coordination is needed. |
 | Cylinder leak | Acknowledged. Remove the leaking cylinder from use and contact the on-duty Air Tech to have it assessed or swapped out. Notify your officer, and coordinate through 300 if immediate or after-hours assistance is needed. |
 | Lifepak and expensive Rescue equipment (Captain 5, MEDIUM) | Acknowledged. Coordinate with Captain 5 to arrange a replacement or pickup. Confirm availability before coming by. |
