@@ -18,3 +18,5 @@ bc1f838c225c8549aaac58f98394ab6de85bd1a3:tests/Feature/Api/StationRequestMemberR
 
 # Captain 5 PostgreSQL integrity test: `item_key` is a stable Rescue checklist label (`patient_compartment-item-5`), not a credential. Narrow single-fingerprint false positive; secret scanning stays active.
 c4b46df7a9e411b545f6fc9d1dd77adfdf8f5d8b:tests/Integration/Captain5PostgresIntegrityTest.php:generic-api-key:105
+# Member-correction PostgreSQL race test: the same stable Rescue checklist label (`patient_compartment-item-5`, the LifePak 15) as above, not a credential. Narrow single-fingerprint false positive; secret scanning stays active.
+3c0ef9f27a58749c0db039ae6428710b81211f16:tests/Integration/MemberCorrectionOwnershipPostgresRaceTest.php:generic-api-key:229
