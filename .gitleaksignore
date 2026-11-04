@@ -15,3 +15,6 @@
 # Station request member-resolve test: two synthetic client_action_id UUIDs (constants once named KEY_ONE/KEY_TWO). Not credentials.
 bc1f838c225c8549aaac58f98394ab6de85bd1a3:tests/Feature/Api/StationRequestMemberResolveTest.php:generic-api-key:30
 bc1f838c225c8549aaac58f98394ab6de85bd1a3:tests/Feature/Api/StationRequestMemberResolveTest.php:generic-api-key:32
+
+# Captain 5 PostgreSQL integrity test: `item_key` is a stable Rescue checklist label (`patient_compartment-item-5`), not a credential. Narrow single-fingerprint false positive; secret scanning stays active.
+c4b46df7a9e411b545f6fc9d1dd77adfdf8f5d8b:tests/Integration/Captain5PostgresIntegrityTest.php:generic-api-key:105
