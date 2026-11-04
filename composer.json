@@ -14,7 +14,7 @@
         "filament/filament": "^3.2",
         "google/apiclient": "^2.15",
         "jeremy379/laravel-openid-connect": "^3.3.0",
-        "laravel-notification-channels/webpush": "^10.4",
+        "laravel-notification-channels/webpush": "^13.0",
         "laravel/framework": "^12.69.0",
         "laravel/passport": "^13.7.1",
         "laravel/pulse": "^1.0",
