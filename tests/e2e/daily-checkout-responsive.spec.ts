@@ -1,6 +1,6 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { resolve } from 'node:path';
-import type { CommandOverview } from '../../resources/js/daily-checkout/src/types';
+import { BOARD_BASE, handleBoardRoute, newBoardServer, type BoardServer } from './support/command300-board';
 import { SHIFT_BASE, handleShiftRoute, newShiftServer } from './support/command300-shift';
 
 const stations = [1, 2, 3, 4, 6].map((stationNumber) => ({
@@ -209,37 +209,19 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
 }
 
-function commandOverview(): CommandOverview {
-  return {
-    generated_at: new Date().toISOString(),
-    total: stations.length,
-    stations: stations.map((station, index) => ({
-      ...station,
-      id: 29 + index,
-      apparatus_count: 1,
-      open_defects: index,
-      open_service_tickets: 1,
-      last_checkout_at: null,
-      daily_checkout: { required_total: 1, completed: 0, not_checked: 1, review_pending: 0, out_of_service: 0, completion_percent: 0 },
-      apparatuses: [{
-        id: 100 + index, name: `Command test unit ${station.station_number}`, unit_id: `T${station.station_number}`,
-        type: 'engine', status: 'In Service', service_state: 'in_service', open_defects: index,
-        open_service_tickets: 1, daily_checkout_state: 'not_checked', last_checkout_at: null,
-      }],
-    })),
-  };
+async function mockCommandBoard(page: Page, board: BoardServer): Promise<void> {
+  // Registered after mockDailySelectorApi, so it answers the board routes first.
+  await page.route(`**${BOARD_BASE}**`, async (route) => {
+    await handleBoardRoute(route, new URL(route.request().url()).pathname, board);
+  });
 }
 
-test('Command 300 tabs open on Communications, show one station at a time and preserve selection through refresh and profile navigation', async ({ page }, testInfo) => {
+test('Command 300 board opens on Communications, shows one card per station and keeps the open station through refresh and reload', async ({ page }, testInfo) => {
   await mockDailySelectorApi(page);
   const quality = captureBrowserQuality(page);
-  const data = commandOverview();
-  let requests = 0;
-  await page.route('**/api/public/command/overview', route => {
-    requests += 1;
-    return route.fulfill({ json: data });
-  });
-  await page.route('**/api/public/stations/29', route => route.fulfill({ json: { ...stations[0], id: 29, apparatuses: [], rooms: [] } }));
+  const board = newBoardServer();
+  await mockCommandBoard(page, board);
+  const listRequests = () => board.requests.filter((request) => request === `GET ${BOARD_BASE}`).length;
 
   await page.goto('/daily/command-300');
   await expect(page.getByRole('heading', { name: '300', exact: true })).toBeVisible();
@@ -249,104 +231,76 @@ test('Command 300 tabs open on Communications, show one station at a time and pr
   await expect(commandBoard).toHaveAttribute('href', 'https://cmd.mbfdhub.com');
   await expect(commandBoard).toHaveAttribute('target', '_blank');
   await expect(commandBoard).toHaveAttribute('rel', 'noopener noreferrer');
-  const tabs = page.getByRole('tablist', { name: 'Communications and stations' });
-  await expect(tabs.getByRole('tab')).toHaveCount(7);
-  await expect(tabs.getByRole('tab').first()).toHaveText('Communications');
-  await expect(tabs.getByRole('tab', { name: 'Communications', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByTestId('command-stations')).toHaveCount(1);
+
+  // Messages: Communications first and selected; Department Updates second. No per-station tabs any more.
+  const tabs = page.getByRole('tablist', { name: 'Communications and Department Updates' });
+  await expect(tabs.getByRole('tab')).toHaveCount(2);
+  await expect(tabs.getByRole('tab').first()).toHaveText(/^Communications/);
+  await expect(tabs.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('command-comms')).toBeVisible();
-  await expect(page.getByTestId('command-station')).toHaveCount(0);
-  await expectTouchTargets(page, '[role="tab"]');
 
-  for (const station of data.stations) {
-    const tab = tabs.getByRole('tab', { name: station.name, exact: true });
-    if (testInfo.project.use.hasTouch) await tab.tap();
-    else await tab.click();
-    await expect(tab).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByRole('tabpanel')).toHaveCount(1);
-    const panel = page.getByRole('tabpanel', { name: station.name, exact: true });
-    await expect(panel.getByRole('heading', { name: station.name, exact: true })).toBeVisible();
-    await expect(panel).toContainText(station.apparatuses[0].name!);
-    await expect(panel).toContainText('0 of 1 checked today');
-    await expect(panel).toContainText('1 open service ticket');
-    await expect(panel.getByRole('link', { name: `Open ${station.name}`, exact: true })).toHaveAttribute('href', `/daily/stations/${station.id}?return_to=${encodeURIComponent(`/daily/command-300?station=${station.id}`)}`);
-    await expectNoHorizontalOverflow(page);
-  }
-  expect(requests).toBe(1); // Tab switches use the loaded overview, without extra API calls.
-  await page.getByTestId('command-overview-refresh').click();
-  await expect.poll(() => requests).toBe(2);
-  await expect(tabs.getByRole('tab', { name: 'Station 6', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await page.reload();
-  await expect(page.getByRole('tabpanel', { name: 'Station 6', exact: true })).toBeVisible();
-
-  const last = tabs.getByRole('tab', { name: 'Station 6', exact: true });
-  const comms = tabs.getByRole('tab', { name: 'Communications', exact: true });
-  await last.focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(comms).toBeFocused();
-  await expect(comms).toHaveAttribute('aria-selected', 'true');
-  await expect(page).not.toHaveURL(/station=/);
-  await page.keyboard.press('ArrowLeft');
-  await expect(last).toBeFocused();
-  await expect(last).toHaveAttribute('aria-selected', 'true');
-  await page.keyboard.press('Home');
-  await expect(comms).toBeFocused();
-  await expect(comms).toHaveAttribute('aria-selected', 'true');
-  await page.keyboard.press('End');
-  await expect(last).toBeFocused();
-  await expect(last).toHaveAttribute('aria-selected', 'true');
-  await expect(tabs.locator('[tabindex="0"]')).toHaveCount(1);
-
-  await tabs.getByRole('tab', { name: 'Station 1', exact: true }).click();
-  await page.getByRole('link', { name: 'Open Station 1', exact: true }).click();
-  await expect(page).toHaveURL(/\/daily\/stations\/29\?return_to=%2Fdaily%2Fcommand-300%3Fstation%3D29$/);
-  await expect(page.getByRole('heading', { name: 'Station 1', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Back to 300', exact: true }).click();
-  await expect(page).toHaveURL(/\/daily\/command-300\?station=29$/);
-  await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
+  const cards = page.getByTestId('command-station-card');
+  await expect(cards).toHaveCount(3);
+  await expectTouchTargets(page, '[data-testid="command-station-card"], [role="tab"], [data-testid="command-overview-refresh"]');
   await expectNoHorizontalOverflow(page);
-  await page.screenshot({ path: testInfo.outputPath('command300-station-tabs.png'), fullPage: true });
+
+  const open = cards.filter({ hasText: 'Station 1' });
+  if (testInfo.project.use.hasTouch) await open.tap();
+  else await open.click();
+  const sheet = page.getByTestId('command-station-sheet');
+  await expect(sheet.getByRole('heading', { name: 'Station 1', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/daily\/command-300\?station=41$/);
+  await expectNoHorizontalOverflow(page);
+
+  const before = listRequests();
+  await page.getByRole('button', { name: 'Close' }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page).not.toHaveURL(/station=/);
+  await page.getByTestId('command-overview-refresh').click();
+  await expect.poll(listRequests).toBeGreaterThan(before);
+
+  await page.goto('/daily/command-300?station=41');
+  await expect(page.getByTestId('command-station-sheet').getByRole('heading', { name: 'Station 1', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId('command-station-sheet').getByRole('heading', { name: 'Station 1', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('command300-station-board.png'), fullPage: true });
   expect(quality.consoleErrors).toEqual([]);
   expect(quality.failedRequests).toEqual([]);
 });
 
-test('Command 300 station tabs handle changed station lists, empty data, refresh errors and offline state', async ({ page }, testInfo) => {
+test('Command 300 board handles changed station lists, empty data, refresh errors and offline state', async ({ page }, testInfo) => {
   test.skip(!['daily-responsive-phone-320', 'daily-responsive-wide-1440'].includes(testInfo.project.name), 'Data transitions at phone and desktop widths.');
   await mockDailySelectorApi(page);
-  const data = commandOverview();
-  let fail = false;
-  await page.route('**/api/public/command/overview', route => fail
-    ? route.fulfill({ status: 503, json: { message: 'Service unavailable' } })
-    : route.fulfill({ json: data }));
+  const board = newBoardServer();
+  await mockCommandBoard(page, board);
+
   await page.goto('/daily/command-300?station=invalid');
-  await expect(page.getByRole('tabpanel', { name: 'Communications', exact: true })).toBeVisible();
-  await page.getByRole('tab', { name: 'Station 6', exact: true }).click();
-  data.stations.pop();
+  const cards = page.getByTestId('command-station-card');
+  await expect(cards).toHaveCount(3);
+  await expect(page.getByTestId('command-station-sheet')).toHaveCount(0);
+  await expect(page.getByTestId('command-comms')).toBeVisible();
+
   const refresh = page.getByTestId('command-overview-refresh');
+  board.stations.pop();
   await refresh.click();
-  await expect(page.getByRole('tab')).toHaveCount(6);
-  await expect(page.getByRole('tabpanel', { name: 'Communications', exact: true })).toBeVisible();
-  await page.getByRole('tab', { name: 'Station 1', exact: true }).click();
-  fail = true;
+  await expect(cards).toHaveCount(2);
+
+  board.status = 503;
   await refresh.click();
-  await expect(page.getByRole('alert')).toContainText('The overview could not be refreshed');
-  await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'The board could not be refreshed' })).toBeVisible();
+  await expect(cards).toHaveCount(2); // the last good board stays on screen
+
   await page.context().setOffline(true);
   await expect(refresh).toBeDisabled();
-  await page.getByRole('tab', { name: 'Station 4', exact: true }).click();
-  await expect(page.getByRole('tabpanel', { name: 'Station 4', exact: true })).toBeVisible();
   await page.context().setOffline(false);
-  fail = false;
-  data.stations = [{ ...data.stations[0], apparatuses: [], apparatus_count: 0 }];
-  await refresh.click();
-  await expect(page.getByRole('tab')).toHaveCount(3);
-  await page.getByRole('tab', { name: 'Station 1', exact: true }).click();
-  await expect(page.getByText('No apparatus is assigned to this station.')).toBeVisible();
-  data.stations = [];
+  await expect(refresh).toBeEnabled();
+
+  board.status = 200;
+  board.stations = [];
   await refresh.click();
   await expect(page.getByText('No active stations', { exact: true })).toBeVisible();
-  // Communications stays available with no stations at all.
-  await expect(page.getByRole('tab')).toHaveCount(2);
+  await expect(cards).toHaveCount(0);
+  // Messages stay available with no stations at all.
   await expect(page.getByTestId('command-comms')).toBeVisible();
 });
 
