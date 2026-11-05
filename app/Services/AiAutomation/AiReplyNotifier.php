@@ -19,6 +19,9 @@ use Throwable;
  */
 final class AiReplyNotifier
 {
+    /** Template keys whose reply is visible in the thread but never sent as a notification. */
+    public const SILENT_TEMPLATE = 'clean_receipt';
+
     public function __construct(
         private readonly NotificationDispatchService $dispatcher,
         private readonly AiAutomationSwitch $switch,
@@ -26,6 +29,11 @@ final class AiReplyNotifier
 
     public function notify(AiIntakeEvent $intake, DomainAdapter $adapter, IntakeFacts $facts): void
     {
+        // The clean-checkout receipt is only a line in the checkout's own thread and My Activity. It never rings the bell.
+        if ($intake->template_key === self::SILENT_TEMPLATE) {
+            return;
+        }
+
         try {
             $user = $facts->requesterUserId !== null ? User::query()->find($facts->requesterUserId) : null;
             // The reply was written before any OFF; the bell is still new output, so OFF suppresses it too.

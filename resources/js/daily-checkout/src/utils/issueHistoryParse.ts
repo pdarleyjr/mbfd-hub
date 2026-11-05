@@ -4,8 +4,10 @@ import type {
   ConcernNote,
   FindingsSnapshot,
   IssueHistory,
+  IssueOwner,
   IssueSummary,
   LatestAction,
+  MemberCorrectionState,
   TimelineEntry,
 } from '../types/issueHistory.ts';
 import { humanize } from '../components/ui/status.ts';
@@ -40,11 +42,26 @@ const parseLatestAction = (value: unknown): LatestAction | null => {
   return { label, actor_name: text(value.actor_name), at: text(value.at), text: text(value.text) };
 };
 
+const parseMemberCorrection = (value: unknown): MemberCorrectionState | null => {
+  if (!isRow(value) || typeof value.eligible !== 'boolean') return null;
+
+  return {
+    eligible: value.eligible,
+    closes_immediately: value.closes_immediately === true,
+    pending: isRow(value.pending) ? { at: text(value.pending.at) } : null,
+  };
+};
+
+const parseOwner = (value: unknown): IssueOwner | null => (value === 'captain5' || value === 'logistics' ? value : null);
+
 export const parseIssueSummary = (value: unknown): IssueSummary | null => {
   if (!isRow(value)) return null;
   const issueId = id(value.id);
   if (issueId === null) return null;
   const status = text(value.action_status) ?? '';
+  // Added only when the server sent them, so an older answer parses to the same shape as before.
+  const memberCorrection = parseMemberCorrection(value.member_correction);
+  const owner = parseOwner(value.owner);
 
   return {
     id: issueId,
@@ -66,6 +83,8 @@ export const parseIssueSummary = (value: unknown): IssueSummary | null => {
     service_status: text(value.service_status),
     recurrence_of_defect_id: id(value.recurrence_of_defect_id),
     history_count: count(value.history_count),
+    ...(memberCorrection !== null ? { member_correction: memberCorrection } : {}),
+    ...(owner !== null ? { owner } : {}),
   };
 };
 

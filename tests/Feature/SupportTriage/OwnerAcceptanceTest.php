@@ -941,10 +941,17 @@ final class OwnerAcceptanceTest extends TestCase
     private function dashboardLevel(ApparatusDefect $defect): string
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
-        foreach (app(ApparatusDefectSource::class)->rows($this->vehicleStaff(), DashboardQuery::now(), 200) as $row) {
-            if ((int) $row->id === (int) $defect->id) {
-                return (string) $row->severity;
-            }
+        $rows = app(ApparatusDefectSource::class)->rows($this->vehicleStaff(), DashboardQuery::now(), 200);
+        $onBoard = collect($rows)->first(fn ($row): bool => (int) $row->id === (int) $defect->id);
+        if ($defect->fresh()->responsible_owner === ApparatusDefect::OWNER_CAPTAIN5) {
+            // One queue per issue: Captain 5's equipment is not on the Logistics board; its priority is unchanged.
+            $this->assertNull($onBoard, "Captain 5's defect {$defect->id} must not be in the Logistics queue.");
+
+            return (string) \App\Models\SupportTriage\SupportTriageLevel::query()
+                ->where('subject_type', \App\Services\SupportTriage\TriageProjector::DEFECT)->where('subject_id', $defect->id)->value('level');
+        }
+        if ($onBoard !== null) {
+            return (string) $onBoard->severity;
         }
         $this->fail("Defect {$defect->id} is not on the dashboard.");
     }

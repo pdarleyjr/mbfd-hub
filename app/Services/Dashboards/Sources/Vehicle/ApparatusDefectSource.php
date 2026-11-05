@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Dashboards\Support\ApparatusClass;
 use App\Services\Dashboards\Support\VehicleIssueSource;
 use App\Services\Defects\DefectCorrectiveActionService;
+use App\Services\Defects\DefectOwnership;
 use App\Services\SupportTriage\TriageProjector;
 use App\Services\SupportTriage\TriageSql;
 use App\Support\Captain5\EventActorLabel;
@@ -89,6 +90,12 @@ final class ApparatusDefectSource extends VehicleIssueSource
 
     protected function scopeToBoard(Builder $query, OperationalDisplayWindow $window): void
     {
+        // One responsible queue: Captain 5's issues are worked in the Captain 5 workspace, not here. They stay in the
+        // apparatus, inspection and Defects history, and Latest Activity shows them read-only.
+        $query->where(fn (Builder $owner) => $owner->whereNull('apparatus_defects.responsible_owner')
+            ->orWhere('apparatus_defects.responsible_owner', '<>', ApparatusDefect::OWNER_CAPTAIN5)
+            // Cleared to Logistics by the previous image and not adopted yet: Logistics' work, never in neither queue.
+            ->orWhere(fn (Builder $clear) => DefectOwnership::whereUnadoptedClear($clear, 'apparatus_defects')));
         $query->where(fn (Builder $board) => $board
             ->where('apparatus_defects.resolved', false)
             ->orWhere(fn (Builder $closed) => $closed
@@ -184,7 +191,8 @@ final class ApparatusDefectSource extends VehicleIssueSource
             ['label' => 'Reported by', 'value' => (string) $fresh['issue']->actorLabel],
             ['label' => 'Service ticket', 'value' => (string) $defect->serviceTicket?->ticket_number],
             ['label' => 'Assigned to', 'value' => $this->assigneeLabel($details['assigned_to'] ?? null)],
-            ['label' => 'Member reports', 'value' => $defect->latestObservation?->observation === 'appears_corrected' ? 'The latest checkout says the item is present again' : ''],
+            ['label' => 'Member reports', 'value' => $this->memberReportLabel($defect)],
+            ['label' => 'Handled by', 'value' => DefectOwnership::isCaptain5Owned($defect) ? 'Captain 5' : 'Support Services (Logistics)'],
         ], static fn (array $fact): bool => $fact['value'] !== ''));
 
         $timeline = $defect->events->map(static fn (ApparatusDefectEvent $event): array => [
@@ -221,6 +229,16 @@ final class ApparatusDefectSource extends VehicleIssueSource
         if (DefectActionStatus::isClosed($status)) {
             return [new IssueAction('reopen', 'Reopen', 'secondary', [self::textarea('reason', 'Reason for reopening', true, 5000), ...$messages])];
         }
+        if (DefectOwnership::isCaptain5Owned($defect)) {
+            if ((string) $defect->compartment_key === ApparatusDefect::STRETCHER_REPORT_COMPARTMENT) {
+                return []; // stretcher reports always stay with Captain 5; DefectOwnership::transfer refuses the move
+            }
+
+            // Captain 5 works it; from here Logistics can only take it over (one queue per issue).
+            return [new IssueAction('take_for_logistics', 'Take for Logistics', 'secondary', [
+                self::textarea('internal_note', 'Why Logistics should handle it (staff only, optional)', max: 4000),
+            ])];
+        }
 
         $progress = array_combine(
             DefectCorrectiveActionService::ACTION_STATUSES,
@@ -237,9 +255,12 @@ final class ApparatusDefectSource extends VehicleIssueSource
                 : new IssueAction('add_note', 'Add note or message', 'secondary', $messages, bulk: IssueAction::BULK_FORM),
             new IssueAction('set_progress', 'Update progress', 'secondary', [self::select('action_status', 'Progress', $progress), ...$messages], bulk: IssueAction::BULK_FORM),
             $staff === [] ? null : new IssueAction('assign', 'Assign', 'secondary', [self::select('assignee_id', 'Assign to', $staff), ...$messages], bulk: IssueAction::BULK_FORM),
-            $defect->latestObservation?->observation === 'appears_corrected'
+            $this->memberReportLabel($defect) !== ''
                 ? new IssueAction('verify', 'Verify correction', 'primary', [self::textarea('notes', 'Notes (optional)', max: 5000), ...$messages])
                 : null,
+            new IssueAction('send_to_captain5', 'Send to Captain 5', 'secondary', [
+                self::textarea('internal_note', 'Why Captain 5 should handle it (staff only, optional)', max: 4000),
+            ]),
             new IssueAction('classify_impact', 'Classify impact', 'secondary', [self::select('operational_impact', 'Operational impact', DefectCorrectiveActions::IMPACT_LABELS), ...$messages]),
             new IssueAction('set_priority', 'Change priority', 'secondary', [self::select('level', 'Priority', self::PRIORITY_CHOICES)]),
             new IssueAction('resolve', 'Resolve', 'primary', [
@@ -254,6 +275,18 @@ final class ApparatusDefectSource extends VehicleIssueSource
                 ], DefectNoActionClosure::DIALOG_TEXT, IssueAction::BULK_FORM)
                 : null,
         ]));
+    }
+
+    /** What a member last said about the item being back: a checkout's Present, or a "Report fixed" (newest wins). */
+    private function memberReportLabel(ApparatusDefect $defect): string
+    {
+        $observation = $defect->latestObservation;
+        $reported = $defect->correction_reported_at;
+        if ($reported !== null && ($observation === null || $reported->greaterThanOrEqualTo($observation->created_at))) {
+            return 'A member reported it fixed. Verify before closing.';
+        }
+
+        return $observation?->observation === 'appears_corrected' ? 'The latest checkout says the item is present again' : '';
     }
 
     /** "Medium (set by equipment priorities)" or "High (changed by Pat Smith)". */
@@ -306,6 +339,9 @@ final class ApparatusDefectSource extends VehicleIssueSource
                 return ActionResult::forbidden();
             }
             $messages = ['member_message' => self::text($input, 'member_message'), 'internal_note' => self::text($input, 'internal_note')];
+            if (DefectOwnership::isCaptain5Owned($defect) && ! DefectActionStatus::isClosed($defect->action_status) && ! in_array($action, ['take_for_logistics', 'reopen'], true)) {
+                return ActionResult::invalid(['action' => 'Captain 5 handles this issue. Take it for Logistics first.'], 'Captain 5 handles this issue. Take it for Logistics first.');
+            }
             $quiet = $messages['member_message'] === null && $messages['internal_note'] === null;
 
             $already = $this->alreadyInEffect($defect, $action, $input, $quiet);
@@ -329,6 +365,24 @@ final class ApparatusDefectSource extends VehicleIssueSource
                 ]), 'Issue assigned.'),
                 'verify' => $this->done($service->verifyCorrection($key, $user, ['notes' => self::text($input, 'notes'), ...$messages]), 'Correction verified and issue resolved.'),
                 'set_priority' => $this->setPriority($defect, $user, $input),
+                'take_for_logistics' => $this->done(app(DefectOwnership::class)->transfer(
+                    $user,
+                    $key,
+                    ApparatusDefect::OWNER_LOGISTICS,
+                    $expectedVersion,
+                    substr(hash('sha256', $expectedVersion), 0, 32),
+                    $messages['internal_note'],
+                    ['role' => 'fleet_reviewer'],
+                ), 'Taken for Logistics. It is in this queue now.'),
+                'send_to_captain5' => $this->done(app(DefectOwnership::class)->transfer(
+                    $user,
+                    $key,
+                    ApparatusDefect::OWNER_CAPTAIN5,
+                    $expectedVersion,
+                    substr(hash('sha256', $expectedVersion), 0, 32),
+                    $messages['internal_note'],
+                    ['role' => 'fleet_reviewer'],
+                ), 'Sent to Captain 5. It is in the Captain 5 queue now.'),
                 'classify_impact' => $this->done($service->classifyImpact($key, $user, ['operational_impact' => $input['operational_impact'] ?? null, ...$messages]), 'Operational impact saved.'),
                 'resolve' => $this->done($service->resolve($key, $user, [
                     'resolution_type' => $input['resolution_type'] ?? null,

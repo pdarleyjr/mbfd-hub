@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\AdminAlertEvent;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectRecommendation;
+use App\Services\Defects\DefectOwnership;
 use App\Services\EquipmentMatchingService;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +23,17 @@ class ApparatusDefectObserver
      */
     public function created(ApparatusDefect $defect): void
     {
+        // One responsible queue from the first moment (docs/unified-activity-and-ownership.md). A failure here leaves
+        // the owner unprojected; every reader then falls back to the same rule, so nothing is lost.
+        try {
+            app(DefectOwnership::class)->project($defect, 'created');
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+        if ($defect->getAttribute('responsible_owner') === ApparatusDefect::OWNER_CAPTAIN5) {
+            return; // Captain 5 works it and is told by Captain5Notifier; Logistics gets no alert or replacement suggestion
+        }
+
         try {
             // Create admin alert for new defect
             $this->createDefectAlert($defect);

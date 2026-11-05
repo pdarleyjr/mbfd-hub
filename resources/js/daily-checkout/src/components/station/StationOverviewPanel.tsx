@@ -96,7 +96,7 @@ export default function StationOverviewPanel({ stationId, overview, loading, err
         </section>
       </div>
       <CheckoutSheet stationId={stationId} row={openCheckout} onClose={() => setOpenCheckout(null)} returnFocusTo={() => opener.current} />
-      <StationRequestSheet request={openRequest} onClose={() => setOpenRequest(null)} returnFocusTo={() => opener.current} />
+      <StationRequestSheet request={openRequest} onClose={() => setOpenRequest(null)} returnFocusTo={() => opener.current} onResolved={onRetry} />
     </div>
   );
 }

@@ -105,7 +105,7 @@ final class CanonicalInspectionWorkspaceTest extends TestCase
     {
         Notification::fake();
         // A reviewer who turned "Every Daily Checkout" off keeps hearing nothing per checkout, whatever their old
-        // `vehicle_inspections` row says. The category is in-app on by default (tests/Feature/Notifications/EveryDailyCheckoutAlertTest.php).
+        // `vehicle_inspections` row says. The category is opt-in on every channel (tests/Feature/Notifications/EveryDailyCheckoutAlertTest.php).
         $recipient = $this->userWithRole('super_admin');
         UserNotificationSubscription::query()->create([
             'user_id' => $recipient->id,
@@ -118,12 +118,19 @@ final class CanonicalInspectionWorkspaceTest extends TestCase
             'database_enabled' => false, 'webpush_enabled' => false, 'email_enabled' => false,
         ]);
 
-        // A reviewer who never chose anything gets the in-app default.
+        // A reviewer who saved the in-app choice ON hears about it; one who never chose anything does not (opt-in).
         $optedIn = $this->userWithRole('super_admin');
+        UserNotificationSubscription::query()->create([
+            'user_id' => $optedIn->id,
+            'event_key' => User::NOTIFICATION_PREFERENCE_DAILY_CHECKOUT_EVERY_SUBMISSION,
+            'database_enabled' => true, 'webpush_enabled' => false, 'email_enabled' => false,
+        ]);
+        $neverChose = $this->userWithRole('super_admin');
 
         $inspection = $this->inspection();
 
         Notification::assertNotSentTo($recipient, NewSubmissionNotification::class);
+        Notification::assertNotSentTo($neverChose, NewSubmissionNotification::class);
         Notification::assertSentTo($optedIn, NewSubmissionNotification::class);
         // The alerts reviewers do get are built by the dispatcher and open the canonical page.
         $this->assertSame(

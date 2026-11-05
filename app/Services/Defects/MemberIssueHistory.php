@@ -42,6 +42,9 @@ final class MemberIssueHistory
     /** What the person reporting wrote. These say what was seen; they are not the department acting on it. */
     private const REPORT_EVENTS = ['reported', 'observed_again', 'appears_corrected'];
 
+    /** Staff routing between Captain 5 and Logistics: never part of the crew's story of an issue. */
+    private const STAFF_ONLY_EVENTS = ['owner_transferred'];
+
     /** Never internal_note: it is not even read. */
     private const EVENT_COLUMNS = [
         'id', 'apparatus_defect_id', 'apparatus_inspection_id', 'actor_user_id', 'event_type',
@@ -138,7 +141,9 @@ final class MemberIssueHistory
                 'reporter_name' => $this->text($defect->getAttribute('reporter_name')),
                 'first_reported_at' => $this->at($defect->first_reported_at),
                 'action_status' => $status,
-                'action_label' => DefectActionStatus::label($status),
+                'action_label' => $status === DefectActionStatus::ACKNOWLEDGED && $defect->getAttribute('responsible_owner') === ApparatusDefect::OWNER_CAPTAIN5
+                    ? 'Acknowledged by Captain 5'
+                    : DefectActionStatus::label($status),
                 'closure_kind' => DefectActionStatus::closureKind($status),
                 'latest_action' => $latest[(int) $defect->id] ?? null,
                 'last_observation' => $defect->latestObservation?->observation,
@@ -146,6 +151,9 @@ final class MemberIssueHistory
                 'service_status' => $defect->serviceTicket?->status,
                 'recurrence_of_defect_id' => $defect->recurrence_of_defect_id !== null ? (int) $defect->recurrence_of_defect_id : null,
                 'history_count' => $counts[(int) $defect->id] ?? 0,
+                // Who works it, and whether a member can say it is fixed (docs/unified-activity-and-ownership.md).
+                'owner' => $defect->getAttribute('responsible_owner') ?? app(DefectOwnership::class)->ownerOf($defect),
+                'member_correction' => DefectMemberCorrection::stateFor($defect, $defect->latestObservation),
             ];
         })->all();
     }
@@ -183,7 +191,7 @@ final class MemberIssueHistory
      */
     private function latestActions(array $ids): array
     {
-        $excluded = [...ApparatusDefectEvent::PAGE_ONLY_EVENTS, ...self::REPORT_EVENTS];
+        $excluded = [...ApparatusDefectEvent::PAGE_ONLY_EVENTS, ...self::REPORT_EVENTS, ...self::STAFF_ONLY_EVENTS];
         $events = ApparatusDefectEvent::query()
             ->whereIn('id', static fn ($newest) => $newest->selectRaw('MAX(id)')->from('apparatus_defect_events')
                 ->whereIn('apparatus_defect_id', $ids)->whereNotIn('event_type', $excluded)->groupBy('apparatus_defect_id'))
@@ -234,7 +242,7 @@ final class MemberIssueHistory
     private function historyCounts(array $ids): array
     {
         $events = ApparatusDefectEvent::query()->selectRaw('apparatus_defect_id, COUNT(*) AS total')
-            ->whereIn('apparatus_defect_id', $ids)->whereNotIn('event_type', ApparatusDefectEvent::PAGE_ONLY_EVENTS)
+            ->whereIn('apparatus_defect_id', $ids)->whereNotIn('event_type', [...ApparatusDefectEvent::PAGE_ONLY_EVENTS, ...self::STAFF_ONLY_EVENTS])
             ->groupBy('apparatus_defect_id')->pluck('total', 'apparatus_defect_id');
         $messages = ApparatusIssueMessage::query()->selectRaw('apparatus_defect_id, COUNT(*) AS total')
             ->whereIn('apparatus_defect_id', $ids)->memberVisible()->fromStaff()
@@ -277,7 +285,7 @@ final class MemberIssueHistory
     private function eventEntries(ApparatusDefect $defect): array
     {
         $events = ApparatusDefectEvent::query()
-            ->where('apparatus_defect_id', $defect->id)->changingTheIssue()
+            ->where('apparatus_defect_id', $defect->id)->changingTheIssue()->whereNotIn('event_type', self::STAFF_ONLY_EVENTS)
             ->with('actor:id,name,display_name')
             ->orderBy('created_at')->orderBy('id')
             ->get(self::EVENT_COLUMNS);

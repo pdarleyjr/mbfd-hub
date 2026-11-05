@@ -9,10 +9,14 @@ import {
   type InspectionReceiptState,
 } from '../utils/dailyCheckoutSubmissionQueue';
 import { contextualBackLabel, safeContextualPath } from '../utils/contextualBack';
+import { isReportedIssues, type ReportedIssues } from '../utils/receiptIssues';
 
 const RECEIPT_OUTCOMES: readonly InspectionReceiptOutcome[] = ['submitted', 'pending_review', 'accepted_with_exception', 'queued'];
 
-const readReceiptState = (state: unknown): Partial<InspectionReceiptState> => {
+/** What the member reported on this checkout, when the receipt knows it (an immediate online send). */
+type ReceiptState = Partial<InspectionReceiptState> & { issues?: ReportedIssues };
+
+const readReceiptState = (state: unknown): ReceiptState => {
   if (!state || typeof state !== 'object') return {};
   const candidate = state as Record<string, unknown>;
 
@@ -20,7 +24,19 @@ const readReceiptState = (state: unknown): Partial<InspectionReceiptState> => {
     outcome: RECEIPT_OUTCOMES.includes(candidate.outcome as InspectionReceiptOutcome) ? candidate.outcome as InspectionReceiptOutcome : undefined,
     queuedSubmissionId: typeof candidate.queuedSubmissionId === 'string' ? candidate.queuedSubmissionId : undefined,
     returnTo: typeof candidate.returnTo === 'string' ? candidate.returnTo : undefined,
+    issues: isReportedIssues(candidate.issues) ? candidate.issues : undefined,
   };
+};
+
+/**
+ * The receipt says only what the app knows: the inspection was received and recorded. The line about issues comes
+ * from what the member reported, never from a reply (Support Services answers, if at all, inside the checkout's
+ * own thread), and it never states a count because the server decides what is new.
+ */
+const issuesLine = (issues: ReportedIssues | undefined, outcome: InspectionReceiptOutcome): string | null => {
+  if (issues === 'some') return 'Issues you reported were sent for follow-up.';
+
+  return issues === 'none' && outcome === 'submitted' ? 'No new issues reported.' : null;
 };
 
 /** Only an allowlisted in-app Daily route may be used as the way back. */
@@ -39,6 +55,7 @@ export default function SuccessPage() {
   // uses one plain wording for every accepted outcome (see the owner decision
   // in db42dafa); `outcome` is kept on the page for diagnostics.
   const outcome: InspectionReceiptOutcome = isQueued ? 'queued' : receipt.outcome && receipt.outcome !== 'queued' ? receipt.outcome : 'submitted';
+  const receiptIssuesLine = isQueued ? null : issuesLine(receipt.issues, outcome);
   const queuedSubmissionId = receipt.queuedSubmissionId;
   const returnTo = inAppPath(receipt.returnTo) ?? '/stations';
   const returnLabel = returnTo === '/vehicle-inspections' ? 'Back to vehicle inspections' : contextualBackLabel(`/daily${returnTo}`);
@@ -90,7 +107,7 @@ export default function SuccessPage() {
         </div>
       )}
       <h1 id="inspection-receipt-heading" className="mb-2 text-2xl font-bold">
-        {isQueued ? 'Inspection saved on this device' : 'Inspection recorded'}
+        {isQueued ? 'Inspection saved on this device' : 'Inspection received'}
       </h1>
       <div role="status" aria-live="polite">
         {isQueued ? (
@@ -98,7 +115,10 @@ export default function SuccessPage() {
             It has not been sent yet. It will be sent automatically when this device is connected. Keep this app installed and do not clear its data until it is sent.
           </p>
         ) : (
-          <p className="text-hub-ink-secondary">Your daily checkout has been recorded.</p>
+          <p className="text-hub-ink-secondary">
+            Inspection received and recorded.
+            {receiptIssuesLine ? ` ${receiptIssuesLine}` : ''}
+          </p>
         )}
       </div>
 

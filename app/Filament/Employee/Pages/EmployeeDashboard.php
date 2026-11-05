@@ -73,9 +73,14 @@ class EmployeeDashboard extends Page
             ? app(\App\Services\EmployeeMessaging\EmployeeLogisticsMessagingService::class)->memberUnreadCount($authUser)
             : 0;
 
+        // The member's own recent activity, from every domain, as one short list.
+        $activity = $authUser instanceof \App\Models\User
+            ? app(\App\Services\Activity\MemberActivityFeed::class)->forCard($authUser, $employee)
+            : [];
+
         // For blade compatibility — use $user variable name but it's an Employee
         $user = $employee;
 
-        return compact('user', 'bidAssignment', 'equipmentCount', 'pendingRequests', 'recentEquipment', 'recentRequests', 'messageUnread', 'canMessageLogistics');
+        return compact('user', 'bidAssignment', 'equipmentCount', 'pendingRequests', 'recentEquipment', 'recentRequests', 'messageUnread', 'canMessageLogistics', 'activity');
     }
 }

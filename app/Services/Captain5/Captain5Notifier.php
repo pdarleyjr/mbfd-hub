@@ -11,6 +11,7 @@ use App\Models\ApparatusDefectEvent;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
 use App\Models\CommandCommunicationPost;
+use App\Models\StretcherIssueReport;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
 use App\Services\DailyRoster\OnDutyCaptain5Recipients;
@@ -60,7 +61,7 @@ final class Captain5Notifier
     public const COMMAND_300_PATH = '/daily/command-300';
 
     /** Captain 5 events that tell the crew something changed even without a typed message. */
-    private const NOTIFYING_EVENTS = ['replacement_available', 'resolved', 'correction_verified', 'dismissed'];
+    private const NOTIFYING_EVENTS = ['replacement_available', 'resolved', 'correction_verified', 'dismissed', 'member_resolved'];
 
     /** Participants who are actively working an issue (not every former observer). */
     private const ACTIVE_SOURCES = ['replied', 'assigned', 'captain5'];
@@ -86,9 +87,9 @@ final class Captain5Notifier
             if ($ids === []) {
                 return;
             }
-            // Nobody to tell (no eligible Captain 5 at all): skip the scope work on the submit path.
+            // Nobody to tell (no eligible Captain 5 and no EMS Captain): skip the scope work on the submit path.
             $onDuty = $this->onDutyRecipients();
-            if ($onDuty->isEmpty()) {
+            if ($onDuty->isEmpty() && $this->eligible($this->roster->emsCaptainUsers())->isEmpty()) {
                 return;
             }
             $defects = $this->scope->filter(ApparatusDefect::query()->whereIn('id', $ids)->orderBy('id')->get());
@@ -133,12 +134,53 @@ final class Captain5Notifier
         });
     }
 
+    /**
+     * A standalone stretcher report (docs/unified-activity-and-ownership.md section 4): the on-duty Captain 5, and the
+     * EMS Captain as well when the crew says the stretcher cannot be used. One alert per report, never per retry.
+     */
+    public function stretcherReported(StretcherIssueReport $report): void
+    {
+        $this->guard('stretcherReported', function () use ($report): void {
+            $defect = $report->apparatus_defect_id !== null ? ApparatusDefect::query()->find($report->apparatus_defect_id) : null;
+            if (! $defect instanceof ApparatusDefect) {
+                return;
+            }
+            $reporter = $report->reporter_user_id !== null ? User::query()->find($report->reporter_user_id) : null;
+            $who = trim((string) ($reporter?->display_name ?: $reporter?->name)) ?: 'A member';
+            $unit = $this->unitLabel(Apparatus::query()->find($report->apparatus_id));
+            $problem = StretcherIssueReport::PROBLEMS[$report->problem] ?? 'Other';
+            $title = $report->unusable ? "{$unit}: stretcher cannot be used" : "{$unit}: stretcher issue reported";
+            $body = "{$who} reported a stretcher problem ({$problem})".($report->attached_to_existing ? ', added to the open issue' : '').': '.$this->excerpt((string) $report->description);
+            $url = $this->workspaceUrl((int) $defect->getKey());
+
+            $onDuty = $this->onDutyRecipients();
+            $this->queue('captain5:stretcher:'.$report->getKey().':reported', self::KIND_NEW_FINDINGS, $onDuty,
+                fn (): array => ['title' => $title, 'body' => $body, 'url' => $url], $reporter);
+
+            if ($report->unusable) {
+                $onDutyIds = $onDuty->map(fn (User $user): int => (int) $user->getKey())->all();
+                $ems = $this->eligible($this->roster->emsCaptainUsers())->reject(fn (User $user): bool => in_array((int) $user->getKey(), $onDutyIds, true));
+                $this->queue('captain5:stretcher:'.$report->getKey().':unusable', self::KIND_ESCALATED, $ems,
+                    fn (): array => ['title' => $title, 'body' => $body, 'url' => $url], $reporter);
+            }
+        });
+    }
+
+    /**
+     * Whether anyone on the Captain 5 side can be told right now (an eligible Captain 5 or the EMS Captain). When nobody
+     * can, a significant-damage alert on Captain 5's equipment falls back to Logistics instead of reaching no one.
+     */
+    public function canReachCaptain5Side(): bool
+    {
+        return $this->onDutyRecipients()->isNotEmpty() || $this->eligible($this->roster->emsCaptainUsers())->isNotEmpty();
+    }
+
     /** A Captain 5 action on an issue (called by DefectCorrectiveActionService in Captain 5 mode). */
     public function issueUpdated(ApparatusDefect $defect, ApparatusDefectEvent $event): void
     {
         $this->guard('issueUpdated', function () use ($defect, $event): void {
             $message = trim((string) $event->member_message);
-            $resolving = in_array($event->event_type, ['resolved', 'correction_verified'], true);
+            $resolving = in_array($event->event_type, ['resolved', 'correction_verified', 'member_resolved'], true);
             $ordered = $event->event_type === 'action_updated' && $event->to_status === DefectActionStatus::ACTION_PENDING
                 && $event->from_status !== DefectActionStatus::ACTION_PENDING;
             $reopened = $event->event_type === 'reopened';
@@ -159,14 +201,20 @@ final class Captain5Notifier
             }
             $label = DefectActionStatus::label($event->to_status ?: $defect->action_status);
             $phrase = $this->issuePhrase($defect);
-            $body = $resolving
-                ? "Captain 5 marked the {$phrase} resolved.".($message !== '' ? ' '.$this->excerpt($message) : '')
-                : "The {$phrase}: {$label}.".($message !== '' ? ' '.$this->excerpt($message) : '');
+            $byMember = $event->event_type === 'member_resolved';
+            $who = trim((string) ($actor?->display_name ?: $actor?->name)) ?: 'A member';
+            $body = match (true) {
+                $byMember => "{$who} marked the {$phrase} fixed.",
+                $resolving => "Captain 5 marked the {$phrase} resolved.".($message !== '' ? ' '.$this->excerpt($message) : ''),
+                default => "The {$phrase}: {$label}.".($message !== '' ? ' '.$this->excerpt($message) : ''),
+            };
+            // A member closing Captain 5's issue: Captain 5 on duty hears it too, not only the people on the issue.
+            $recipients = $byMember ? $this->involved($defect)->merge($this->onDutyRecipients())->unique('id')->values() : $this->involved($defect);
 
             $this->queue(
                 'captain5:defect:'.$defect->getKey().':'.($resolving ? 'resolved' : 'update').':'.$event->getKey(),
                 $resolving ? self::KIND_ISSUE_RESOLVED : self::KIND_ISSUE_UPDATE,
-                $this->involved($defect),
+                $recipients,
                 fn (User $recipient): array => [
                     'title' => $resolving ? "{$unit}: issue resolved" : "{$unit}: update from Captain 5",
                     'body' => $body,
@@ -344,6 +392,7 @@ final class Captain5Notifier
             match (true) {
                 $subject === 'communication' => $this->replayCommunication($parts[2] ?? ''),
                 $subject === 'inspection' => $this->replayFindings($id),
+                $subject === 'stretcher' => ($report = StretcherIssueReport::query()->find($id)) !== null ? $this->stretcherReported($report) : null,
                 $subject === 'defect' => $this->withModels($id, (int) ($parts[4] ?? 0), fn (ApparatusDefect $d, ApparatusDefectEvent $e) => $this->issueUpdated($d, $e)),
                 $subject === 'message' && $tail === 'notify' => ($m = ApparatusIssueMessage::query()->find($id)) !== null
                     ? $this->messagePosted($m, $m->apparatus_defect_id === null && $kind === self::KIND_MESSAGE ? 'clarification_requested' : null) : null,

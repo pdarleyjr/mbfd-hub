@@ -248,12 +248,34 @@ final class VehicleAdapterTest extends TestCase
         $this->assertSame('repeat_only', $this->adapter()->facts($this->inspectionIntake($second))->ineligibleReason);
     }
 
-    public function test_a_clean_checkout_is_ineligible(): void
+    public function test_a_live_clean_checkout_is_eligible_for_the_receipt_and_backlog_work_never_is(): void
     {
         $this->actAs($this->alpha);
         $inspection = ApparatusInspection::query()->findOrFail($this->submit($this->payload())->assertCreated()->json('id'));
 
-        $this->assertSame('no_findings', $this->adapter()->facts($this->inspectionIntake($inspection))->ineligibleReason);
+        $live = $this->adapter()->facts($this->inspectionIntake($inspection));
+        $this->assertTrue($live->eligible());
+        $this->assertSame([], $live->findings);
+        $this->assertSame((int) $this->alpha->id, $live->requesterUserId);
+
+        $backlog = $this->inspectionIntake($inspection);
+        $backlog->forceFill(['origin' => AiIntakeEvent::ORIGIN_BACKLOG])->save();
+        $facts = $this->adapter()->facts($backlog);
+        $this->assertSame('no_findings', $facts->ineligibleReason);
+        $this->assertFalse($facts->eligible());
+        $this->assertSame([], $this->adapter()->backlogCandidates(VehicleAdapter::SOURCE_INSPECTION, 0, 50), 'a clean checkout is never a backlog candidate');
+    }
+
+    public function test_a_clean_checkout_already_answered_on_its_thread_is_not_answered_again(): void
+    {
+        $this->actAs($this->alpha);
+        $inspection = ApparatusInspection::query()->findOrFail($this->submit($this->payload())->assertCreated()->json('id'));
+        $intake = $this->inspectionIntake($inspection);
+        $this->adapter()->writeReply($intake, $this->adapter()->facts($intake), 'Inspection received and recorded. No new issues reported.');
+
+        $facts = $this->adapter()->facts($intake);
+        $this->assertFalse($facts->eligible());
+        $this->assertTrue($facts->alreadyAnswered);
     }
 
     public function test_a_missing_source_and_a_test_excluded_checkout_are_ineligible(): void
@@ -546,12 +568,14 @@ final class VehicleAdapterTest extends TestCase
         $this->assertFalse((bool) $defect->resolved, 'A Present answer must never close the issue.');
         $this->assertSame('reported', $defect->action_status);
         $this->assertSame('appears_corrected', ApparatusDefectObservation::query()->where('apparatus_inspection_id', $second->id)->value('observation'));
-        $this->assertSame('no_findings', $this->adapter()->facts($this->inspectionIntake($second))->ineligibleReason);
-        // The receipt for this clean follow-up checkout is still an intake row the engine will skip, never a reply.
+        // A live follow-up checkout with no new and no confirmed-again finding is a clean checkout: it is owed only the one-line receipt.
+        $facts = $this->adapter()->facts($this->inspectionIntake($second));
+        $this->assertTrue($facts->eligible());
+        $this->assertSame([], $facts->findings);
         $this->assertSame(2, AiIntakeEvent::query()->where('source_type', VehicleAdapter::SOURCE_INSPECTION)->count());
     }
 
-    public function test_found_present_on_a_later_checkout_needs_no_reply_and_leaves_the_official_issue_fields_alone(): void
+    public function test_found_present_on_a_later_checkout_gets_only_the_clean_receipt_and_leaves_the_official_issue_fields_alone(): void
     {
         $payload = $this->payload();
         [$ac, $ai] = $this->pick($payload, 'engine2', false);
@@ -564,7 +588,7 @@ final class VehicleAdapterTest extends TestCase
         $this->actAs($this->alpha);
         $present = ApparatusInspection::query()->findOrFail($this->submit($this->payload(null, 1040, 402.4))->assertCreated()->json('id'));
         $facts = $this->adapter()->facts($this->inspectionIntake($present));
-        $this->assertSame('no_findings', $facts->ineligibleReason);
+        $this->assertTrue($facts->eligible(), 'A live checkout with no new finding is owed only the clean receipt.');
         $this->assertSame([], $facts->findings);
         $this->assertSame($before, $official(), 'A Present answer is evidence for staff, not a closure.');
         $this->assertFalse((bool) $defect->fresh()->resolved);

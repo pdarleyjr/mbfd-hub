@@ -93,6 +93,9 @@ final class InspectionNotificationDispatcher
     /** Significant damage was newly reported or an existing issue was escalated to significant. */
     public function issueEscalated(ApparatusDefect $defect, ApparatusInspection $inspection): void
     {
+        if ($defect->getAttribute('responsible_owner') === ApparatusDefect::OWNER_CAPTAIN5 && app(Captain5Notifier::class)->canReachCaptain5Side()) {
+            return; // Captain 5 and the EMS Captain are told by Captain5Notifier; one owner, one alert
+        }
         $this->guard('issueEscalated', function () use ($defect, $inspection): void {
             $unit = $this->unitLabel($this->physicalApparatus($inspection), $inspection->designation_at_time);
             $operator = trim((string) $inspection->operator_name) ?: 'A member';
@@ -226,14 +229,17 @@ final class InspectionNotificationDispatcher
             $reportedOn = $this->date($defect->first_reported_at ?? $defect->reported_date ?? $defect->created_at);
             $resolvedOn = $this->date($event->created_at);
             $type = (string) (($event->details['resolution_type'] ?? null) ?: $defect->resolution_type);
-            $body = sprintf(
-                'The %s reported on %s %s. Logistics marked the issue resolved on %s.',
-                $this->issuePhrase($defect),
-                $reportedOn,
-                $this->resolutionPhrase($type),
-                $resolvedOn,
-            );
             $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
+            $body = $event->event_type === 'member_resolved'
+                // A member closed it (docs/unified-activity-and-ownership.md section 3): say who, never "Logistics".
+                ? sprintf('The %s reported on %s was marked fixed by %s on %s.', $this->issuePhrase($defect), $reportedOn, trim((string) ($actor?->display_name ?: $actor?->name)) ?: 'a member', $resolvedOn)
+                : sprintf(
+                    'The %s reported on %s %s. Logistics marked the issue resolved on %s.',
+                    $this->issuePhrase($defect),
+                    $reportedOn,
+                    $this->resolutionPhrase($type),
+                    $resolvedOn,
+                );
 
             $this->queue(
                 'defect:'.$defect->getKey().':resolved:'.$event->getKey(),
@@ -867,10 +873,17 @@ final class InspectionNotificationDispatcher
         $name = trim((string) ($author->display_name ?: $author->name)) ?: 'A member';
         $about = $defect !== null ? ' about the '.$this->issuePhrase($defect) : '';
 
+        // On Captain 5's issue only the Logistics reviewers already in the conversation are told; Captain 5 is told
+        // by Captain5Notifier::memberReplied. Never the whole Logistics list for an issue Logistics does not work.
+        $recipients = InspectionReviewers::forThread($defect, $inspection);
+        if ($defect !== null && $defect->getAttribute('responsible_owner') === ApparatusDefect::OWNER_CAPTAIN5) {
+            $recipients = InspectionReviewers::participatingIn($defect);
+        }
+
         $this->queue(
             $eventKey,
             Kind::MEMBER_REPLY,
-            InspectionReviewers::forThread($defect, $inspection),
+            $recipients,
             fn (User $recipient): array => [
                 'title' => "{$unit}: member reply",
                 'body' => "{$name} replied{$about}: {$excerpt}",

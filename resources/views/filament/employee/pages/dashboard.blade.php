@@ -13,6 +13,8 @@
         </div>
     </div>
 
+    @include('filament.employee.partials.my-activity-card', ['items' => $activity])
+
     @if($bidAssignment)
         <section class="ep-bid-assignment ep-panel" aria-labelledby="bid-assignment-heading" data-bid-assignment>
             <div class="ep-panel-header">

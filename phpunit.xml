@@ -36,6 +36,7 @@
         <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" force="true"/>
         <env name="APP_URL" value="http://localhost" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="ACTIVITY_UNREAD_SINCE" value="" force="true"/>
         <env name="AI_ANALYSIS_ENABLED" value="false" force="true"/>
         <env name="AI_DRIVER" value="gateway" force="true"/>
         <env name="AI_GATEWAY_CAPABILITY" value="" force="true"/>

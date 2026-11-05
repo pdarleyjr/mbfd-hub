@@ -184,6 +184,15 @@ class DefectsRelationManager extends RelationManager implements ExportableTable
                     ->formatStateUsing(fn ($state) => str_replace('_', ' ', ucfirst($state)))
                     ->visibleFrom('md'),
 
+                // The one queue that works it (docs/unified-activity-and-ownership.md); every issue stays listed here.
+                Tables\Columns\TextColumn::make('responsible_owner')
+                    ->label('Handled by')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => $state === ApparatusDefect::OWNER_CAPTAIN5 ? 'Captain 5' : 'Support Services')
+                    ->color(fn (?string $state): string => $state === ApparatusDefect::OWNER_CAPTAIN5 ? 'info' : 'gray')
+                    ->placeholder('Support Services')
+                    ->visibleFrom('md'),
+
                 Tables\Columns\TextColumn::make('reported_date')
                     ->label('Reported')
                     ->date('M j, Y')

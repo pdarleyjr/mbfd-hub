@@ -4,8 +4,11 @@ import type { IssueSummary, TimelineEntry } from '../../types/issueHistory.ts';
 import { describeIssueHistoryError, fetchIssueHistory } from '../../utils/issueHistoryApi';
 import { formatEventDate, issuePresentation, reportedByLine } from '../../utils/issueHistoryFormat.ts';
 import Tag from '../ui/Tag';
+import { ownerName } from './findingsChanged.ts';
 import IssueTimeline from './IssueTimeline';
+import MemberCorrectionSheet from './MemberCorrectionSheet';
 import './findings.css';
+import './memberActions.css';
 
 type TimelineState =
   | { status: 'idle' }
@@ -24,10 +27,16 @@ interface Props {
 export default function IssueCard({ issue }: Props) {
   const [open, setOpen] = useState(false);
   const [timeline, setTimeline] = useState<TimelineState>({ status: 'idle' });
+  const [correcting, setCorrecting] = useState(false);
   const latestRequest = useRef(0);
   const presentation = issuePresentation(issue);
   const latest = issue.latest_action;
   const latestDate = formatEventDate(latest?.at);
+  const correction = issue.member_correction;
+  const pending = correction?.pending ?? null;
+  const pendingDate = formatEventDate(pending?.at);
+  // Only an issue that is still open can be marked fixed, and not once a correction is already waiting.
+  const canMarkFixed = correction?.eligible === true && pending === null && presentation.phase === 'active';
   // Anything that adds to the history changes this, so an open timeline is read again after a refresh.
   const revision = `${issue.action_status}|${issue.history_count}|${latest?.at ?? ''}`;
 
@@ -69,6 +78,19 @@ export default function IssueCard({ issue }: Props) {
           {latest.text && <span className="issue-card__quote">{latest.text}</span>}
         </p>
       )}
+      {issue.owner && <p className="issue-card__line" data-issue-owner>Handled by {ownerName(issue.owner)}</p>}
+      {pending && (
+        <p className="issue-card__pending" role="status" data-correction-pending>
+          Correction reported, awaiting verification{pendingDate ? `. Reported on ${pendingDate}` : ''}
+        </p>
+      )}
+      {canMarkFixed && (
+        <div className="issue-card__actions">
+          <button type="button" className="hub-btn hub-btn--secondary" onClick={() => setCorrecting(true)}>Mark fixed</button>
+        </div>
+      )}
+      {/* Stays mounted while open, so a refresh that moves the card to "awaiting" cannot close the sheet on the member. */}
+      {(canMarkFixed || correcting) && <MemberCorrectionSheet issue={issue} open={correcting} onClose={() => setCorrecting(false)} />}
       <details className="issue-card__history" onToggle={event => setOpen(event.currentTarget.open)}>
         <summary>
           <span>{open ? 'Hide history' : 'Show history'}{issue.history_count > 0 ? ` (${issue.history_count})` : ''}</span>

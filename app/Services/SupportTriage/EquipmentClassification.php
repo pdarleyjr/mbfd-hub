@@ -47,6 +47,15 @@ final readonly class EquipmentClassification
         public string $contact300 = 'urgent',
     ) {}
 
+    /** The same result with another handler (the stored equipment owner outranks the catalog's guess). */
+    public function withHandler(string $handler, string $reason): self
+    {
+        return new self(
+            $this->level, $this->category, $handler, $this->ruleId, $this->ruleName, [...$this->reasons, $reason],
+            $this->memberResponse, $this->isPpe, $this->isCritical, $this->hazard, $this->unclassified, $this->contact300,
+        );
+    }
+
     public static function rank(string $level): int
     {
         return match ($level) {

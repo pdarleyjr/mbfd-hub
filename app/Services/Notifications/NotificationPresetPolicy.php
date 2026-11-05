@@ -13,12 +13,20 @@ namespace App\Services\Notifications;
  * never enrolls a phone (the device still has to tap "Turn on alerts") and never reaches a member with no city
  * email on file (the roster-sourced city email is the only address these alerts use).
  *
- * Two exceptions: "Every Daily Checkout as it's submitted" would send one phone alert per apparatus checkout
- * every day and bury the real alerts, and "Fleet operational alerts" reach every active member about units they
- * may not ride, so their phone alerts stay off (the bell is on).
+ * Two exceptions: "Every Daily Checkout as it's submitted" would send one alert per apparatus checkout every
+ * day and bury the real alerts, so it is opt-in on every channel (nothing, bell included, until a member turns it
+ * on), and "Fleet operational alerts" reach every active member about units they may not ride, so their phone
+ * alerts stay off (the bell is on).
  */
 final class NotificationPresetPolicy
 {
+    /**
+     * Opt-in categories: the bell is off too until a member saves a choice turning it on (a saved row is always
+     * honored, so a member who already chose it keeps it). Only a person who asks for every Daily Checkout hears
+     * about the clean ones.
+     */
+    public const DATABASE_OFF_BY_DEFAULT = ['daily_checkout_every_submission'];
+
     /** Categories whose phone alerts stay off by default. */
     public const PUSH_OFF_BY_DEFAULT = ['daily_checkout_every_submission', 'fleet_operational_alerts'];
 
@@ -37,7 +45,8 @@ final class NotificationPresetPolicy
         $supports = static fn (string $channel): bool => in_array($channel, $channels, true);
 
         return [
-            NotificationCategory::CHANNEL_DATABASE => $supports(NotificationCategory::CHANNEL_DATABASE),
+            NotificationCategory::CHANNEL_DATABASE => $supports(NotificationCategory::CHANNEL_DATABASE)
+                && ! in_array($key, self::DATABASE_OFF_BY_DEFAULT, true),
             NotificationCategory::CHANNEL_WEBPUSH => $supports(NotificationCategory::CHANNEL_WEBPUSH)
                 && ! in_array($key, self::PUSH_OFF_BY_DEFAULT, true),
             NotificationCategory::CHANNEL_EMAIL => $supports(NotificationCategory::CHANNEL_EMAIL)

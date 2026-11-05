@@ -430,6 +430,14 @@ jobs:
               php artisan daily-checkout:apply-approved-policy --confirm=APPLY_APPROVED_FRONTLINE_DAILY_POLICY --no-interaction
               php artisan daily-checkout:activate-ledger --release-sha="$RELEASE_SHA" --no-interaction
               php artisan daily-checkout:apply-approved-policy --verify --no-interaction
+              # One owner per equipment issue (docs/unified-activity-and-ownership.md): the full per-issue dry run is
+              # kept with the host evidence (this log is public, so it shows counts only), then the projection is
+              # written in maintenance mode after the verified backup, and verified before the image switch.
+              (umask 077 && mkdir -p storage/app/private/release-evidence \
+                && php artisan defects:project-ownership --dry-run --no-interaction > "storage/app/private/release-evidence/ownership-dry-run-$RELEASE_SHA.txt")
+              php artisan defects:project-ownership --dry-run --summary --no-interaction
+              php artisan defects:project-ownership --summary --no-interaction
+              php artisan defects:project-ownership --verify --no-interaction
             '
 
           OLD_CONTAINER_ID="$(docker inspect --format '{{.Id}}' "$HUB_APP_CONTAINER")"
@@ -464,6 +472,9 @@ jobs:
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan view:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan event:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan filament:clear-cached-components
+          # Rows the previous image's workers wrote between the projection and the switch get their owner now.
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan defects:project-ownership --pending --no-interaction
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan defects:project-ownership --verify --no-interaction
           REMOTE
 
       - name: Verify Hub application health

@@ -215,6 +215,13 @@ Schedule::command('inspections:retry-notifications')
     ->withoutOverlapping()
     ->onOneServer();
 
+// One queue per equipment issue (docs/unified-activity-and-ownership.md): owns any issue the previous image wrote or
+// cleared, or whose projection failed. Writes nothing and prints nothing when there is nothing pending.
+Schedule::command('defects:project-ownership --pending')
+    ->everyTenMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 Schedule::command('support:retry-notifications --limit=100')
     ->everyFiveMinutes()
     ->withoutOverlapping()

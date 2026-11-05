@@ -101,7 +101,9 @@ final class Captain5PostgresIntegrityTest extends TestCase
         ]);
         $defect = ApparatusDefect::query()->create([
             'apparatus_id' => $apparatus->id, 'apparatus_inspection_id' => $inspection->id, 'first_reported_inspection_id' => $inspection->id,
-            'compartment' => 'L2', 'item' => "Lock item {$suffix}", 'status' => 'open', 'issue_type' => 'missing',
+            // A Rescue medical item (LifePak 15): Captain 5's by its equipment, not by the apparatus type.
+            'compartment' => 'Patient Compartment', 'item' => "LifePak 15 {$suffix}", 'compartment_key' => 'patient_compartment', 'item_key' => 'patient_compartment-item-5',
+            'status' => 'open', 'issue_type' => 'missing',
         ]);
         $employee = Employee::query()->create(['employee_id' => "C5PG-C-{$suffix}", 'name' => 'PG Captain', 'rank' => 'Captain', 'password' => 'x']);
         $captain = User::factory()->create(['account_status' => AccountStatus::Active, 'employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id]);

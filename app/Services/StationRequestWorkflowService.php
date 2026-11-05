@@ -10,6 +10,7 @@ use App\Models\RoomAsset;
 use App\Models\StationRequest;
 use App\Models\StationRequestItem;
 use App\Models\User;
+use App\Services\StationRequests\StationRequestMemberResolution;
 use App\Support\DecisionReason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -31,8 +32,11 @@ class StationRequestWorkflowService
             $assetOperations = (array) ($data['asset_operations'] ?? []);
             $memberLine = null;
 
+            $reopensMemberResolution = $this->reopensMemberResolution($request, $newStatus);
+
             if (in_array($request->status, StationRequestStatus::terminalValues(), true)
-                && $request->status !== $newStatus) {
+                && $request->status !== $newStatus
+                && ! $reopensMemberResolution) {
                 throw ValidationException::withMessages([
                     'status' => 'A terminal request cannot be moved to another status.',
                 ]);
@@ -79,6 +83,14 @@ class StationRequestWorkflowService
             if ($newStatus === StationRequestStatus::Completed->value && $request->completed_at === null) {
                 $attributes['completed_at'] = now();
             }
+            if ($reopensMemberResolution) {
+                // Back in the queue: the old "marked resolved" line must not keep reading as the latest answer.
+                $attributes['status_detail'] = $data['status_detail'] ?? null;
+                $attributes['completed_at'] = null;
+                $attributes['current_public_response'] = $memberLine ?? (filled($data['public_note'] ?? null)
+                    ? trim((string) $data['public_note'])
+                    : 'Reopened by staff for follow-up.');
+            }
             if ($newStatus === StationRequestStatus::Denied->value && $request->denied_at === null) {
                 $attributes['denied_at'] = now();
             }
@@ -92,7 +104,7 @@ class StationRequestWorkflowService
                 'public_note' => $data['public_note'] ?? null,
                 'internal_note' => $data['internal_note'] ?? null,
                 'changed_by_user_id' => $actor->id,
-                'metadata' => ['event' => 'workflow_transition'],
+                'metadata' => ['event' => 'workflow_transition'] + ($reopensMemberResolution ? ['reopened' => 'member_resolved'] : []),
             ]);
 
             if (! $wasCompleted && $newStatus === StationRequestStatus::Completed->value) {
@@ -121,6 +133,18 @@ class StationRequestWorkflowService
                 'assetEvents.roomAsset',
             ]) ?? $request;
         }, 3);
+    }
+
+    /**
+     * The one way out of "completed": staff reopening a request a member marked resolved. A member resolve never
+     * touches room assets, so there is nothing to undo; any completion that applied asset events stays terminal.
+     */
+    private function reopensMemberResolution(StationRequest $request, string $newStatus): bool
+    {
+        return $request->status === StationRequestStatus::Completed->value
+            && $request->status_detail === StationRequestMemberResolution::STATUS_DETAIL
+            && in_array($newStatus, StationRequestStatus::openValues(), true)
+            && ! $request->assetEvents()->exists();
     }
 
     /** @param array<string, mixed> $operation */

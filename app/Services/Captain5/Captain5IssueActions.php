@@ -58,7 +58,10 @@ final class Captain5IssueActions
             throw new AuthorizationException('You can view this workspace but not act on issues.');
         }
         $probe = ApparatusDefect::query()->find($defectId);
-        if ($probe === null || ! $this->scope->inScope($probe)) {
+        // An issue Captain 5 sent to Logistics is Logistics' now; from here it can only be brought back.
+        // (A retried "send to Logistics" lands here too and is answered from its idempotency key.)
+        $bringingBack = in_array($valid['action'], Captain5IssueClearing::ACTIONS, true) && $probe !== null && Captain5IssueClearing::isCleared($probe);
+        if ($probe === null || (! $bringingBack && ! $this->scope->inScope($probe))) {
             throw new AuthorizationException('Not available.');
         }
 
