@@ -150,7 +150,12 @@ final class FleetStatusReportReconciler
                     continue;
                 }
 
-                $truck->forceFill(array_map(static fn (array $change): mixed => $change['new'], $row['changes']))->save();
+                $refused = $this->refusedIdentity($truck, $row['changes']);
+                if ($refused !== null) {
+                    $result['skipped'][] = ['vehicle_number' => $row['vehicle_number'], 'reason' => $refused];
+
+                    continue;
+                }
                 $result['rows_written']++;
                 $result['fields_written'] += count($row['changes']);
                 $result['history_recorded'] += $this->recordHistory(
@@ -206,7 +211,12 @@ final class FleetStatusReportReconciler
                     continue;
                 }
 
-                $truck->forceFill(array_map(static fn (array $change): mixed => $change['new'], $changes))->save();
+                $refused = $this->refusedIdentity($truck, $changes);
+                if ($refused !== null) {
+                    $result['skipped'][] = ['vehicle_number' => $entry['vehicle_number'], 'field' => null, 'reason' => $refused];
+
+                    continue;
+                }
                 $result['rows_written']++;
                 $result['fields_written'] += count($changes);
                 $result['history_recorded'] += $this->recordHistory(
@@ -557,6 +567,26 @@ final class FleetStatusReportReconciler
     }
 
     // ---------------------------------------------------------------- writing
+
+    /**
+     * Saves the new values, or returns why the identity guard refused them (a report designation that is another
+     * truck's number, or a front-line unit already on another truck). A refused row is listed as skipped and the rest
+     * of the report still applies.
+     *
+     * @param  array<string, array<string, mixed>>  $changes
+     */
+    private function refusedIdentity(Apparatus $truck, array $changes): ?string
+    {
+        try {
+            $truck->forceFill(array_map(static fn (array $change): mixed => $change['new'], $changes))->save();
+
+            return null;
+        } catch (UnitIdentityConflict $conflict) {
+            $truck->setRawAttributes($truck->getRawOriginal());
+
+            return 'Not written: '.$conflict->summary();
+        }
+    }
 
     /** @param array<string, mixed> $row */
     private function staleReason(?Apparatus $truck, array $row, string $since): ?string

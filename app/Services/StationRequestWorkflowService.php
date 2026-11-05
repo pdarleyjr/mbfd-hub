@@ -10,8 +10,10 @@ use App\Models\RoomAsset;
 use App\Models\StationRequest;
 use App\Models\StationRequestItem;
 use App\Models\User;
+use App\Services\MemberReplies\MemberReplyLedger;
 use App\Services\StationRequests\StationRequestMemberResolution;
 use App\Support\DecisionReason;
+use App\Support\MemberReplies\ReplySubject;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -120,6 +122,10 @@ class StationRequestWorkflowService
                 $this->recordRepairCompletionEvents($request, $actor);
             }
 
+            if (filled($data['public_note'] ?? null)) {
+                // A public update answers the member (docs/member-replies.md section 4); an internal note does not.
+                app(MemberReplyLedger::class)->staffReplied(ReplySubject::STATION_REQUEST, (int) $request->getKey());
+            }
             DB::afterCommit(fn () => $this->sideEffects->requestChanged($request));
 
             return $request->fresh([

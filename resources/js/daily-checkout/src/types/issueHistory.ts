@@ -91,6 +91,8 @@ export interface ClosedIssuesPage {
 export interface IssueHistory {
   issue: IssueSummary | null;
   timeline: TimelineEntry[];
+  /** The signed-in member is on this issue, so its conversation and reply box are theirs (docs/member-replies.md). */
+  participant?: boolean;
 }
 
 /** loading: nothing yet. live: the last request worked. stale: showing an earlier answer. unavailable: nothing to show. */

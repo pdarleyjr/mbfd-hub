@@ -28,7 +28,7 @@ class StationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
 
-    protected static ?string $navigationGroup = 'Operations';
+    protected static ?string $navigationGroup = 'Stations';
 
     protected static ?int $navigationSort = 20;
 

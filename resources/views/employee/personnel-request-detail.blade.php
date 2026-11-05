@@ -82,7 +82,8 @@
                         <div class="hub-callout hub-callout--warning mt-6 p-5">
                             <h2 class="font-bold">{{ $request->status === \App\Enums\PersonnelRequestStatus::NeedsInformation ? 'Information needed' : 'Requested information received' }}</h2>
                             <p class="mt-2 text-sm leading-6">{{ $request->employee_response }}</p>
-                            @if(collect($request->information_requested)->intersect(['police_report', 'damage_photo', 'other'])->isNotEmpty())
+                            {{-- Documents stay with the member the request is for; an officer who submitted it for them can still reply below. --}}
+                            @if(($isBeneficiary ?? true) && collect($request->information_requested)->intersect(['police_report', 'damage_photo', 'other'])->isNotEmpty())
                                 <form method="post" action="{{ route('employee.personnel-requests.attachments.store', $request) }}" enctype="multipart/form-data" class="mt-4 space-y-3">
                                     @csrf
                                     <label class="block font-semibold" for="document_type">Document type</label>
@@ -131,7 +132,14 @@
                                 @php $historyItem = $request->items->firstWhere('id', (int) data_get($update->metadata, 'item_id')); @endphp
                                 <p class="font-bold">{{ $historyItem ? str($update->event)->replace('_', ' ')->title() : $update->status->label() }}</p>
                                 @if($historyItem)<p class="text-sm font-semibold text-hub-ink-secondary">{{ $historyItem->item_name }}</p>@endif
-                                @if($update->employee_visible_note)<p class="mt-1 text-sm leading-6 text-hub-ink-secondary">{{ $update->employee_visible_note }}</p>@endif
+                                @if($update->employee_visible_note)
+                                    @php
+                                        $fromViewer = $update->changed_by_employee_id !== null && (int) $update->changed_by_employee_id === (int) ($viewerEmployeeId ?? 0);
+                                        $fromMember = $update->event === 'employee_responded' && $update->changed_by_employee_id !== null;
+                                    @endphp
+                                    <p class="mt-1 text-xs font-semibold text-hub-ink" data-update-author>{{ $fromViewer ? 'You' : ($fromMember ? ((int) $update->changed_by_employee_id === (int) $request->beneficiary_employee_id ? $request->beneficiary_name : $request->requester_name) : 'Support Services') }}</p>
+                                    <p class="mt-1 whitespace-pre-wrap text-sm leading-6 text-hub-ink-secondary">{{ $update->employee_visible_note }}</p>
+                                @endif
                                 <time class="mt-1 block text-xs text-hub-ink-secondary">{{ $update->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y · g:i A') }}</time>
                             </li>
                         @endforeach

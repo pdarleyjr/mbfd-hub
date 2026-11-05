@@ -25,7 +25,11 @@ function TruckRow({ truck }: { truck: RescueTruck }) {
 function ChangeFacts({ change }: { change: RescueTruckChange }) {
   return (
     <>
-      <span className="break-words font-semibold text-hub-ink">{change.unit}: {truckLabel(change.from_vehicle_number)} to {truckLabel(change.to_vehicle_number)}</span>
+      <span className="break-words font-semibold text-hub-ink">
+        {change.without_replacement
+          ? `${change.unit} kept on ${truckLabel(change.from_vehicle_number)} (no replacement available)`
+          : `${change.unit}: ${truckLabel(change.from_vehicle_number)} to ${truckLabel(change.to_vehicle_number)}`}
+      </span>
       <span className={`${HINT} block break-words`}>
         <time dateTime={change.at ?? undefined}>{dateTimeText(change.at)}</time>
         {change.by ? ` · ${change.by}` : ''}

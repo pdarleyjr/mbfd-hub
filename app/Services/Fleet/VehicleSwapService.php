@@ -53,14 +53,17 @@ final class VehicleSwapService
             $vacated[$field] = $this->freeFor($field, $vacated[$field], $from, $to);
         }
 
-        $from->forceFill(['unit_id' => 'swap-hold-'.$from->getKey(), 'slug' => 'swap-hold-'.$from->getKey()])->save();
-        $to->forceFill([...$unitIdentity, 'status' => self::CHANGEOUT_NEW_TRUCK_STATUS, 'current_location' => $location])->save();
-        $from->forceFill([
-            ...$vacated,
-            'status' => ApparatusChangeout::OLD_TRUCK_STATUS,
-            'station_id' => $traded ? $vacated['station_id'] : $from->station_id,
-            'current_location' => $location,
-        ])->save();
+        // The only sanctioned identity move: the rows pass through a held state the identity guard would refuse.
+        UnitIdentityGuard::whileMovingUnits(function () use ($from, $to, $unitIdentity, $vacated, $location, $traded): void {
+            $from->forceFill(['unit_id' => 'swap-hold-'.$from->getKey(), 'slug' => 'swap-hold-'.$from->getKey()])->save();
+            $to->forceFill([...$unitIdentity, 'status' => self::CHANGEOUT_NEW_TRUCK_STATUS, 'current_location' => $location])->save();
+            $from->forceFill([
+                ...$vacated,
+                'status' => ApparatusChangeout::OLD_TRUCK_STATUS,
+                'station_id' => $traded ? $vacated['station_id'] : $from->station_id,
+                'current_location' => $location,
+            ])->save();
+        });
 
         return ['before' => $before, 'after' => ['from' => $this->snapshot($from->refresh()), 'to' => $this->snapshot($to->refresh())]];
     }

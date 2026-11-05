@@ -7,10 +7,12 @@ namespace App\Filament\Resources\ApparatusServiceTicketResource\Pages;
 use App\Enums\ApparatusServiceTicketStatus;
 use App\Filament\Concerns\ArchivesRequests;
 use App\Filament\Resources\ApparatusServiceTicketResource;
+use App\Filament\Support\SubmissionConversationActions;
 use App\Models\Apparatus;
 use App\Models\ApparatusServiceTicket;
 use App\Models\User;
 use App\Services\ApparatusServiceTicketWorkflowService;
+use App\Support\MemberReplies\ReplySubject;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -33,7 +35,7 @@ class ViewApparatusServiceTicket extends ViewRecord
             ApparatusServiceTicketStatus::Cancelled,
         ])->map(fn (ApparatusServiceTicketStatus $status): Actions\Action => $this->transitionAction($status))->all();
 
-        return [...$workflowActions, $this->noteAction(), $this->operationalStatusAction(), ...$this->getArchiveActions()];
+        return [...$workflowActions, $this->noteAction(), SubmissionConversationActions::header(ReplySubject::APPARATUS_SERVICE_TICKET, fn (): ApparatusServiceTicket => $this->ticket()), $this->operationalStatusAction(), ...$this->getArchiveActions()];
     }
 
     private function noteAction(): Actions\Action

@@ -43,7 +43,7 @@ class ApparatusChangeoutResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-truck';
 
-    protected static ?string $navigationGroup = 'Operations';
+    protected static ?string $navigationGroup = 'Fleet';
 
     protected static ?int $navigationSort = 73;
 
@@ -102,6 +102,12 @@ class ApparatusChangeoutResource extends Resource
             ->orderByDesc('id');
     }
 
+    /** A no-replacement record names the same truck on both sides: no truck took the unit. */
+    public static function toTruckText(ApparatusChangeout $record): string
+    {
+        return $record->isWithoutReplacement() ? 'None available (unit kept on this truck)' : (string) $record->to_vehicle_number;
+    }
+
     private static function acknowledgeRowAction(): Tables\Actions\Action
     {
         return Tables\Actions\Action::make('acknowledge')
@@ -132,10 +138,11 @@ class ApparatusChangeoutResource extends Resource
                 ->searchable(['unit_designation', 'from_vehicle_number', 'to_vehicle_number', 'submitted_by_name'])
                 ->wrap()
                 ->extraAttributes(['class' => 'hub-phone-summary'])
-                ->description(fn (ApparatusChangeout $record): string => 'Truck '.($record->from_vehicle_number ?: 'not recorded').' to truck '.$record->to_vehicle_number.'. '
+                ->description(fn (ApparatusChangeout $record): string => $record->trucksPhrase().'. '
                     .ChangeoutAlertText::when($record).' by '.$record->submitted_by_name.'.'),
             Tables\Columns\TextColumn::make('from_vehicle_number')->label('From truck')->visibleFrom('md')->placeholder('Not recorded')->extraAttributes(['class' => 'tabular-nums']),
-            Tables\Columns\TextColumn::make('to_vehicle_number')->label('To truck')->visibleFrom('md')->weight('bold')->extraAttributes(['class' => 'tabular-nums']),
+            Tables\Columns\TextColumn::make('to_vehicle_number')->label('To truck')->visibleFrom('md')->weight('bold')->extraAttributes(['class' => 'tabular-nums'])
+                ->formatStateUsing(fn (?string $state, ApparatusChangeout $record): string => self::toTruckText($record)),
             Tables\Columns\TextColumn::make('effective_at')
                 ->label('When')
                 ->visibleFrom('md')
@@ -184,10 +191,11 @@ class ApparatusChangeoutResource extends Resource
                         ->color('primary'),
                     Infolists\Components\TextEntry::make('to_vehicle_number')
                         ->label('To truck')
-                        ->url(fn (ApparatusChangeout $record): ?string => $record->to_apparatus_id === null
+                        ->formatStateUsing(fn (?string $state, ApparatusChangeout $record): string => self::toTruckText($record))
+                        ->url(fn (ApparatusChangeout $record): ?string => $record->to_apparatus_id === null || $record->isWithoutReplacement()
                             ? null
                             : ApparatusResource::getUrl('view', ['record' => $record->to_apparatus_id]))
-                        ->color(fn (ApparatusChangeout $record): ?string => $record->to_apparatus_id === null ? null : 'primary'),
+                        ->color(fn (ApparatusChangeout $record): ?string => $record->to_apparatus_id === null || $record->isWithoutReplacement() ? null : 'primary'),
                     Infolists\Components\TextEntry::make('effective_at')->label('When')->dateTime('M j, Y g:i A', HubTimezone::NAME),
                     Infolists\Components\TextEntry::make('submitted_by_name')->label('By'),
                     Infolists\Components\TextEntry::make('note')->label('Crew note')->placeholder('None'),

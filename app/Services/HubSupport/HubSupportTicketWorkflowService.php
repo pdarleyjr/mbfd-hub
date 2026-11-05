@@ -10,6 +10,8 @@ use App\Enums\HubSupportTicketStatus;
 use App\Models\HubSupportTicket;
 use App\Models\HubSupportTicketUpdate;
 use App\Models\User;
+use App\Services\MemberReplies\MemberReplyLedger;
+use App\Support\MemberReplies\ReplySubject;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -120,6 +122,10 @@ final class HubSupportTicketWorkflowService
             if ($target !== $current || $public !== '') {
                 app(HubSupportTicketSideEffectService::class)->memberUpdated($locked, $update);
             }
+            if ($public !== '') {
+                // A public response answers the member (docs/member-replies.md section 4); an internal note does not.
+                app(MemberReplyLedger::class)->staffReplied(ReplySubject::HUB_SUPPORT_TICKET, (int) $locked->getKey(), $update->created_at);
+            }
 
             return $locked->fresh(['updates', 'attachments']) ?? $locked;
         }, 3);
@@ -171,6 +177,7 @@ final class HubSupportTicketWorkflowService
             ]);
 
             app(HubSupportTicketSideEffectService::class)->reporterReplied($locked, $update);
+            app(MemberReplyLedger::class)->memberReplied(ReplySubject::HUB_SUPPORT_TICKET, (int) $locked->getKey(), $reporter, $update->created_at);
 
             return $update;
         }, 3);
@@ -202,6 +209,7 @@ final class HubSupportTicketWorkflowService
                 'client_action_id' => $validated['client_action_id'] ?? null, 'action_hash' => $hash,
             ]);
             app(HubSupportTicketSideEffectService::class)->reporterReplied($locked, $update);
+            app(MemberReplyLedger::class)->memberReplied(ReplySubject::HUB_SUPPORT_TICKET, (int) $locked->getKey(), $reporter, $update->created_at);
 
             return $update;
         }, 3);

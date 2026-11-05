@@ -71,7 +71,7 @@ class MediaControlMedia extends Page
 
     protected static ?string $slug = 'media-control/media';
 
-    protected static ?string $navigationGroup = 'Communications';
+    protected static ?string $navigationGroup = 'Programs';
 
     protected static ?int $navigationSort = 70;
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CircleCheck } from 'lucide-react';
 import type { StationRequestSummary } from '../../types';
 import { formatHubDate } from '../../../../shared/timezone.ts';
@@ -6,6 +6,8 @@ import { canMarkResolved } from '../../utils/stationRequestResolveApi';
 import { BTN_PRIMARY, Sheet } from '../captain5/ui';
 import Tag, { StatusTag } from '../ui/Tag';
 import { humanize } from '../ui/status';
+import ConversationThread from '../conversation/ConversationThread';
+import { fetchSubmissionConversation, postSubmissionReply } from '../../utils/conversationApi';
 import StationRequestResolveSheet from './StationRequestResolveSheet';
 
 interface StationRequestSheetProps {
@@ -26,6 +28,9 @@ export default function StationRequestSheet({ request, onClose, returnFocusTo, o
   const [resolving, setResolving] = useState(false);
   const [resolvedId, setResolvedId] = useState<number | null>(null);
   useEffect(() => { setResolving(false); }, [request?.id]);
+  const requestId = request?.id ?? 0;
+  const loadConversation = useCallback(() => fetchSubmissionConversation('station_request', requestId), [requestId]);
+  const sendReply = useCallback((body: string, clientMessageId: string) => postSubmissionReply('station_request', requestId, body, clientMessageId), [requestId]);
   const showResolve = request !== null && onResolved !== undefined && canMarkResolved(request) && resolvedId !== request.id;
 
   return (
@@ -74,6 +79,10 @@ export default function StationRequestSheet({ request, onClose, returnFocusTo, o
                 ))}
               </ol>
             </section>
+          )}
+          {/* Only the member who sent it; the server enforces the same rule. */}
+          {request.member_conversation?.participant === true && (
+            <ConversationThread key={request.id} id={`station-request-${request.id}`} load={loadConversation} send={sendReply} heading="Conversation with Support Services" />
           )}
         </div>
       )}

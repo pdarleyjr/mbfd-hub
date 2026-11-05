@@ -161,5 +161,7 @@ export const parseIssueHistory = (payload: unknown): IssueHistory | null => {
   return {
     issue: parseIssueSummary(payload.issue),
     timeline: payload.timeline.flatMap((entry) => parseTimelineEntry(entry) ?? []),
+    // Additive, per viewer: true only when the server says this member is on the issue (docs/member-replies.md).
+    participant: isRow(payload.conversation) && payload.conversation.participant === true,
   };
 };

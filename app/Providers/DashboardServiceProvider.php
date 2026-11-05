@@ -15,7 +15,12 @@ final class DashboardServiceProvider extends ServiceProvider
     {
         $this->app->singleton(IssueSourceRegistry::class, function ($app): IssueSourceRegistry {
             $sources = [];
-            foreach ([...(array) config('dashboards.vehicle_sources', []), ...(array) config('dashboards.station_sources', [])] as $class) {
+            $classes = [
+                ...(array) config('dashboards.vehicle_sources', []),
+                ...(array) config('dashboards.station_sources', []),
+                ...(array) config('dashboards.request_sources', []),
+            ];
+            foreach ($classes as $class) {
                 $source = $app->make($class);
                 if ($source instanceof IssueSource) {
                     $sources[] = $source;

@@ -7,6 +7,7 @@ namespace App\Filament\Resources\StationRequestResource\Pages;
 use App\Enums\StationRequestStatus;
 use App\Filament\Concerns\ArchivesRequests;
 use App\Filament\Resources\StationRequestResource;
+use App\Filament\Support\SubmissionConversationActions;
 use App\Models\Room;
 use App\Models\RoomAsset;
 use App\Models\StationRequest;
@@ -14,6 +15,7 @@ use App\Models\StationRequestItem;
 use App\Models\User;
 use App\Services\StationRequestWorkflowService;
 use App\Support\DecisionReason;
+use App\Support\MemberReplies\ReplySubject;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -29,6 +31,7 @@ class ViewStationRequest extends ViewRecord
     {
         return [
             ...$this->getArchiveActions(),
+            SubmissionConversationActions::header(ReplySubject::STATION_REQUEST, fn (): StationRequest => $this->stationRequest()),
             Actions\Action::make('update_workflow')
                 ->label('Update Status')
                 ->icon('heroicon-o-arrow-path-rounded-square')

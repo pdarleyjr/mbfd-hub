@@ -12,6 +12,8 @@ use App\Models\UnitMasterVehicle;
 use App\Models\UnitMasterVehicleChange;
 use App\Services\Display\DisplaySnapshotService;
 use App\Services\Fleet\FleetStatusReportReconciler;
+use App\Services\Fleet\UnitIdentityConflict;
+use App\Services\Fleet\UnitIdentityGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -527,6 +529,34 @@ final class FleetStatusReportTest extends TestCase
 
         $report = $this->reconciler()->report($plan, $result, $this->shippedFile());
         $this->assertSame(FleetStatusReportReconciler::OUTCOME_DISCREPANCY, $this->planRow($report, '1035')['outcome']);
+    }
+
+    public function test_a_row_the_identity_guard_refuses_is_skipped_and_the_rest_of_the_report_applies(): void
+    {
+        $plan = $this->shippedPlan();
+        $refusedId = $this->row('1035')->id;
+        // Stands in for a collision left in the data; the model's saving hook asks the container for the guard.
+        $this->app->instance(UnitIdentityGuard::class, new class($refusedId)
+        {
+            public function __construct(private readonly int $refusedId) {}
+
+            public function check(Apparatus $row): void
+            {
+                if ((int) $row->getKey() === $this->refusedId) {
+                    throw UnitIdentityConflict::withMessages(['designation' => 'Designation Reserve is the vehicle number of another truck.']);
+                }
+            }
+        });
+
+        $result = $this->reconciler()->apply($plan);
+        $this->temporaryFiles[] = (string) $result['saved_to'];
+
+        $this->assertSame(6, $result['rows_written']);
+        $this->assertSame([['vehicle_number' => '1035', 'reason' => 'Not written: Designation Reserve is the vehicle number of another truck.']], $result['skipped']);
+        $this->assertSame(29, $this->row('1035')->station_id, 'nothing on the refused row was written');
+        $this->assertSame('Station 2', $this->row('002-14')->current_location, 'the rows after it still applied');
+        $saved = json_decode((string) file_get_contents((string) $result['saved_to']), true, 32, JSON_THROW_ON_ERROR);
+        $this->assertNotContains('1035', array_column($saved['rows'], 'vehicle_number'), 'a revert never touches the refused row');
     }
 
     public function test_a_second_apply_writes_nothing_and_saves_nothing(): void

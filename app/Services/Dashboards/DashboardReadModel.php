@@ -93,6 +93,10 @@ final class DashboardReadModel
         }
 
         $views = $source->views();
+        // A source on the Member Requests board is a member's own request; on the Overview it is the Requests lane.
+        if (in_array(DashboardView::MemberRequests, $views, true)) {
+            return DashboardSnapshot::LANE_REQUESTS;
+        }
         if (in_array(DashboardView::VehicleCheckout, $views, true)) {
             return DashboardSnapshot::LANE_VEHICLE;
         }

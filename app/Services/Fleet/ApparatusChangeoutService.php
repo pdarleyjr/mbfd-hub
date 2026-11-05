@@ -135,6 +135,78 @@ final class ApparatusChangeoutService
     }
 
     /**
+     * The admin escape hatch: a front-line unit's truck goes Out of Service and no other truck is available to take the
+     * unit. Nothing moves; the unit stays on this truck until a swap. It is recorded as a changeout so Fleet hears about
+     * it exactly as it hears about a swap: the dashboard row, the Apparatus page banner and the "Truck changed" alert.
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    public function recordWithoutReplacement(Apparatus $truck, User $actor, string $reason): ApparatusChangeout
+    {
+        if (! $actor->canManageFleetSwaps()) {
+            throw new AuthorizationException('Fleet manage access is required to take a unit\'s only truck out of service.');
+        }
+        $reason = (string) self::clean($reason, 1000);
+        Validator::make(['reason' => $reason], ['reason' => ['required', 'string', 'min:5', 'max:1000']], [
+            'reason.required' => 'Say why no other truck can run as this unit.',
+            'reason.min' => 'Say why no other truck can run as this unit.',
+        ])->validate();
+
+        $changeout = DB::transaction(function () use ($truck, $actor, $reason): ApparatusChangeout {
+            /** @var Apparatus $locked */
+            $locked = Apparatus::query()->lockForUpdate()->findOrFail($truck->getKey());
+            if (blank($locked->slug)) {
+                throw ValidationException::withMessages(['reason' => 'This truck carries no unit, so mark it Out of Service with Change status instead.']);
+            }
+            if ($locked->getAttribute('status') === ApparatusChangeout::OLD_TRUCK_STATUS) {
+                throw ValidationException::withMessages(['reason' => 'This truck is already '.ApparatusChangeout::OLD_TRUCK_STATUS.'.']);
+            }
+            $unit = ApparatusChangeoutPlanner::unitLabel($locked);
+            $previousStatus = $locked->getAttribute('status');
+            $input = ['apparatus_id' => (int) $locked->getKey(), 'actor_id' => (int) $actor->getKey(), 'mode' => ApparatusChangeoutPlanner::MODE_NO_REPLACEMENT, 'reason' => $reason, 'at' => now()->toIso8601String()];
+            $changeout = ApparatusChangeout::query()->create([
+                'client_submission_id' => (string) Uuid::uuid4(),
+                'payload_hash' => hash('sha256', json_encode($input, JSON_THROW_ON_ERROR)),
+                'unit_slug' => (string) $locked->slug,
+                'unit_designation' => $unit,
+                'station_id' => $locked->station_id,
+                'from_apparatus_id' => $locked->getKey(),
+                'to_apparatus_id' => $locked->getKey(),
+                'from_vehicle_number' => $locked->vehicle_number,
+                'to_vehicle_number' => (string) ($locked->vehicle_number ?? ''),
+                'to_vehicle_listed' => true,
+                'status' => ApparatusChangeout::STATUS_COMPLETED,
+                'handoff_status' => ApparatusChangeout::HANDOFF_COMPLETE,
+                'note' => $reason,
+                'submitted_by_user_id' => $actor->getKey(),
+                'submitted_by_name' => (string) $actor->name,
+                'effective_at' => now(),
+                'move_audit' => [
+                    'mode' => ApparatusChangeoutPlanner::MODE_NO_REPLACEMENT,
+                    'before' => null,
+                    'after' => null,
+                    'previous_status' => $previousStatus,
+                    'old_truck_status' => ApparatusChangeout::OLD_TRUCK_STATUS,
+                    'new_truck_record' => false,
+                    'displaced_unit' => null,
+                    'review_notes' => ["No truck replaced {$unit}. Use Swap truck on {$unit} as soon as a truck is available."],
+                    'actor' => ['id' => $actor->getKey(), 'name' => $actor->name],
+                    'alert_id' => null,
+                ],
+            ]);
+            $locked->forceFill(['status' => ApparatusChangeout::OLD_TRUCK_STATUS])->save();
+            ApparatusFleetEvent::record('no_replacement', null, $changeout, $actor, array_filter(['vehicle_number' => $locked->vehicle_number, 'previous_status' => $previousStatus, 'reason' => $reason]));
+            $this->forgetReadModelsAfterCommit();
+
+            return $changeout;
+        }, self::ATTEMPTS);
+        $this->tellFleetAfterCommit($changeout);
+
+        return $changeout->refresh();
+    }
+
+    /**
      * Fleet has seen it. Nothing about a truck changes. Repeating it changes nothing.
      *
      * @throws AuthorizationException

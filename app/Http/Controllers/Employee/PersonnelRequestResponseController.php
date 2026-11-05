@@ -8,6 +8,7 @@ use App\Concerns\ResolvesCanonicalEmployee;
 use App\Http\Controllers\Controller;
 use App\Models\PersonnelRequest;
 use App\Services\PersonnelRequests\PersonnelRequestWorkflowService;
+use App\Support\PersonnelRequests\PersonnelRequestParticipantAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -23,7 +24,7 @@ class PersonnelRequestResponseController extends Controller
             'idempotency_key' => ['nullable', 'string', 'max:100'],
         ]);
         $employee = $this->authenticatedEmployee();
-        abort_unless($personnelRequest->beneficiary_employee_id === $employee->id, 403);
+        abort_unless(PersonnelRequestParticipantAccess::isParticipant($employee, $personnelRequest), 403);
         $item = filled($validated['item_id'] ?? null)
             ? $personnelRequest->items()->findOrFail($validated['item_id'])
             : null;

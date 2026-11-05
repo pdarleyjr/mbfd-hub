@@ -7,7 +7,9 @@ namespace App\Services;
 use App\Models\StationInventoryAudit;
 use App\Models\StationSupplyRequest;
 use App\Models\User;
+use App\Services\MemberReplies\MemberReplyLedger;
 use App\Support\DecisionReason;
+use App\Support\MemberReplies\ReplySubject;
 use Illuminate\Support\Facades\DB;
 
 final class StationSupplyRequestWorkflowService
@@ -62,6 +64,10 @@ final class StationSupplyRequestWorkflowService
                 'from_value' => ['request_id' => $locked->id, ...$before],
                 'to_value' => ['request_id' => $locked->id, ...$locked->only(array_keys($data))],
             ]);
+            // A new member-facing response answers the member (docs/member-replies.md section 4); admin notes do not.
+            if (array_key_exists('public_response', $data) && filled($data['public_response']) && ($before['public_response'] ?? null) !== $data['public_response']) {
+                app(MemberReplyLedger::class)->staffReplied(ReplySubject::STATION_SUPPLY_REQUEST, (int) $locked->getKey());
+            }
         }, 3);
         $request->refresh();
     }

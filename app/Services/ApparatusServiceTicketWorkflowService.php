@@ -13,6 +13,8 @@ use App\Models\Apparatus;
 use App\Models\ApparatusServiceTicket;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\MemberReplies\MemberReplyLedger;
+use App\Support\MemberReplies\ReplySubject;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -189,6 +191,9 @@ class ApparatusServiceTicketWorkflowService
             $notifyRequester = $publicNote !== null
                 || $target !== $current
                 || array_key_exists('scheduled_for', $validated);
+            if ($publicNote !== null) {
+                app(MemberReplyLedger::class)->staffReplied(ReplySubject::APPARATUS_SERVICE_TICKET, (int) $locked->getKey());
+            }
             DB::afterCommit(fn () => $this->sideEffects->ticketChanged($locked, $notifyRequester));
 
             return $this->load($locked);
@@ -223,6 +228,9 @@ class ApparatusServiceTicketWorkflowService
                 'changed_by_user_id' => $actor->id,
                 'metadata' => ['event' => 'note_added'],
             ]);
+            if ($public !== null) {
+                app(MemberReplyLedger::class)->staffReplied(ReplySubject::APPARATUS_SERVICE_TICKET, (int) $locked->getKey());
+            }
             DB::afterCommit(fn () => $this->sideEffects->ticketChanged($locked, $public !== null));
 
             return $this->load($locked);

@@ -33,7 +33,7 @@
                 <div>
                     <dt>Last truck change</dt>
                     <dd>
-                        <a href="{{ \App\Filament\Resources\ApparatusChangeoutResource::getUrl('view', ['record' => $last]) }}">{{ $last->unit_designation }}: truck {{ $last->from_vehicle_number ?: 'not recorded' }} to truck {{ $last->to_vehicle_number }}</a>
+                        <a href="{{ \App\Filament\Resources\ApparatusChangeoutResource::getUrl('view', ['record' => $last]) }}">{{ $last->isWithoutReplacement() ? $last->headline() : $last->unit_designation.': truck '.($last->from_vehicle_number ?: 'not recorded').' to truck '.$last->to_vehicle_number }}</a>
                         @if ($last->effective_at)
                             &bull; {{ $last->effective_at->setTimezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }}
                         @endif

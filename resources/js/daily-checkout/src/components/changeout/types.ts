@@ -140,6 +140,8 @@ export interface ChangeoutSummary {
   unit_designation: string;
   from_vehicle_number: string | null;
   to_vehicle_number: string | null;
+  /** An admin took the unit's only truck out of service: nothing moved, so there is no "to" truck. */
+  without_replacement: boolean;
   to_apparatus_id: number | null;
   station_id: number | null;
   effective_at: string | null;

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Apparatus;
+use App\Services\Fleet\UnitIdentityConflict;
 use Illuminate\Console\Command;
 
 /**
@@ -236,7 +237,15 @@ class BackfillApparatusPmData extends Command
                 $apparatus->last_pm_mileage = max(0, $data['miles'] - 5000);
             }
 
-            $apparatus->save();
+            try {
+                $apparatus->save();
+            } catch (UnitIdentityConflict $conflict) {
+                // One row whose vehicle number names another unit never stops the rest of the backfill.
+                $this->warn("  Skipping {$designation}: {$conflict->summary()}");
+                $skipped++;
+
+                continue;
+            }
 
             $this->info("  ✓ {$designation} (ID: {$apparatus->id}) - {$data['unit_name']}");
             if ($ownedByMaster) {
