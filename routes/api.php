@@ -74,7 +74,7 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::post('apparatuses/{apparatus}/inspection-sessions/{session}/abandon', [ApparatusController::class, 'abandonInspectionSession'])->middleware(['throttle:30,1']);
     Route::get('apparatuses/{apparatus}/service-notices', [PublicApparatusServiceTicketController::class, 'apparatusNotices']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
-    Route::post('apparatuses/{apparatus}/inventory-corrections', [\App\Http\Controllers\Api\InventoryCorrectionController::class, 'store'])->middleware(['throttle:30,1']);
+    Route::post('apparatuses/{apparatus}/inventory-corrections', [\App\Http\Controllers\Api\InventoryCorrectionController::class, 'store'])->middleware(['throttle:60,1']);
     // Vehicle changeouts and operational alerts (docs/apparatus-changeouts.md). Network only, never offline-cached.
     Route::get('apparatuses/{apparatus}/changeout-context', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'context'])->whereNumber('apparatus');
     Route::post('apparatuses/{apparatus}/changeouts', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'store'])->whereNumber('apparatus')->middleware(['throttle:30,1']);
