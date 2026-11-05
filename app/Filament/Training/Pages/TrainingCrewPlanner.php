@@ -52,6 +52,8 @@ final class TrainingCrewPlanner extends Page
 
     protected static string $view = 'filament.training.pages.crew-planner';
 
+    private const GROUPS = ['promotional', 'de_bid'];
+
     #[Locked]
     public string $draftId;
 
@@ -74,6 +76,9 @@ final class TrainingCrewPlanner extends Page
 
     /** Ranks ticked in the filter; none ticked shows every rank. */
     public array $ranks = [];
+
+    /** "Show only" groups (promotional list, Driver Engineer bid); a member in any ticked group is shown. */
+    public array $groups = [];
 
     public array $candidateSelection = [];
 
@@ -208,6 +213,15 @@ final class TrainingCrewPlanner extends Page
         $this->ranks = in_array($rank, $ranks, true)
             ? array_values(array_diff($ranks, [$rank]))
             : array_slice([...$ranks, $rank], 0, 50);
+    }
+
+    /** One tap ticks or unticks one "Show only" group. */
+    public function toggleGroup(string $group): void
+    {
+        $this->actor();
+        abort_unless(in_array($group, self::GROUPS, true), 422);
+        $groups = array_values(array_intersect(self::GROUPS, $this->groups));
+        $this->groups = in_array($group, $groups, true) ? array_values(array_diff($groups, [$group])) : [...$groups, $group];
     }
 
     /** Only a date with a TeleStaff roster on file can be chosen. Sessions keep their clock times on the new date. */
@@ -525,6 +539,7 @@ final class TrainingCrewPlanner extends Page
             'draft' => $draft, 'duty' => $duty, 'all' => $all, 'candidates' => $candidates,
             'courses' => $courses, 'chosen' => $chosen, 'showCourseSearch' => $this->courseSearch !== '' || $courses->count() >= 15,
             'hasClass' => $composer->hasClass($draft), 'dates' => $this->dateChoices(),
+            'groupChoices' => $this->groupChoices(array_filter($all['rows'] ?? [], fn (array $row): bool => $composer->eligible($row, $draft))),
             'rankChoices' => $this->rankChoices(array_filter($all['rows'] ?? [], fn (array $row): bool => $composer->eligible($row, $draft))),
             'rosterChange' => $composer->rosterChange($actor, $draft, $duty),
             'eligibleTotal' => count(array_filter($all['rows'] ?? [], fn (array $row): bool => $composer->eligible($row, $draft))),
@@ -676,6 +691,10 @@ final class TrainingCrewPlanner extends Page
         }
         if (($this->filters['de_bid'] ?? false) === true) {
             $filters['de_bid'] = true;
+        }
+        $groups = array_values(array_intersect(self::GROUPS, $this->groups));
+        if ($groups !== []) {
+            $filters['groups'] = $groups;
         }
         $ranks = array_values(array_unique(array_filter($this->ranks, static fn ($rank): bool => is_string($rank) && trim($rank) !== '' && mb_strlen($rank) <= 100)));
         if ($ranks !== []) {
@@ -866,6 +885,15 @@ final class TrainingCrewPlanner extends Page
      *
      * @return list<array{value: string, label: string, count: int}>
      */
+    /** @return list<array{value: string, label: string, count: int}> */
+    private function groupChoices(array $eligible): array
+    {
+        return [
+            ['value' => 'promotional', 'label' => 'On a promotional list', 'count' => count(array_filter($eligible, static fn (array $row): bool => ! empty($row['is_promotional'])))],
+            ['value' => 'de_bid', 'label' => 'Bid a Driver Engineer seat', 'count' => count(array_filter($eligible, static fn (array $row): bool => ! empty($row['assignment_verified']) && ! empty($row['is_de_bid'])))],
+        ];
+    }
+
     private function rankChoices(array $eligible): array
     {
         $order = ['Fire Chief', 'Deputy Fire Chief', 'Division Chief', 'Captain', 'Lieutenant', 'Firefighter'];
@@ -907,6 +935,8 @@ final class TrainingCrewPlanner extends Page
             'selected' => isset($draft['selections'][$id]), 'slot_id' => $draft['selections'][$id]['slot_id'] ?? null,
             'slot_options' => array_map(fn (string $slotId): array => ['id' => $slotId] + $labels[$slotId], $eligibleSlots),
             'partial' => count($eligibleSlots) < count($labels), 'provisional' => $row['provisional'] ?? false,
+            'promotional' => $row['promotional'] ?? null,
+            'de_bid' => ! empty($row['assignment_verified']) && ! empty($row['is_de_bid']),
         ];
     }
 

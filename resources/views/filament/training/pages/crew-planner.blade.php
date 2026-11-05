@@ -4,7 +4,7 @@
         $selectedCount = count($draft['selections']);
         $shownCount = count($candidates);
         $searching = trim((string) ($filters['search'] ?? '')) !== '';
-        $filtersActive = $ranks !== [];
+        $filtersActive = $ranks !== [] || $groups !== [];
         $tz = \App\Support\HubTimezone::NAME;
         $dateLabel = \Carbon\CarbonImmutable::parse($duty->dutyDate, $tz)->format('l, F j, Y');
         $dateShort = \Carbon\CarbonImmutable::parse($duty->dutyDate, $tz)->format('l, M j');
@@ -94,6 +94,14 @@
                         </div>
                     </fieldset>
                 @endif
+                <fieldset class="mt-3" data-crew-groups>
+                    <legend class="font-medium">Show only <span class="font-normal text-sm">(tick one or both; a member in either is shown)</span></legend>
+                    <div class="mt-1 cp-ranks">
+                        @foreach ($groupChoices as $choice)
+                            <label class="flex items-center gap-2" wire:key="group-{{ $choice['value'] }}"><input type="checkbox" wire:click="toggleGroup(@js($choice['value']))" @checked(in_array($choice['value'], $groups, true)) /> {{ $choice['label'] }} ({{ $choice['count'] }})</label>
+                        @endforeach
+                    </div>
+                </fieldset>
                 <label class="mt-3 block cp-search">Find a name<input type="search" wire:model.live.debounce.350ms="filters.search" placeholder="Name or employee ID" class="block w-full rounded-lg border-gray-300" /></label>
                 <div class="mt-4 flex flex-wrap items-center gap-3">
                     @if ($shownCount > 0)<x-filament::button color="gray" wire:click="selectAllShown" wire:loading.attr="disabled">Select all {{ $shownCount }} shown</x-filament::button>@endif
@@ -106,7 +114,7 @@
                         <li wire:key="candidate-{{ $id }}" class="cp-row py-3">
                             <label class="cp-pick">
                                 <input type="checkbox" wire:click="toggleMember({{ $id }})" @checked($person['selected']) aria-label="Select {{ $person['name'] }}" />
-                                <span class="min-w-0"><strong>{{ $person['name'] }}</strong><br /><span class="text-sm">{{ $person['rank'] }} · ID {{ $person['employee_id'] }}</span></span>
+                                <span class="min-w-0"><strong>{{ $person['name'] }}</strong><br /><span class="text-sm">{{ $person['rank'] }} · ID {{ $person['employee_id'] }}</span>@if ($person['promotional'] || $person['de_bid'])<span class="mt-1 flex flex-wrap gap-1">@if ($person['promotional'])<x-filament::badge color="info" size="sm">Promotional list: {{ $person['promotional'] }}</x-filament::badge>@endif @if ($person['de_bid'])<x-filament::badge color="warning" size="sm">Driver Engineer bid</x-filament::badge>@endif</span>@endif</span>
                             </label>
                             @unless ($person['provisional'])
                                 <span class="cp-duty text-sm">{{ $person['station'] }} · {{ $person['unit'] }}</span>
@@ -124,7 +132,7 @@
                             @endif
                         </li>
                     @empty
-                        <li class="py-4">{{ ($filtersActive || $searching) ? 'No one matches. Untick a rank or clear the name.' : 'Everyone on duty that day has completed it.' }}</li>
+                        <li class="py-4">{{ ($filtersActive || $searching) ? 'No one matches. Untick a rank or a "Show only" group, or clear the name.' : 'Everyone on duty that day has completed it.' }}</li>
                     @endforelse
                 </ul>
                 @if ($shownCount > 250)<p class="mt-3 text-sm">Showing the first 250. Tick a rank or search for a name to narrow it.</p>@endif

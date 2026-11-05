@@ -84,6 +84,30 @@ final class PromotionalDirectory
         return $lines;
     }
 
+    /**
+     * One short label per employee profile who holds an eligible place on a list in effect, e.g.
+     * "Lieutenant #3" or "Lieutenant #3 · Captain #12" (one query for everyone).
+     *
+     * @return array<int, string>
+     */
+    public function eligibleSummaries(): array
+    {
+        $labels = [];
+        foreach ($this->entries() as $employeeId => $entries) {
+            $parts = [];
+            foreach ($entries as $entry) {
+                if ($entry['status'] === PromotionalListEntry::STATUS_ELIGIBLE) {
+                    $parts[] = $entry['type'].($entry['rank'] !== null ? ' #'.$entry['rank'] : '');
+                }
+            }
+            if ($parts !== []) {
+                $labels[$employeeId] = implode(' · ', array_values(array_unique($parts)));
+            }
+        }
+
+        return $labels;
+    }
+
     /** @return array<int, list<array{type: string, title: string, rank: int|null, status: string, expires: string|null}>> */
     private function entries(): array
     {

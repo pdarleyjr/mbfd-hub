@@ -6,6 +6,8 @@ namespace Tests\Feature\Training;
 
 use App\Filament\Training\Pages\TrainingCrewPlanner;
 use App\Models\Employee;
+use App\Models\PromotionalList;
+use App\Models\PromotionalListEntry;
 use App\Models\Training\TrainingAttendance;
 use App\Models\Training\TrainingCourse;
 use App\Models\Training\TrainingModule;
@@ -269,6 +271,22 @@ final class TrainingCrewPlannerFlowTest extends TestCase
      * @param  list<array{string, string, string}>  $sessions
      * @param  array<string, array{string, string}>  $duty  employee id => [from, to] overriding the 08:00-20:00 default
      */
+    public function test_show_only_toggles_narrow_the_list_to_promotional_list_members_and_driver_engineer_bidders(): void
+    {
+        $list = PromotionalList::query()->create(['list_type' => 'lieutenant', 'title' => 'Lieutenant 2026', 'effective_date' => '2026-01-01',
+            'expires_on' => '2027-12-31', 'status' => PromotionalList::STATUS_ACTIVE, 'source_reference' => 'Fixture']);
+        $list->entries()->create(['original_rank' => 2, 'soi_id' => 'S2', 'last_name' => 'Synthetic', 'first_name' => 'Pat',
+            'employee_id' => $this->employees['90003']->id, 'scores' => [], 'status' => PromotionalListEntry::STATUS_ELIGIBLE, 'current_rank' => 2]);
+        $component = $this->readyComponent();
+        $component->assertSee('On a promotional list (1)')->assertSee('Promotional list: Lieutenant #2')
+            ->call('toggleGroup', 'promotional')
+            ->assertSee('Synthetic 90003')->assertDontSee('Synthetic 90001')->assertDontSee('Synthetic 90002')
+            ->call('toggleGroup', 'promotional')
+            ->assertSee('Synthetic 90001')->assertSee('Synthetic 90002');
+        $component->call('toggleGroup', 'de_bid')->assertSee('No one matches.');
+        $component->call('toggleGroup', 'nope')->assertStatus(422);
+    }
+
     private function readyComponent(array $sessions = [], array $duty = [], string $date = '2026-10-21'): mixed
     {
         $rows = [];
