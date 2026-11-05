@@ -21,6 +21,9 @@ final readonly class DashboardSnapshot
 
     public const LANE_MESSAGES = 'messages';
 
+    /** What members asked for (uniforms, PPE, medical supplies, narcotics checks): the Member Requests board and its Overview lane. */
+    public const LANE_REQUESTS = 'requests';
+
     /**
      * @param  list<DashboardIssue>  $rows  rows matching the selected filter
      * @param  array<string, string>  $laneOf  ref => lane

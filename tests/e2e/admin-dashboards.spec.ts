@@ -7,9 +7,9 @@ import { join } from 'node:path';
  * display-mode isolation. Rows are synthetic fixtures (tests/Support/Dashboards), never production data.
  */
 const views = [
-  { slug: 'overview', path: '/admin', label: 'Admin Overview', position: '1 of 3', heading: 'Admin Overview' },
-  { slug: 'vehicle-checkout', path: '/admin/dashboards/vehicle-checkout', label: 'Vehicle Checkout', position: '2 of 3', heading: 'Vehicle Checkout Dashboard' },
-  { slug: 'station-operations', path: '/admin/dashboards/station-operations', label: 'Station Operations', position: '3 of 3', heading: 'Station Operations Dashboard' },
+  { slug: 'overview', path: '/admin', label: 'Admin Overview', position: '1 of 4', heading: 'Admin Overview' },
+  { slug: 'vehicle-checkout', path: '/admin/dashboards/vehicle-checkout', label: 'Vehicle Checkout', position: '2 of 4', heading: 'Vehicle Checkout Dashboard' },
+  { slug: 'station-operations', path: '/admin/dashboards/station-operations', label: 'Station Operations', position: '3 of 4', heading: 'Station Operations Dashboard' },
 ] as const;
 
 const screensDir = process.env.ADMIN_DASHBOARDS_SCREENS_DIR ?? 'test-results/admin-dashboards/screens';
@@ -68,14 +68,16 @@ for (const view of views) {
 test('pager links are real links with explicit labels and disabled ends', async ({ page }) => {
   await openView(page, '/admin');
   await expect(page.getByRole('link', { name: 'No previous dashboard' })).toHaveAttribute('aria-disabled', 'true');
-  await page.getByRole('link', { name: 'Next dashboard: Vehicle Checkout (2 of 3)' }).click();
+  await page.getByRole('link', { name: 'Next dashboard: Vehicle Checkout (2 of 4)' }).click();
   await expect(page).toHaveURL(/\/admin\/dashboards\/vehicle-checkout$/);
-  await page.getByRole('link', { name: 'Next dashboard: Station Operations (3 of 3)' }).click();
+  await page.getByRole('link', { name: 'Next dashboard: Station Operations (3 of 4)' }).click();
   await expect(page).toHaveURL(/\/admin\/dashboards\/station-operations$/);
+  await page.getByRole('link', { name: 'Next dashboard: Member Requests (4 of 4)' }).click();
+  await expect(page).toHaveURL(/\/admin\/dashboards\/member-requests$/);
   await expect(page.getByRole('link', { name: 'No next dashboard' })).toHaveAttribute('aria-disabled', 'true');
   await page.goBack();
-  await expect(page).toHaveURL(/\/admin\/dashboards\/vehicle-checkout$/);
-  await expect(page.locator('.mbfd-dash-pager__label')).toContainText('2 of 3');
+  await expect(page).toHaveURL(/\/admin\/dashboards\/station-operations$/);
+  await expect(page.locator('.mbfd-dash-pager__label')).toContainText('3 of 4');
 });
 
 test('filter chips narrow the list with exact counts', async ({ page }) => {

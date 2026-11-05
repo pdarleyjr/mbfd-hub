@@ -623,6 +623,8 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
 .mbfd-dash-queue__group[data-tone="danger"] .mbfd-dash-queue__head { background: rgb(var(--hub-danger-bg)); color: rgb(var(--hub-danger)); }
 .mbfd-dash-queue__group[data-tone="info"] .mbfd-dash-queue__head { background: rgb(var(--hub-blue-tint)); color: rgb(var(--hub-blue)); }
 .mbfd-dash-queue__group[data-tone="success"] .mbfd-dash-queue__head { background: rgb(var(--hub-success-bg)); color: rgb(var(--hub-success)); }
+.mbfd-dash-queue__group[data-tone="warning"] .mbfd-dash-queue__head { background: rgb(var(--hub-warning-bg)); color: rgb(var(--hub-warning-strong)); }
+.mbfd-dash-queue__group[data-tone="violet"] .mbfd-dash-queue__head { background: rgb(var(--hub-domain-personnel) / .1); color: rgb(var(--hub-domain-personnel)); }
 .mbfd-dash-queue__icon { width: 1.125rem; height: 1.125rem; }
 
 .mbfd-dash-queue__count {
@@ -673,6 +675,45 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
 }
 
 .mbfd-dash-pager__name { font-weight: 700; color: var(--dash-ink); }
+
+/* Direct links to every board this person can open, beside the ‹ n of 4 › steps. */
+.mbfd-dash-pager__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    margin: 0 auto 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mbfd-dash-pager__tab {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding-inline: .75rem;
+    border: 1px solid var(--dash-border);
+    border-radius: var(--hub-radius-control, 8px);
+    background: var(--dash-surface);
+    color: rgb(var(--hub-blue));
+    font-size: .8125rem;
+    font-weight: 700;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+.mbfd-dash-pager__tab:hover { background: rgb(var(--hub-blue-tint)); }
+.mbfd-dash-pager__tab:focus-visible { outline: 3px solid rgb(var(--hub-focus)); outline-offset: -3px; }
+/* Tablets and phones: the board links take their own line above the ‹ n of 4 › steps. */
+@media (max-width: 1023.98px) {
+    .mbfd-dash-pager { flex-wrap: wrap; }
+    .mbfd-dash-pager__tabs { flex-basis: 100%; justify-content: center; margin: 0; }
+}
+
+.mbfd-dash-pager__tab.is-current { border-color: rgb(var(--hub-header)); background: rgb(var(--hub-header)); color: #fff; }
+
+/* Request rows: status always visible, and how long the oldest open request has waited. */
+.mbfd-dash-row__age { color: rgb(var(--hub-warning-strong)); font-weight: 700; font-variant-numeric: tabular-nums; }
+.mbfd-dash-badge[data-member-replied] { background: rgb(var(--hub-domain-personnel) / .1); border-color: rgb(var(--hub-domain-personnel) / .35); color: rgb(var(--hub-domain-personnel)); }
 
 /* ---------- Action panel (drawer / sheet) ---------- */
 
@@ -985,6 +1026,10 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
         min-height: 0;
     }
 
+    /* Four Overview lanes (Requests included): side by side on a 1080p wall or wide monitor, two by two on a laptop. */
+    body.mbfd-dash-fit .mbfd-dash-body--lanes[data-lanes="4"] .mbfd-dash-main { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    body.mbfd-dash-fit .mbfd-dash-body--lanes[data-lanes="2"] .mbfd-dash-main { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
     body.mbfd-dash-fit .mbfd-dash-body--single .mbfd-dash-main { grid-template-rows: minmax(0, 1fr); min-height: 0; }
 
     body.mbfd-dash-fit .mbfd-dash-group__sections {
@@ -1025,6 +1070,13 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
         bottom: calc(var(--hub-status-bar-height) + .5rem);
         z-index: 29;
         padding: 0;
+    }
+}
+
+@media (min-width: 1024px) and (max-width: 1439.98px) and (min-height: 600px) {
+    body.mbfd-dash-fit .mbfd-dash-body--lanes[data-lanes="4"] .mbfd-dash-main {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
     }
 }
 

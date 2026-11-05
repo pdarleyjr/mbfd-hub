@@ -3,8 +3,11 @@
     that opens the action panel for one issue, or a link to the page for all of one item's issues
     ($row['href'], from IssuePresenter::groupRow()). Every value is escaped. $compact drops the detail line.
 --}}
-@php($compact = $compact ?? false)
-<li class="mbfd-dash-row" wire:key="row-{{ $scope ?? 'list' }}-{{ $row['ref'] }}">
+@php
+    $compact = $compact ?? false;
+    $isRequest = $row['lane'] === \App\Services\Dashboards\DashboardSnapshot::LANE_REQUESTS;
+@endphp
+<li class="mbfd-dash-row" wire:key="row-{{ $scope ?? 'list' }}-{{ $row['ref'] }}" @if ($isRequest) data-request-row @endif>
     @if (filled($row['href'] ?? null))
         <a href="{{ $row['href'] }}" class="mbfd-dash-row__button @if ($compact) is-compact @endif" data-group-key="{{ $row['ref'] }}">
     @else
@@ -13,7 +16,7 @@
             aria-haspopup="dialog"
             x-on:click="$dispatch('dashboard-issue-open', { ref: $el.dataset.issueRef })">
     @endif
-        @if ($row['lane'] === 'messages' && $row['image'] === null && $row['initials'] !== null)
+        @if (($row['lane'] === 'messages' || $isRequest) && $row['image'] === null && $row['initials'] !== null)
             <span class="mbfd-dash-thumb mbfd-dash-thumb--avatar" aria-hidden="true">{{ $row['initials'] }}</span>
         @elseif ($row['image'] !== null)
             <span class="mbfd-dash-thumb mbfd-dash-thumb--{{ $row['imageKind'] }}">
@@ -34,6 +37,12 @@
                 <span class="mbfd-dash-badge" data-severity="{{ $row['severity'] }}">{{ $row['severityLabel'] }}<span class="sr-only"> priority</span></span>
                 @if ($row['stage'] === 'resolved')
                     <span class="mbfd-dash-badge" data-stage="resolved">{{ $row['statusLabel'] }}</span>
+                @elseif ($isRequest)
+                    {{-- A request's status is the next step ("Ready For Pickup", "Needs Information"), so it is always shown. --}}
+                    <span class="mbfd-dash-badge" data-plain data-request-status>{{ $row['statusLabel'] }}</span>
+                @endif
+                @if ($row['memberReplied'] ?? false)
+                    <span class="mbfd-dash-badge" data-member-replied>Member replied</span>
                 @endif
             </span>
             <span class="mbfd-dash-row__title">{{ $row['title'] }}</span>
@@ -47,6 +56,9 @@
 
         <span class="mbfd-dash-row__meta">
             <time datetime="{{ $row['timeIso'] }}">{{ $row['time'] }}</time>
+            @if ($isRequest && filled($row['age'] ?? null))
+                <span class="mbfd-dash-row__age" data-age>Waiting {{ $row['age'] }}</span>
+            @endif
             @if (filled($row['actor']))
                 <span class="mbfd-dash-row__actor" aria-hidden="true">{{ $row['actor'] }}</span>
             @endif

@@ -76,20 +76,24 @@ final class DashboardViewsTest extends TestCase
     {
         $overview = $this->get('/admin')->assertOk()->getContent();
         $this->assertStringContainsString('Admin Overview</span>', $overview);
-        $this->assertStringContainsString('1 of 3', $overview);
+        $this->assertStringContainsString('1 of 4', $overview);
         $this->assertMatchesRegularExpression('#<a role="link" aria-disabled="true"[^>]*aria-label="No previous dashboard"#', $overview);
-        $this->assertMatchesRegularExpression('#href="[^"]*/admin/dashboards/vehicle-checkout"[^>]*rel="next"[^>]*aria-label="Next dashboard: Vehicle Checkout \(2 of 3\)"#', $overview);
+        $this->assertMatchesRegularExpression('#href="[^"]*/admin/dashboards/vehicle-checkout"[^>]*rel="next"[^>]*aria-label="Next dashboard: Vehicle Checkout \(2 of 4\)"#', $overview);
 
         $vehicle = $this->get('/admin/dashboards/vehicle-checkout')->assertOk()->getContent();
-        $this->assertStringContainsString('2 of 3', $vehicle);
-        $this->assertMatchesRegularExpression('#href="[^"]*/admin"[^>]*rel="prev"[^>]*aria-label="Previous dashboard: Admin Overview \(1 of 3\)"#', $vehicle);
+        $this->assertStringContainsString('2 of 4', $vehicle);
+        $this->assertMatchesRegularExpression('#href="[^"]*/admin"[^>]*rel="prev"[^>]*aria-label="Previous dashboard: Admin Overview \(1 of 4\)"#', $vehicle);
         $this->assertMatchesRegularExpression('#href="[^"]*/admin/dashboards/station-operations"[^>]*rel="next"#', $vehicle);
 
         $station = $this->get('/admin/dashboards/station-operations')->assertOk()->getContent();
-        $this->assertStringContainsString('3 of 3', $station);
+        $this->assertStringContainsString('3 of 4', $station);
         $this->assertMatchesRegularExpression('#href="[^"]*/admin/dashboards/vehicle-checkout"[^>]*rel="prev"#', $station);
-        $this->assertMatchesRegularExpression('#<a role="link" aria-disabled="true"[^>]*aria-label="No next dashboard"#', $station);
+        $this->assertMatchesRegularExpression('#href="[^"]*/admin/dashboards/member-requests"[^>]*rel="next"[^>]*aria-label="Next dashboard: Member Requests \(4 of 4\)"#', $station);
         $this->assertStringContainsString('aria-label="Dashboards"', $station);
+
+        $requests = $this->get('/admin/dashboards/member-requests')->assertOk()->getContent();
+        $this->assertStringContainsString('4 of 4', $requests);
+        $this->assertMatchesRegularExpression('#<a role="link" aria-disabled="true"[^>]*aria-label="No next dashboard"#', $requests);
     }
 
     public function test_display_mode_still_renders_only_the_station_operations_board_and_no_dashboard_ui(): void

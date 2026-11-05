@@ -25,5 +25,13 @@ return [
         App\Services\Dashboards\Sources\Station\StationInspectionSource::class,
         App\Services\Dashboards\Sources\Station\HubSupportTicketSource::class,
         App\Services\Dashboards\Sources\Station\SupportMessageSource::class,
+        App\Services\Dashboards\Sources\Station\StationSupplyRequestSource::class,
+    ],
+
+    // What members ask for: the Member Requests board (4 of 4) and the Overview's Requests lane.
+    'request_sources' => [
+        App\Services\Dashboards\Sources\Requests\PersonnelRequestSource::class,
+        App\Services\Dashboards\Sources\Requests\MedicalSupplyRequestSource::class,
+        App\Services\Dashboards\Sources\Requests\NarcoticsCheckSource::class,
     ],
 ];
