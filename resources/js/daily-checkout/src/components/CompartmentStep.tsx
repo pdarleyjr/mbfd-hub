@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import type { ChecklistData, ChecklistItem, Compartment } from '../types';
 import { resolveBlueprint } from '../data/apparatusBlueprints';
 import { findingsForArea, inspectionProgress, itemIsComplete } from '../utils/inspectionProgress';
-import { previousIssueHeadline, previousIssueStatusLine, resolveFindingTargets, targetsForItem, formatReportedDate } from '../utils/previousFindings';
+import { previousIssueHeadline, previousIssueStatusLine, resolveFindingTargets, targetsForItem, formatReportedDate, markedPresentNote } from '../utils/previousFindings';
 import { ArrowRight, Check, ChevronDown, ClipboardList, Package, TriangleAlert, X } from 'lucide-react';
 import ApparatusBlueprint from './ApparatusBlueprint';
 import InventoryCorrectionForm from './InventoryCorrectionForm';
@@ -300,7 +300,7 @@ export default function CompartmentStep({ checklistType, usesVehicleId = true, c
                   {noLongerOpen.has(finding.id) && <p>No longer listed as open. It may have been resolved since this page loaded.</p>}
                 </div>;
               })}
-              {markedPresent && <p role="status" className="equipment-known-note">Marked present. Logistics will verify the correction.</p>}
+              {markedPresent && <p role="status" className="equipment-known-note">{markedPresentNote(known)}</p>}
             </div>}
             {expanded && <div className="equipment-details" id={`details-${current.id}-${item.id}`}>
               {item.instructions && <p className="equipment-instructions">{item.instructions}</p>}

@@ -187,6 +187,7 @@ function normalizeWorkspace(raw: Record<string, unknown>): Workspace {
     issues: asArray(data.issues).map(normalizeSummary),
     // Absent from an answer sent before these existed: nothing cleared, and the Truck Changes tab shows its empty state.
     cleared_issues: asArray(raw.cleared_issues).map(normalizeSummary),
+    recently_resolved: asArray(raw.recently_resolved).map(normalizeSummary),
     rescue_trucks: asArray(raw.rescue_trucks).map(normalizeTruck),
     rescue_truck_changes: asArray(raw.rescue_truck_changes).map(normalizeTruckChange),
     handoff: { duty_date: data.handoff?.duty_date ?? data.duty_date, notes: asArray(data.handoff?.notes) },

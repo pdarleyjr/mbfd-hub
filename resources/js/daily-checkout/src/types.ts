@@ -312,6 +312,10 @@ export interface OpenFinding {
   severity?: 'routine' | 'significant';
   first_reported_at?: string | null;
   latest_member_update?: { text: string; at: string } | null;
+  /** Who works the issue; names the person who will verify a Present answer. */
+  owner?: 'captain5' | 'logistics';
+  /** True when marking the item present closes the issue by itself. */
+  member_correction?: { closes_immediately: boolean };
 }
 
 /** A member's inventory correction report that Logistics has not decided yet (outside the hashed checklist). */

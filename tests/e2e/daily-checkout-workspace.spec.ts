@@ -667,7 +667,7 @@ test('known finding remains visible when reported corrected and keyboard actions
   await page.keyboard.press('Enter');
   await expect(pass).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('Previously reported: Damaged', { exact: true })).toBeVisible();
-  await expect(page.getByText('Awaiting verification', { exact: true })).toBeVisible();
+  await expect(page.getByText('New — not yet acknowledged', { exact: true })).toBeVisible();
   expect((await pass.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   expect(await pass.evaluate(element => Number.parseFloat(getComputedStyle(element).transitionDuration))).toBeLessThanOrEqual(0.00001);
   const checklist = page.getByRole('button', { name: /Checklist.*remaining/ });
@@ -769,15 +769,15 @@ test('previously reported issues show their current status, match by id before n
   // A finding without ids still matches by the recorded names and says it is waiting for verification.
   const tevy = page.locator('[data-previous-issues]').filter({ hasText: 'Previously reported: Damaged' });
   await expect(tevy).toHaveCount(1);
-  await expect(tevy.getByText('Awaiting verification', { exact: true })).toBeVisible();
+  await expect(tevy.getByText('New — not yet acknowledged', { exact: true })).toBeVisible();
   await expect(page.getByText(/Known (missing|damaged)/)).toHaveCount(0);
   // The member still records what they see.
   const pass = page.getByRole('button', { name: "Pass Driver's Gear", exact: true });
   await expect(pass).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByText('Marked present. Logistics will verify the correction.')).toHaveCount(0);
+  await expect(page.getByText('Marked present. Support Services will verify it before it is closed.')).toHaveCount(0);
   await pass.click();
   await expect(pass).toHaveAttribute('aria-pressed', 'true');
-  await expect(gear.getByText('Marked present. Logistics will verify the correction.', { exact: true })).toBeVisible();
+  await expect(gear.getByText('Marked present. Support Services will verify it before it is closed.', { exact: true })).toBeVisible();
   await expect(gear.getByText('Previously reported: Missing', { exact: true })).toBeVisible();
   await expect(tevy.getByText('Marked present.')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

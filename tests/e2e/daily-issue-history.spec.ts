@@ -59,7 +59,7 @@ const unmatched = issue({
   reporter_name: null,
   first_reported_at: null,
   action_status: 'awaiting_verification',
-  action_label: 'Awaiting verification',
+  action_label: 'New — not yet acknowledged',
   latest_action: null,
   history_count: 1,
 });
@@ -403,7 +403,7 @@ test('marking an item present keeps the verification note and resolves nothing',
   await page.getByRole('button', { name: "Pass Driver's Gear", exact: true }).click();
 
   const known = page.locator('[data-previous-issues="drivers-gear"]');
-  await expect(known.getByText('Marked present. Logistics will verify the correction.', { exact: true })).toBeVisible();
+  await expect(known.getByText('Marked present. Support Services will verify it before it is closed.', { exact: true })).toBeVisible();
   await expect(known).toContainText('Replacement available');
   await expect(summaryOf(page, '2 open issues on this apparatus')).toBeVisible();
 });
