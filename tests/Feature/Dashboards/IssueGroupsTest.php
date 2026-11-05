@@ -49,6 +49,24 @@ final class IssueGroupsTest extends TestCase
         $this->assertSame(['apparatus:4', 'apparatus:3', 'apparatus:2', 'apparatus:1'], array_column($groups, 'key'));
     }
 
+    public function test_notices_follow_the_open_items_and_come_before_recently_resolved_ones(): void
+    {
+        $now = CarbonImmutable::parse('2026-10-31 12:00:00', 'UTC');
+        $groups = IssueGroups::of([
+            $this->issue('1', 'apparatus:1', ['stage' => 'resolved', 'severity' => 'high', 'occurredAt' => $now]),
+            $this->issue('2', null, ['stage' => DashboardIssue::STAGE_NOTICE, 'severity' => 'low', 'occurredAt' => $now]),
+            $this->issue('3', 'apparatus:3', ['severity' => 'low', 'occurredAt' => $now->subDays(2)]),
+        ]);
+
+        $this->assertSame(['apparatus:3', 'fake:2', 'apparatus:1'], array_column($groups, 'key'));
+
+        $notice = IssuePresenter::row($this->issue('2', null, ['stage' => DashboardIssue::STAGE_NOTICE]), DashboardSnapshot::LANE_VEHICLE);
+        $this->assertTrue($notice['notice']);
+        $this->assertNull($notice['age'], 'a notice is not waiting on anyone');
+        $this->assertSame('View', $notice['cta']);
+        $this->assertFalse(IssuePresenter::row($this->issue('3', null), DashboardSnapshot::LANE_VEHICLE)['notice']);
+    }
+
     public function test_a_closed_issue_never_raises_the_severity_of_a_group_with_open_issues(): void
     {
         $this->assertSame('low', IssueGroups::worstSeverity([

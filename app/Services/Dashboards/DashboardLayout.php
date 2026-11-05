@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Dashboards;
 
 use App\Filament\Pages\IssueGroupPage;
+use App\Services\Dashboards\Sources\Vehicle\TakeHomeInspectionNoticeSource;
 use App\Support\Dashboards\DashboardIssue;
 use App\Support\Dashboards\DashboardView;
 
@@ -102,6 +103,7 @@ final class DashboardLayout
         $station = DashboardSnapshot::LANE_STATION;
         $messages = DashboardSnapshot::LANE_MESSAGES;
         $cards = [
+            // Take-home inspections (notices, approved on submission) follow the open issues here; they are not counted.
             $vehicle => self::card('lane-vehicle', 'Apparatus', 'Open checkout issues, one row per unit.', 'heroicon-o-truck', 'danger',
                 self::groups($s->rowsIn($vehicle), $s), 'No open vehicle issues for this operational day.', $links['vehicle'], 'vehicle checkout issues', filterKey: 'apparatus'),
             $station => self::card('lane-station', 'Stations', 'Open requests, one row per station.', 'heroicon-o-building-office', 'warning',
@@ -113,7 +115,7 @@ final class DashboardLayout
         // is a conversation. Only admins who can see a request source get the lane at all.
         $requests = DashboardSnapshot::LANE_REQUESTS;
         if ($s->hasLane($requests)) {
-            $cards[$requests] = self::card('lane-requests', 'Requests', 'Uniforms, PPE, medical supplies and narcotics checks, one row per member.', 'heroicon-o-clipboard-document-list', 'info',
+            $cards[$requests] = self::card('lane-requests', 'Requests', 'Uniforms, PPE and equipment, one row per member.', 'heroicon-o-clipboard-document-list', 'info',
                 self::groups($s->rowsIn($requests), $s), 'No open member requests.', $links['requests'] ?? null, 'member requests', filterKey: 'requests');
         }
         if ($onlyLane !== null && ! isset($cards[$onlyLane])) {
@@ -132,8 +134,23 @@ final class DashboardLayout
     private static function vehicle(DashboardSnapshot $s, array $links, ?string $filterLabel): array
     {
         $lane = DashboardSnapshot::LANE_VEHICLE;
-        $rows = $s->rowsIn($lane);
+        $all = $s->rowsIn($lane);
+        // Notices (take-home inspections, approved on submission) get their own card, apart from the issues to work.
+        $notices = array_values(array_filter($all, static fn (DashboardIssue $r): bool => $r->isNotice()));
+        $rows = array_values(array_filter($all, static fn (DashboardIssue $r): bool => ! $r->isNotice()));
         $special = array_values(array_filter($rows, static fn (DashboardIssue $r): bool => array_intersect(['marine', 'special'], $r->tags) !== []));
+        $side = [
+            self::queue('apparatus-queue', 'Apparatus workflow queue', $filterLabel ? 'Filtered: '.$filterLabel : null, 'heroicon-o-cog-6-tooth', $s, $lane, $filterLabel === null),
+            self::card('marine-special', 'Marine & specialty units', null, 'heroicon-o-lifebuoy', 'info',
+                self::groups($special, $s), 'No open marine or specialty unit issues.', null, null, true),
+        ];
+        // Only for Fleet viewers (the source reports "notices" only to them), and only unfiltered: a chip never matches a notice.
+        if ($filterLabel === null && $s->hasCount('notices', $lane)) {
+            $side[] = self::card('take-home-notices', 'Take-home inspections',
+                'Approved automatically. Shown for '.TakeHomeInspectionNoticeSource::noticeHours().' hours; nothing to act on.',
+                'heroicon-o-clipboard-document-check', 'neutral', self::groups($notices, $s),
+                'No take-home inspections in the last '.TakeHomeInspectionNoticeSource::noticeHours().' hours.');
+        }
 
         return [
             'primaryLane' => $lane,
@@ -147,11 +164,7 @@ final class DashboardLayout
                 self::card('priority-apparatus', 'Priority apparatus alerts', $filterLabel ? 'Filtered: '.$filterLabel : 'One row per unit, most severe first.', 'heroicon-o-exclamation-circle', 'danger',
                     self::groups($rows, $s), $filterLabel ? 'No apparatus issues match “'.$filterLabel.'” for this operational day.' : 'No open vehicle issues for this operational day.'),
             ],
-            'side' => [
-                self::queue('apparatus-queue', 'Apparatus workflow queue', $filterLabel ? 'Filtered: '.$filterLabel : null, 'heroicon-o-cog-6-tooth', $s, $lane, $filterLabel === null),
-                self::card('marine-special', 'Marine & specialty units', null, 'heroicon-o-lifebuoy', 'info',
-                    self::groups($special, $s), 'No open marine or specialty unit issues.', null, null, true),
-            ],
+            'side' => $side,
         ];
     }
 

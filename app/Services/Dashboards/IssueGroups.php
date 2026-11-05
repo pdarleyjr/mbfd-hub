@@ -15,7 +15,8 @@ final class IssueGroups
     private const SEVERITY_ORDER = ['high' => 0, 'medium' => 1, 'low' => 2];
 
     /**
-     * Groups with something still open come first, then the worst severity, then the newest.
+     * Groups with something still open come first, then notices (information only), then the rest (recently
+     * resolved); inside each, the worst severity, then the newest.
      *
      * @param  list<DashboardIssue>  $issues
      * @return list<array{key: string, issues: list<DashboardIssue>}>
@@ -69,7 +70,13 @@ final class IssueGroups
     {
         $newest = max(array_map(static fn (DashboardIssue $issue): int => $issue->occurredAt->getTimestamp(), $issues));
         $hasOpen = array_filter($issues, static fn (DashboardIssue $issue): bool => $issue->isOpen()) !== [];
+        $onlyNotices = array_filter($issues, static fn (DashboardIssue $issue): bool => ! $issue->isNotice()) === [];
+        $tier = match (true) {
+            $hasOpen => 0,
+            $onlyNotices => 1,
+            default => 2,
+        };
 
-        return [$hasOpen ? 0 : 1, self::SEVERITY_ORDER[self::worstSeverity($issues)], -$newest, $issues[0]->ref()];
+        return [$tier, self::SEVERITY_ORDER[self::worstSeverity($issues)], -$newest, $issues[0]->ref()];
     }
 }

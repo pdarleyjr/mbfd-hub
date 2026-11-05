@@ -21,10 +21,9 @@ use App\Services\Activity\OperationsActivityPreferences;
 use App\Services\Dashboards\DashboardAccess;
 use App\Services\Dashboards\DashboardReadModel;
 use App\Services\Dashboards\DashboardSnapshot;
-use App\Services\Dashboards\Sources\Requests\MedicalSupplyRequestSource;
-use App\Services\Dashboards\Sources\Requests\NarcoticsCheckSource;
 use App\Services\Dashboards\Sources\Requests\PersonnelRequestSource;
 use App\Services\Dashboards\Sources\Station\StationSupplyRequestSource;
+use App\Services\Ems\EmsAccess;
 use App\Services\Security\ApplicationAccessService;
 use App\Support\Dashboards\DashboardQuery;
 use App\Support\Dashboards\DashboardView;
@@ -41,7 +40,10 @@ use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\Defects\Concerns\BuildsContinuityFixtures;
 use Tests\TestCase;
 
-/** The Member Requests board (4 of 4), its sources and the Overview's Requests lane. */
+/**
+ * The Member Requests board (4 of 4), its sources and the Overview's Requests lane. Uniform, PPE and equipment requests
+ * only: medical supply requests and narcotics checks stay with Captain 5 and never reach the admin dashboards.
+ */
 final class MemberRequestsDashboardTest extends TestCase
 {
     use BuildsContinuityFixtures;
@@ -211,18 +213,21 @@ final class MemberRequestsDashboardTest extends TestCase
         $board = Livewire::test(DashboardBoard::class, ['dashboard' => 'member-requests']);
         $chip = static fn (string $label, int $count): string => '#'.$label.'</span>\s*<span class="mbfd-dash-chip__count">· '.$count.'<#s';
         $html = $board->html();
-        $this->assertMatchesRegularExpression($chip('All', 3), $html);
+        $this->assertMatchesRegularExpression($chip('All', 2), $html);
         $this->assertMatchesRegularExpression($chip('Uniforms', 1), $html);
         $this->assertMatchesRegularExpression($chip('PPE / equipment', 1), $html);
-        $this->assertMatchesRegularExpression($chip('Medical supplies', 1), $html);
-        $this->assertMatchesRegularExpression($chip('Needs review', 3), $html);
+        $this->assertMatchesRegularExpression($chip('Needs review', 2), $html);
+        // Medical supply requests stay with Captain 5: no chip, no row, not in any count.
+        $this->assertStringNotContainsString('Medical supplies</span>', $html);
         $this->assertStringNotContainsString('Narcotics checks</span>', $html);
+        $this->assertStringNotContainsString('Gauze 4x4', $html);
 
         $board->call('setFilter', 'ppe')->assertSet('filter', 'ppe')
             ->assertSee('Structural gloves (XL) ×1')
             ->assertDontSee('Class B shirt (L) ×2')
             ->assertDontSee('Gauze 4x4');
-        $board->call('setFilter', 'medical')->assertSee('Gauze 4x4 ×10')->assertDontSee('Structural gloves');
+        // The old chip key is no longer a filter: it falls back to All.
+        $board->call('setFilter', 'medical')->assertSet('filter', 'all')->assertDontSee('Gauze 4x4');
     }
 
     public function test_overview_has_a_requests_lane_and_chip_that_shows_it_alone(): void
@@ -234,8 +239,10 @@ final class MemberRequestsDashboardTest extends TestCase
         $html = $board->html();
         $this->assertStringContainsString('data-card="lane-requests"', $html);
         $this->assertStringContainsString('data-lanes="4"', $html);
-        $this->assertMatchesRegularExpression('#Requests</span>\s*<span class="mbfd-dash-chip__count">· 2<#s', $html);
+        // The medical supply request is Captain 5's: not in the lane and not in its count.
+        $this->assertMatchesRegularExpression('#Requests</span>\s*<span class="mbfd-dash-chip__count">· 1<#s', $html);
         $this->assertStringContainsString('Class B shirt (L) ×2', $html);
+        $this->assertStringNotContainsString('Gauze 4x4', $html);
         $this->assertMatchesRegularExpression('#href="[^"]*/admin/dashboards/member-requests" class="mbfd-dash-card__link"#', $html);
 
         $only = $board->call('setFilter', 'requests')->html();
@@ -335,12 +342,12 @@ final class MemberRequestsDashboardTest extends TestCase
 
     public function test_member_replied_also_reads_the_shared_awaiting_staff_flag(): void
     {
-        $request = $this->medicalRequest();
-        $source = app(MedicalSupplyRequestSource::class);
+        $request = $this->personnelRequest($this->employee('Jordan Lee'), 'uniform', PersonnelRequestStatus::Acknowledged);
+        $source = app(PersonnelRequestSource::class);
         $this->assertNotContains('member_replied', $source->rows($this->admin, DashboardQuery::now(), 50)[0]->tags);
 
         \Illuminate\Support\Facades\DB::table('submission_reply_states')->insert([
-            'subject_type' => \App\Support\MemberReplies\ReplySubject::EMS_INVENTORY_REQUEST, 'subject_id' => $request->id,
+            'subject_type' => \App\Support\MemberReplies\ReplySubject::PERSONNEL_REQUEST, 'subject_id' => $request->id,
             'awaiting_staff_reply' => true, 'last_member_reply_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->assertContains('member_replied', $source->rows($this->admin, DashboardQuery::now(), 50)[0]->tags);
@@ -363,48 +370,60 @@ final class MemberRequestsDashboardTest extends TestCase
         $this->assertSame([], $source->rows($this->admin, DashboardQuery::now(), 50));
     }
 
-    public function test_medical_supply_requests_acknowledge_and_go_back_to_the_member(): void
+    public function test_admin_dashboards_never_list_ems_supply_requests_or_narcotics_checks(): void
     {
         $medic = $this->member('Casey Medic');
         $request = $this->medicalRequest(member: $medic);
-        $source = app(MedicalSupplyRequestSource::class);
+        $checkId = $this->narcoticsCheck(member: $this->member('Robin Medic'));
+        $this->personnelRequest($this->employee('Jordan Lee'), 'uniform', PersonnelRequestStatus::Pending);
+        $emsManager = $this->adminWith(['admin.ems.manage', 'admin.personnel.view', 'admin.fleet.view', 'admin.stations.view']);
+        // Both people can work EMS supply requests in the Captain 5 / EMS pages; the admin dashboards still never list them.
+        $this->assertTrue(app(EmsAccess::class)->canView($this->admin));
+        $this->assertTrue(app(EmsAccess::class)->canView($emsManager));
 
-        $row = $source->rows($this->admin, DashboardQuery::now(), 50)[0];
-        $this->assertSame('awaiting_response', $row->stage);
-        $this->assertSame('Gauze 4x4 ×10', $row->title);
-        $this->assertSame('member:'.$medic->id, $row->groupKey);
-        $this->assertSame(['medical'], $row->tags);
+        $registry = app(IssueSourceRegistry::class);
+        $this->assertFalse($registry->has('medical_supply_request'));
+        $this->assertFalse($registry->has('narcotics_check'));
 
-        $detail = $source->detail($this->admin, (string) $request->id);
-        $this->assertSame(['acknowledge', 'return_to_member'], array_map(static fn ($action): string => $action->key, $detail->actions));
-        $this->assertSame('done', $source->perform($this->admin, (string) $request->id, 'acknowledge', [], $detail->issue->version)->outcome);
-        $this->assertSame(InventoryRequest::REVIEWED, $request->fresh()->status);
+        foreach ([$this->admin, $emsManager] as $user) {
+            foreach (DashboardView::cases() as $view) {
+                $snapshot = $this->snapshot($view, user: $user);
+                $types = array_unique(array_map(static fn ($row): string => $row->type, $snapshot->rows));
+                $this->assertNotContains('medical_supply_request', $types, $view->value);
+                $this->assertNotContains('narcotics_check', $types, $view->value);
+                $this->assertArrayNotHasKey('medical', $snapshot->counts, $view->value);
+                $this->assertArrayNotHasKey('narcotics', $snapshot->counts, $view->value);
+            }
+        }
 
-        $fresh = $source->detail($this->admin, (string) $request->id);
-        $this->assertSame('done', $source->perform($this->admin, (string) $request->id, 'return_to_member', ['reason' => 'Count the gauze again.'], $fresh->issue->version)->outcome);
-        $this->assertSame(InventoryRequest::RETURNED, $request->fresh()->status);
-        $returned = $source->rows($this->admin, DashboardQuery::now(), 50)[0];
-        $this->assertSame('in_progress', $returned->stage);
-        $this->assertContains('waiting_member', $returned->tags);
+        foreach (['overview', 'vehicle-checkout', 'station-operations', 'member-requests'] as $board) {
+            $html = Livewire::test(DashboardBoard::class, ['dashboard' => $board])->html();
+            $this->assertStringNotContainsString('Gauze 4x4', $html, $board);
+            $this->assertStringNotContainsString('Narcotics check', $html, $board);
+            $this->assertStringNotContainsString('Medical supplies', $html, $board);
+        }
+        $this->assertStringContainsString('Class B shirt (L) ×2', Livewire::test(DashboardBoard::class, ['dashboard' => 'member-requests'])->html());
+        $this->get(IssueGroupPage::getUrl(['group' => 'member:'.$medic->id], panel: 'admin'))->assertDontSee('Gauze 4x4');
+
+        // Nothing on the Captain 5 side was touched.
+        $this->assertSame(InventoryRequest::SUBMITTED, $request->fresh()->status);
+        $this->assertSame('pending', DB::table('narcotics_checks')->where('id', $checkId)->value('status'));
     }
 
-    public function test_narcotics_checks_are_listed_read_only_with_the_review_link(): void
+    public function test_an_ems_only_admin_does_not_get_the_member_requests_board(): void
     {
-        $id = $this->narcoticsCheck(member: $this->member('Robin Medic'));
-        $this->narcoticsCheck('approved');
-        $source = app(NarcoticsCheckSource::class);
+        $this->medicalRequest();
+        $ems = $this->adminWith(['admin.ems.manage']);
+        $this->assertTrue(app(EmsAccess::class)->canView($ems));
+        $this->assertFalse(DashboardAccess::canView($ems, DashboardView::MemberRequests));
 
-        $rows = $source->rows($this->admin, DashboardQuery::now(), 50);
-        $this->assertCount(2, $rows);
-        $this->assertSame('Narcotics check for R22, waiting for review', $rows[0]->title);
-        $this->assertSame(1, $source->counts($this->admin, DashboardQuery::now())['open']);
-
-        $detail = $source->detail($this->admin, (string) $id);
-        $this->assertSame([], $detail->actions);
-        $this->assertStringContainsString('Captain 5 narcotics review', (string) $detail->readOnlyReason);
-        $this->assertSame('/captain-5', $detail->issue->sourceUrl);
-        $this->assertSame('invalid', $source->perform($this->admin, (string) $id, 'approve', [], $detail->issue->version)->outcome);
-        $this->assertSame('pending', DB::table('narcotics_checks')->where('id', $id)->value('status'));
+        $this->actingAs($ems);
+        $this->assertFalse(MemberRequestsDashboard::canAccess());
+        $this->get('/admin/dashboards/member-requests')->assertForbidden();
+        Livewire::test(DashboardBoard::class, ['dashboard' => 'member-requests'])->assertForbidden();
+        $overview = Livewire::test(DashboardBoard::class, ['dashboard' => 'overview'])->html();
+        $this->assertStringNotContainsString('data-card="lane-requests"', $overview);
+        $this->assertStringNotContainsString('Gauze 4x4', $overview);
     }
 
     public function test_station_supply_requests_show_on_station_operations_and_the_overview(): void
@@ -469,9 +488,7 @@ final class MemberRequestsDashboardTest extends TestCase
     public function test_request_sources_never_reach_the_wall_display(): void
     {
         $this->personnelRequest($this->employee('Jordan Lee'), 'uniform', PersonnelRequestStatus::Pending);
-        foreach ([PersonnelRequestSource::class, MedicalSupplyRequestSource::class, NarcoticsCheckSource::class] as $class) {
-            $this->assertFalse(app($class)->visibleTo($this->admin, true), $class);
-        }
+        $this->assertFalse(app(PersonnelRequestSource::class)->visibleTo($this->admin, true));
         $this->assertStringNotContainsString('Jordan Lee', $this->get('/admin?display=1')->assertOk()->getContent());
     }
 }

@@ -50,8 +50,6 @@ final class IssueGroupBoard extends Component
         'hub_support_ticket' => 'Member reports',
         'station_supply_request' => 'Station supply requests',
         'personnel_request' => 'Uniform and PPE requests',
-        'medical_supply_request' => 'Medical supply requests',
-        'narcotics_check' => 'Narcotics checks',
     ];
 
     #[Locked]

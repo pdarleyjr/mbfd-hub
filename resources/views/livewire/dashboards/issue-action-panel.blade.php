@@ -78,7 +78,11 @@
                             </span>
                         @endif
                         <dl class="mbfd-dash-panel__keyfacts">
-                            <div><dt>Severity</dt><dd><span class="mbfd-dash-badge" data-severity="{{ $d['severity'] }}">{{ $d['severityLabel'] }}</span></dd></div>
+                            @if ($d['stage'] === \App\Support\Dashboards\DashboardIssue::STAGE_NOTICE)
+                                <div><dt>Type</dt><dd><span class="mbfd-dash-badge" data-notice>Notice</span></dd></div>
+                            @else
+                                <div><dt>Severity</dt><dd><span class="mbfd-dash-badge" data-severity="{{ $d['severity'] }}">{{ $d['severityLabel'] }}</span></dd></div>
+                            @endif
                             <div><dt>Status</dt><dd>{{ $d['statusLabel'] }}</dd></div>
                             <div><dt>Reported</dt><dd><time datetime="{{ $d['occurredIso'] }}">{{ $d['occurred'] }}</time></dd></div>
                             @if (filled($d['reporter']))

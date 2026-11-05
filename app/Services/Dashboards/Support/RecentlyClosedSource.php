@@ -15,8 +15,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * QueryBackedSource for what members submit (uniform orders, PPE requests, medical supply requests, narcotics checks,
- * station supply requests), with the board's display rules:
+ * QueryBackedSource for what members submit (uniform orders, PPE and equipment requests, station supply requests),
+ * with the board's display rules:
  *
  * - Row set: every open record, plus records closed in the last dashboards.resolved_display_hours (72 by default),
  *   the same retention the equipment issues use. They sort after the open ones (prepareRows, IssueGroups). Staff take
@@ -34,8 +34,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 abstract class RecentlyClosedSource extends QueryBackedSource
 {
-    /** Tags the request sources report: kind (uniform, ppe, medical, narcotics) and where the request stands. */
-    public const REQUEST_TAGS = ['uniform', 'ppe', 'medical', 'narcotics', 'member_replied', 'waiting_member', 'awaiting_pickup'];
+    /** Tags the request sources report: kind (uniform, ppe) and where the request stands. */
+    public const REQUEST_TAGS = ['uniform', 'ppe', 'member_replied', 'waiting_member', 'awaiting_pickup'];
 
     /**
      * Records that closed (completed, denied, cancelled, decided, reconciled...) at or after $since.

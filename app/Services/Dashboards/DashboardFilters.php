@@ -34,13 +34,12 @@ final class DashboardFilters
                 self::lane('personnel', 'Personnel', 'heroicon-m-users', DashboardSnapshot::LANE_MESSAGES),
                 self::lane('requests', 'Requests', 'heroicon-m-clipboard-document-list', DashboardSnapshot::LANE_REQUESTS),
             ],
-            // Medical, narcotics and "member replied" hide at zero: only some request staff see those sources at all.
+            // Uniform, PPE and equipment requests only: medical supplies and narcotics checks stay with Captain 5.
+            // "Member replied" hides at zero.
             DashboardView::MemberRequests => [
                 $all,
                 self::tag('uniform', 'Uniforms', 'heroicon-m-shopping-bag'),
                 self::tag('ppe', 'PPE / equipment', 'heroicon-m-shield-check'),
-                self::tag('medical', 'Medical supplies', 'heroicon-m-beaker', true),
-                self::tag('narcotics', 'Narcotics checks', 'heroicon-m-lock-closed', true),
                 ['key' => 'awaiting_response', 'label' => 'Needs review', 'countKey' => 'awaiting_response', 'kind' => 'stage', 'optional' => false, 'icon' => 'heroicon-m-clock'],
                 self::tag('member_replied', 'Member replied', 'heroicon-m-chat-bubble-left-ellipsis', true),
             ],

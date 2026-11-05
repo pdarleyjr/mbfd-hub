@@ -12,8 +12,9 @@ use Filament\Support\Enums\MaxWidth;
 use Illuminate\Contracts\View\View;
 
 /**
- * Dashboard 4 of 4: what members have asked for and are waiting on. Uniform orders, PPE and
- * equipment requests, medical supply requests and narcotics checks, one row per member.
+ * Dashboard 4 of 4: what members have asked for and are waiting on. Uniform orders and PPE and
+ * equipment requests, one row per member. Medical supply requests and narcotics checks stay with
+ * Captain 5 and are not listed here.
  */
 class MemberRequestsDashboard extends Page
 {
@@ -47,7 +48,7 @@ class MemberRequestsDashboard extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Uniform orders, PPE and equipment requests, medical supply requests and narcotics checks, one row per member.';
+        return 'Uniform orders and PPE and equipment requests, one row per member.';
     }
 
     public function getHeader(): ?View
