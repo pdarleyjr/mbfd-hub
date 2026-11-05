@@ -333,6 +333,24 @@ final class MemberRequestsDashboardTest extends TestCase
         $this->assertSame(0, $source->counts($this->admin, DashboardQuery::now())['member_replied']);
     }
 
+    public function test_member_replied_also_reads_the_shared_awaiting_staff_flag(): void
+    {
+        $request = $this->medicalRequest();
+        $source = app(MedicalSupplyRequestSource::class);
+        $this->assertNotContains('member_replied', $source->rows($this->admin, DashboardQuery::now(), 50)[0]->tags);
+
+        \Illuminate\Support\Facades\DB::table('submission_reply_states')->insert([
+            'subject_type' => \App\Support\MemberReplies\ReplySubject::EMS_INVENTORY_REQUEST, 'subject_id' => $request->id,
+            'awaiting_staff_reply' => true, 'last_member_reply_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->assertContains('member_replied', $source->rows($this->admin, DashboardQuery::now(), 50)[0]->tags);
+        $this->assertSame(1, $source->counts($this->admin, DashboardQuery::now())['member_replied']);
+
+        \Illuminate\Support\Facades\DB::table('submission_reply_states')->update(['awaiting_staff_reply' => false]);
+        $this->assertNotContains('member_replied', $source->rows($this->admin, DashboardQuery::now(), 50)[0]->tags);
+        $this->assertSame(0, $source->counts($this->admin, DashboardQuery::now())['member_replied']);
+    }
+
     public function test_completed_personnel_requests_can_be_archived_off_the_board(): void
     {
         $request = $this->personnelRequest($this->employee('Jordan Lee'), 'uniform', PersonnelRequestStatus::Completed, [['Job shirt', 'M', 1, 1]], ['completed_at' => now()->subHour()]);

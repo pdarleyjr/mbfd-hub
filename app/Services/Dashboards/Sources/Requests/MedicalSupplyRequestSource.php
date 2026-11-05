@@ -19,6 +19,7 @@ use App\Support\Dashboards\DashboardIssue;
 use App\Support\Dashboards\DashboardView;
 use App\Support\Dashboards\IssueAction;
 use App\Support\Dashboards\IssueDetail;
+use App\Support\MemberReplies\ReplySubject;
 use App\Support\OperationalDisplayWindow;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -143,6 +144,11 @@ final class MedicalSupplyRequestSource extends RecentlyClosedSource
         return $record->getAttribute('dashboard_last_message_context') === InventoryRequestEvent::CONTEXT_MEMBER;
     }
 
+    protected function replySubject(): ?string
+    {
+        return ReplySubject::EMS_INVENTORY_REQUEST;
+    }
+
     protected function prepareRows(Builder $query): void
     {
         $active = implode(',', array_map(static fn (string $s): string => "'".$s."'", InventoryRequest::ACTIVE_STATUSES));
@@ -151,6 +157,7 @@ final class MedicalSupplyRequestSource extends RecentlyClosedSource
             ->selectRaw('('.self::lastMessageContextSql().') as dashboard_last_message_context')
             ->orderByRaw("CASE WHEN ems_inventory_requests.status IN ({$active}) THEN 0 ELSE 1 END")
             ->orderByDesc('ems_inventory_requests.submitted_at')->orderByDesc('ems_inventory_requests.id');
+        $this->selectAwaitingStaffReply($query);
     }
 
     /** @param InventoryRequest $record */

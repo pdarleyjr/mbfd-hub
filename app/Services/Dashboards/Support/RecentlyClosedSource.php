@@ -67,12 +67,57 @@ abstract class RecentlyClosedSource extends QueryBackedSource
         return false;
     }
 
+    /**
+     * The ReplySubject key this source's records use in submission_reply_states, or null when the workflow has no
+     * member reply thread. The shared "awaiting staff" flag (MemberReplyLedger) then counts as "member replied"
+     * alongside the domain's own signal; the domain signal still covers replies sent before that flag existed.
+     */
+    protected function replySubject(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Adds dashboard_awaiting_staff_reply to the row select. Sources with a replySubject() call this from prepareRows().
+     *
+     * @param  Builder<TModel>  $query
+     */
+    final protected function selectAwaitingStaffReply(Builder $query): void
+    {
+        $type = $this->replySubject();
+        if ($type === null) {
+            return;
+        }
+        $table = $query->getModel()->getTable();
+        $query->selectRaw(
+            "EXISTS (SELECT 1 FROM submission_reply_states WHERE submission_reply_states.subject_type = ? AND submission_reply_states.subject_id = {$table}.id AND submission_reply_states.awaiting_staff_reply = ?) as dashboard_awaiting_staff_reply",
+            [$type, true],
+        );
+    }
+
     final protected function tagConstraints(): array
     {
         return [
             ...$this->requestTagConstraints(),
-            'member_replied' => fn (Builder $q) => $q->where(fn (Builder $replied) => $this->whereMemberReplied($replied)),
+            'member_replied' => fn (Builder $q) => $q->where(function (Builder $replied): void {
+                $this->whereMemberReplied($replied);
+                $this->orWhereAwaitingStaffReply($replied);
+            }),
         ];
+    }
+
+    /** @param  Builder<TModel>  $query */
+    private function orWhereAwaitingStaffReply(Builder $query): void
+    {
+        $type = $this->replySubject();
+        if ($type === null) {
+            return;
+        }
+        $table = $query->getModel()->getTable();
+        $query->orWhereExists(static fn ($state) => $state->selectRaw('1')->from('submission_reply_states')
+            ->where('submission_reply_states.subject_type', $type)
+            ->whereColumn('submission_reply_states.subject_id', $table.'.id')
+            ->where('submission_reply_states.awaiting_staff_reply', true));
     }
 
     public function counts(User $user, DashboardQuery $query): array
@@ -133,7 +178,7 @@ abstract class RecentlyClosedSource extends QueryBackedSource
      */
     protected function withReplyTag(Model $record, array $tags, bool $open): array
     {
-        if ($open && $this->memberReplied($record)) {
+        if ($open && ($this->memberReplied($record) || (bool) $record->getAttribute('dashboard_awaiting_staff_reply'))) {
             $tags[] = 'member_replied';
         }
 

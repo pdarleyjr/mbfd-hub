@@ -21,6 +21,7 @@ use App\Support\Dashboards\DashboardView;
 use App\Support\Dashboards\IssueAction;
 use App\Support\Dashboards\IssueDetail;
 use App\Support\DecisionReason;
+use App\Support\MemberReplies\ReplySubject;
 use App\Support\OperationalDisplayWindow;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -166,6 +167,11 @@ final class PersonnelRequestSource extends RecentlyClosedSource
         return $record->getAttribute('dashboard_last_event') === self::MEMBER_REPLY_EVENT;
     }
 
+    protected function replySubject(): ?string
+    {
+        return ReplySubject::PERSONNEL_REQUEST;
+    }
+
     protected function prepareRows(Builder $query): void
     {
         $closed = implode(',', array_map(static fn (string $s): string => "'".$s."'", array_keys(self::CLOSING)));
@@ -178,6 +184,7 @@ final class PersonnelRequestSource extends RecentlyClosedSource
             ->orderByRaw("CASE WHEN personnel_requests.status IN ({$closed}) THEN 1 ELSE 0 END")
             ->orderByRaw("CASE WHEN personnel_requests.type = 'equipment' OR personnel_requests.over_allowance = ? THEN 0 ELSE 1 END", [true])
             ->orderByDesc('personnel_requests.created_at')->orderByDesc('personnel_requests.id');
+        $this->selectAwaitingStaffReply($query);
     }
 
     /** @param PersonnelRequest $record */

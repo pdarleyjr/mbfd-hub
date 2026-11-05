@@ -17,6 +17,7 @@ use App\Support\Dashboards\DashboardView;
 use App\Support\Dashboards\IssueAction;
 use App\Support\Dashboards\IssueDetail;
 use App\Support\DecisionReason;
+use App\Support\MemberReplies\ReplySubject;
 use App\Support\OperationalDisplayWindow;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -104,9 +105,15 @@ final class StationSupplyRequestSource extends RecentlyClosedSource
 
     protected function prepareRows(Builder $query): void
     {
-        $query->with('station:id,station_number,name')
+        $query->select('station_supply_requests.*')->with('station:id,station_number,name')
             ->orderByRaw("CASE WHEN station_supply_requests.status IN ('open','ordered') THEN 0 ELSE 1 END")
             ->orderByDesc('station_supply_requests.created_at')->orderByDesc('station_supply_requests.id');
+        $this->selectAwaitingStaffReply($query);
+    }
+
+    protected function replySubject(): ?string
+    {
+        return ReplySubject::STATION_SUPPLY_REQUEST;
     }
 
     /** @param StationSupplyRequest $record */
@@ -128,7 +135,7 @@ final class StationSupplyRequestSource extends RecentlyClosedSource
                 'ordered' => 'in_progress',
                 default => in_array($status, self::CLOSED, true) ? 'resolved' : 'other',
             },
-            tags: ['supplies'],
+            tags: $this->withReplyTag($record, ['supplies'], $open),
             subject: StationImageKey::label(self::stationOf($record)),
             imageKey: StationImageKey::for(self::stationOf($record)),
             actorLabel: $displayMode ? null : (trim((string) $record->created_by_name) ?: null),
