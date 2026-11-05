@@ -34,7 +34,17 @@
                     <time class="emsg-bubble__time" datetime="{{ $local->toIso8601String() }}" title="{{ $local->format('l, F j, Y g:i A') }}">{{ $local->isSameDay(now($zone)) ? $local->format('g:i A') : $local->format('M j, g:i A') }}</time>
                 @endif
             </div>
-            <p class="emsg-bubble__body">{{ $message->body }}</p>
+            @php $long = mb_strlen((string) $message->body) > 600 || substr_count((string) $message->body, "\n") > 8; @endphp
+            @if ($long)
+                <div x-data="{ open: false }">
+                    <div class="emsg-bubble__body" :class="open ? '' : 'emsg-bubble__body--clamped'" id="emsg-body-{{ $message->id }}">{{ $message->body }}</div>
+                    <button type="button" class="emsg-showmore" x-on:click="open = ! open" :aria-expanded="open ? 'true' : 'false'" aria-controls="emsg-body-{{ $message->id }}" data-emsg-showmore>
+                        <span x-text="open ? 'Show less' : 'Show full message'">Show full message</span>
+                    </button>
+                </div>
+            @else
+                <div class="emsg-bubble__body">{{ $message->body }}</div>
+            @endif
         </li>
     @empty
         <li class="emsg-thread__empty">{{ $emptyText }}</li>
