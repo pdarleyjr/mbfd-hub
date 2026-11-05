@@ -200,8 +200,8 @@ return [
         ],
         'medium_detection' => [
             'label' => 'MEDIUM: gas meter or detection device',
-            'help' => 'Gas meters and detectors.',
-            'body' => 'Acknowledged. Coordinate a replacement gas meter or detector with Support Services or the appropriate equipment technician. Call or text first so availability can be confirmed.',
+            'help' => 'Gas meters and detectors. Handled by the on-duty Air Tech, like SCBA and cylinders.',
+            'body' => 'Acknowledged. Coordinate with the on-duty Air Tech to have the gas meter or detector checked or swapped out. Notify your officer and contact 300 if immediate assistance or after-hours coordination is needed.',
         ],
         'medium_air_tech' => [
             'label' => 'MEDIUM: SCBA component or cylinder (Air Tech)',
