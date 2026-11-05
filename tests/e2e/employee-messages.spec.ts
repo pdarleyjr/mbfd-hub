@@ -567,7 +567,10 @@ test.describe.serial('Bunker gear cleaning request', () => {
       await expect(card).toHaveText('Support Services Messages');
       const row = page.locator('button[data-emsg-row]', { hasText: body });
       await expect(row).toBeVisible();
-      await expect(row.locator('.emsg-tag--reason')).toHaveText('Bunker gear cleaning request');
+      // Intentional change: bunker gear requests get the emphasised badge (icon + text), not the plain reason pill.
+      await expect(row.locator('[data-emsg-bunker]')).toContainText('Bunker gear cleaning request');
+      await expect(row).toHaveClass(/emsg-row--bunker/);
+      await expect(page.locator('[data-emsg-bunker-summary]')).toContainText('waiting');
       const open = page.locator(`a[data-emsg-open-link][href$="thread=${threadId}"]`);
       await expect(open).toHaveText('Reply');
       await expectNoHorizontalOverflow(page);
