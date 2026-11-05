@@ -14,6 +14,7 @@ use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Services\InspectionPaperFields;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\DefectNameKey;
 use App\Support\HubTimezone;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
@@ -141,9 +142,9 @@ final class DefectContinuityService
         $issueType = strtolower($status);
         $inspection = $inspectionId !== null ? ApparatusInspection::query()->find($inspectionId) : null;
         $inspection?->assertOperational();
-        $existing = ApparatusDefect::query()
-            ->where('apparatus_id', $apparatusId)->where('compartment', $compartment)->where('item', $item)
-            ->unresolved()->lockForUpdate()->first();
+        // Names compare without case or spacing, so " radio" never opens a second issue beside "Radio".
+        $existing = $this->lockedOpenFor($apparatusId)
+            ->first(static fn (ApparatusDefect $open): bool => DefectNameKey::same($open->compartment, $compartment) && DefectNameKey::same($open->item, $item));
 
         if ($existing !== null) {
             $history = $existing->defect_history ?? [];
@@ -169,8 +170,8 @@ final class DefectContinuityService
 
         $entry = ['compartment' => $compartment, 'item' => $item, 'status' => $status, 'notes' => $notes, 'photo_path' => $photoPath,
             'significant' => false, 'compartment_id' => null, 'item_id' => null];
-        $prior = ApparatusDefect::query()->where('apparatus_id', $apparatusId)->where('compartment', $compartment)
-            ->where('item', $item)->where('resolved', true)->orderByDesc('id')->value('id');
+        $prior = $this->resolvedEpisodes($apparatusId)
+            ->first(static fn (ApparatusDefect $closed): bool => DefectNameKey::same($closed->compartment, $compartment) && DefectNameKey::same($closed->item, $item))?->id;
         $apparatus = new Apparatus;
         $apparatus->id = $apparatusId;
         [$defect] = $this->createOrFind($apparatus, $inspection, $entry, $prior !== null ? (int) $prior : null);
@@ -249,8 +250,8 @@ final class DefectContinuityService
      */
     public function currentLocation(array $index, ApparatusDefect $defect): array
     {
-        $matches = array_values(array_filter($index, static fn (array $row): bool => in_array($defect->compartment, $row['identity']['compartment_names'], true)
-            && in_array($defect->item, $row['identity']['item_names'], true)));
+        $matches = array_values(array_filter($index, static fn (array $row): bool => DefectNameKey::contains($row['identity']['compartment_names'], $defect->compartment)
+            && DefectNameKey::contains($row['identity']['item_names'], $defect->item)));
         $match = count($matches) === 1 ? $matches[0] : null;
         $identity = $match['identity'] ?? null;
 
@@ -285,12 +286,17 @@ final class DefectContinuityService
      * A member's report about an issue already on record: one observed_again event carrying the note, and
      * the inspection's one observation when it has none yet. The origin report, status and severity stay as they were.
      * The caller holds the apparatus lock and has locked the defect with lockOpenDefectIds().
+     * $matchedByName records that the server, not the member, tied the report to this issue.
      */
-    public function recordConcernConfirmation(ApparatusInspection $inspection, int $defectId, string $description, ?string $photoPath): ApparatusDefect
+    public function recordConcernConfirmation(ApparatusInspection $inspection, int $defectId, string $description, ?string $photoPath, bool $matchedByName = false): ApparatusDefect
     {
         $defect = ApparatusDefect::query()->findOrFail($defectId);
         $defect->forceFill(['last_observed_inspection_id' => $inspection->id, 'last_observed_at' => now()])->save();
-        $this->event($defect, $inspection, 'observed_again', ['details' => ['notes' => $description, 'member_concern' => true]]);
+        $details = ['notes' => $description, 'member_concern' => true];
+        if ($matchedByName) {
+            $details['matched_by_name'] = true;
+        }
+        $this->event($defect, $inspection, 'observed_again', ['details' => $details]);
         // One observation per defect and inspection: a checklist finding on the same item came first and keeps it.
         ApparatusDefectObservation::query()->firstOrCreate(
             ['apparatus_defect_id' => $defect->id, 'apparatus_inspection_id' => $inspection->id],
@@ -344,6 +350,10 @@ final class DefectContinuityService
      * Load and lock, in one query and ascending id order, every unresolved defect any
      * submitted item could match by stable key or by name/alias.
      *
+     * Names compare in their DefectNameKey form, which no portable index can serve, so the query
+     * locks the apparatus's open issues (a handful, behind the apparatus_id index and the apparatus
+     * lock the caller holds) and the names are compared here.
+     *
      * @param  list<array<string, mixed>>  $entries
      * @return array<int, ApparatusDefect>
      */
@@ -355,25 +365,58 @@ final class DefectContinuityService
             array_push($compartmentNames, ...$entry['compartment_names']);
             array_push($itemNames, ...$entry['item_names']);
         }
-        $compartmentNames = array_values(array_unique($compartmentNames));
-        $itemNames = array_values(array_unique($itemNames));
 
+        return $this->lockedOpenFor($apparatusId)
+            ->filter(static fn (ApparatusDefect $open): bool => ($open->item_key !== null && in_array($open->item_key, $itemKeys, true))
+                || (DefectNameKey::contains($compartmentNames, $open->compartment) && DefectNameKey::contains($itemNames, $open->item)))
+            ->keyBy('id')
+            ->all();
+    }
+
+    /**
+     * Every unresolved defect of one apparatus, locked in ascending id order (the global lock order).
+     *
+     * @return Collection<int, ApparatusDefect>
+     */
+    private function lockedOpenFor(int $apparatusId): Collection
+    {
         return ApparatusDefect::query()
             ->where('apparatus_id', $apparatusId)
             ->where('resolved', false)
-            ->where(function ($query) use ($itemKeys, $compartmentNames, $itemNames): void {
-                $query->where(function ($names) use ($compartmentNames, $itemNames): void {
-                    $names->whereIn('compartment', $compartmentNames)->whereIn('item', $itemNames);
-                });
-                if ($itemKeys !== []) {
-                    $query->orWhereIn('item_key', $itemKeys);
-                }
-            })
             ->orderBy('id')
             ->lockForUpdate()
-            ->get()
-            ->keyBy('id')
-            ->all();
+            ->get();
+    }
+
+    /**
+     * Earlier closed episodes of one apparatus, newest first, that can be a recurrence's origin.
+     * A merged duplicate is not an episode: its history lives on the issue it was merged into.
+     *
+     * @return Collection<int, ApparatusDefect>
+     */
+    private function resolvedEpisodes(int $apparatusId): Collection
+    {
+        return ApparatusDefect::query()
+            ->where('apparatus_id', $apparatusId)
+            ->where('resolved', true)
+            ->whereNull('duplicate_of_defect_id')
+            ->orderByDesc('id')
+            ->get(['id', 'compartment', 'item', 'compartment_key', 'item_key']);
+    }
+
+    /** How many checklist items carry these names, compared in their DefectNameKey form. */
+    private function matchingCount(array $definitions, string $compartment, string $item): int
+    {
+        $count = 0;
+        foreach ($definitions as $items) {
+            foreach ($items as $definition) {
+                if (DefectNameKey::contains($definition['compartment_names'] ?? [], $compartment) && DefectNameKey::contains($definition['item_names'] ?? [], $item)) {
+                    $count++;
+                }
+            }
+        }
+
+        return $count;
     }
 
     /**
@@ -386,7 +429,6 @@ final class DefectContinuityService
      */
     private function assignTargets(array $entries, array $open, array $definitions): array
     {
-        $paperFields = app(InspectionPaperFields::class);
         $byKey = [];
         foreach ($open as $defect) {
             if ($defect->item_key !== null) {
@@ -409,9 +451,9 @@ final class DefectContinuityService
                 if (isset($claimed[$candidate->id])) {
                     continue;
                 }
-                if (in_array($candidate->compartment, $entry['compartment_names'], true)
-                    && in_array($candidate->item, $entry['item_names'], true)
-                    && ($entry['identity'] === null || count($paperFields->matchingEquipment($definitions, $candidate->compartment, $candidate->item)) === 1)) {
+                if (DefectNameKey::contains($entry['compartment_names'], $candidate->compartment)
+                    && DefectNameKey::contains($entry['item_names'], $candidate->item)
+                    && ($entry['identity'] === null || $this->matchingCount($definitions, (string) $candidate->compartment, (string) $candidate->item) === 1)) {
                     $assigned[$index] = $candidate;
                     $claimed[$candidate->id] = true;
                     break;
@@ -423,9 +465,9 @@ final class DefectContinuityService
             $defect = $assigned[$index];
             if ($defect === null && $entry['is_issue']) {
                 // The unresolved-name unique index allows one open row per name pair:
-                // an unmatched issue that shares exact names merges into that row.
+                // an unmatched issue that shares the names (case and spacing aside) merges into that row.
                 foreach ($open as $candidate) {
-                    if ((string) $candidate->compartment === (string) $entry['compartment'] && (string) $candidate->item === (string) $entry['item']) {
+                    if (DefectNameKey::same($candidate->compartment, $entry['compartment']) && DefectNameKey::same($candidate->item, $entry['item'])) {
                         $defect = $candidate;
                         break;
                     }
@@ -434,7 +476,7 @@ final class DefectContinuityService
             if ($defect === null && ! $entry['is_issue']) {
                 continue;
             }
-            $group = $defect !== null ? 'd:'.$defect->id : 'n:'.$entry['compartment']."\0".$entry['item'];
+            $group = $defect !== null ? 'd:'.$defect->id : 'n:'.DefectNameKey::normalize($entry['compartment'])."\0".DefectNameKey::normalize($entry['item']);
             $targets[$group]['defect'] = $defect;
             $targets[$group]['group'] = $group;
             $targets[$group]['entries'][] = $entry;
@@ -475,38 +517,15 @@ final class DefectContinuityService
         if ($new === []) {
             return [];
         }
-        $itemKeys = $compartmentNames = $itemNames = [];
-        foreach ($new as $target) {
-            foreach ($target['entries'] as $entry) {
-                if ($entry['item_id'] !== null) {
-                    $itemKeys[] = $entry['item_id'];
-                }
-                array_push($compartmentNames, ...$entry['compartment_names']);
-                array_push($itemNames, ...$entry['item_names']);
-            }
-        }
-        $resolved = ApparatusDefect::query()
-            ->where('apparatus_id', $apparatusId)
-            ->where('resolved', true)
-            ->where(function ($query) use ($itemKeys, $compartmentNames, $itemNames): void {
-                $query->where(function ($names) use ($compartmentNames, $itemNames): void {
-                    $names->whereIn('compartment', array_values(array_unique($compartmentNames)))->whereIn('item', array_values(array_unique($itemNames)));
-                });
-                if ($itemKeys !== []) {
-                    $query->orWhereIn('item_key', array_values(array_unique($itemKeys)));
-                }
-            })
-            ->orderByDesc('id')
-            ->get(['id', 'compartment', 'item', 'compartment_key', 'item_key']);
-        $paperFields = app(InspectionPaperFields::class);
+        $resolved = $this->resolvedEpisodes($apparatusId);
         $found = [];
         foreach ($new as $target) {
             $entry = $target['entries'][0];
             foreach ($resolved as $prior) {
                 $keyMatch = $entry['item_id'] !== null && $prior->item_key === $entry['item_id'] && $prior->compartment_key === $entry['compartment_id'];
-                $nameMatch = in_array((string) $prior->compartment, $entry['compartment_names'], true)
-                    && in_array((string) $prior->item, $entry['item_names'], true)
-                    && ($entry['identity'] === null || count($paperFields->matchingEquipment($definitions, (string) $prior->compartment, (string) $prior->item)) === 1);
+                $nameMatch = DefectNameKey::contains($entry['compartment_names'], $prior->compartment)
+                    && DefectNameKey::contains($entry['item_names'], $prior->item)
+                    && ($entry['identity'] === null || $this->matchingCount($definitions, (string) $prior->compartment, (string) $prior->item) === 1);
                 if ($keyMatch || $nameMatch) {
                     $found[$target['group']] = (int) $prior->id;
                     break;
@@ -552,9 +571,13 @@ final class DefectContinuityService
         try {
             return [DB::transaction(static fn (): ApparatusDefect => ApparatusDefect::query()->create($attributes)), true];
         } catch (UniqueConstraintViolationException $exception) {
-            $winner = ApparatusDefect::query()
-                ->where('apparatus_id', $apparatus->id)->where('compartment', $entry['compartment'])->where('item', $entry['item'])
-                ->where('resolved', false)->lockForUpdate()->first();
+            // Either partial unique index can be the one that refused: the open row with the same
+            // stable key, else the one with the same names.
+            $open = $this->lockedOpenFor((int) $apparatus->id);
+            $winner = ($entry['item_id'] !== null
+                ? $open->first(static fn (ApparatusDefect $row): bool => $row->item_key === $entry['item_id'] && $row->compartment_key === $entry['compartment_id'])
+                : null)
+                ?? $open->first(static fn (ApparatusDefect $row): bool => DefectNameKey::same($row->compartment, $entry['compartment']) && DefectNameKey::same($row->item, $entry['item']));
             if ($winner === null) {
                 throw $exception;
             }

@@ -65,14 +65,19 @@ final class MemberIssueHistory
             'as_of' => CarbonImmutable::now(HubTimezone::NAME)->toIso8601String(),
             'open' => $this->summaries($apparatus, $open),
             'notes' => $this->notes($apparatus),
-            'closed_count' => ApparatusDefect::query()->where('apparatus_id', $apparatus->id)->where('resolved', true)->count(),
+            'closed_count' => ApparatusDefect::query()->where('apparatus_id', $apparatus->id)->where('resolved', true)->whereNull('duplicate_of_defect_id')->count(),
         ];
     }
 
-    /** @return array{data: list<array<string, mixed>>, next_cursor: string|null} */
+    /**
+     * A merged duplicate is not an issue of its own to a member: its reports, messages and members now
+     * belong to the issue it was merged into, so the closed list leaves it out.
+     *
+     * @return array{data: list<array<string, mixed>>, next_cursor: string|null}
+     */
     public function closed(Apparatus $apparatus, ?string $cursor): array
     {
-        $page = $this->issues($apparatus)->where('resolved', true)->orderByDesc('id')
+        $page = $this->issues($apparatus)->where('resolved', true)->whereNull('apparatus_defects.duplicate_of_defect_id')->orderByDesc('id')
             ->cursorPaginate(self::PAGE_SIZE, ['*'], 'cursor', $cursor);
 
         return [
@@ -143,7 +148,7 @@ final class MemberIssueHistory
                 'action_status' => $status,
                 'action_label' => $status === DefectActionStatus::ACKNOWLEDGED && $defect->getAttribute('responsible_owner') === ApparatusDefect::OWNER_CAPTAIN5
                     ? 'Acknowledged by Captain 5'
-                    : DefectActionStatus::label($status),
+                    : DefectActionStatus::labelFor($status, $defect->resolution_type),
                 'closure_kind' => DefectActionStatus::closureKind($status),
                 'latest_action' => $latest[(int) $defect->id] ?? null,
                 'last_observation' => $defect->latestObservation?->observation,

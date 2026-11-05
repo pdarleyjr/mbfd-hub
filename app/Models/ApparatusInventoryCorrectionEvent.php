@@ -39,6 +39,15 @@ final class ApparatusInventoryCorrectionEvent extends Model
 
     public const LINKED_TO_INSPECTION = 'linked_to_inspection';
 
+    /** Another member reported the same change and was added to this request. */
+    public const JOINED = 'joined';
+
+    /** On a closed duplicate: it was combined into the surviving request. */
+    public const MERGED_INTO = 'merged_into';
+
+    /** On the surviving request: a duplicate was combined into it. */
+    public const MERGED_FROM = 'merged_from';
+
     protected $guarded = ['id'];
 
     protected $casts = ['details' => 'array'];

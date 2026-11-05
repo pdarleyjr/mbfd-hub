@@ -100,7 +100,9 @@ class MyInventoryCorrectionView extends Page implements HasNavigationParent
         // Ownership is re-checked on every render.
         $correction = $this->authorizedCorrection($this->correctionId);
 
-        return ['detail' => app(InventoryCorrectionProjection::class)->memberDetail($correction)];
+        $user = auth('web')->user();
+
+        return ['detail' => app(InventoryCorrectionProjection::class)->memberDetail($correction, $user instanceof User ? $user : null)];
     }
 
     private function authorizedCorrection(int $id): ApparatusInventoryCorrection

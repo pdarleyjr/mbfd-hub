@@ -32,6 +32,8 @@ final class DefectEventNarrative
         'severity_corrected' => 'Severity corrected',
         'cleared_from_captain5' => 'Sent to Logistics (stays open)',
         'returned_to_captain5' => 'Brought back to Captain 5',
+        'merged_into' => 'Merged into another report of the same issue',
+        'duplicates_merged' => 'Duplicate reports merged into this issue',
         'owner_transferred' => 'Moved to another queue',
         'correction_reported' => 'Needs verification: a member reported it fixed',
         'member_resolved' => 'Resolved by a member',
@@ -90,6 +92,23 @@ final class DefectEventNarrative
                 $to = $text('to_severity');
                 if ($from !== null && $to !== null) {
                     $lines[] = 'Severity changed from '.DefectSeverityCorrection::label($from).' to '.DefectSeverityCorrection::label($to).'.';
+                }
+                if (($reason = $text('reason')) !== null) {
+                    $lines[] = 'Reason: '.$reason;
+                }
+                break;
+            case 'merged_into':
+                if (($survivor = $text('survivor_defect_id')) !== null) {
+                    $lines[] = 'Merged into issue #'.$survivor.'. Its reports, messages and members continue there.';
+                }
+                if (($reason = $text('reason')) !== null) {
+                    $lines[] = 'Reason: '.$reason;
+                }
+                break;
+            case 'duplicates_merged':
+                $ids = array_values(array_filter(array_map('intval', (array) ($details['duplicate_defect_ids'] ?? []))));
+                if ($ids !== []) {
+                    $lines[] = 'Merged in: '.implode(', ', array_map(static fn (int $id): string => '#'.$id, $ids)).'.';
                 }
                 if (($reason = $text('reason')) !== null) {
                     $lines[] = 'Reason: '.$reason;

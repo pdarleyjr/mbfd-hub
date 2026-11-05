@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Fleet;
 
 use App\Models\ApparatusInventoryCorrection;
+use App\Models\ApparatusInventoryCorrectionParticipant;
 use App\Models\User;
 
 /**
@@ -41,12 +42,22 @@ final class InventoryCorrectionAccess
         return $user->hasAnyRole(self::PROPAGATION_ROLES);
     }
 
-    /** The member who reported it (by account, or by the linked employee profile). */
+    /**
+     * A member who is part of the request: the one who reported it, or a member who reported the
+     * same change later and was added to it (by account, or by the linked employee profile).
+     */
     public static function owns(?User $user, ApparatusInventoryCorrection $correction): bool
     {
         if (! $user instanceof User || ! $user->isAuthenticationAllowed()) {
             return false;
         }
+
+        return self::reported($user, $correction) || self::participates($user, $correction);
+    }
+
+    /** The member who filed the request. */
+    public static function reported(User $user, ApparatusInventoryCorrection $correction): bool
+    {
         if ($correction->reporter_user_id !== null && (int) $correction->reporter_user_id === (int) $user->getKey()) {
             return true;
         }
@@ -54,5 +65,23 @@ final class InventoryCorrectionAccess
         return $correction->reporter_employee_id !== null
             && $user->employee_profile_id !== null
             && (int) $correction->reporter_employee_id === (int) $user->employee_profile_id;
+    }
+
+    /** Listed as a participant; uses the loaded participants when present, so lists stay one query. */
+    public static function participates(User $user, ApparatusInventoryCorrection $correction): bool
+    {
+        if ($correction->relationLoaded('participants')) {
+            return $correction->participants->contains(static fn (ApparatusInventoryCorrectionParticipant $participant): bool => $participant->isUser($user));
+        }
+
+        return ApparatusInventoryCorrectionParticipant::query()
+            ->where('apparatus_inventory_correction_id', $correction->getKey())
+            ->where(function ($query) use ($user): void {
+                $query->where('user_id', $user->getKey());
+                if ($user->employee_profile_id !== null) {
+                    $query->orWhere('employee_id', $user->employee_profile_id);
+                }
+            })
+            ->exists();
     }
 }

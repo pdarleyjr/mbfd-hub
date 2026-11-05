@@ -14,7 +14,8 @@ final readonly class ConcernBatch
     /**
      * @param  list<array<string, mixed>>  $compartments  pseudo compartments, one per new issue, for recordFindings()
      * @param  list<ApparatusInspectionConcern>  $newIssues  issues that become (or join) a defect through recordFindings()
-     * @param  list<array{row: ApparatusInspectionConcern, defect_id: int}>  $confirmations  issues that add to a defect already on record
+     * @param  list<array{row: ApparatusInspectionConcern, defect_id: int, matched: bool}>  $confirmations  issues that add to a defect already on record
+     *                                                                                                      (matched: found by its names, not picked by the member)
      */
     public function __construct(
         public array $compartments = [],

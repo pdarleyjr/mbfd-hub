@@ -17,7 +17,15 @@
         'applied' => 'Applied to the checklist',
         'rejected' => 'Rejected',
         'reversed' => 'Change reversed',
+        'joined' => 'Same change reported',
+        'merged_into' => 'Combined with another request',
     ];
+    $mine = $detail['reported_by_viewer'] ?? true;
+    $entryTitle = fn (array $entry): string => match (true) {
+        $entry['type'] === 'submitted' && ! ($entry['mine'] ?? true) => 'Reported by another member',
+        $entry['type'] === 'member_replied' && ! ($entry['mine'] ?? true) => 'Another member replied',
+        default => $titles[$entry['type']] ?? 'Update',
+    };
 @endphp
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="employee" data-inventory-correction-member="{{ $detail['id'] }}">
     <div class="hub-insp hub-insp-stack">
@@ -37,15 +45,20 @@
                 <p class="hub-insp-note">Waiting for Logistics to approve or reject it. Keep recording what you see on each Daily Checkout until it is approved.</p>
             @elseif($detail['status'] === 'rejected')
                 <p class="hub-insp-callout" role="status" data-rejected>Logistics rejected this request. The equipment list was not changed.{{ blank($detail['decision_reason']) ? ' They did not add a message.' : '' }} You can report it again from a Daily Checkout if something is still wrong.</p>
+            @elseif($detail['status'] === 'merged' && $detail['combined_into'])
+                <p class="hub-insp-callout" role="status" data-combined>Another member already reported this change, so this request was combined with <a href="{{ \App\Filament\Employee\Pages\MyInventoryCorrectionView::getUrl(['correction' => $detail['combined_into']['id']], panel: 'employee') }}">{{ $detail['combined_into']['reference'] }}</a>. You will be told the decision there.</p>
             @endif
-            @if(filled($detail['decision_reason']))
+            @if(($detail['members'] ?? 1) > 1 && $detail['status'] !== 'merged')
+                <p class="hub-insp-note" data-members="{{ $detail['members'] }}">{{ $detail['members'] }} members reported this change. Logistics decides it once for everyone.</p>
+            @endif
+            @if(filled($detail['decision_reason']) && $detail['status'] !== 'merged')
                 <p class="hub-insp-item__sub">Logistics' note</p>
                 <p class="hub-insp-item__text">{{ $detail['decision_reason'] }}</p>
             @endif
         </section>
 
         <section class="hub-insp-card" aria-labelledby="mic-report">
-            <h3 class="hub-insp-card__title" id="mic-report">What you reported</h3>
+            <h3 class="hub-insp-card__title" id="mic-report">{{ $mine ? 'What you reported' : 'What was reported' }}</h3>
             <dl class="hub-insp-fields">
                 <div><dt>Checklist said</dt><dd>{{ $target['name'] ?? 'Not on the checklist' }}@if(isset($target['expectedQuantity'])) (quantity {{ $target['expectedQuantity'] }})@endif</dd></div>
                 @foreach($detail['proposal'] as $key => $value)
@@ -54,7 +67,7 @@
                 @endforeach
             </dl>
             @if(filled($detail['note']))
-                <p class="hub-insp-item__sub">Your note</p>
+                <p class="hub-insp-item__sub">{{ $mine ? 'Your note' : 'Note from the first member to report it' }}</p>
                 <p class="hub-insp-item__text">{{ $detail['note'] }}</p>
             @endif
             @if($detail['modified'])
@@ -68,7 +81,7 @@
                 @foreach($detail['thread'] as $entry)
                     <li class="hub-insp-timeline__item" data-event="{{ $entry['type'] }}">
                         <div class="hub-insp-timeline__head">
-                            <p class="hub-insp-timeline__title">{{ $titles[$entry['type']] ?? 'Update' }}</p>
+                            <p class="hub-insp-timeline__title">{{ $entryTitle($entry) }}</p>
                         </div>
                         <p class="hub-insp-item__sub">{{ $entry['at']?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }} · {{ $entry['from'] }}</p>
                         @if(filled($entry['body']))
@@ -77,6 +90,7 @@
                     </li>
                 @endforeach
             </ol>
+            @if($detail['can_reply'] ?? true)
             <form class="hub-insp-reply" wire:submit="sendReply">
                 <label for="mic-reply">{{ $detail['needs_reply'] ? 'Your answer to Logistics' : 'Message Logistics about this correction' }}</label>
                 <textarea id="mic-reply" wire:model="reply" rows="3" maxlength="2000"
@@ -86,6 +100,7 @@
                 @enderror
                 <button type="submit" wire:loading.attr="disabled" wire:target="sendReply">Send reply</button>
             </form>
+            @endif
         </section>
     </div>
 </x-filament-panels::page>

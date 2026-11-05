@@ -29,6 +29,9 @@ final class ApparatusInventoryCorrection extends Model
 
     public const STATUS_REVERSED = 'reversed';
 
+    /** Closed because another open request covers the same change; see duplicate_of_correction_id. */
+    public const STATUS_MERGED = 'merged';
+
     /** @var list<string> awaiting a Logistics decision */
     public const OPEN_STATUSES = [self::STATUS_SUBMITTED, self::STATUS_CLARIFICATION];
 
@@ -74,6 +77,7 @@ final class ApparatusInventoryCorrection extends Model
             self::STATUS_APPLIED => 'Approved',
             self::STATUS_REJECTED => 'Rejected',
             self::STATUS_REVERSED => 'Reversed',
+            self::STATUS_MERGED => 'Combined with another request',
         ];
     }
 
@@ -116,6 +120,22 @@ final class ApparatusInventoryCorrection extends Model
     public function events(): HasMany
     {
         return $this->hasMany(ApparatusInventoryCorrectionEvent::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    /** @return HasMany<ApparatusInventoryCorrectionParticipant, $this> */
+    public function participants(): HasMany
+    {
+        return $this->hasMany(ApparatusInventoryCorrectionParticipant::class)->orderBy('id');
+    }
+
+    /**
+     * The open request this one was combined into.
+     *
+     * @return BelongsTo<self, $this>
+     */
+    public function duplicateOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'duplicate_of_correction_id');
     }
 
     /** @return HasMany<ApparatusInventoryChangeSet, $this> */

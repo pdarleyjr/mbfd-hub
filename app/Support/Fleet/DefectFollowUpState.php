@@ -36,6 +36,9 @@ final class DefectFollowUpState
     /** Closed with no action required: no longer open, but nothing was repaired or replaced. */
     public const CLOSED_NO_ACTION = 'closed_no_action';
 
+    /** A duplicate report merged into another issue: neither a repair nor a no-action call; the other issue carries on. */
+    public const MERGED = 'merged';
+
     /** Reviewer classifications that mean an administrator has looked at the issue. */
     private const REVIEWED_IMPACTS = ['non_blocking', 'needs_repair', 'out_of_service'];
 
@@ -53,6 +56,7 @@ final class DefectFollowUpState
             self::TICKET_CANCELLED => 'Service ticket cancelled',
             self::RESOLVED => 'Resolved',
             self::CLOSED_NO_ACTION => DefectNoActionClosure::STATUS_LABEL,
+            self::MERGED => 'Merged into another issue',
         ];
     }
 
@@ -79,6 +83,9 @@ final class DefectFollowUpState
     /** Requires the serviceTicket relation to be loaded for a linked ticket. */
     public static function for(ApparatusDefect $defect): string
     {
+        if ($defect->resolved && $defect->isMergedDuplicate()) {
+            return self::MERGED;
+        }
         if ($defect->isClosedNoAction()) {
             return self::CLOSED_NO_ACTION;
         }
@@ -119,7 +126,8 @@ final class DefectFollowUpState
         return match ($state) {
             self::RESOLVED => $query->where('resolved', true)
                 ->where(fn (Builder $kind) => $kind->whereNull('action_status')->orWhere('action_status', '!=', DefectActionStatus::DISMISSED)),
-            self::CLOSED_NO_ACTION => $query->where('action_status', DefectActionStatus::DISMISSED),
+            self::CLOSED_NO_ACTION => $query->closedNoAction(),
+            self::MERGED => $query->where('resolved', true)->where('resolution_type', DefectActionStatus::MERGED_DUPLICATE),
             self::SERVICE_FOLLOW_UP => $query->where('resolved', false)
                 ->whereHas('serviceTicket', fn (Builder $ticket) => $ticket->scopes('open')),
             self::TICKET_CLOSED => $query->where('resolved', false)

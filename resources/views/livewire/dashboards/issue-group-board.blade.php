@@ -34,7 +34,7 @@
     @endif
 
     @if ($sections === [] && ! $warning)
-        <p class="mbfd-dash-empty">Nothing is open here now. Everything may have been handled already.</p>
+        <p class="mbfd-dash-empty" data-group-empty>Nothing needs action here.@if ($history !== []) Decided items are under History.@endif</p>
     @endif
 
     <div class="mbfd-dash-group__sections">
@@ -134,5 +134,31 @@
                 </ul>
             </section>
         @endforeach
+
+        @if ($history !== [])
+            <details class="mbfd-dash-card mbfd-dash-group__history" data-group-history wire:key="group-history">
+                <summary class="mbfd-dash-card__head mbfd-dash-group__history-head">
+                    <span class="mbfd-dash-card__title">History ({{ count($history) }})</span>
+                    <span class="mbfd-dash-card__note">Resolved, approved and dismissed. Nothing here needs action.</span>
+                </summary>
+                <ul class="mbfd-dash-list" role="list">
+                    @foreach ($history as $row)
+                        <li class="mbfd-dash-group__row mbfd-dash-group__row--closed" wire:key="history-row-{{ $row['ref'] }}">
+                            <span class="mbfd-dash-group__check" aria-hidden="true"><x-filament::icon icon="heroicon-m-check-circle" class="mbfd-dash-group__done-icon" /></span>
+                            <button type="button" class="mbfd-dash-group__open" data-issue-ref="{{ $row['ref'] }}" aria-haspopup="dialog"
+                                x-on:click="$dispatch('dashboard-issue-open', { ref: $el.dataset.issueRef })">
+                                <span class="mbfd-dash-group__line">
+                                    <span class="mbfd-dash-group__name">{{ $row['title'] }}</span>
+                                    <span class="mbfd-dash-group__state" data-history-status>{{ $row['statusLabel'] }}</span>
+                                </span>
+                                <span class="mbfd-dash-group__sub">
+                                    {{ $row['kind'] }}@if (filled($row['summary'])) · {{ $row['summary'] }}@endif @if (filled($row['actor'])) · {{ $row['actor'] }}@endif · <time datetime="{{ $row['timeIso'] }}">{{ $row['time'] }}</time>
+                                </span>
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+            </details>
+        @endif
     </div>
 </div>

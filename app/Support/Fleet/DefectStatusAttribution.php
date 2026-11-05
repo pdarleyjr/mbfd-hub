@@ -139,6 +139,11 @@ final class DefectStatusAttribution
     /** @param  array<int, array{actor: string|null, at: CarbonImmutable|null}>  $attribution */
     public static function labelFor(ApparatusDefect $defect, array $attribution): string
     {
+        // A merged duplicate was neither fixed nor closed as needing nothing: it continues as another issue.
+        if ($defect->isMergedDuplicate()) {
+            return DefectActionStatus::mergedLabel($defect->duplicate_of_defect_id);
+        }
+
         return self::label($defect->action_status, $attribution[(int) $defect->getKey()]['actor'] ?? null);
     }
 }

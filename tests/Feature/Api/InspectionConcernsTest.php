@@ -202,6 +202,47 @@ final class InspectionConcernsTest extends TestCase
         $this->assertDatabaseCount('apparatus_defect_observations', 1);
     }
 
+    public function test_a_later_members_concern_about_the_same_thing_joins_the_open_issue_instead_of_opening_a_second(): void
+    {
+        $first = User::factory()->create();
+        $open = $this->openDefect($this->boat, [
+            'compartment' => 'Port aft locker', 'item' => 'Hinge is cracked', 'compartment_key' => 'member-concerns',
+            'item_key' => 'concern-11111111-1111-4111-8111-111111111111', 'first_reported_by_user_id' => $first->id,
+        ]);
+
+        $this->submit($this->payload([$this->concern('issue', "  hinge IS\tcracked ", 'port aft  LOCKER')]))->assertCreated();
+
+        $this->assertDatabaseCount('apparatus_defects', 1);
+        $this->assertSame($open->id, ApparatusInspectionConcern::query()->sole()->apparatus_defect_id);
+        $event = ApparatusDefectEvent::query()->sole();
+        $this->assertSame('observed_again', $event->event_type);
+        $this->assertTrue($event->details['matched_by_name']);
+        $this->assertSame('confirmed_again', ApparatusDefectObservation::query()->sole()->observation);
+        $this->assertDatabaseHas('apparatus_defect_participants', ['apparatus_defect_id' => $open->id, 'user_id' => $this->member->id, 'enrollment_source' => 'confirmed']);
+        $this->assertSame($first->id, $open->fresh()->first_reported_by_user_id);
+    }
+
+    public function test_a_concern_joins_an_open_issue_only_in_the_same_location_or_when_both_have_none(): void
+    {
+        $radio = $this->openDefect($this->boat, ['compartment' => 'Cab', 'item' => 'Portable radio']);
+        $unlocated = $this->openDefect($this->boat, ['compartment' => InspectionConcernRecorder::DEFAULT_LOCATION, 'item' => 'Hinge loose']);
+
+        $this->submit($this->payload([
+            $this->concern('issue', 'PORTABLE RADIO', ' cab'),
+            $this->concern('issue', 'portable radio', null),
+            $this->concern('issue', 'hinge  LOOSE', null),
+            $this->concern('issue', 'Hinge loose', 'Port locker'),
+        ]))->assertCreated();
+
+        $links = ApparatusInspectionConcern::query()->orderBy('id')->pluck('apparatus_defect_id')->all();
+        $this->assertSame($radio->id, $links[0]);
+        $this->assertSame($unlocated->id, $links[2]);
+        // No location never joins a located issue, and a location never joins an unlocated one.
+        $this->assertNotContains($links[1], [$radio->id, $unlocated->id]);
+        $this->assertNotContains($links[3], [$radio->id, $unlocated->id]);
+        $this->assertSame(4, ApparatusDefect::query()->count());
+    }
+
     public function test_a_photo_is_stored_like_a_defect_photo_never_as_base64_and_is_served_with_authorization(): void
     {
         $concern = $this->concern('issue', 'Cracked housing', 'Console', null, self::PIXEL);
