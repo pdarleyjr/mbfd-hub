@@ -2,12 +2,14 @@
     One dashboard row. The whole row is a single control, so there is one tab stop per row: a <button>
     that opens the action panel for one issue, or a link to the page for all of one item's issues
     ($row['href'], from IssuePresenter::groupRow()). Every value is escaped. $compact drops the detail line.
+    A notice ($row['notice']) is information only: no priority badge, its own tint, and the panel it opens has no actions.
 --}}
 @php
     $compact = $compact ?? false;
     $isRequest = $row['lane'] === \App\Services\Dashboards\DashboardSnapshot::LANE_REQUESTS;
+    $isNotice = (bool) ($row['notice'] ?? false);
 @endphp
-<li class="mbfd-dash-row" wire:key="row-{{ $scope ?? 'list' }}-{{ $row['ref'] }}" @if ($isRequest) data-request-row @endif>
+<li class="mbfd-dash-row" wire:key="row-{{ $scope ?? 'list' }}-{{ $row['ref'] }}" @if ($isRequest) data-request-row @endif @if ($isNotice) data-notice-row @endif>
     @if (filled($row['href'] ?? null))
         <a href="{{ $row['href'] }}" class="mbfd-dash-row__button @if ($compact) is-compact @endif" data-group-key="{{ $row['ref'] }}">
     @else
@@ -34,7 +36,12 @@
                 @if ($row['subject'])
                     <span class="mbfd-dash-row__subject">{{ $row['subject'] }}</span>
                 @endif
-                <span class="mbfd-dash-badge" data-severity="{{ $row['severity'] }}">{{ $row['severityLabel'] }}<span class="sr-only"> priority</span></span>
+                @if ($isNotice)
+                    <span class="mbfd-dash-badge" data-notice>Notice</span>
+                    <span class="mbfd-dash-badge" data-plain>{{ $row['statusLabel'] }}</span>
+                @else
+                    <span class="mbfd-dash-badge" data-severity="{{ $row['severity'] }}">{{ $row['severityLabel'] }}<span class="sr-only"> priority</span></span>
+                @endif
                 @if ($row['stage'] === 'resolved')
                     <span class="mbfd-dash-badge" data-stage="resolved">{{ $row['statusLabel'] }}</span>
                 @elseif ($isRequest)

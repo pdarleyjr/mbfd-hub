@@ -15,11 +15,13 @@ final class IssuePresenter
 {
     public const THUMB_SIZE = 88;
 
+    private const NOTICE_ICON = 'heroicon-o-clipboard-document-check';
+
     /**
      * @return array{ref: string, subject: ?string, title: string, summary: ?string, severity: string, severityLabel: string,
      *     stage: string, statusLabel: string, time: string, timeIso: string, actor: ?string, initials: ?string,
      *     image: ?string, image2x: ?string, imageKind: ?string, alt: string, icon: string, cta: string, lane: string, age: ?string,
-     *     memberReplied: bool}
+     *     memberReplied: bool, notice: bool}
      */
     public static function row(DashboardIssue $issue, string $lane): array
     {
@@ -47,12 +49,14 @@ final class IssuePresenter
             'image2x' => $image === null ? null : DashboardImages::url($issue->imageKey, self::THUMB_SIZE * 2),
             'imageKind' => $image === null ? null : DashboardImages::kind($issue->imageKey),
             'alt' => $issue->subject ?? $issue->title,
-            'icon' => self::fallbackIcon($issue->imageKey, $lane),
+            'icon' => $issue->isNotice() ? self::NOTICE_ICON : self::fallbackIcon($issue->imageKey, $lane),
             'cta' => self::cta($issue->stage),
             'lane' => $lane,
             'age' => $age,
             // Set by a source's member-reply hook (Support\RecentlyClosedSource::whereMemberReplied()).
             'memberReplied' => $issue->isOpen() && in_array('member_replied', $issue->tags, true),
+            // Information only (DashboardIssue::STAGE_NOTICE): shown without a priority badge and never counted.
+            'notice' => $issue->isNotice(),
         ];
     }
 
@@ -156,7 +160,7 @@ final class IssuePresenter
         return match ($stage) {
             'awaiting_response' => 'Review',
             'in_progress' => 'Update',
-            'resolved' => 'View',
+            'resolved', DashboardIssue::STAGE_NOTICE => 'View',
             default => 'Open',
         };
     }

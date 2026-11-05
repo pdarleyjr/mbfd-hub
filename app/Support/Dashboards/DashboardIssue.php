@@ -16,12 +16,18 @@ use Carbon\CarbonImmutable;
 final readonly class DashboardIssue
 {
     /**
+     * Information only, with nothing to act on: never open, never in a stat or a stage queue, listed after the open
+     * items, and it drops off by itself (e.g. a take-home inspection, approved on submission).
+     */
+    public const STAGE_NOTICE = 'notice';
+
+    /**
      * @param  string  $type  stable source key, e.g. "apparatus_defect" (IssueSource::type()).
      * @param  string  $id  source primary key as a string.
      * @param  'high'|'medium'|'low'  $severity
      * @param  string  $status  the source's own status value (never a synthetic status).
      * @param  string  $statusLabel  human label for that status.
-     * @param  'awaiting_response'|'in_progress'|'resolved'|'other'  $stage  coarse bucket for queues/filters, derived from the source status.
+     * @param  'awaiting_response'|'in_progress'|'resolved'|'other'|'notice'  $stage  coarse bucket for queues/filters, derived from the source status (see STAGE_NOTICE).
      * @param  list<string>  $tags  filter keys this row belongs to, e.g. ["rescue"], ["engine_puc"], ["marine"], ["facilities"], ["supplies"], ["access_it"].
      * @param  string|null  $subject  apparatus designation ("Rescue 2") or station name ("Station 1").
      * @param  string|null  $imageKey  key understood by DashboardImages (never a URL from user input).
@@ -62,6 +68,12 @@ final readonly class DashboardIssue
     public function isOpen(): bool
     {
         return in_array($this->stage, ['awaiting_response', 'in_progress'], true);
+    }
+
+    /** Information only: no workflow, no bulk action, not counted. */
+    public function isNotice(): bool
+    {
+        return $this->stage === self::STAGE_NOTICE;
     }
 
     /** Stable identity used in URLs, wire:key and dedupe: "<type>:<id>". */

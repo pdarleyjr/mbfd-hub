@@ -245,7 +245,7 @@ final class LatestActivityFeedTest extends TestCase
         $this->assertStringNotContainsString('other rig', implode(' ', array_map(static fn (OperationsActivityEvent $e): string => $e->summary, $viewer)));
     }
 
-    public function test_captain_5_owned_issues_carry_the_tag_and_never_need_admin_action(): void
+    public function test_captain_5_owned_medical_issues_stay_off_the_admin_feed(): void
     {
         $captain5 = $this->defectIn('Stretcher battery', 'captain5');
         $logistics = $this->defectIn('Fog nozzle', 'logistics');
@@ -262,18 +262,15 @@ final class LatestActivityFeedTest extends TestCase
         $this->assertNull($nozzle->ownerTag);
         $this->assertTrue($nozzle->actionRequired);
 
-        $stretcher = $byKey['New issue|Missing: Stretcher battery'];
-        $this->assertSame('Captain 5', $stretcher->ownerTag);
-        $this->assertFalse($stretcher->actionRequired);
-
-        $message = $byKey['Member message|Stretcher battery: Battery is dead again'];
-        $this->assertSame('Captain 5', $message->ownerTag);
-        $this->assertFalse($message->actionRequired);
+        // Owner rule 2026-11-05: medical submissions stay with Captain 5, never on the admin dashboard.
+        $this->assertArrayNotHasKey('New issue|Missing: Stretcher battery', $byKey);
+        $this->assertArrayNotHasKey('Member message|Stretcher battery: Battery is dead again', $byKey);
     }
 
     public function test_an_ownership_move_is_listed_with_where_it_went(): void
     {
-        $defect = $this->defectIn('Stretcher battery', 'captain5');
+        // Sent to Captain 5, then brought back to Logistics: Logistics owns it now, so both moves show.
+        $defect = $this->defectIn('Stretcher battery', 'logistics');
         $this->defectEvent($defect, 'owner_transferred', ['actor_user_id' => null, 'details' => ['from' => 'logistics', 'to' => 'captain5', 'basis' => 'medical_item']], 4);
         $this->defectEvent($defect, 'owner_transferred', ['details' => ['from' => 'captain5', 'to' => 'logistics', 'basis' => 'manual']], 3);
 

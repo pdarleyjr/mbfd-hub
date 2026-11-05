@@ -21,7 +21,7 @@ final readonly class DashboardSnapshot
 
     public const LANE_MESSAGES = 'messages';
 
-    /** What members asked for (uniforms, PPE, medical supplies, narcotics checks): the Member Requests board and its Overview lane. */
+    /** What members asked for (uniforms, PPE and equipment): the Member Requests board and its Overview lane. */
     public const LANE_REQUESTS = 'requests';
 
     /**

@@ -715,6 +715,13 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
 .mbfd-dash-row__age { color: rgb(var(--hub-warning-strong)); font-weight: 700; font-variant-numeric: tabular-nums; }
 .mbfd-dash-badge[data-member-replied] { background: rgb(var(--hub-domain-personnel) / .1); border-color: rgb(var(--hub-domain-personnel) / .35); color: rgb(var(--hub-domain-personnel)); }
 
+/* Notices (e.g. a take-home inspection, approved on submission): information only. A quiet info tint and edge, no
+   priority colour, and a plain "View" label instead of an action. */
+.mbfd-dash-badge[data-notice] { background: rgb(var(--hub-info-bg)); border-color: rgb(var(--hub-info-border)); color: rgb(var(--hub-info)); }
+.mbfd-dash-row[data-notice-row] .mbfd-dash-row__button { box-shadow: inset 3px 0 0 rgb(var(--hub-info-border)); }
+.mbfd-dash-row[data-notice-row] .mbfd-dash-row__button:not(:hover) { background: rgb(var(--hub-info-bg) / .35); }
+.mbfd-dash-row[data-notice-row] .mbfd-dash-row__cta { border-color: rgb(var(--hub-border)); color: rgb(var(--hub-ink-secondary)); }
+
 /* ---------- Action panel (drawer / sheet) ---------- */
 
 .mbfd-dash-panel-backdrop {
