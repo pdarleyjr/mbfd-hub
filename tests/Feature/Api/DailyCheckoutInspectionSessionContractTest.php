@@ -180,7 +180,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
             'fb6-port-engine-voltage' => 13.8, 'fb6-star-engine-voltage' => 13.7,
             'fb6-port-engine-temperature' => 182, 'fb6-star-engine-temperature' => 180,
             'fb6-fuel-level' => 75, 'fb6-scba-id-1' => 'A-101', 'fb6-scuba-ids' => 'T-1, T-2',
-            'fb6-driver-radio-number' => '6101', 'fb6-driver-radio-last-four-serial' => '4821',
+            'fb6-driver-radio-number' => '6101',
         ];
         $payload['field_values'] = array_map(static fn (array $field): array => array_key_exists($field['id'], $entered)
             ? ['id' => $field['id'], 'value' => $entered[$field['id']]]

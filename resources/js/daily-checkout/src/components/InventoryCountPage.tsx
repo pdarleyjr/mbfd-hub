@@ -428,6 +428,7 @@ export default function InventoryCountPage({
                       {getRequestStatusBadge(request.status)}
                     </div>
                     <p className="text-sm text-gray-700 mb-2">{request.request_text}</p>
+                    {request.ai_response && <p className="mb-2 text-sm text-gray-700"><strong>{request.ai_response.sender}:</strong> {request.ai_response.text}</p>}
                     {request.public_response && <p className="mb-2 text-sm text-hub-blue"><strong>Support Services:</strong> {request.public_response}</p>}
                     <div className="text-xs text-gray-500">
                       {new Date(request.created_at).toLocaleString('en-US', { timeZone: HUB_TIMEZONE, dateStyle: 'short', timeStyle: 'short' })}

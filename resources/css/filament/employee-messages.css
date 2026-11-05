@@ -409,8 +409,8 @@
 
 /* Received: gray card. Sent by the viewer: branded blue tint. Both have a visible edge. */
 .emsg-bubble {
-    max-width: min(640px, 88%);
-    padding: 10px 14px;
+    max-width: min(720px, 94%);
+    padding: 12px 16px;
     color: rgb(var(--hub2-n-900));
     background: rgb(var(--hub2-n-100));
     border: 1px solid rgb(var(--hub2-n-400) / .55);
@@ -445,10 +445,30 @@
     color: rgb(var(--hub2-action));
 }
 
+/* AI Response: a third voice. Always on the received side, dashed edge so it never reads as a team reply. */
+.emsg-bubble--assistant {
+    align-self: flex-start;
+    background: transparent;
+    border-style: dashed;
+    border-color: rgb(var(--hub2-n-500) / .7);
+    border-radius: 14px 14px 14px 4px;
+}
+
+.emsg-bubble--assistant .emsg-bubble__side {
+    color: rgb(var(--hub2-n-600));
+    font-weight: 600;
+    letter-spacing: .01em;
+}
+
+.emsg-bubble--assistant .emsg-bubble__body {
+    color: rgb(var(--hub2-n-800));
+}
+
 .emsg-bubble__body {
     margin: 0;
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 16px;
+    line-height: 1.55;
+    max-width: 70ch;
     color: rgb(var(--hub2-n-900));
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -638,6 +658,7 @@
 .dark .emsg-thread-scroll { background: rgb(var(--hub2-n-900)); }
 .dark .emsg-bubble { background: rgb(var(--hub2-n-800)); border-color: rgb(var(--hub2-n-500)); }
 .dark .emsg-bubble--mine { background: rgb(var(--hub2-action) / .35); }
+.dark .emsg-bubble--assistant { background: transparent; }
 .dark .emsg-input,
 .dark .emsg-textarea,
 .dark .emsg-search { background: rgb(var(--hub2-n-900)); border-color: rgb(var(--hub2-n-500)); }
@@ -683,3 +704,207 @@
         display: none;
     }
 }
+
+/* Long message bodies: collapsed with an explicit way to read everything. */
+.emsg-bubble__body--clamped {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 8;
+    -webkit-box-orient: vertical;
+}
+
+.emsg-showmore {
+    min-height: 32px;
+    margin-top: 6px;
+    padding: 0 2px;
+    font-size: 13px;
+    font-weight: 700;
+    color: rgb(var(--hub2-action));
+    text-decoration: underline;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+.emsg-showmore:focus-visible {
+    outline: 2px solid rgb(var(--hub2-focus));
+    outline-offset: 2px;
+}
+
+/*
+ * Bunker gear cleaning: the one reason that must never blend in. Amber accent bar + tinted row +
+ * shield icon + bold text label (not color-only). Contrast: dark amber text on a pale amber chip
+ * in light mode, pale amber on deep brown in dark mode.
+ */
+.emsg-row--bunker,
+.emsg-row--bunker:hover {
+    background: #fff4e0;
+    box-shadow: inset 6px 0 0 #d97706;
+}
+
+.emsg-row--bunker.emsg-row--unread {
+    background: #ffe9c2;
+}
+
+.emsg-row--bunker[aria-current="true"] {
+    background: #ffe3b0;
+    box-shadow: inset 6px 0 0 #b45309;
+}
+
+.emsg-bunker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 3px 10px;
+    font-size: 12px;
+    color: #7c2d12;
+    background: #fed7aa;
+    border: 2px solid #c2410c;
+    border-radius: 999px;
+}
+
+.emsg-bunker__label {
+    font-weight: 800;
+    letter-spacing: .01em;
+}
+
+.emsg-bunker__note {
+    font-weight: 600;
+}
+
+.emsg-bunker--summary {
+    margin-top: 0;
+}
+
+.dark .emsg-row--bunker,
+.dark .emsg-row--bunker:hover {
+    background: #3a2208;
+    box-shadow: inset 6px 0 0 #fbbf24;
+}
+
+.dark .emsg-row--bunker.emsg-row--unread {
+    background: #4a2b0a;
+}
+
+.dark .emsg-row--bunker[aria-current="true"] {
+    background: #523009;
+}
+
+.dark .emsg-bunker {
+    color: #ffedd5;
+    background: #7c2d12;
+    border-color: #fbbf24;
+}
+
+.dark .emsg-showmore {
+    color: rgb(var(--hub2-n-0));
+}
+
+.emsg-filter--bunker {
+    color: #7c2d12;
+    background: #ffedd5;
+    border-color: #c2410c;
+    font-weight: 700;
+}
+
+.emsg-filter--bunker[aria-pressed="true"] {
+    color: #fff;
+    background: #c2410c;
+    border-color: #7c2d12;
+}
+
+.dark .emsg-filter--bunker {
+    color: #ffedd5;
+    background: #7c2d12;
+    border-color: #fbbf24;
+}
+
+/* ---- Shared readable message body + card anatomy (Command Communications page) ---- */
+.mbody__text {
+    max-width: 70ch;
+    font-size: 16px;
+    line-height: 1.55;
+    color: rgb(var(--hub2-n-900));
+    overflow-wrap: anywhere;
+}
+
+.mbody__text p + p {
+    margin-top: .75em;
+}
+
+.mbody__text--clamped {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 6;
+    -webkit-box-orient: vertical;
+}
+
+.mbody__toggle {
+    min-height: 44px;
+    padding: 0 2px;
+    font-size: 14px;
+    font-weight: 700;
+    color: rgb(var(--hub2-action));
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+.mbody__toggle:focus-visible {
+    outline: 2px solid rgb(var(--hub2-focus));
+    outline-offset: 2px;
+}
+
+.mbody-card {
+    padding: 16px;
+    background: #fff;
+    border: 1px solid rgb(var(--hub2-n-400) / .55);
+    border-left: 5px solid rgb(var(--hub2-n-400));
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgb(15 23 42 / .06);
+}
+
+.mbody-card--captain5 { border-left-color: #0e7490; }
+.mbody-card--administration { border-left-color: rgb(var(--hub2-action)); }
+.mbody-card--new { background: rgb(var(--hub2-action) / .05); box-shadow: 0 0 0 2px rgb(var(--hub2-action) / .25); }
+.mbody-card--pinned { border-top: 3px solid #d97706; }
+
+.mbody-subject {
+    margin-top: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: rgb(var(--hub2-n-900));
+}
+
+.mbody-replies {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0 0 12px;
+    padding-left: 14px;
+    border-left: 3px solid rgb(var(--hub2-n-400) / .7);
+}
+
+.mbody-reply {
+    padding: 10px 12px;
+    background: rgb(var(--hub2-n-50));
+    border-radius: 10px;
+}
+
+.mbody-exact {
+    display: none;
+}
+
+@media (min-width: 640px) {
+    .mbody-exact { display: inline; }
+}
+
+.dark .mbody-card { background: rgb(var(--hub2-n-800)); border-color: rgb(var(--hub2-n-500)); }
+.dark .mbody-card--new { background: rgb(var(--hub2-action) / .2); }
+.dark .mbody-reply { background: rgb(var(--hub2-n-900)); }
+.dark .mbody__text,
+.dark .mbody-subject { color: rgb(var(--hub2-n-0)); }
+.dark .mbody__toggle { color: rgb(var(--hub2-n-0)); }

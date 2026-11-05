@@ -27,7 +27,7 @@ final class Captain5IssueLifecycleTest extends TestCase
     use BuildsCaptain5World;
     use RefreshDatabase;
 
-    private const RESCUE_ITEM = 'compartment_c-item-3'; // Bolt Cutters (Rescue: always in scope)
+    private const RESCUE_ITEM = 'patient_compartment-item-5'; // LifePak 15 (Rescue medical: Captain 5's)
 
     private const LIFEPAK_E2 = 'comp_r1-item-1';         // Engine 2 Life-Pak (medical)
 

@@ -24,6 +24,7 @@ const ALLOWED = {
   'resources/views/filament/employee/pages/my-bid-certifications.blade.php': 'external app: Bid console',
   'resources/js/daily-checkout/src/components/Command300Page.tsx': 'external app: Command Board',
   'resources/views/training-roster/launch.blade.php': 'training kiosk: classroom links go to the kiosk host and are shared with participants',
+  'resources/views/unit-status/partials/unit-profile.blade.php': 'external site: the official PulsePoint page for a call (web.pulsepoint.org)',
 
   // User-written content: only links to other sites open apart; links to the Hub stay in the window.
   'app/Support/SafeLinkifier.php': 'user text: outside links only (Hub hosts stay in the window)',

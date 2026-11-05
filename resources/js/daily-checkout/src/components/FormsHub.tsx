@@ -38,6 +38,34 @@ export default function FormsHub() {
           </div>
         </Link>
 
+        {/* Stretcher problem on a unit; goes to Captain 5 */}
+        <Link
+          to="/forms-hub/stretcher-issue"
+          className="group rounded-xl bg-hub-surface p-6 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+        >
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-hub-blue/10 text-hub-blue transition-colors group-hover:bg-hub-blue/10">
+                <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h2 className="mb-2 text-xl font-semibold text-hub-ink font-heading">Report stretcher issue</h2>
+              <p className="mb-4 text-sm text-hub-ink-secondary">
+                Tell Captain 5 about a problem with a stretcher on a unit.
+              </p>
+              <span className="inline-flex min-h-11 items-center font-semibold text-hub-blue group-hover:text-hub-blue-strong">
+                Report Issue
+                <svg className="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+            </div>
+          </div>
+        </Link>
+
         {/* Card B: Station Inventory Form */}
         <Link
           to="/forms-hub/station-inventory"

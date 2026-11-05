@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { BOARD_BASE, handleBoardRoute, newBoardServer } from './support/command300-board';
 import {
   SHIFT_BASE, UNSET_DUTY, chiefOnDuty, handleShiftRoute, newShiftServer, rosterChief, rosterUnknown, seatAwaiting,
   type ShiftServer,
@@ -15,17 +16,9 @@ const stations = [1, 2].map((number) => ({
   station_number: number, is_active: true, created_at: '2026-08-31T00:00:00.000000Z', updated_at: '2026-08-31T00:00:00.000000Z',
 }));
 
-const overview = {
-  generated_at: new Date().toISOString(),
-  total: stations.length,
-  stations: stations.map((station) => ({
-    ...station, apparatus_count: 0, open_defects: 0, open_service_tickets: 0, last_checkout_at: null,
-    daily_checkout: { required_total: 0, completed: 0, not_checked: 0, review_pending: 0, out_of_service: 0, completion_percent: null },
-    apparatuses: [],
-  })),
-};
 
 async function mockApi(page: Page, shift: ShiftServer): Promise<void> {
+  const board = newBoardServer();
   await page.route('**/images/**', (route) => route.fulfill({ status: 204 }));
   await page.route('**/favicon*', (route) => route.fulfill({ status: 204 }));
   await page.route('**/api/**', async (route) => {
@@ -44,7 +37,7 @@ async function mockApi(page: Page, shift: ShiftServer): Promise<void> {
     }
     if (pathname.startsWith(SHIFT_BASE)) return handleShiftRoute(route, pathname, shift);
     if (pathname === '/api/public/stations') return route.fulfill({ json: { stations } });
-    if (pathname === '/api/public/command/overview') return route.fulfill({ json: overview });
+    if (pathname.startsWith(BOARD_BASE)) return void await handleBoardRoute(route, pathname, board);
     if (pathname === '/api/command-communications/posts') return route.fulfill({ json: { data: [], pinned: [], next_before: null, unread_count: 0 } });
     if (pathname === '/api/command-communications/summary') return route.fulfill({ json: { unread_count: 0, latest_activity_at: null } });
     if (pathname === '/api/command-communications/read') return route.fulfill({ json: { unread_count: 0, last_read_at: new Date().toISOString() } });

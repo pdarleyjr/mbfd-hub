@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { StationCheckoutDetail, StationCheckoutRow } from '../../types';
 import { ApiClient, ApiRequestError, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../../utils/api';
 import { formatHubDate } from '../../../../shared/timezone.ts';
@@ -12,8 +12,21 @@ const ITEM_TONE: Record<string, Tone> = { present: 'success', missing: 'danger',
 const needsAttention = (status: string): boolean => (ITEM_TONE[status.toLowerCase()] ?? 'neutral') === 'danger';
 
 /** The whole of one submitted checkout, read only. Compartments with a problem start open; the rest open on a tap. */
-export default function CheckoutSheet({ stationId, row, onClose, returnFocusTo }: { stationId: number; row: StationCheckoutRow | null; onClose: () => void; returnFocusTo: () => HTMLElement | null }) {
-  const [detail, setDetail] = useState<StationCheckoutDetail | null>(null);
+interface CheckoutSheetProps<D extends StationCheckoutDetail> {
+  stationId: number;
+  row: StationCheckoutRow | null;
+  onClose: () => void;
+  returnFocusTo: () => HTMLElement | null;
+  /** Stack over another sheet (the 300 station drill-in). */
+  layer?: 0 | 1;
+  /** Where the checkout comes from; defaults to the member station route. The 300 page passes its own gated route. */
+  load?: (stationId: number, checkoutId: number) => Promise<D>;
+  /** Extra read-only content under the checkout facts, for example that vehicle's open issues. */
+  renderExtra?: (detail: D) => ReactNode;
+}
+
+export default function CheckoutSheet<D extends StationCheckoutDetail = StationCheckoutDetail>({ stationId, row, onClose, returnFocusTo, layer = 0, load, renderExtra }: CheckoutSheetProps<D>) {
+  const [detail, setDetail] = useState<D | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -25,7 +38,7 @@ export default function CheckoutSheet({ stationId, row, onClose, returnFocusTo }
     setUnavailable(false);
     if (checkoutId === null) return undefined;
     let active = true;
-    ApiClient.getStationCheckout(stationId, checkoutId)
+    (load ?? (ApiClient.getStationCheckout as unknown as (stationId: number, checkoutId: number) => Promise<D>))(stationId, checkoutId)
       .then((loaded) => { if (active) setDetail(loaded); })
       .catch((reason: unknown) => {
         if (!active) return;
@@ -34,14 +47,14 @@ export default function CheckoutSheet({ stationId, row, onClose, returnFocusTo }
         setError(reason instanceof Error ? reason.message : 'The checkout could not be loaded.');
       });
     return () => { active = false; };
-  }, [stationId, checkoutId, attempt]);
+  }, [stationId, checkoutId, attempt, load]);
 
   const issues = detail?.compartments.reduce((total, compartment) => total + compartment.items.filter((item) => needsAttention(item.status)).length, 0) ?? 0;
   const itemCount = detail?.compartments.reduce((total, compartment) => total + compartment.items.length, 0) ?? 0;
   const label = row ? unitLabel(row) : '';
 
   return (
-    <Sheet open={row !== null} onClose={onClose} returnFocusTo={returnFocusTo} testId="station-checkout-sheet" title={row ? `${row.designation} checkout` : 'Checkout'} description={label || undefined}>
+    <Sheet open={row !== null} layer={layer} onClose={onClose} returnFocusTo={returnFocusTo} testId="station-checkout-sheet" title={row ? `${row.designation} checkout` : 'Checkout'} description={label || undefined}>
       {row && (
         <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
           <Fact label="Submitted by" value={row.submitted_by} wide />
@@ -55,6 +68,7 @@ export default function CheckoutSheet({ stationId, row, onClose, returnFocusTo }
       {!detail && !error && !unavailable && <div role="status" aria-label="Loading checkout" className="space-y-3"><span className="hub-skeleton block !h-8 w-2/3" /><span className="hub-skeleton block !h-40 w-full" /></div>}
       {unavailable && <p className="hub-callout p-4 text-sm" role="alert">This checkout is no longer available here.</p>}
       {error && <LoadError title="The checkout could not be loaded" message={error} onRetry={() => setAttempt((value) => value + 1)} />}
+      {detail && renderExtra?.(detail)}
       {detail && (
         <div className="space-y-2" data-testid="station-checkout-detail">
           <p className="mb-3 text-sm font-semibold tabular-nums text-hub-ink">{itemCount} {itemCount === 1 ? 'item' : 'items'} checked, {issues === 0 ? 'no problems reported' : `${issues} ${issues === 1 ? 'problem' : 'problems'} reported`}</p>

@@ -125,7 +125,7 @@ final class NextShiftRosterTest extends TestCase
     public function test_a_new_finding_alerts_the_captain_the_roster_says_is_working(): void
     {
         $crew = $this->officer('Firefighter', 'Crew Member');
-        $this->reportMissing($this->rescue, $crew, [$this->firstItemId($this->rescue)]);
+        $this->reportMissing($this->rescue, $crew, ['patient_compartment-item-5']); // LifePak 15: Captain 5's (a Rescue's lights are Logistics')
 
         $notified = DB::table('inspection_notification_deliveries')->where('event_key', 'like', 'captain5:%')
             ->pluck('recipient_user_id')->map(static fn ($id): int => (int) $id)->all();

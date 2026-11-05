@@ -11,6 +11,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusInspectionReviewEvent;
+use App\Services\AiAutomation\AiIntake;
 use App\Services\Captain5\Captain5Notifier;
 use App\Services\Defects\DefectContinuityService;
 use App\Services\Defects\FindingsResult;
@@ -79,6 +80,7 @@ final class ApparatusInspectionProcessingService
         $batch = $concerns->begin($inspection, $apparatus, $evidence['concerns'] ?? []);
         $findings = app(DefectContinuityService::class)->recordFindings($inspection, $apparatus, [...$observations, ...$batch->compartments], $definitions, $evidence);
         $findings = $concerns->finish($batch, $inspection, $apparatus, $findings);
+        $this->projectTriage($findings);
         $this->carryEquipmentNumbers($inspection, $apparatus, $checklist, $evidence);
 
         $this->recordNonMeterHolds($inspection, $apparatus, $findings);
@@ -92,7 +94,32 @@ final class ApparatusInspectionProcessingService
             if (filled($apparatus->snipeit_asset_id)) {
                 AuditEquipmentAfterInspection::dispatch((int) $inspection->id, (int) $apparatus->id)->delay(now()->addSeconds(5));
             }
+            // AI Response receipt (docs/ai-response-automation.md): never throws, does nothing while the switch is OFF.
+            AiIntake::record('apparatus_inspection', (int) $inspection->id);
         });
+    }
+
+    /**
+     * Staff triage level (Low, Medium, High) for the issues this checkout created or confirmed. Done now, before the
+     * reviewer alerts below are filtered by level. It reads the equipment catalog and sends nothing; the savepoint
+     * keeps a problem here from costing the member their checkout.
+     */
+    private function projectTriage(FindingsResult $findings): void
+    {
+        $ids = array_values(array_unique([...$findings->newDefectIds, ...$findings->confirmedDefectIds, ...$findings->significantNewOrEscalatedDefectIds]));
+        if ($ids === []) {
+            return;
+        }
+        try {
+            DB::transaction(function () use ($ids): void {
+                $projector = app(\App\Services\SupportTriage\TriageProjector::class);
+                foreach (ApparatusDefect::query()->whereIn('id', $ids)->get() as $defect) {
+                    $projector->refreshDefect($defect);
+                }
+            });
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**

@@ -6,6 +6,7 @@ namespace App\Services\Training\CrewPlanner;
 
 use App\Models\Training\TrainingCourse;
 use App\Models\User;
+use App\Services\Personnel\Promotions\PromotionalDirectory;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -32,12 +33,21 @@ final class TrainingPlannerCandidateService
             'assignment_category' => ['nullable', Rule::in(['rescue', 'combat', 'day_other', 'unverified'])],
             'published_assignment' => ['nullable', 'string', 'max:255'],
             'de_bid' => ['nullable', 'boolean'], 'floating' => ['nullable', 'boolean'],
+            // "Show only" groups: a member in ANY ticked group is shown (promotional list in effect, Driver Engineer bid).
+            'groups' => ['nullable', 'array', 'max:2'], 'groups.*' => ['string', Rule::in(['promotional', 'de_bid'])],
             'shift' => ['nullable', Rule::in(['A Shift', 'B Shift', 'C Shift', 'D Shift', 'Days'])],
             'search' => ['nullable', 'string', 'max:100'], 'day_station' => ['nullable', 'string', 'max:100'],
             'day_apparatus' => ['nullable', 'string', 'max:100'], 'day_seat_rank' => ['nullable', 'string', 'max:100'],
             'slot_start_at' => ['nullable', 'date', 'required_with:slot_end_at'],
             'slot_end_at' => ['nullable', 'date', 'required_with:slot_start_at', 'after:slot_start_at'],
         ])->validate();
+        // Promotional standing is the same for every row of this request: one query, then a lookup per person.
+        $promotional = app(PromotionalDirectory::class)->eligibleSummaries();
+        foreach ($snapshot['rows'] as $index => $person) {
+            $label = $promotional[(int) ($person['employee_profile_id'] ?? 0)] ?? null;
+            $snapshot['rows'][$index]['promotional'] = $label;
+            $snapshot['rows'][$index]['is_promotional'] = $label !== null;
+        }
         $identities = [];
         foreach ($snapshot['rows'] as $person) {
             // Prefix preserves exact string identity even for numeric-looking identifiers.
@@ -120,6 +130,13 @@ final class TrainingPlannerCandidateService
             if ($row[$field] !== $expected) {
                 return false;
             }
+        }
+        $groups = array_values(array_unique((array) ($filters['groups'] ?? [])));
+        if ($groups !== [] && ! (
+            (in_array('promotional', $groups, true) && ! empty($row['is_promotional']))
+            || (in_array('de_bid', $groups, true) && ! empty($row['assignment_verified']) && ! empty($row['is_de_bid']))
+        )) {
+            return false;
         }
         if (filled($filters['search'] ?? null) && ! str_contains(mb_strtolower($row['name'].' '.$row['employee_id']), mb_strtolower(trim($filters['search'])))) {
             return false;

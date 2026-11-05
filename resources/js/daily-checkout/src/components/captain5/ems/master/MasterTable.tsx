@@ -1,4 +1,5 @@
 import OnHandCell from './OnHandCell';
+import LevelTag, { LEVEL_ACCENT, LEVEL_ROW } from './StockLevelTag';
 import { shelfName } from './logic';
 import type { MasterItem } from './types';
 
@@ -53,13 +54,14 @@ export default function MasterTable({ items, caption, shelfLinks = false, hrefFo
         <tbody>
           {items.map((item) => (
             <tr key={item.id} id={`master-row-${item.id}`} data-testid="master-row" data-item-id={item.id} data-state={item.order_state}
-              data-highlight={highlightId === item.id ? 'true' : undefined}
-              className={`border-b border-hub-border-soft last:border-b-0 ${highlightId === item.id ? 'bg-hub-blue-tint' : ''}`}>
-              <td className={`${CELL} !py-1.5 [overflow-wrap:anywhere]`}>
+              data-highlight={highlightId === item.id ? 'true' : undefined} data-level={item.level ?? 'none'}
+              className={`border-b border-hub-border-soft last:border-b-0 ${highlightId === item.id ? 'bg-hub-blue-tint' : item.level ? LEVEL_ROW[item.level] : ''}`}>
+              <td className={`${CELL} !py-1.5 [overflow-wrap:anywhere] ${item.level ? LEVEL_ACCENT[item.level] : ''}`}>
                 <button type="button" data-testid="open-item" aria-haspopup="dialog" onClick={() => onOpen(item)}
                   className="flex min-h-11 w-full items-center rounded-hub-control text-left font-semibold leading-snug text-hub-ink underline decoration-hub-border decoration-1 underline-offset-4 hover:decoration-hub-ink">
                   <span data-testid="item-name">{item.name}</span>
                 </button>
+                <LevelTag level={item.level} className="mb-1" />
                 <span className="block text-[13px] leading-5 text-hub-n-600 sm:hidden" data-testid="item-shelf-inline">
                   <ShelfCell item={item} link={shelfLinks} href={hrefFor?.(item.location_code)} onGo={() => onGoToShelf?.(item)} />
                 </span>

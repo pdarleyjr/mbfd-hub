@@ -35,7 +35,16 @@ export interface NarcoticsCheck {
   decided_by_rank: string | null;
   resubmission_of: string | null;
   resubmitted_as: string | null;
+  /** Photo 1. */
   image: NarcoticsImage;
+  /** Every photo, photo 1 first. Optional so an older answer still shows photo 1. */
+  photo_count?: number;
+  photos?: NarcoticsPhoto[];
+}
+
+/** One photo of a check; position 1 is the first. */
+export interface NarcoticsPhoto extends NarcoticsImage {
+  position: number;
 }
 
 export interface NarcoticsHistoryEntry {

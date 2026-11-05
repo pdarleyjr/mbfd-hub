@@ -21,7 +21,7 @@ use Illuminate\Validation\ValidationException;
  */
 final class Captain5IssueActions
 {
-    public const ACTIONS = ['acknowledge', 'ordered', 'update_delivery', 'available_for_pickup', 'replaced', 'verify', 'dismiss', 'reopen', ...Captain5IssueClearing::ACTIONS];
+    public const ACTIONS = ['acknowledge', 'ordered', 'update_delivery', 'available_for_pickup', 'replaced', 'verify', 'dismiss', 'reopen', ...Captain5IssueClearing::ACTIONS, Captain5IssueClearing::ACTION_CLEAR_RESOLUTION];
 
     public const REPLACEMENT_RESOLUTIONS = ['replacement_installed', 'spare_issued', 'repair_completed'];
 
@@ -58,7 +58,10 @@ final class Captain5IssueActions
             throw new AuthorizationException('You can view this workspace but not act on issues.');
         }
         $probe = ApparatusDefect::query()->find($defectId);
-        if ($probe === null || ! $this->scope->inScope($probe)) {
+        // An issue Captain 5 sent to Logistics is Logistics' now; from here it can only be brought back.
+        // (A retried "send to Logistics" lands here too and is answered from its idempotency key.)
+        $bringingBack = in_array($valid['action'], Captain5IssueClearing::ACTIONS, true) && $probe !== null && Captain5IssueClearing::isCleared($probe);
+        if ($probe === null || (! $bringingBack && ! $this->scope->inScope($probe))) {
             throw new AuthorizationException('Not available.');
         }
 
@@ -93,6 +96,7 @@ final class Captain5IssueActions
             'replaced' => $this->replaced($engine, $defectId, $actor, $valid, $messages, $key),
             'verify' => $engine->verifyCorrection($defectId, $actor, [...$messages, 'notes' => $valid['resolution_notes'] ?? null], $key),
             'dismiss' => $engine->dismiss($defectId, $actor, [...$messages, 'reason' => $this->required($valid, 'reason', DefectNoActionClosure::REASON_LABEL)], $key),
+            'clear_resolution' => $engine->clearResolution($defectId, $actor, [], $key),
             'reopen' => $this->reopen($engine, $probe, $actor, $messages, $this->required($valid, 'reason', 'Explain why this issue is being reopened.'), $key),
             default => throw ValidationException::withMessages(['action' => 'Unknown action.']),
         };

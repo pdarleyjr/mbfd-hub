@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { ageText, dateTimeText, dayText } from './format';
+import { ageText, dateTimeText, dayText, verificationText } from './format';
 import type { IssueSummary } from './types';
 import { HINT, IssueTags } from './ui';
 
@@ -20,6 +20,7 @@ interface Props {
 
 /** One whole-row button: a 44px+ target that works by touch, mouse and keyboard alike. */
 export default function IssueRow({ issue, onOpen, detail = 'age', quietUnit = false, aside, footnote, testId = 'captain5-issue-row' }: Props) {
+  const verification = verificationText(issue);
   const delivery = [
     issue.expected_delivery ? `Expected ${dayText(issue.expected_delivery)}` : 'No delivery date',
     issue.details.vendor_reference ? `Ref ${issue.details.vendor_reference}` : null,
@@ -44,6 +45,15 @@ export default function IssueRow({ issue, onOpen, detail = 'age', quietUnit = fa
               : <>Reported <time dateTime={issue.first_reported_at ?? undefined} title={dateTimeText(issue.first_reported_at)}>{ageText(issue.first_reported_at)}</time></>}
           </span>
           <IssueTags issue={issue} />
+          {verification && (
+            <span
+              data-testid="captain5-needs-verification"
+              className={`break-words rounded-hub-control border-l-4 px-2.5 py-1.5 text-[13px] font-semibold leading-5 ${issue.verification?.safety_critical ? 'border-hub-danger bg-hub-danger-bg text-hub-ink' : 'border-hub-warning bg-hub-warning-bg text-hub-ink'}`}
+            >
+              {verification}{issue.verification?.safety_critical ? '. Safety-critical: check it in person before closing.' : ''}
+            </span>
+          )}
+          {issue.resolution && !issue.open && <span data-testid="captain5-resolution-line" className={`${HINT} break-words font-semibold`}>{issue.resolution.text}</span>}
           {footnote && <span className={`${HINT} break-words`}>{footnote}</span>}
         </span>
         <ChevronRight className="h-5 w-5 flex-none text-hub-n-500" aria-hidden="true" />

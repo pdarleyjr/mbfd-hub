@@ -23,18 +23,18 @@ export default function ClearedIssues({ issues, open, busy, onToggle, onOpen, on
       className="rounded-hub-control border border-hub-border bg-hub-n-25 px-3.5 py-1"
     >
       <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-hub-ink">
-        Cleared for Logistics (<span className="tabular-nums">{issues.length}</span>)
+        Sent to Logistics (<span className="tabular-nums">{issues.length}</span>)
       </summary>
       <div className="space-y-2 pb-3">
         <p className={HINT}>Still open with Logistics. Not in your queue or counts. Bring one back to work it here.</p>
-        <ul className="space-y-2" aria-label="Issues cleared for Logistics" data-testid="captain5-cleared-list">
+        <ul className="space-y-2" aria-label="Issues sent to Logistics" data-testid="captain5-cleared-list">
           {issues.map((issue) => (
             <IssueRow
               key={issue.id}
               issue={issue}
               onOpen={onOpen}
               testId="captain5-cleared-row"
-              footnote={`Cleared ${dateTimeText(issue.captain5_cleared_at)}${issue.captain5_cleared_by ? ` by ${issue.captain5_cleared_by}` : ''}`}
+              footnote={`Sent ${dateTimeText(issue.captain5_cleared_at)}${issue.captain5_cleared_by ? ` by ${issue.captain5_cleared_by}` : ''}`}
               aside={(
                 <button
                   type="button"

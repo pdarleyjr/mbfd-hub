@@ -287,7 +287,7 @@ final class DisplaySnapshotService
             ->get(['id', 'station_id', 'inspection_date', 'inspection_type', 'overall_status', 'created_at']);
         $stationRequests = StationRequest::query()
             ->where('station_id', $id)
-            ->with('updates:id,station_request_id,status,public_note,created_at')
+            ->with(['updates' => fn ($updates) => $updates->withoutAutoReceipts()->select(['id', 'station_request_id', 'status', 'public_note', 'created_at', 'automation_intake_id'])])
             ->orderByDesc('created_at')
             ->limit(25)
             ->get(['id', 'station_id', 'request_number', 'request_type', 'title', 'priority', 'status', 'current_public_response', 'created_at']);

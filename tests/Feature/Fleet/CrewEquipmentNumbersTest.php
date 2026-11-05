@@ -41,7 +41,7 @@ class CrewEquipmentNumbersTest extends TestCase
             'ladder 1' => ['ladder1', 5, 5],
             'ladder 3' => ['ladder3', 4, 4],
             'rescue' => ['rescue', 1, 3],
-            'fire boat' => ['fireboat6', 5, 8],
+            'fire boat' => ['fireboat6', 5, 4], // one number per radio: the Motorola serial is the radio ID, not asked twice
         ];
     }
 

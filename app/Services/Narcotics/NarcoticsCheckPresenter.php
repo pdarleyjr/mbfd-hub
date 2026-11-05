@@ -68,7 +68,10 @@ final class NarcoticsCheckPresenter
                 : NarcoticsCheck::query()->whereKey($check->resubmission_of_id)->value('uuid')),
             'resubmitted_as' => $resubmitted?->uuid,
             'can_resubmit' => ! $staff && $check->status === NarcoticsCheck::REJECTED && $resubmitted === null,
+            // Photo 1, as before; every photo (photo 1 first) is in `photos`.
             'image' => $this->image($check),
+            'photo_count' => $check->photoCount(),
+            'photos' => $this->photos($check),
         ];
     }
 
@@ -90,6 +93,38 @@ final class NarcoticsCheckPresenter
                 'at' => $event->created_at?->toIso8601String(),
             ])->values()->all(),
         ];
+    }
+
+    /**
+     * Every photo in order, photo 1 first, each with its own authorized addresses.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function photos(NarcoticsCheck $check): array
+    {
+        $available = $check->imagesAvailable();
+        $url = fn (int $position, string $variant): ?string => $available
+            ? route('narcotics.api.checks.photo', ['uuid' => $check->uuid, 'position' => $position, 'variant' => $variant], false)
+            : null;
+        $one = fn (int $position, int $width, int $height, int $bytes, string $mime): array => [
+            'position' => $position,
+            'available' => $available,
+            'thumb_url' => $url($position, 'thumb'),
+            'preview_url' => $url($position, 'preview'),
+            'full_url' => $url($position, 'full'),
+            'width' => $width,
+            'height' => $height,
+            'bytes' => $bytes,
+            'mime' => $mime,
+        ];
+
+        $photos = [$one(1, $check->image_width, $check->image_height, $check->image_bytes, $check->image_mime)];
+        $extras = $check->relationLoaded('extraPhotos') ? $check->extraPhotos : $check->extraPhotos()->get();
+        foreach ($extras as $photo) {
+            $photos[] = $one($photo->position, $photo->image_width, $photo->image_height, $photo->image_bytes, $photo->image_mime);
+        }
+
+        return $photos;
     }
 
     /** @return array<string, mixed> */

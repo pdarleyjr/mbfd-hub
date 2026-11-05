@@ -88,7 +88,7 @@ test('a member completes Fire Boat 6 with no vehicle ID and the server records i
 
   await completeTheBoat(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible({ timeout: 60_000 });
 
   expect(requests.some((line) => /^POST \/api\/public\/apparatuses\/\d+\/inspections 201$/.test(line))).toBe(true);
   expect(problems).toEqual([]);
@@ -119,7 +119,7 @@ test('a note written from the first screen, before any area is done, reaches the
   await completeTheBoat(page);
   await expect(page.getByLabel('What did you notice?')).toHaveValue('Starboard cleat loose, noted from the first screen');
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible({ timeout: 60_000 });
 
   expect(problems).toEqual([]);
   const evidence = fixture<Fb6State>('fb6-state').inspections.at(-1)?.checklist_evidence;
@@ -191,7 +191,7 @@ test('Station 6 opens the boat, the daily readings are on screen, and they are s
   await page.mouse.move(box.x + 160, box.y + 20, { steps: 6 });
   await page.mouse.up();
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible({ timeout: 60_000 });
   expect(problems).toEqual([]);
 
   const evidence = fixture<Fb6State>('fb6-state').inspections.at(-1)?.checklist_evidence;
@@ -224,7 +224,7 @@ test('SCBA and radio numbers carry to the next member, who only changes what cha
   await first.page.getByRole('button', { name: 'Add another radio' }).click();
   await first.page.getByLabel('Additional radio').fill('6199');
   await first.page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(first.page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+  await expect(first.page.getByRole('heading', { name: 'Inspection received' })).toBeVisible({ timeout: 60_000 });
   expect(first.problems).toEqual([]);
 
   const next = await member(browser, info, 'fleet');
@@ -238,7 +238,7 @@ test('SCBA and radio numbers carry to the next member, who only changes what cha
   await next.page.getByLabel('Driver radio number').fill('6150');
   await next.page.getByRole('button', { name: 'Remove additional scba' }).click();
   await next.page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(next.page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+  await expect(next.page.getByRole('heading', { name: 'Inspection received' })).toBeVisible({ timeout: 60_000 });
   expect(next.problems).toEqual([]);
 
   const third = await member(browser, info, 'member');
@@ -261,7 +261,7 @@ test('a concern is reported, the next member sees it live with its history, and 
   await reporter.page.getByLabel('What did you notice?').last().fill('Tide was unusually low at the lift this morning');
   await reporter.page.getByRole('radio', { name: 'Note for the record: no action needed' }).last().check();
   await reporter.page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(reporter.page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+  await expect(reporter.page.getByRole('heading', { name: 'Inspection received' })).toBeVisible({ timeout: 60_000 });
   expect(reporter.problems).toEqual([]);
 
   const next = await member(browser, info, 'second');
@@ -271,7 +271,7 @@ test('a concern is reported, the next member sees it live with its history, and 
   await next.page.getByText('Other recorded findings (1)').click();
   const card = next.page.locator('.inspection-unlocated-findings .issue-card');
   await expect(card).toContainText('Port foam line coupling is leaking');
-  await expect(card).toContainText('Awaiting verification');
+  await expect(card).toContainText('New — not yet acknowledged');
   await expect(card).toContainText(/Reported by .+ on /);
   await next.page.getByText(/^Recent notes/).click();
   await expect(next.page.locator('.findings-note').filter({ hasText: 'Tide was unusually low' })).toBeVisible();
@@ -314,9 +314,9 @@ test('two members with the boat open at once both finish, and neither is locked 
   await completeTheBoat(second.page);
 
   await first.page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(first.page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+  await expect(first.page.getByRole('heading', { name: 'Inspection received' })).toBeVisible({ timeout: 60_000 });
   await second.page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(second.page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+  await expect(second.page.getByRole('heading', { name: 'Inspection received' })).toBeVisible({ timeout: 60_000 });
 
   expect(first.problems).toEqual([]);
   expect(second.problems).toEqual([]);

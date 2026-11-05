@@ -312,7 +312,7 @@ test('only people the roster clearly places on duty are listed; unclear or unmat
     const before = await fingerprint(page);
     await page.getByLabel('Find a name', { exact: true }).fill('90004');
     await expect(members(page)).toHaveCount(0);
-    await expect(page.getByText('No one matches. Untick a rank or clear the name.', { exact: true })).toBeVisible();
+    await expect(page.getByText('No one matches. Untick a rank or a "Show only" group, or clear the name.', { exact: true })).toBeVisible();
     await page.getByLabel('Find a name', { exact: true }).fill('');
     await expect(members(page)).toHaveCount(3);
     expect(await fingerprint(page)).toEqual(before);

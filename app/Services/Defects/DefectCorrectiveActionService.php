@@ -321,6 +321,29 @@ final class DefectCorrectiveActionService
     }
 
     /**
+     * Takes a closed issue off the "Recently resolved" lists (Captain 5 workspace, Admin board). Nothing about the
+     * resolution changes, the crew is told nothing and nobody is enrolled: the event is page-only (staff history).
+     * A second clear, or a clear of an open issue, changes nothing.
+     *
+     * @param  array{internal_note?: ?string}  $data
+     */
+    public function clearResolution(int $defectId, User $actor, array $data = [], ?string $idempotencyKey = null): ApparatusDefect
+    {
+        return $this->run('clear_resolution', $defectId, $actor, $idempotencyKey, false, function (ApparatusDefect $defect) use ($actor): ?array {
+            if (! DefectActionStatus::isClosed($defect->action_status) || $defect->resolution_cleared_at !== null) {
+                return null;
+            }
+            $defect->resolution_cleared_at = now();
+            $defect->resolution_cleared_by_user_id = $actor->getKey();
+            $defect->save();
+
+            return $this->spec(ApparatusDefectEvent::RESOLUTION_CLEARED, (string) $defect->action_status, (string) $defect->action_status, [], [
+                'closure' => DefectActionStatus::closureKind($defect->action_status),
+            ]);
+        });
+    }
+
+    /**
      * Same row, same history: a resolved or dismissed issue becomes active again.
      * (A new failure episode after a verified resolution is a NEW row created by
      * DefectContinuityService, not a reopen.)
@@ -356,10 +379,18 @@ final class DefectCorrectiveActionService
             $defect->resolved_by_user_id = null;
             $defect->resolution_type = null;
             $defect->resolution_notes = null;
-            // Open again means back on every queue that covers it, Captain 5's included.
+            // Open again means back with the owner its equipment belongs to: a person's earlier move does not stick.
             $defect->captain5_cleared_at = null;
             $defect->captain5_cleared_by_user_id = null;
+            $defect->resolution_cleared_at = null;
+            $defect->resolution_cleared_by_user_id = null;
+            $defect->correction_reported_at = null;
+            $defect->correction_reported_by_user_id = null;
+            if ($defect->owner_basis === DefectOwnership::BASIS_MANUAL) {
+                $defect->owner_basis = null;
+            }
             $defect->save();
+            app(DefectOwnership::class)->project($defect, 'reopened');
 
             return $this->spec('reopened', $from, $to, $data, ['reason' => trim($data['reason']), ...$previous]);
         });
@@ -391,6 +422,21 @@ final class DefectCorrectiveActionService
                 ->where('apparatus_defect_id', $defect->getKey())
                 ->orderByDesc('id')
                 ->first();
+            $reported = $defect->correction_reported_at;
+            $memberReportIsNewer = $reported !== null && ($latest === null || $reported->greaterThanOrEqualTo($latest->created_at));
+            if ($memberReportIsNewer) {
+                // A member said it is fixed outside a checkout (docs/unified-activity-and-ownership.md section 3).
+                return $this->close(
+                    $defect,
+                    $actor,
+                    DefectActionStatus::RESOLVED,
+                    'correction_verified',
+                    $data['resolution_type'] ?? 'item_located',
+                    $data['notes'] ?? 'Correction verified: a member reported the item fixed.',
+                    $data,
+                    ['verified_member_report_at' => $reported->toIso8601String()],
+                );
+            }
             if ($latest === null || $latest->observation !== 'appears_corrected') {
                 throw ValidationException::withMessages([
                     'defect' => 'The latest inspection did not report this item as present, so there is no correction to verify.',
@@ -593,6 +639,9 @@ final class DefectCorrectiveActionService
             }
 
             $defect->refresh();
+            if ($spec['type'] === ApparatusDefectEvent::RESOLUTION_CLEARED) {
+                return $defect; // housekeeping on a staff list: no follower, no notification
+            }
             if ($captain5 !== null) {
                 $this->participants->enroll($defect, $actor, 'captain5');
                 $this->captain5Notifier->issueUpdated($defect, $event);

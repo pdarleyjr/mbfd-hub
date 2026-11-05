@@ -54,6 +54,8 @@ final class Captain5Workspace
             'rescue_dailies' => $this->rescueDailies(),
             'issues' => $summaries,
             'issues_truncated' => $this->truncated,
+            'resolved_display_hours' => ApparatusDefect::resolvedDisplayHours(),
+            'recently_resolved' => $this->presenter->summaries($this->recentlyResolvedIssues()),
             'cleared_issues' => $this->presenter->summaries($this->clearedIssues()),
             ...$this->trucks->payload(),
             'handoff' => $this->handoff($dutyDate, $viewer),
@@ -79,12 +81,22 @@ final class Captain5Workspace
     /** @return Collection<int, ApparatusDefect> open issues Captain 5 cleared for Logistics; a closed one is in History instead */
     public function clearedIssues(): Collection
     {
-        [$issues] = $this->scope->collect(
-            $this->scope->candidateQuery()->where('resolved', false)->whereNotNull('captain5_cleared_at')->with(['firstReporter', 'captain5ClearedBy']),
-            self::OPEN_LIMIT,
-        );
+        // Moved to Logistics, so no longer in scope: listed as they are, newest first, for Bring back.
+        $issues = $this->scope->sentToLogisticsQuery()->with(['firstReporter', 'captain5ClearedBy'])
+            ->orderByDesc('id')->limit(self::OPEN_LIMIT)->get();
 
         return $this->scope->attachApparatus($issues);
+    }
+
+    /**
+     * @return Collection<int, ApparatusDefect> fixed in-scope issues still on display: resolved within
+     *                                          dashboards.resolved_display_hours and not cleared by staff. Not open, not counted.
+     */
+    public function recentlyResolvedIssues(): Collection
+    {
+        $query = $this->scope->candidateQuery()->recentlyResolved()->with(['firstReporter', 'resolvedBy'])->orderByDesc('resolved_at')->orderByDesc('id');
+
+        return $this->scope->attachApparatus($this->scope->collect($query, self::HISTORY_LIMIT)[0]);
     }
 
     /** @return Collection<int, ApparatusDefect> closed in-scope issues within the history window */
@@ -140,7 +152,9 @@ final class Captain5Workspace
             ->orderByDesc('id')
             ->get(['id', 'apparatus_id', 'operator_name', 'rank', 'created_at', 'completed_at', 'processing_status', 'review_status'])
             ->unique('apparatus_id')->keyBy('apparatus_id');
-        $openCounts = ApparatusDefect::query()->whereIn('apparatus_id', $ids)->where('resolved', false)->whereNull('captain5_cleared_at')
+        $openCounts = ApparatusDefect::query()->whereIn('apparatus_id', $ids)->where('resolved', false)
+            ->where(fn ($owned) => $owned->where('responsible_owner', ApparatusDefect::OWNER_CAPTAIN5)
+                ->orWhere(fn ($unprojected) => $unprojected->whereNull('responsible_owner')->whereNull('captain5_cleared_at')))
             ->selectRaw('apparatus_id, count(*) as open_count')->groupBy('apparatus_id')->pluck('open_count', 'apparatus_id');
 
         return $rescues->map(function (Apparatus $apparatus) use ($inspections, $openCounts): array {

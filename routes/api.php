@@ -74,7 +74,7 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::post('apparatuses/{apparatus}/inspection-sessions/{session}/abandon', [ApparatusController::class, 'abandonInspectionSession'])->middleware(['throttle:30,1']);
     Route::get('apparatuses/{apparatus}/service-notices', [PublicApparatusServiceTicketController::class, 'apparatusNotices']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
-    Route::post('apparatuses/{apparatus}/inventory-corrections', [\App\Http\Controllers\Api\InventoryCorrectionController::class, 'store'])->middleware(['throttle:30,1']);
+    Route::post('apparatuses/{apparatus}/inventory-corrections', [\App\Http\Controllers\Api\InventoryCorrectionController::class, 'store'])->middleware(['throttle:60,1']);
     // Vehicle changeouts and operational alerts (docs/apparatus-changeouts.md). Network only, never offline-cached.
     Route::get('apparatuses/{apparatus}/changeout-context', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'context'])->whereNumber('apparatus');
     Route::post('apparatuses/{apparatus}/changeouts', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'store'])->whereNumber('apparatus')->middleware(['throttle:30,1']);
@@ -86,6 +86,9 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('apparatus-issues/{defect}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'defectPhoto'])->whereNumber('defect');
     Route::get('apparatus-issues/{defect}/observations/{observation}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'observationPhoto'])->whereNumber(['defect', 'observation']);
     Route::get('inspection-concerns/{concern}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'concernPhoto'])->whereNumber('concern');
+    // Member "it's fixed" and standalone stretcher reports (docs/unified-activity-and-ownership.md). Network only.
+    Route::post('apparatus-issues/{defect}/member-correction', [\App\Http\Controllers\Api\MemberIssueActionsController::class, 'correction'])->whereNumber('defect')->middleware(['throttle:20,1']);
+    Route::post('apparatuses/{apparatus}/stretcher-issues', [\App\Http\Controllers\Api\MemberIssueActionsController::class, 'stretcher'])->whereNumber('apparatus')->middleware(['throttle:20,1']);
     Route::get('stations/{station}/operational-alerts', [\App\Http\Controllers\Api\OperationalAlertController::class, 'station'])->whereNumber('station');
     // One-time vehicle questions outside a checkout (Captain 5 page); the unit is authorized per request.
     Route::get('apparatuses/{apparatus}/vehicle-identification', [\App\Http\Controllers\Api\VehicleIdentificationController::class, 'show'])->whereNumber('apparatus');
@@ -110,10 +113,18 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('stations/{station}/checkouts/{inspection}', [\App\Http\Controllers\Api\StationOverviewController::class, 'checkout'])->whereNumber(['station', 'inspection']);
     Route::get('stations/{station}/rooms/{room}/profile', [StationContextController::class, 'roomProfile']);
     Route::get('station-requests/{stationRequest}', [PublicStationRequestController::class, 'show']);
+    Route::post('station-requests/{stationRequest}/member-resolve', [PublicStationRequestController::class, 'memberResolve'])->whereNumber('stationRequest')->middleware('throttle:20,1');
     Route::get('stations/{station}/gas-meters', [\App\Http\Controllers\Api\StationController::class, 'gasMeters']);
 
     // 300 Command profile: read-only, allowlisted overview of every active station.
     Route::get('command/overview', CommandOverviewController::class)->middleware('can:access-command-300');
+
+    // 300 dashboard: batched station board plus read-only drill-ins. Same gate; GET only.
+    Route::prefix('command/stations')->middleware('can:access-command-300')->controller(\App\Http\Controllers\Api\Command300StationsController::class)->group(function () {
+        Route::get('/', 'index');
+        Route::get('{station}', 'show')->whereNumber('station');
+        Route::get('{station}/checkouts/{inspection}', 'checkout')->whereNumber(['station', 'inspection']);
+    });
 
 });
 

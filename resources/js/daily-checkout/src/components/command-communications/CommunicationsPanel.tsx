@@ -5,7 +5,7 @@ import { EmptyState, LoadError } from '../ui/StateViews';
 import Composer from './Composer';
 import PinnedStrip from './PinnedStrip';
 import PostItem from './PostItem';
-import { CHANNEL_COPY, DEFAULT_CHANNEL, type CommandChannel, type CommandPost } from './types';
+import { CHANNEL_COPY, DEFAULT_CHANNEL, type CommandChannel, type CommandPost, type CommandPostSide } from './types';
 import type { CommandCommunications } from './useCommandCommunications';
 import { useClock } from './usePageClock';
 
@@ -44,7 +44,16 @@ export default function CommunicationsPanel({ comms, channel = comms.channel ?? 
   const newestId = feed.posts[0]?.id ?? null;
   const newestRef = useRef(newestId);
   newestRef.current = newestId;
-  const ordered = useMemo(() => [...feed.posts].reverse(), [feed.posts]);
+  const [authorFilter, setAuthorFilter] = useState<CommandPostSide | 'all'>('all');
+  const ordered = useMemo(
+    () => [...feed.posts].reverse().filter((post) => authorFilter === 'all' || post.author.side === authorFilter),
+    [feed.posts, authorFilter],
+  );
+  const sideCounts = useMemo(() => {
+    const counts: Record<CommandPostSide, number> = { administration: 0, captain5: 0, command: 0 };
+    for (const post of feed.posts) counts[post.author.side] += 1;
+    return counts;
+  }, [feed.posts]);
   const newCount = anchorId ? Math.max(0, feed.posts.findIndex((post) => post.id === anchorId)) : 0;
 
   const onScroll = useCallback(() => {
@@ -127,6 +136,35 @@ export default function CommunicationsPanel({ comms, channel = comms.channel ?? 
 
       <PinnedStrip pinned={feed.pinned} now={now} onTogglePin={onTogglePin} pinBusyId={feed.pinBusyId} />
 
+      {feed.posts.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2" role="group" aria-label="Show messages from" data-testid="command-author-filter">
+          {([['all', 'All'], ['administration', 'Admin'], ['captain5', 'Captain 5'], ['command', '300']] as const).map(([value, label]) => {
+            const count = value === 'all' ? feed.posts.length : sideCounts[value];
+            if (value !== 'all' && count === 0) return null;
+            const active = authorFilter === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setAuthorFilter(value)}
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold ${active ? 'border-hub-blue bg-hub-blue-tint text-hub-blue' : 'border-hub-border bg-hub-surface text-hub-ink'}`}
+              >
+                {label}<span className="text-[13px] tabular-nums opacity-80">{count}</span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full border border-hub-border bg-hub-surface px-4 text-sm font-semibold text-hub-ink"
+            data-testid="command-jump-newest"
+          >
+            <ArrowDown className="h-4 w-4" aria-hidden="true" />Jump to newest
+          </button>
+        </div>
+      )}
+
       <div className="relative">
         <div
           ref={feedRef}
@@ -145,6 +183,13 @@ export default function CommunicationsPanel({ comms, channel = comms.channel ?? 
           )}
           {feed.status === 'error' && feed.posts.length === 0 && (
             <LoadError title="Messages unavailable" message={feed.error} onRetry={() => { refresh().catch(() => undefined); }} />
+          )}
+          {feed.status === 'ready' && feed.posts.length > 0 && ordered.length === 0 && (
+            <EmptyState
+              icon={<MessageSquare className="hub-empty__icon" aria-hidden="true" />}
+              title="No messages from this sender"
+              body="Choose All to see every message."
+            />
           )}
           {feed.status === 'ready' && feed.posts.length === 0 && (
             <EmptyState

@@ -1,4 +1,5 @@
 /** Shapes of the Master Supply Room Inventory API (docs/ems/captain5-medical-inventory-workflow.md, section 6). */
+import type { StockLevel } from './stockLevel.ts';
 
 /** Every way an item can be counted, in the order the server lists them (`units`). Anything but `each` needs a size. */
 export type CountUnit =
@@ -28,6 +29,8 @@ export interface OpenOrder {
 }
 
 export interface OrderSummary { needs_order: number; pending: number; ordered: number; backordered: number }
+
+export interface LevelSummary { red: number; yellow: number; green: number }
 
 /** One shelf. `code` is null for the "No shelf assigned" group. */
 export interface MasterSection {
@@ -74,6 +77,52 @@ export interface MasterItem {
   to_order: number | null;
   order_state: OrderState;
   open_order: OpenOrder | null;
+  /** Green, yellow or red from the live on hand. Null when never counted or no expected amount. */
+  level: StockLevel | null;
+  /** Whole count units: at or below this the item is yellow. Null when the item has no expected amount. */
+  reorder_at: number | null;
+  /** Whole count units: at or below this (or at 0) the item is red. */
+  critical_at: number | null;
+  /** True when `reorder_at` is the preset (half the expected amount) rather than a person's number. */
+  reorder_at_auto: boolean;
+  /** True when `critical_at` is the preset (a quarter of the expected amount). */
+  critical_at_auto: boolean;
+  /** More was taken than the ledger held, so on hand shows 0 until someone counts the shelf. */
+  count_due?: boolean;
+}
+
+// ------------------------------------------------------------ supply room screen (GET /supply/screen)
+
+export interface ScreenWithdrawalLine { name: string; quantity: number; unit_label: string; count_due: boolean }
+
+export interface ScreenWithdrawal {
+  uuid: string;
+  number: string;
+  employee_name: string;
+  unit_label: string | null;
+  /** Ready to show, for example "Nov 3, 9:15 AM". */
+  taken_at: string;
+  taken_at_iso: string;
+  status: 'taken' | 'undone';
+  note: string | null;
+  count_due: boolean;
+  lines: ScreenWithdrawalLine[];
+}
+
+export interface KioskScreen {
+  id: number;
+  name: string;
+  state: 'online' | 'offline' | 'waiting' | 'revoked';
+  state_label: string;
+  last_seen: string | null;
+  paired_at: string | null;
+  paired_by: string | null;
+}
+
+export interface SupplyScreenData {
+  withdrawals: ScreenWithdrawal[];
+  screens: KioskScreen[];
+  search_words_waiting: number;
 }
 
 export interface InactiveItem { id: number; name: string; location_code: string | null }
@@ -89,7 +138,8 @@ export interface MasterData {
   draft: DraftSummary | null;
   last_count: LastCount | null;
   can_edit: boolean;
-  summary: OrderSummary;
+  /** Newer servers also count the items at each stock level. */
+  summary: OrderSummary & Partial<LevelSummary>;
   units: UnitOption[];
 }
 
@@ -135,6 +185,10 @@ export interface BatchChange {
   expected?: number | null;
   /** Whole count units. Counts as a physical count of the item. */
   on_hand?: number;
+  /** Whole count units for the yellow line; null puts it back to the preset (half the expected amount). */
+  reorder_at?: number | null;
+  /** Whole count units for the red line; null puts it back to the preset (a quarter of the expected amount). */
+  critical_at?: number | null;
 }
 
 export interface OrderInput { status: OpenOrderStatus; quantity: number; expected_on?: string; note?: string }

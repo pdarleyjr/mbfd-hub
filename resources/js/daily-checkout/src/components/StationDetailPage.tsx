@@ -29,7 +29,9 @@ import type { QuickLinkProps } from './ui/QuickLink';
 import StationHeader from './station/StationHeader';
 import StationOverviewPanel from './station/StationOverviewPanel';
 import StationRosterPanel from './station/StationRosterPanel';
+import StationRequestResolveSheet from './station/StationRequestResolveSheet';
 import StationShiftAlert from './station/StationShiftAlert';
+import { canMarkResolved } from '../utils/stationRequestResolveApi';
 import { useStationOverview } from './station/useStationOverview';
 import Tag, { StatusTag } from './ui/Tag';
 import { EmptyState, LoadError, SkeletonRows } from './ui/StateViews';
@@ -62,6 +64,8 @@ export default function StationDetailPage() {
   const [stationInspections, setStationInspections] = useState<StationInspectionSummary[]>([]);
   const [stationRequests, setStationRequests] = useState<StationRequestSummary[]>([]);
   const [requestScope, setRequestScope] = useState<'open' | 'all'>('open');
+  // The request whose "Mark resolved" form is open. The server decides who is offered the button.
+  const [resolvingRequest, setResolvingRequest] = useState<StationRequestSummary | null>(null);
   // Only officers may open the Personnel Equipment Request; the server says who they are.
   const [canRequestPersonnelEquipment, setCanRequestPersonnelEquipment] = useState(false);
   // The roster holds employee IDs and leave codes, so it has its own rule; the roster route checks it again.
@@ -101,6 +105,17 @@ export default function StationDetailPage() {
     { id: 'inspections', label: 'Inspections' },
     { id: 'activity', label: 'Activity' },
   ];
+
+  // After a member marks a request resolved: reload the list so the card shows its new state. A failed refresh keeps
+  // the list on screen; the resolve itself is already saved.
+  const refreshStationRequests = async () => {
+    if (!id) return;
+    try {
+      setStationRequests(await ApiClient.getStationRequests(parseInt(id), 'all'));
+    } catch (err) {
+      if (isApiAuthenticationError(err)) redirectToLoginAfterSessionExpiry();
+    }
+  };
 
   // Fetch station data
   useEffect(() => {
@@ -380,12 +395,23 @@ export default function StationDetailPage() {
                       </div>
                     </div>
                     {req.current_public_response && <LatestResponse label="Latest response" text={req.current_public_response} />}
+                    {req.ai_receipt && <p className={`mt-3 ${SECONDARY}`} data-testid="ai-receipt"><span className="font-semibold text-hub-ink">{req.ai_receipt.sender}:</span> {req.updates?.find((update) => update.is_auto_receipt)?.public_note || 'Received'}</p>}
                     <p className={`mt-3 ${SECONDARY}`}>{req.room?.name || req.room_name_snapshot || 'Station-wide'} · Submitted {formatDate(req.created_at)}</p>
+                    {canMarkResolved(req) && (
+                      <button type="button" className="hub-btn hub-btn--primary mt-3 !min-h-11 w-full sm:w-auto" onClick={() => setResolvingRequest(req)} data-testid="station-request-mark-resolved">
+                        Mark resolved
+                      </button>
+                    )}
                     {req.updates && req.updates.length > 1 && <UpdateHistory summary={`View ${req.updates.length} updates`} updates={req.updates} />}
                   </li>
                 ))}
               </ul>
             ) : <EmptyState icon={<ClipboardList className="hub-empty__icon" aria-hidden="true" />} title={requestScope === 'open' ? 'No open station requests' : 'No station request history'} body="New repair, service, and equipment requests appear here." action={<Link to={stationRequestPath} className="hub-btn hub-btn--secondary">New station request</Link>} />)}
+            <StationRequestResolveSheet
+              request={resolvingRequest}
+              onClose={() => setResolvingRequest(null)}
+              onResolved={() => { void refreshStationRequests(); }}
+            />
           </div>
         );
       }
@@ -518,14 +544,14 @@ function LatestResponse({ label, text }: { label: string; text: string }) {
   return <p className="mt-3 rounded-hub-control border border-hub-info-border bg-hub-info-bg p-3 text-sm text-hub-n-800"><span className="font-semibold">{label}:</span> {text}</p>;
 }
 
-function UpdateHistory({ summary, updates }: { summary: string; updates: Array<{ id: number; status: string; created_at: string; public_note?: string | null }> }) {
+function UpdateHistory({ summary, updates }: { summary: string; updates: Array<{ id: number; status: string; created_at: string; public_note?: string | null; sender?: string | null }> }) {
   return (
     <details className="mt-3">
       <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-hub-blue">{summary}</summary>
       <ol className="mt-2 space-y-2 border-l-2 border-hub-n-200 pl-4">
         {updates.map((update) => (
           <li key={update.id} className="text-sm text-hub-n-600">
-            <span className="font-semibold text-hub-ink">{humanize(update.status)}</span> · {formatDate(update.created_at)}
+            <span className="font-semibold text-hub-ink">{humanize(update.status)}</span> · {formatDate(update.created_at)}{update.sender ? <> · <span className="font-semibold text-hub-ink">{update.sender}</span></> : null}
             {update.public_note && <p className="mt-0.5">{update.public_note}</p>}
           </li>
         ))}

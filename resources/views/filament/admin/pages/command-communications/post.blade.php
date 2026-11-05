@@ -32,14 +32,14 @@
         default => 'gray',
     };
     $sideLabel = fn ($item): string => match ($item->author_context) {
-        'administration' => 'Administration',
+        'administration' => 'Admin',
         'captain5' => 'Captain 5',
-        default => '300 Command',
+        default => '300',
     };
     $sideColor = fn ($item): string => $item->author_context === 'administration' ? 'primary' : ($item->author_context === 'captain5' ? 'info' : 'gray');
 @endphp
 
-<article class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm" id="{{ $pinnedList ? 'pinned-' : 'post-' }}{{ $post->public_id }}" aria-label="{{ $post->isDeleted() ? 'Removed message' : 'Message from '.($post->author?->name ?? 'a former member') }}">
+<article @class(['mbody-card', 'mbody-card--new' => $isNew($post), 'mbody-card--pinned' => $post->isPinned() && ! $post->isDeleted(), 'mbody-card--'.($post->author_context ?: 'command') => true]) id="{{ $pinnedList ? 'pinned-' : 'post-' }}{{ $post->public_id }}" aria-label="{{ $post->isDeleted() ? 'Removed message' : 'Message from '.($post->author?->name ?? 'a former member') }}">
     <header class="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span class="text-sm font-semibold text-gray-900">{{ $post->author?->name ?? 'Former member' }}</span>
         @if ($post->author?->employeeProfile?->rank)
@@ -53,8 +53,8 @@
         @if ($post->isPinned() && ! $post->isDeleted())
             <x-filament::badge color="gray" size="sm" icon="heroicon-m-bookmark">Pinned</x-filament::badge>
         @endif
-        <time class="ml-auto text-xs text-gray-600" datetime="{{ $post->created_at->toIso8601String() }}" title="{{ $post->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A') }}">
-            {{ $post->created_at->diffForHumans() }}
+        <time class="ml-auto text-xs text-gray-600 mbody-time" datetime="{{ $post->created_at->toIso8601String() }}" title="{{ $post->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A') }}">
+            {{ $post->created_at->diffForHumans() }} <span class="mbody-exact">&middot; {{ $post->created_at->copy()->timezone(config('hub.timezone'))->format('M j, g:i A') }}</span>
         </time>
     </header>
 
@@ -62,11 +62,11 @@
         @include('filament.admin.pages.command-communications.tombstone', ['item' => $post])
     @else
         @if ($post->subject)
-            <h3 class="mt-2 text-base font-semibold text-gray-900">{{ $post->subject }}</h3>
+            <h3 class="mbody-subject">{{ $post->subject }}</h3>
         @endif
 
         @if ($post->body !== '')
-            <div class="mt-2 break-words text-sm text-gray-900">{{ SafeLinkifier::render($post->body) }}</div>
+            <x-message-body :text="$post->body" class="mt-2" />
         @endif
 
         @include('filament.admin.pages.command-communications.attachments', ['attachments' => $post->attachments])
@@ -91,9 +91,9 @@
     @endif
 
     @if ($post->replies->isNotEmpty())
-        <div class="mt-3 space-y-2" role="list" aria-label="Replies">
+        <div class="mbody-replies" role="list" aria-label="Replies ({{ $post->replies->count() }})">
             @foreach ($post->replies as $reply)
-                <div role="listitem" class="rounded-lg bg-gray-50 p-3">
+                <div role="listitem" class="mbody-reply">
                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span class="text-sm font-semibold text-gray-900">{{ $reply->author?->name ?? 'Former member' }}</span>
                         @if ($reply->author?->employeeProfile?->rank)
@@ -111,7 +111,7 @@
                         @include('filament.admin.pages.command-communications.tombstone', ['item' => $reply])
                     @else
                         @if ($reply->body !== '')
-                            <div class="mt-1 break-words text-sm text-gray-900">{{ SafeLinkifier::render($reply->body) }}</div>
+                            <x-message-body :text="$reply->body" class="mt-1" />
                         @endif
                         @include('filament.admin.pages.command-communications.attachments', ['attachments' => $reply->attachments])
                         @if ($canDelete($reply))

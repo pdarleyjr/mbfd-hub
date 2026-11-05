@@ -26,6 +26,7 @@ import {
 import type { DailyCheckoutQueuedSubmission } from '../lib/db';
 import { clearInspectionProgress, clearInspectionSessionAbandonKey, clearInspectionSessionStartKey, createClientSubmissionId, createDraftAutosaver, getOrCreateInspectionSessionAbandonKey, getOrCreateInspectionSessionStartKey, loadInspectionProgress, type DraftAutosaver } from '../utils/storage';
 import { safeContextualPath } from '../utils/contextualBack';
+import { reportedIssuesFor, type ReportedIssues } from '../utils/receiptIssues';
 import { canMigrateInventoryDraft, inventoryMigrationMessage, mergeDraftAnswers } from '../utils/inventoryDraftMigration';
 import { otherMembersCheckoutNotice } from '../utils/sharedDeviceNotice';
 import { useInventoryMarkers } from '../hooks/useInventoryMarkers';
@@ -261,11 +262,12 @@ export default function InspectionWizard() {
   }
   const autosaver = autosaverRef.current;
 
-  const showReceipt = (outcome: InspectionReceiptOutcome, queuedSubmissionId?: string) => {
+  const showReceipt = (outcome: InspectionReceiptOutcome, queuedSubmissionId?: string, issues?: ReportedIssues) => {
     // The queue-change and replay-result paths can both report one acceptance.
     if (receiptShownRef.current) return;
     receiptShownRef.current = true;
-    const state: InspectionReceiptState = { outcome, queuedSubmissionId, returnTo: returnTo ?? undefined };
+    // `issues` is only known for an immediate online send (the member's own answers); replayed sends omit it.
+    const state: InspectionReceiptState & { issues?: ReportedIssues } = { outcome, queuedSubmissionId, returnTo: returnTo ?? undefined, ...(issues ? { issues } : {}) };
     navigate(outcome === 'queued' ? '/success?queued=true' : '/success', { state });
   };
 
@@ -919,7 +921,7 @@ export default function InspectionWizard() {
           navigator.vibrate(200);
         }
         
-        showReceipt(submissionResult);
+        showReceipt(submissionResult, undefined, reportedIssuesFor(submission));
       }
     } catch (err) {
       setSubmissionError(err instanceof Error ? err.message : 'Failed to submit inspection');

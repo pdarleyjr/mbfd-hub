@@ -12,6 +12,18 @@ export interface LatestAction {
   text: string | null;
 }
 
+/** Who verifies and closes an issue. Absent when the server does not say. */
+export type IssueOwner = 'captain5' | 'logistics';
+
+/** What this member may do about an issue themselves (docs/unified-activity-and-ownership.md section 3). */
+export interface MemberCorrectionState {
+  eligible: boolean;
+  /** True when the member's own report closes the issue; false when the owner must verify it first. */
+  closes_immediately: boolean;
+  /** Set once a correction has been reported and is waiting for the owner. */
+  pending: { at: string | null } | null;
+}
+
 export interface IssueSummary {
   id: number;
   /** Current names, resolved like the checklist's open findings. */
@@ -34,6 +46,9 @@ export interface IssueSummary {
   service_status: string | null;
   recurrence_of_defect_id: number | null;
   history_count: number;
+  /** Present only when the server sent it; absent means the member has no action here. */
+  member_correction?: MemberCorrectionState;
+  owner?: IssueOwner;
 }
 
 export interface TimelineEntry {

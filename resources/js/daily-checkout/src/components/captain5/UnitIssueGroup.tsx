@@ -62,9 +62,9 @@ export default function UnitIssueGroup({ group, expanded, busy, onToggle, onOpen
                       className={`${BTN_SECONDARY} flex-none`}
                       disabled={busy}
                       onClick={() => onClear([issue])}
-                      aria-label={`Clear for Logistics: ${group.unit}, ${issue.item}`}
+                      aria-label={`Send to Logistics: ${group.unit}, ${issue.item}`}
                     >
-                      Clear for Logistics
+                      Send to Logistics
                     </button>
                   )}
                 />
@@ -72,7 +72,7 @@ export default function UnitIssueGroup({ group, expanded, busy, onToggle, onOpen
             </ul>
             {count > 1 && (
               <button type="button" data-testid="captain5-clear-unit" className={`${BTN_SECONDARY} w-full sm:w-auto`} disabled={busy} onClick={() => onClear(group.issues)}>
-                Clear all {count} for Logistics
+                Send all {count} to Logistics
               </button>
             )}
           </>

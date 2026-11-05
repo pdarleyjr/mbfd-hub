@@ -35,6 +35,9 @@
             };
         @endphp
 
+        @php
+            $bunkerWaiting = $threads->filter(fn ($t) => $t->isBunkerGear() && $t->last_message_side === \App\Models\EmployeeMessaging\EmployeeLogisticsMessage::SIDE_MEMBER)->count();
+        @endphp
         <div class="emsg-panel" wire:poll.30s.visible="poll" aria-labelledby="emsg-widget-title">
             <header class="emsg-panel__header">
                 <div class="flex flex-wrap items-center gap-2">
@@ -44,6 +47,12 @@
                     @endif
                     @if ($unread > 0)
                         <span class="emsg-unread-dot">{{ $unread }} unread</span>
+                    @endif
+                    @if ($bunkerWaiting > 0)
+                        <span class="emsg-bunker emsg-bunker--summary" data-emsg-bunker-summary>
+                            <svg class="emsg-bunker__icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v5c0 5 3.4 8.4 8 10 4.6-1.6 8-5 8-10V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+                            <span class="emsg-bunker__label">{{ $bunkerWaiting }} bunker gear cleaning {{ \Illuminate\Support\Str::plural('request', $bunkerWaiting) }} waiting</span>
+                        </span>
                     @endif
                 </div>
                 <a class="emsg-link-button" href="{{ \App\Filament\Admin\Pages\EmployeeMessages::getUrl() }}">View all messages</a>
@@ -74,7 +83,7 @@
                                 type="button"
                                 data-emsg-row
                                 wire:click="toggleThread({{ $row->id }})"
-                                @class(['emsg-row', 'emsg-row--unread' => $rowUnread])
+                                @class(['emsg-row', 'emsg-row--unread' => $rowUnread, 'emsg-row--bunker' => $row->isBunkerGear()])
                                 aria-expanded="{{ $isOpen ? 'true' : 'false' }}"
                                 aria-controls="emsg-widget-conversation-{{ $row->id }}"
                                 aria-current="{{ $isOpen ? 'true' : 'false' }}"

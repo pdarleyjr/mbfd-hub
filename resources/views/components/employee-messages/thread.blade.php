@@ -14,20 +14,37 @@
     @endif
     @forelse ($messages as $message)
         @php
-            $fromLogistics = $message->isFromLogistics();
-            $mine = ($viewerSide === \App\Models\EmployeeMessaging\EmployeeLogisticsMessage::SIDE_LOGISTICS) === $fromLogistics;
-            $sideLabel = $fromLogistics ? 'Support Services' : 'Member';
+            $staffView = $viewerSide === \App\Models\EmployeeMessaging\EmployeeLogisticsMessage::SIDE_LOGISTICS;
+            $fromAssistant = $message->isFromAssistant();
+            // Members see the automated reply exactly like a Support Services reply (owner decision); staff see it marked.
+            $fromLogistics = $message->isFromLogistics() || ($fromAssistant && ! $staffView);
+            $markAssistant = $fromAssistant && $staffView;
+            // The automated reply is never "mine" for staff: it is not something a team member wrote.
+            $mine = ! $fromAssistant && $staffView === $message->isFromLogistics();
+            $sideLabel = $markAssistant ? (string) config('ai_automation.staff_label', 'Support Services (automated)') : ($fromLogistics ? 'Support Services' : 'Member');
             $local = $message->created_at?->copy()->timezone($zone);
         @endphp
-        <li wire:key="emsg-message-{{ $message->id }}" @class(['emsg-bubble', 'emsg-bubble--mine' => $mine, 'emsg-bubble--theirs' => ! $mine, 'emsg-bubble--logistics' => $fromLogistics])>
+        <li wire:key="emsg-message-{{ $message->id }}" @class(['emsg-bubble', 'emsg-bubble--mine' => $mine, 'emsg-bubble--theirs' => ! $mine, 'emsg-bubble--logistics' => $fromLogistics, 'emsg-bubble--assistant' => $markAssistant])>
             <div class="emsg-bubble__meta">
                 <span class="emsg-bubble__side">{{ $sideLabel }}</span>
-                <span class="emsg-bubble__author">{{ $message->author_name }}</span>
+                @unless ($fromAssistant)
+                    <span class="emsg-bubble__author">{{ $message->author_name }}</span>
+                @endunless
                 @if ($local)
                     <time class="emsg-bubble__time" datetime="{{ $local->toIso8601String() }}" title="{{ $local->format('l, F j, Y g:i A') }}">{{ $local->isSameDay(now($zone)) ? $local->format('g:i A') : $local->format('M j, g:i A') }}</time>
                 @endif
             </div>
-            <p class="emsg-bubble__body">{{ $message->body }}</p>
+            @php $long = mb_strlen((string) $message->body) > 600 || substr_count((string) $message->body, "\n") > 8; @endphp
+            @if ($long)
+                <div x-data="{ open: false }">
+                    <div class="emsg-bubble__body" :class="open ? '' : 'emsg-bubble__body--clamped'" id="emsg-body-{{ $message->id }}">{{ $message->body }}</div>
+                    <button type="button" class="emsg-showmore" x-on:click="open = ! open" :aria-expanded="open ? 'true' : 'false'" aria-controls="emsg-body-{{ $message->id }}" data-emsg-showmore>
+                        <span x-text="open ? 'Show less' : 'Show full message'">Show full message</span>
+                    </button>
+                </div>
+            @else
+                <div class="emsg-bubble__body">{{ $message->body }}</div>
+            @endif
         </li>
     @empty
         <li class="emsg-thread__empty">{{ $emptyText }}</li>

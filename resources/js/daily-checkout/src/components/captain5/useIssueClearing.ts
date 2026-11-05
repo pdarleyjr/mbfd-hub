@@ -4,7 +4,7 @@ import { Captain5ApiError, performIssueAction } from '../../utils/captain5Api';
 import { newKey } from './format';
 import type { IssueActionName, IssueSummary } from './types';
 
-type ClearingAction = Extract<IssueActionName, 'send_to_logistics' | 'bring_back_to_captain5'>;
+type ClearingAction = Extract<IssueActionName, 'send_to_logistics' | 'bring_back_to_captain5' | 'clear_resolution'>;
 
 /** Only what a run needs of an issue: the Undo list holds these with the tokens the server just returned. */
 type Target = Pick<IssueSummary, 'id' | 'state_token'>;
@@ -29,16 +29,18 @@ const plural = (count: number, one: string, many: string): string => (count === 
 /** Plain English for what a run did, including anything it did not do. */
 export function describeRun(action: ClearingAction, total: number, tally: Pick<Tally, 'changed' | 'failed' | 'refusal'> & { done: number }): string {
   const clearing = action === 'send_to_logistics';
-  const notDone = clearing ? 'not cleared' : 'not brought back';
+  const dropping = action === 'clear_resolution';
+  const notDone = clearing ? 'not sent' : dropping ? 'not cleared' : 'not brought back';
   const problems: string[] = [];
   if (tally.changed > 0) problems.push(`${tally.changed} changed and ${plural(tally.changed, 'was', 'were')} ${notDone}.`);
   if (tally.failed > 0) problems.push(`${tally.failed} could not be sent. Try again.`);
   if (tally.refusal) problems.push(tally.refusal);
   if (problems.length === 0) {
+    if (dropping) return total === 1 ? 'Cleared from the resolved list.' : `Cleared all ${total} from the resolved list.`;
     if (!clearing) return total === 1 ? 'Brought back to the Captain 5 queue.' : `Brought back all ${total} to the Captain 5 queue.`;
-    return total === 1 ? 'Cleared from Captain 5. It stays open with Logistics.' : `Cleared all ${total} from Captain 5. They stay open with Logistics.`;
+    return total === 1 ? 'Sent to Logistics. It stays open with Logistics.' : `Sent all ${total} to Logistics. They stay open with Logistics.`;
   }
-  return `${clearing ? 'Cleared' : 'Brought back'} ${tally.done} of ${total}. ${problems.join(' ')}`;
+  return `${clearing ? 'Sent' : dropping ? 'Cleared' : 'Brought back'} ${tally.done} of ${total}. ${problems.join(' ')}`;
 }
 
 /**

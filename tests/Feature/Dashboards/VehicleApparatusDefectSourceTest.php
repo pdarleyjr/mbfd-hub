@@ -157,7 +157,7 @@ final class VehicleApparatusDefectSourceTest extends TestCase
         $resolvedToday = $this->defect('Axe', ['action_status' => DefectActionStatus::RESOLVED]);
         $resolvedToday->forceFill(['resolved_at' => '2026-10-30 13:30:00'])->save();
         $resolvedYesterday = $this->defect('Pike pole', ['action_status' => DefectActionStatus::RESOLVED]);
-        $resolvedYesterday->forceFill(['resolved_at' => '2026-10-29 11:00:00'])->save();
+        $resolvedYesterday->forceFill(['resolved_at' => '2026-10-26 11:00:00'])->save(); // past the 72 hour display window
         $dismissedToday = $this->defect('Wrong item', ['action_status' => DefectActionStatus::DISMISSED]);
         $dismissedToday->forceFill(['resolved_at' => '2026-10-30 13:40:00'])->save();
 
@@ -197,13 +197,17 @@ final class VehicleApparatusDefectSourceTest extends TestCase
         $this->assertSame('2026-11-01 13:00:00', $at->fresh()->resolved_at->utc()->format('Y-m-d H:i:s'));
 
         $ids = fn (string $now): array => array_map(static fn ($row): int => (int) $row->id, $this->allRows($this->source, $admin, $this->boardQuery($now)));
-        $this->assertSame([$at->id], $ids('2026-11-01 09:00:00'));
-        $this->assertSame(1, $this->source->counts($admin, $this->boardQuery('2026-11-01 09:00:00'))['resolved_today']);
-        // At 07:59 on the next morning the same window is still active; at 08:00 it has rolled over.
-        $this->assertSame([$at->id], $ids('2026-11-02 07:59:00'));
-        $this->assertSame([], $ids('2026-11-02 08:00:00'));
+        $today = fn (string $now): int => $this->source->counts($admin, $this->boardQuery($now))['resolved_today'];
+        // "Completed today" still follows the operational day...
+        $this->assertSame(1, $today('2026-11-01 09:00:00'));
+        $this->assertSame(1, $today('2026-11-02 07:59:00'));
+        $this->assertSame(0, $today('2026-11-02 08:00:00'));
         // Before 08:00 on the 1st, the previous day (Oct 31 08:00 EDT onwards) holds the 07:59 resolution.
-        $this->assertSame([$before->id], $ids('2026-11-01 07:59:00'));
+        $this->assertSame(1, $today('2026-11-01 07:59:00'));
+        // ...while the rows stay on the board for the display window (72 hours), cleared or not.
+        $this->assertEqualsCanonicalizing([$at->id, $before->id], $ids('2026-11-01 09:00:00'));
+        $this->assertEqualsCanonicalizing([$at->id, $before->id], $ids('2026-11-02 08:00:00'));
+        $this->assertSame([], $ids('2026-11-04 12:00:00'));
     }
 
     public function test_acknowledge_goes_through_the_corrective_action_service_and_the_defects_list_shows_it(): void

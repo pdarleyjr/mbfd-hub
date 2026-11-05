@@ -84,7 +84,12 @@ export function MyChecksList({ api, goForm, goForms, goDetail, refreshKey }: Lis
                         <li key={check.id}>
                             <button type="button" className="nc-row" onClick={() => goDetail(check.id)} data-testid="narcotics-row">
                                 {check.image.thumb_url
-                                    ? <img src={check.image.thumb_url} alt="" className="nc-thumb" loading="lazy" width={72} height={72} />
+                                    ? (
+                                        <span className="nc-thumb-wrap">
+                                            <img src={check.image.thumb_url} alt="" className="nc-thumb" loading="lazy" width={72} height={72} />
+                                            {(check.photo_count ?? 1) > 1 && <span className="nc-thumb-count" aria-label={`${check.photo_count} photos`}>{check.photo_count}</span>}
+                                        </span>
+                                    )
                                     : <span className="nc-thumb nc-thumb--gone" aria-hidden="true">Photo removed</span>}
                                 <span className="nc-row-text">
                                     <span className="nc-row-top"><StatusBadge status={check.status} label={check.status_label} /></span>
@@ -127,12 +132,13 @@ export function CheckDetail({ api, id, goMine, goForms, goDetail, resubmit }: De
     const [check, setCheck] = useState<NarcoticsCheckDetail | null>(null);
     const [error, setError] = useState<NarcoticsApiError | null>(null);
     const [viewing, setViewing] = useState(false);
+    const [shown, setShown] = useState(0);
 
     const load = useCallback(async () => {
         try { setCheck(await api.show(id)); setError(null); } catch (caught) { setError(caught instanceof NarcoticsApiError ? caught : new NarcoticsApiError('That check could not be loaded.', 0)); }
     }, [api, id]);
 
-    useEffect(() => { setCheck(null); setError(null); void load(); }, [load]);
+    useEffect(() => { setCheck(null); setError(null); setShown(0); void load(); }, [load]);
     // A pending check changes when Captain 5 decides: look again quietly while it is open and the page is visible.
     useEffect(() => {
         if (check?.status !== 'pending') return undefined;
@@ -154,6 +160,11 @@ export function CheckDetail({ api, id, goMine, goForms, goDetail, resubmit }: De
         );
     }
     if (!check) return <div className="nc nc-app"><div className="nc-loading"><Spinner label="Opening the narcotics check…" /></div></div>;
+
+    // Every photo, photo 1 first; an older answer has only `image`.
+    const photos = check.photos && check.photos.length > 0 ? check.photos : [{ ...check.image, position: 1 }];
+    const current = photos[Math.min(shown, photos.length - 1)];
+    const several = photos.length > 1;
 
     return (
         <div className="nc nc-app" data-testid="narcotics-detail">
@@ -187,13 +198,26 @@ export function CheckDetail({ api, id, goMine, goForms, goDetail, resubmit }: De
             )}
 
             <section className="nc-card" aria-labelledby="nc-detail-photo">
-                <h2 id="nc-detail-photo">Photo</h2>
-                {check.image.available && check.image.preview_url ? (
-                    <button type="button" className="nc-preview-frame" onClick={() => setViewing(true)} aria-label="Zoom in on the photo">
-                        <img src={check.image.preview_url} alt={`Narcotics check photo sent ${when(check.submitted_at)}`} />
-                        <span className="nc-zoom-hint"><ZoomIn size={16} aria-hidden="true" /> Tap to zoom</span>
-                    </button>
-                ) : <p className="nc-hint">The photo file was removed under the retention policy. The record and the decision are kept.</p>}
+                <h2 id="nc-detail-photo">{several ? `Photos (${photos.length})` : 'Photo'}</h2>
+                {current.available && current.preview_url ? (
+                    <div className="nc-gallery">
+                        <button type="button" className="nc-preview-frame" onClick={() => setViewing(true)} aria-label={several ? `Zoom in on photo ${current.position}` : 'Zoom in on the photo'} data-testid="narcotics-detail-photo">
+                            <img src={current.preview_url} alt={`Narcotics check photo ${several ? `${current.position} of ${photos.length} ` : ''}sent ${when(check.submitted_at)}`} />
+                            <span className="nc-zoom-hint"><ZoomIn size={16} aria-hidden="true" /> Tap to zoom</span>
+                        </button>
+                        {several && (
+                            <ul className="nc-gallery-strip" aria-label="Choose a photo">
+                                {photos.map((photo, index) => (
+                                    <li key={photo.position}>
+                                        <button type="button" onClick={() => setShown(index)} aria-current={photo.position === current.position ? 'true' : undefined} aria-label={`Show photo ${photo.position}`}>
+                                            {photo.thumb_url && <img src={photo.thumb_url} alt="" loading="lazy" />}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                ) : <p className="nc-hint">The {several ? 'photo files were' : 'photo file was'} removed under the retention policy. The record and the decision are kept.</p>}
                 <p className="nc-note" data-testid="narcotics-detail-unit"><strong>Rescue unit:</strong> {unitText(check)}</p>
                 <p className="nc-note" data-testid="narcotics-detail-seal"><strong>Seal number:</strong> {sealText(check)}</p>
                 {check.member_note && <p className="nc-note"><strong>Your note:</strong> {check.member_note}</p>}
@@ -212,7 +236,7 @@ export function CheckDetail({ api, id, goMine, goForms, goDetail, resubmit }: De
             </section>
 
             <div className="nc-actions"><Button appearance="subtle" onClick={goForms}>Back to Forms</Button></div>
-            {viewing && check.image.full_url && <PhotoViewer src={check.image.full_url} alt="Narcotics check photo" onClose={() => setViewing(false)} />}
+            {viewing && current.full_url && <PhotoViewer src={current.full_url} alt={several ? `Narcotics check photo ${current.position}` : 'Narcotics check photo'} onClose={() => setViewing(false)} />}
         </div>
     );
 }

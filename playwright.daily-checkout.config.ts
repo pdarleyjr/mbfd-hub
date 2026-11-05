@@ -47,7 +47,7 @@ const responsiveViewports = [
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /(canonical-login-responsive|command-communications|command-300-shift|daily-checkout-(inspection|responsive|service-worker|workspace|mobile|vehicle-confirmation)|daily-issue-report|daily-issue-history|daily-inventory-correction|daily-(?:station-)?vehicle-identification|daily-station-overview|daily-changeout|captain5-workspace|captain5-(?:submitted-forms|master-inventory|supply-data))\.spec\.ts/,
+  testMatch: /(canonical-login-responsive|command-communications|command-300-(?:shift|board)|daily-checkout-(inspection|responsive|service-worker|workspace|mobile|vehicle-confirmation)|daily-issue-report|daily-issue-history|daily-inventory-correction|daily-(?:station-)?vehicle-identification|daily-station-overview|daily-changeout|captain5-workspace|captain5-(?:submitted-forms|master-inventory|supply-data))\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
   // Every spec here mocks the API per test in a fresh browser context and writes only to its own
@@ -159,7 +159,7 @@ export default defineConfig({
     },
     ...responsiveViewports.map(({ name, width, height }) => ({
       name: `daily-responsive-${name}`,
-      testMatch: /(canonical-login-responsive|command-communications|command-300-shift|daily-checkout-responsive|daily-checkout-workspace|daily-checkout-mobile)\.spec\.ts/,
+      testMatch: /(canonical-login-responsive|command-communications|command-300-(?:shift|board)|daily-checkout-responsive|daily-checkout-workspace|daily-checkout-mobile)\.spec\.ts/,
       use: {
         browserName: 'chromium' as const,
         viewport: { width, height },

@@ -96,7 +96,7 @@ final class LogisticsDashboardNotesAndAttributionTest extends TestCase
         $issues = app(StationOperationsHubWidget::class)->getViewData()['department']['inspectionQueues']['issues'];
 
         $this->assertSame([$defect->id], array_column($issues['rows'], 'id'));
-        $this->assertSame('Awaiting verification · reported by FF Sam Crew', $issues['rows'][0]['status']);
+        $this->assertSame('New — not yet acknowledged · reported by FF Sam Crew', $issues['rows'][0]['status']);
     }
 
     public function test_the_notes_card_lists_internal_notes_and_member_messages_with_links_to_the_daily(): void

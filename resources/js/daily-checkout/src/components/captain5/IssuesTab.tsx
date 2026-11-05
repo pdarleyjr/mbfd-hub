@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CircleCheck } from 'lucide-react';
 import { EmptyState } from '../ui/StateViews';
 import ClearedIssues from './ClearedIssues';
+import RecentlyResolved from './RecentlyResolved';
 import UnitIssueGroup from './UnitIssueGroup';
 import { QUEUE_FILTERS, applyFilters, type KindFilter, type QueueFilter } from './filters';
 import { sortQueue } from './format';
@@ -128,6 +129,14 @@ export default function IssuesTab({ workspace, queue, kind, targetIssueId, onFil
           action={<button type="button" className={BTN_SECONDARY} onClick={() => onFilter('all', 'all')}>Show all open issues</button>}
         />
       )}
+
+      <RecentlyResolved
+        issues={workspace.recently_resolved ?? []}
+        hours={workspace.resolved_display_hours ?? 72}
+        busy={clearing.busy}
+        onOpen={onOpen}
+        onClear={(issue) => void clearing.run('clear_resolution', [issue])}
+      />
 
       <ClearedIssues
         issues={workspace.cleared_issues}

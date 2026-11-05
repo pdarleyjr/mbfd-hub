@@ -350,12 +350,14 @@ test.describe.serial('Narcotics check', () => {
       const [pngLeft, pngRight] = await previewColours(page, [[0.2, 0.5], [0.8, 0.5]]);
       expect(isRed(pngLeft), `PNG left half is red, got ${pngLeft}`).toBe(true);
       expect(isBlue(pngRight), `PNG right half is blue, got ${pngRight}`).toBe(true);
-      await expect(page.getByRole('button', { name: 'Retake photo' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Choose a different photo' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Take another photo' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Upload more photos' })).toBeVisible();
 
-      // Replace it with the sideways phone JPEG while watching nothing leaves the browser yet.
+      // Remove it, then choose the sideways phone JPEG while watching nothing leaves the browser yet.
       const posts: string[] = [];
       page.on('request', (request) => { if (request.method() === 'POST' && request.url().includes('/api/narcotics-checks')) posts.push(request.url()); });
+      await page.getByRole('button', { name: 'Remove photo 1' }).click();
+      await expect(page.getByTestId('narcotics-preview')).toHaveCount(0);
       await chooseFile(page, phoneJpeg());
       await expect.poll(async () => (await previewDimensions(page)).height, { message: 'the JPEG replaced the PNG' }).toBeGreaterThan(png.height);
       const jpeg = await previewDimensions(page);
@@ -851,6 +853,98 @@ test.describe.serial('Narcotics check', () => {
     } finally {
       await anonymous.close();
     }
+  });
+
+  test('member: several photos in one check, added together and one by one, one removed; Captain 5 sees and zooms each', async ({ browser }, info) => {
+    const state = run(info);
+    const note = `Three boxes ${state.token} (photos)`;
+    let checkId = '';
+    await as(browser, info, 'member', async ({ page }) => {
+      await page.goto(FORM_URL);
+      await expect(formHeading(page)).toBeVisible();
+      await expect(uploadInput(page)).toHaveAttribute('multiple', '');
+      // Two at once from the picker, then a third on its own.
+      await uploadInput(page).setInputFiles([phoneJpeg(), screenshotPng()].map((photo) => ({ name: photo.name, mimeType: photo.mimeType, buffer: photo.buffer })));
+      await expect(page.getByTestId('narcotics-preview')).toHaveCount(2);
+      await chooseFile(page, makePhoto('png', 1200, 1600, 1, 'Box_3.png'));
+      await expect(page.getByTestId('narcotics-preview')).toHaveCount(3);
+      await expect(page.getByRole('heading', { name: /Photos \(3 of 10\)/ })).toBeVisible();
+      await expectTouchTargets(info, [page.getByRole('button', { name: 'Remove photo 1' }), page.getByTestId('narcotics-take'), page.getByTestId('narcotics-upload')]);
+      await expectNoHorizontalOverflow(page);
+      await shot(page, info, '40-form-three-photos');
+
+      // Each tile zooms on its own.
+      await page.getByRole('button', { name: 'Zoom in on photo 2' }).click();
+      const viewer = page.getByRole('dialog', { name: 'Photo viewer' });
+      await expect(viewer).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(viewer).toHaveCount(0);
+
+      // A fourth, then removed again: what is sent is what is on screen.
+      await chooseFile(page, makePhoto('jpeg', 1600, 1200, 1, 'Extra.jpg'));
+      await expect(page.getByTestId('narcotics-preview')).toHaveCount(4);
+      await page.getByRole('button', { name: 'Remove photo 4' }).click();
+      await expect(page.getByTestId('narcotics-preview')).toHaveCount(3);
+
+      await chooseUnit(page, { choice: 'R3' });
+      await sealField(page).fill('MULTI-3');
+      await page.getByTestId('narcotics-note').fill(note);
+      const uploads: string[] = [];
+      page.on('request', (request) => { if (request.method() === 'POST' && request.url().endsWith('/api/narcotics-checks')) uploads.push(request.url()); });
+      await sendButton(page).click();
+      // The server re-encodes three photos before it answers.
+      await expect(page.getByRole('heading', { name: SENT })).toBeVisible({ timeout: 60_000 });
+      expect(uploads, 'one request carries every photo').toHaveLength(1);
+
+      const check = await checkWithNote(page, note) as ApiCheck & { photo_count: number; photos: Array<{ position: number; width: number; height: number; available: boolean }> };
+      checkId = check.id;
+      expect(check.photo_count).toBe(3);
+      expect(check.photos.map((photo) => photo.position)).toEqual([1, 2, 3]);
+      expect(check.photos[0].height, 'photo 1 is the sideways phone JPEG, stood upright').toBeGreaterThan(check.photos[0].width);
+      expect(check.photos[2].height).toBeGreaterThan(check.photos[2].width);
+      for (const position of [1, 2, 3]) {
+        expect((await page.request.get(`/api/narcotics-checks/${check.id}/photos/${position}/thumb`)).status()).toBe(200);
+      }
+      expect((await page.request.get(`/api/narcotics-checks/${check.id}/photos/4/thumb`)).status()).toBe(404);
+
+      await page.goto(`${FORM_URL}&check=${check.id}`);
+      await expect(page.getByRole('heading', { name: 'Photos (3)' })).toBeVisible();
+      await page.getByRole('button', { name: 'Show photo 3' }).click();
+      await expect(page.getByTestId('narcotics-detail-photo')).toHaveAccessibleName('Zoom in on photo 3');
+      await expectNoHorizontalOverflow(page);
+      await shot(page, info, '41-member-detail-three-photos');
+    });
+
+    await as(browser, info, 'other', async ({ page }) => {
+      expect((await page.request.get(`/api/narcotics-checks/${checkId}/photos/2/full`)).status(), 'another member never sees photo 2').toBe(404);
+    });
+
+    await as(browser, info, 'captain5', async ({ page }) => {
+      await openNarcoticsTab(page);
+      const row = reviewRow(page, note);
+      await expect(row.getByTestId('narcotics-row-photo-count')).toHaveText('3');
+      await row.click();
+      await expect(sheet(page)).toBeVisible();
+      const strip = sheet(page).getByTestId('narcotics-photo-strip');
+      await expect(strip.getByRole('button')).toHaveCount(3);
+      await strip.getByRole('button', { name: 'Show photo 2 of 3' }).click();
+      await expect(page.getByTestId('narcotics-photo')).toHaveAccessibleName('Zoom in on photo 2 of 3');
+      const shownPhoto = page.getByTestId('narcotics-photo').locator('img');
+      await expect(shownPhoto).toHaveAttribute('src', /\/photos\/2\/preview$/);
+      // The picture was swapped: wait for photo 2 itself to finish loading before measuring it.
+      await expect.poll(() => shownPhoto.evaluate((element) => (element as HTMLImageElement).complete && (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+      await imageIsSharp(page, shownPhoto, 1200);
+      await page.getByTestId('narcotics-photo').click();
+      const zoom = page.getByTestId('narcotics-zoom');
+      await expect(zoom).toBeVisible();
+      await expect(zoom.locator('img')).toHaveAttribute('src', new RegExp(`/photos/2/full$`));
+      await zoom.getByRole('button', { name: 'Close photo' }).click();
+      await expectTouchTargets(info, [strip.getByRole('button').first()]);
+      await expectNoHorizontalOverflow(page);
+      await shot(page, info, '42-captain5-three-photos');
+      await page.getByTestId('narcotics-approve').click();
+      await expect(page.getByTestId('narcotics-notice')).toContainText('Approved and archived');
+    });
   });
 });
 

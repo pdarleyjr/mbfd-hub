@@ -27,6 +27,8 @@
         // so the shell navigation hands them the inspection as their own entry.
         $takeHomeFallback = collect($hubNavigation['moreNavigation'])->firstWhere('key', 'take-home-inspection');
         $showDailyRoster = app(\App\Services\Security\DailyRosterAccess::class)->canSeeHomeEntry($currentUser);
+        // Unit Status shows on-duty names, so it follows the Daily Roster's own access rule (and its feature flag).
+        $showUnitStatus = (bool) config('unit_status.enabled') && app(\App\Services\Security\DailyRosterAccess::class)->canView($currentUser);
         $quickAccessItems = [
             [
                 'title' => 'Station / Vehicles / Equipment',
@@ -145,7 +147,7 @@
     <main id="main-content" class="hub-page">
         <section class="home-today" aria-labelledby="home-greeting">
             <x-hub.home-duty :lines="$dutyLines" />
-            @if($showEmployeePortal || $showDailyRoster || $commandBoardUrl !== null)
+            @if($showEmployeePortal || $showDailyRoster || $showUnitStatus || $commandBoardUrl !== null)
                 <div class="hub-page-header__actions">
                     @if($showEmployeePortal)
                     <a href="{{ url('/daily/vehicle-inspections') }}" data-important-target class="hub-btn hub-btn--primary hub-btn--field">
@@ -154,14 +156,20 @@
                     </a>
                     @endif
                     @if($showDailyRoster)
-                        <a href="{{ route('daily-roster.show') }}" data-important-target data-home-daily-roster class="hub-btn hub-btn--secondary hub-btn--field">
+                        <a href="{{ route('daily-roster.show') }}" data-important-target data-home-daily-roster class="hub-btn hub-btn--brand hub-btn--field">
                             <x-heroicon-o-calendar-days class="hub-btn__icon" aria-hidden="true" />
                             Daily Roster
                         </a>
                     @endif
+                    @if($showUnitStatus)
+                        <a href="{{ route('unit-status.show') }}" data-important-target data-home-unit-status class="hub-btn hub-btn--brand hub-btn--field">
+                            <x-heroicon-o-signal class="hub-btn__icon" aria-hidden="true" />
+                            Unit Status
+                        </a>
+                    @endif
                     {{-- Only for members Command300Access admits. The board's own Hub sign-in checks the same rule again. --}}
                     @if($commandBoardUrl !== null)
-                        <a href="{{ $commandBoardUrl }}" target="_blank" rel="noopener noreferrer" data-important-target data-home-command-board class="hub-btn hub-btn--secondary hub-btn--field">
+                        <a href="{{ $commandBoardUrl }}" target="_blank" rel="noopener noreferrer" data-important-target data-home-command-board class="hub-btn hub-btn--brand hub-btn--field">
                             <x-heroicon-o-squares-2x2 class="hub-btn__icon" aria-hidden="true" />
                             Command Board<span class="hub-visually-hidden"> (opens in a new tab)</span>
                         </a>
@@ -284,8 +292,8 @@
                             </details>
                         @endif
 
-                        {{-- Training Tools: the same native disclosure as Additional Links (summary/details carries keyboard and screen reader behavior). --}}
-                        <details data-training-tools class="hub-tile hub-tile--training hub-additional bg-hub-surface">
+                        {{-- Training Tools: the same native disclosure as Additional Links (summary/details carries keyboard and screen reader behavior). /#training-tools (the Command Board Sandbox's way back) opens it: resources/js/home-duty.js. --}}
+                        <details data-training-tools class="hub-tile hub-tile--training hub-additional bg-hub-surface" id="training-tools">
                             <summary class="hub-additional__summary">
                                 <svg class="hub-tile__glyph" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"></path></svg>
                                 <span class="hub-tile__body">

@@ -64,7 +64,7 @@ final class StaffCheckController extends Controller
             ]);
 
             $archive = ($f['scope'] ?? 'inbox') === 'archive';
-            $query = NarcoticsCheck::query()->with(['resubmission:id,uuid,resubmission_of_id', 'resubmissionOf:id,uuid']);
+            $query = NarcoticsCheck::query()->with(['resubmission:id,uuid,resubmission_of_id', 'resubmissionOf:id,uuid', 'extraPhotos']);
             $archive ? $query->archived() : $query->inbox();
             if ($archive && isset($f['status'])) {
                 $query->where('status', $f['status']);
@@ -122,7 +122,7 @@ final class StaffCheckController extends Controller
     {
         $check = NarcoticsCheck::query()
             ->where('uuid', Str::lower($uuid))
-            ->with(['resubmission:id,uuid,resubmission_of_id', 'resubmissionOf:id,uuid'])
+            ->with(['resubmission:id,uuid,resubmission_of_id', 'resubmissionOf:id,uuid', 'extraPhotos'])
             ->first();
         if ($check === null) {
             throw EmsException::notFound('narcotics check');

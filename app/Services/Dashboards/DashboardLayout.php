@@ -164,15 +164,9 @@ final class DashboardLayout
      */
     private static function groups(array $issues, DashboardSnapshot $s): array
     {
-        // Alert lists show what still needs someone. A unit whose items were all decided drops off; its history stays on its own page.
-        $pending = array_values(array_filter(
-            IssueGroups::of($issues),
-            static fn (array $group): bool => array_filter($group['issues'], static fn (DashboardIssue $issue): bool => $issue->isOpen()) !== [],
-        ));
-
         return array_map(
             static fn (array $group): array => IssuePresenter::groupRow($group, $s->laneFor($group['issues'][0]), IssueGroupPage::getUrl(['group' => $group['key']], panel: 'admin')),
-            $pending,
+            IssueGroups::of($issues),
         );
     }
 }

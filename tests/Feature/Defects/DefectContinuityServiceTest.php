@@ -193,11 +193,11 @@ final class DefectContinuityServiceTest extends TestCase
         $this->assertDatabaseCount('apparatus_defect_observations', 1);
     }
 
-    public function test_present_on_an_open_defect_is_recorded_as_appears_corrected_but_never_resolves_it(): void
+    public function test_present_on_an_open_damaged_defect_is_recorded_as_appears_corrected_but_waits_for_verification(): void
     {
         $apparatus = $this->apparatus();
         $reporter = User::factory()->create();
-        $this->record($apparatus, $this->inspection($apparatus, [$this->compartment('cab', 'Cab', [$this->item('cab-item-1', 'Radio', 'Missing')])], $reporter));
+        $this->record($apparatus, $this->inspection($apparatus, [$this->compartment('cab', 'Cab', [$this->item('cab-item-1', 'Radio', 'Damaged')])], $reporter));
         $defect = ApparatusDefect::query()->firstOrFail();
         $member = User::factory()->create();
 
@@ -439,7 +439,7 @@ final class DefectContinuityServiceTest extends TestCase
         $this->assertSame('front_cab', $row['compartment_id']);
         $this->assertSame('front_cab-item-1', $row['item_id']);
         $this->assertSame('reported', $row['action_status']);
-        $this->assertSame('Awaiting verification', $row['action_label']);
+        $this->assertSame('New — not yet acknowledged', $row['action_label']);
         $this->assertSame('routine', $row['severity']);
         $this->assertSame('Replacement is on the shelf', $row['latest_member_update']['text']);
         $this->assertStringNotContainsString('SECRET', json_encode($findings->all()));

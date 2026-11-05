@@ -25,6 +25,7 @@ use App\Notifications\Inspections\InspectionNotificationKind as Kind;
 use App\Services\Captain5\Captain5Notifier;
 use App\Services\Inventory\InventoryCorrectionReason;
 use App\Services\Notifications\NotificationRecipientEvaluator;
+use App\Services\Notifications\SupportAlertLevelFilter;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectSeverityCorrection;
 use App\Support\Fleet\InspectionReviewers;
@@ -93,6 +94,9 @@ final class InspectionNotificationDispatcher
     /** Significant damage was newly reported or an existing issue was escalated to significant. */
     public function issueEscalated(ApparatusDefect $defect, ApparatusInspection $inspection): void
     {
+        if ($defect->getAttribute('responsible_owner') === ApparatusDefect::OWNER_CAPTAIN5 && app(Captain5Notifier::class)->canReachCaptain5Side()) {
+            return; // Captain 5 and the EMS Captain are told by Captain5Notifier; one owner, one alert
+        }
         $this->guard('issueEscalated', function () use ($defect, $inspection): void {
             $unit = $this->unitLabel($this->physicalApparatus($inspection), $inspection->designation_at_time);
             $operator = trim((string) $inspection->operator_name) ?: 'A member';
@@ -108,6 +112,8 @@ final class InspectionNotificationDispatcher
                     'body' => "{$operator} reported significant damage to {$item} on ".$this->date($inspection->completed_at ?? $inspection->created_at).'.',
                     'url' => $this->adminUrl((int) $inspection->getKey(), 'issue-'.$defect->getKey()),
                 ],
+                null,
+                ['type' => 'apparatus_defect', 'id' => (int) $defect->getKey()],
             );
         });
     }
@@ -224,14 +230,17 @@ final class InspectionNotificationDispatcher
             $reportedOn = $this->date($defect->first_reported_at ?? $defect->reported_date ?? $defect->created_at);
             $resolvedOn = $this->date($event->created_at);
             $type = (string) (($event->details['resolution_type'] ?? null) ?: $defect->resolution_type);
-            $body = sprintf(
-                'The %s reported on %s %s. Logistics marked the issue resolved on %s.',
-                $this->issuePhrase($defect),
-                $reportedOn,
-                $this->resolutionPhrase($type),
-                $resolvedOn,
-            );
             $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
+            $body = $event->event_type === 'member_resolved'
+                // A member closed it (docs/unified-activity-and-ownership.md section 3): say who, never "Logistics".
+                ? sprintf('The %s reported on %s was marked fixed by %s on %s.', $this->issuePhrase($defect), $reportedOn, trim((string) ($actor?->display_name ?: $actor?->name)) ?: 'a member', $resolvedOn)
+                : sprintf(
+                    'The %s reported on %s %s. Logistics marked the issue resolved on %s.',
+                    $this->issuePhrase($defect),
+                    $reportedOn,
+                    $this->resolutionPhrase($type),
+                    $resolvedOn,
+                );
 
             $this->queue(
                 'defect:'.$defect->getKey().':resolved:'.$event->getKey(),
@@ -601,17 +610,21 @@ final class InspectionNotificationDispatcher
     /**
      * @param  Collection<int, User>  $candidates
      * @param  Closure(User): array{title: string, body: string, url: string}  $content
+     * @param  array{type: string, id: int}|null  $triage  Set only for an OPTIONAL staff triage alert about one record: people
+     *                                                     who turned that record's priority level off are not sent it (and get no
+     *                                                     ledger row). Mandatory alerts (approvals, holds, replies, updates on a
+     *                                                     member's own report) never pass it.
      */
-    private function queue(string $eventKey, string $kind, Collection $candidates, Closure $content, ?User $actor = null): void
+    private function queue(string $eventKey, string $kind, Collection $candidates, Closure $content, ?User $actor = null, ?array $triage = null): void
     {
         if ($this->replay !== null) {
-            $this->deliverReplay($kind, $candidates, $content, $actor);
+            $this->deliverReplay($kind, $candidates, $content, $actor, $triage);
 
             return;
         }
 
         $fresh = [];
-        foreach ($this->distinctRecipients($candidates, $actor, $kind, $eventKey) as $recipient) {
+        foreach ($this->withinTriageLevels($this->distinctRecipients($candidates, $actor, $kind, $eventKey), $triage) as $recipient) {
             $inserted = DB::table('inspection_notification_deliveries')->insertOrIgnore([
                 'event_key' => $eventKey,
                 'recipient_user_id' => $recipient->getKey(),
@@ -746,10 +759,11 @@ final class InspectionNotificationDispatcher
     /**
      * @param  Collection<int, User>  $candidates
      * @param  Closure(User): array{title: string, body: string, url: string}  $content
+     * @param  array{type: string, id: int}|null  $triage
      */
-    private function deliverReplay(string $kind, Collection $candidates, Closure $content, ?User $actor): void
+    private function deliverReplay(string $kind, Collection $candidates, Closure $content, ?User $actor, ?array $triage = null): void
     {
-        $recipient = $this->distinctRecipients($candidates, $actor, $kind, $this->replay['key'])
+        $recipient = $this->withinTriageLevels($this->distinctRecipients($candidates, $actor, $kind, $this->replay['key']), $triage)
             ->first(fn (User $user): bool => (int) $user->getKey() === $this->replay['user']);
         if ($recipient === null) {
             return; // no longer an eligible recipient (inactive, now the actor, or no longer following)
@@ -766,6 +780,21 @@ final class InspectionNotificationDispatcher
                 'exception' => $exception->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Drops people who turned this record's priority level off. Evaluated here, while the alert is being decided (inside
+     * the domain transaction, before the ledger row), so the record's own current data decides its level.
+     *
+     * @param  Collection<int, User>  $recipients
+     * @param  array{type: string, id: int}|null  $triage
+     * @return Collection<int, User>
+     */
+    private function withinTriageLevels(Collection $recipients, ?array $triage): Collection
+    {
+        return $triage === null
+            ? $recipients
+            : app(SupportAlertLevelFilter::class)->filter($recipients, $triage['type'], $triage['id']);
     }
 
     private function markDelivery(string $eventKey, User $recipient, string $status): void
@@ -913,10 +942,17 @@ final class InspectionNotificationDispatcher
         $name = trim((string) ($author->display_name ?: $author->name)) ?: 'A member';
         $about = $defect !== null ? ' about the '.$this->issuePhrase($defect) : '';
 
+        // On Captain 5's issue only the Logistics reviewers already in the conversation are told; Captain 5 is told
+        // by Captain5Notifier::memberReplied. Never the whole Logistics list for an issue Logistics does not work.
+        $recipients = InspectionReviewers::forThread($defect, $inspection);
+        if ($defect !== null && $defect->getAttribute('responsible_owner') === ApparatusDefect::OWNER_CAPTAIN5) {
+            $recipients = InspectionReviewers::participatingIn($defect);
+        }
+
         $this->queue(
             $eventKey,
             Kind::MEMBER_REPLY,
-            InspectionReviewers::forThread($defect, $inspection),
+            $recipients,
             fn (User $recipient): array => [
                 'title' => "{$unit}: member reply",
                 'body' => "{$name} replied{$about}: {$excerpt}",

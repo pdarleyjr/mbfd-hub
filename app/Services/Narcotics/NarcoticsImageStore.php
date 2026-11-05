@@ -65,38 +65,61 @@ final class NarcoticsImageStore
         $this->deletePaths($stored['disk'], [$stored['image_path'], $stored['preview_path'], $stored['thumb_path']]);
     }
 
-    /** Removes the files of a check (retention). Returns how many files were removed. */
+    /** @param list<array{disk: string, image_path: string, preview_path: string, thumb_path: string}> $stored */
+    public function discardAll(array $stored): void
+    {
+        foreach ($stored as $one) {
+            $this->discard($one);
+        }
+    }
+
+    /** Removes the files of a check, every photo of it (retention). Returns how many files were removed. */
     public function purge(NarcoticsCheck $check): int
     {
         $paths = [$check->image_path, $check->preview_path, $check->thumb_path];
         $this->deletePaths($check->image_disk, $paths);
+        $count = count($paths);
+        foreach ($check->extraPhotos()->get() as $photo) {
+            $this->deletePaths($photo->image_disk, [$photo->image_path, $photo->preview_path, $photo->thumb_path]);
+            $count += 3;
+        }
 
-        return count($paths);
+        return $count;
     }
 
-    /** @return array{bytes: string, mime: string, extension: string}|null null when the file is gone */
-    public function read(NarcoticsCheck $check, string $variant): ?array
+    /**
+     * One size of one photo. Position 1 is the check's own photo; 2 and up are its extra photos.
+     *
+     * @return array{bytes: string, mime: string, extension: string}|null null when the file is gone
+     */
+    public function read(NarcoticsCheck $check, string $variant, int $position = 1): ?array
     {
         if ($check->images_purged_at !== null) {
             return null;
         }
+        $photo = $position === 1
+            ? $check
+            : ($position > 1 ? $check->extraPhotos()->where('position', $position)->first() : null);
+        if ($photo === null) {
+            return null;
+        }
         $path = match ($variant) {
-            'thumb' => $check->thumb_path,
-            'preview' => $check->preview_path,
-            'full' => $check->image_path,
+            'thumb' => $photo->thumb_path,
+            'preview' => $photo->preview_path,
+            'full' => $photo->image_path,
             default => null,
         };
         if ($path === null) {
             return null;
         }
         try {
-            $disk = Storage::disk($check->image_disk);
+            $disk = Storage::disk($photo->image_disk);
             if (! $disk->exists($path)) {
                 return null;
             }
             $bytes = $disk->get($path);
         } catch (Throwable $exception) {
-            Log::error('Narcotics check photo could not be read', ['check' => $check->uuid, 'variant' => $variant, 'exception' => $exception->getMessage()]);
+            Log::error('Narcotics check photo could not be read', ['check' => $check->uuid, 'position' => $position, 'variant' => $variant, 'exception' => $exception->getMessage()]);
 
             return null;
         }
@@ -104,7 +127,7 @@ final class NarcoticsImageStore
             return null;
         }
 
-        return ['bytes' => $bytes, 'mime' => $check->image_mime, 'extension' => $check->image_mime === 'image/webp' ? 'webp' : 'jpg'];
+        return ['bytes' => $bytes, 'mime' => $photo->image_mime, 'extension' => $photo->image_mime === 'image/webp' ? 'webp' : 'jpg'];
     }
 
     /** @param list<string> $paths */

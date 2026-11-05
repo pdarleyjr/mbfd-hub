@@ -62,7 +62,7 @@ final class DefectActionStatus
     public static function labels(): array
     {
         return [
-            self::REPORTED => 'Awaiting verification',
+            self::REPORTED => 'New — not yet acknowledged',
             self::ACKNOWLEDGED => 'Acknowledged by Logistics',
             self::ACTION_PENDING => 'Action pending',
             self::REPLACEMENT_AVAILABLE => 'Replacement available',

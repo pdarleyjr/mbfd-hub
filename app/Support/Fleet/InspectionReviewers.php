@@ -68,6 +68,20 @@ final class InspectionReviewers
      *
      * @return Collection<int, User>
      */
+    /**
+     * Reviewers who already wrote on or acted on this issue, with no fallback to everyone (an issue Captain 5 owns).
+     *
+     * @return Collection<int, User>
+     */
+    public static function participatingIn(ApparatusDefect $defect): Collection
+    {
+        $involved = ApparatusIssueMessage::query()->where('apparatus_defect_id', $defect->getKey())->whereNotNull('author_user_id')->pluck('author_user_id')
+            ->merge(ApparatusDefectEvent::query()->where('apparatus_defect_id', $defect->getKey())->whereNotNull('actor_user_id')->pluck('actor_user_id'))
+            ->map(fn ($id): int => (int) $id)->unique()->all();
+
+        return self::all()->filter(fn (User $user): bool => in_array((int) $user->getKey(), $involved, true))->values();
+    }
+
     public static function forThread(?ApparatusDefect $defect, ?ApparatusInspection $inspection): Collection
     {
         $reviewers = self::all();
