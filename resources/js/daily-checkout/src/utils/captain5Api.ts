@@ -171,6 +171,7 @@ function normalizeTruckChange(raw: unknown, index: number): RescueTruckChange {
       const entry = asRecord(line);
       return { name: asText(entry.name) ?? 'Item', note: asText(entry.note) };
     }),
+    without_replacement: item.without_replacement === true,
   };
 }
 

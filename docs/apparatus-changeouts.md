@@ -28,7 +28,9 @@ schedule does.
 10. A front-line unit (`config/daily_checkout_frontline.php`) is never Out of Service; its truck can be. On the Apparatus
     pages, taking that truck out of service asks which truck runs as the unit and swaps. If none is available, a Fleet
     manager records it with `ApparatusChangeoutService::recordWithoutReplacement`: mode `no_replacement`, nothing moves, the
-    truck goes Out of Service, and Fleet is told exactly as for a swap. `FrontlineCoverage` warns on the Apparatus pages
+    truck goes Out of Service, and Fleet is told exactly as for a swap. The record has the same truck on both sides, so
+    readers that ask where a unit went or what it left (`ApparatusChangeout::scopeRealMoves`) skip it, and screens say
+    "E 1 kept on truck 20503 (no replacement available)". `FrontlineCoverage` warns on the Apparatus pages
     until a truck is swapped onto the unit, in the same words the `daily-checkout:apply-approved-policy` gate uses.
 
 ## 2. Records

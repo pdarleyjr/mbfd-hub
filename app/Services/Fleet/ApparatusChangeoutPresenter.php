@@ -26,6 +26,8 @@ final class ApparatusChangeoutPresenter
             'from_vehicle_number' => $changeout->from_vehicle_number,
             'to_vehicle_number' => $changeout->to_vehicle_number,
             'to_apparatus_id' => $changeout->to_apparatus_id,
+            // Nothing moved: an admin took the unit's only truck out of service (from and to are the same truck).
+            'without_replacement' => $changeout->isWithoutReplacement(),
             'station_id' => $changeout->station_id,
             'effective_at' => $changeout->effective_at?->utc()->toIso8601ZuluString(),
             'old_truck_status' => $audit['old_truck_status'] ?? ApparatusChangeout::OLD_TRUCK_STATUS,

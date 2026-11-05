@@ -46,8 +46,19 @@ function ReceiptBody({ summary }: { summary: ChangeoutSummary }) {
           {summary.message ?? `${summary.unit_designation} moved from truck ${fromTruck} to truck ${summary.to_vehicle_number ?? 'not recorded'}.`}
         </h1>
         <dl className="hub-well divide-y divide-hub-n-100 text-sm">
-          <DetailRow label="From truck" value={summary.from_vehicle_number ?? 'Not recorded'} />
-          <DetailRow label="To truck" value={summary.to_vehicle_number ?? 'Not recorded'} />
+          {summary.without_replacement
+            ? (
+              <>
+                <DetailRow label="Truck" value={summary.from_vehicle_number ?? 'Not recorded'} />
+                <DetailRow label="Replacement" value="None available" />
+              </>
+            )
+            : (
+              <>
+                <DetailRow label="From truck" value={summary.from_vehicle_number ?? 'Not recorded'} />
+                <DetailRow label="To truck" value={summary.to_vehicle_number ?? 'Not recorded'} />
+              </>
+            )}
           {summary.effective_at && <DetailRow label="When" value={formatHubDate(summary.effective_at)} />}
           {summary.submitted_by_name && <DetailRow label="Who" value={summary.submitted_by_name} />}
           {tookCount + leftCount > 0 && <DetailRow label="Equipment" value={`Took ${tookCount}, left ${leftCount}`} />}

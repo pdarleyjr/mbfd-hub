@@ -16,8 +16,8 @@ use Illuminate\Http\Request;
 
 /**
  * The member side of the conversation on a station request, supply request or service ticket, for the Daily
- * Checkout app (docs/member-replies.md section 2.3). The member who submitted it reads and replies; anyone else
- * gets 403. A record that does not exist is 404. Staff answer from the admin console.
+ * Checkout app (docs/member-replies.md section 2.3). The member who submitted it reads and replies. Anyone else gets
+ * 404, exactly as for a record that does not exist, so ids cannot be probed. Staff answer from the admin console.
  */
 final class SubmissionConversationController extends Controller
 {
@@ -26,8 +26,7 @@ final class SubmissionConversationController extends Controller
     public function show(Request $request, string $type, int $id): JsonResponse
     {
         $user = $this->member($request);
-        $subject = $this->subject($type, $id);
-        abort_unless(SubmissionConversationAccess::isParticipant($user, $type, $subject), 403, 'Only the member who sent this can read its conversation.');
+        $subject = $this->participantSubject($user, $type, $id);
 
         return response()->json(['data' => $this->payload($user, $type, $subject)]);
     }
@@ -35,16 +34,16 @@ final class SubmissionConversationController extends Controller
     public function store(Request $request, string $type, int $id): JsonResponse
     {
         $user = $this->member($request);
+        $subject = $this->participantSubject($user, $type, $id);
         $valid = $request->validate([
             'body' => ['required', 'string', 'max:'.SubmissionConversationService::MAX_BODY],
             'client_message_id' => ['required', 'uuid'],
         ]);
-        $subject = $this->subject($type, $id);
-        abort_unless(SubmissionConversationAccess::isParticipant($user, $type, $subject), 403, 'Only the member who sent this can reply to it.');
 
         try {
             $this->conversations->postAsMember($user, $type, $id, (string) $valid['body'], (string) $valid['client_message_id']);
         } catch (AuthorizationException) {
+            // Only reached by a participant (checked above), e.g. a message id another author already used.
             abort(403, 'Only the member who sent this can reply to it.');
         }
 
@@ -62,13 +61,17 @@ final class SubmissionConversationController extends Controller
         ];
     }
 
-    private function subject(string $type, int $id): \Illuminate\Database\Eloquent\Model
+    /** Someone else's record is indistinguishable from one that does not exist (as MySubmissionConversation). */
+    private function participantSubject(User $user, string $type, int $id): \Illuminate\Database\Eloquent\Model
     {
         try {
-            return $this->conversations->subject($type, $id);
+            $subject = $this->conversations->subject($type, $id);
         } catch (ModelNotFoundException) {
             abort(404);
         }
+        abort_unless(SubmissionConversationAccess::isParticipant($user, $type, $subject), 404);
+
+        return $subject;
     }
 
     private function member(Request $request): User

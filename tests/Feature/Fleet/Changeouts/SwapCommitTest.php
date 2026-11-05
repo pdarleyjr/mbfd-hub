@@ -30,6 +30,7 @@ final class SwapCommitTest extends ChangeoutTestCase
             ->assertJsonPath('changeout.from_vehicle_number', 'V-202')
             ->assertJsonPath('changeout.to_vehicle_number', 'V-909')
             ->assertJsonPath('changeout.to_apparatus_id', $this->reserve->id)
+            ->assertJsonPath('changeout.without_replacement', false)
             ->assertJsonPath('changeout.old_truck_status', 'Out of Service')
             ->assertJsonPath('changeout.alert_id', null)
             ->assertJsonPath('changeout.alert_completed', false)
@@ -40,8 +41,8 @@ final class SwapCommitTest extends ChangeoutTestCase
             ->assertJsonPath('changeout.displaced_unit', null)
             ->assertJsonPath('changeout.message', 'E2 is now on truck V-909. Truck V-202 is marked Out of Service.');
         $this->assertSame([
-            'id', 'status', 'unit_designation', 'from_vehicle_number', 'to_vehicle_number', 'to_apparatus_id', 'station_id', 'effective_at',
-            'old_truck_status', 'alert_id', 'alert_completed', 'return_of_changeout_id', 'submitted_by_name', 'moved', 'left_behind',
+            'id', 'status', 'unit_designation', 'from_vehicle_number', 'to_vehicle_number', 'to_apparatus_id', 'without_replacement', 'station_id',
+            'effective_at', 'old_truck_status', 'alert_id', 'alert_completed', 'return_of_changeout_id', 'submitted_by_name', 'moved', 'left_behind',
             'next_daily_checkout_path', 'message', 'new_truck_record', 'displaced_unit',
         ], array_keys($response->json('changeout')));
 

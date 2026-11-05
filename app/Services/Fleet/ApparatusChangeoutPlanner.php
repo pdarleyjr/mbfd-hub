@@ -147,6 +147,7 @@ final class ApparatusChangeoutPlanner
     public function changedOutFrom(Apparatus $truck): ?ApparatusChangeout
     {
         return ApparatusChangeout::query()
+            ->realMoves()
             ->where('from_apparatus_id', $truck->getKey())
             ->where('status', ApparatusChangeout::STATUS_COMPLETED)
             ->where('effective_at', '>=', now()->subHours((int) config('daily_checkout.inventory_revision_grace_hours', 168)))
@@ -157,6 +158,7 @@ final class ApparatusChangeoutPlanner
     public function previousChangeout(string $unitSlug): ?ApparatusChangeout
     {
         return ApparatusChangeout::query()->with(['items'])
+            ->realMoves()
             ->where('unit_slug', $unitSlug)
             ->where('status', ApparatusChangeout::STATUS_COMPLETED)
             ->orderByDesc('id')
@@ -244,7 +246,7 @@ final class ApparatusChangeoutPlanner
      */
     public function handoffNotice(Apparatus $truck): ?array
     {
-        $changeout = ApparatusChangeout::query()
+        $changeout = ApparatusChangeout::query()->realMoves()
             ->where('to_apparatus_id', $truck->getKey())
             ->where('status', ApparatusChangeout::STATUS_COMPLETED)
             ->where('effective_at', '>=', now()->subDays(self::HANDOFF_NOTICE_DAYS))

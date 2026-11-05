@@ -139,7 +139,7 @@ final class VehicleChangeoutSource extends VehicleIssueSource
             facts: array_values(array_filter([
                 ['label' => 'Unit', 'value' => $changeout->unit_designation],
                 ['label' => 'From truck', 'value' => (string) $changeout->from_vehicle_number],
-                ['label' => 'To truck', 'value' => $changeout->to_vehicle_number],
+                ['label' => 'To truck', 'value' => ApparatusChangeoutResource::toTruckText($changeout)],
                 ['label' => 'By', 'value' => $changeout->submitted_by_name],
                 ['label' => 'When', 'value' => (string) self::local($changeout->effective_at)],
                 ['label' => 'Acknowledged by', 'value' => (string) self::personName($changeout->acknowledgedBy)],

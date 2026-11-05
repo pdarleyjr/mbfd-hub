@@ -8,7 +8,6 @@ use App\Models\Apparatus;
 use App\Support\Fleet\FrontlineUnits;
 use App\Support\Fleet\UnitIdentity;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Keeps a unit (E1) and a truck (vehicle 20503) apart on every apparatus write, not only the admin form. Runs from the
@@ -26,7 +25,8 @@ use Illuminate\Validation\ValidationException;
  *
  * Free-text names and spare labels ("Reserve", "Rescue 17503", "R 44 Replacement") are left alone: they are history,
  * not identity. A truck swap moves identities through short in-between states, so VehicleSwapService runs inside
- * whileMovingUnits(). That is the only way past the guard.
+ * whileMovingUnits(). That is the only way past the guard. Sync and batch writers (master vehicle links, status reports)
+ * do not bypass it: they catch UnitIdentityConflict per row and leave that row for Fleet.
  */
 final class UnitIdentityGuard
 {
@@ -52,7 +52,12 @@ final class UnitIdentityGuard
         }
     }
 
-    /** @throws ValidationException */
+    /**
+     * A form or API edit shows the refusal as a validation error. A sync or batch writer catches UnitIdentityConflict,
+     * sets that one row aside for Fleet and carries on: a refused row never aborts a whole run halfway.
+     *
+     * @throws UnitIdentityConflict
+     */
     public function check(Apparatus $row): void
     {
         if (self::$movingUnits > 0) {
@@ -60,7 +65,7 @@ final class UnitIdentityGuard
         }
         $problems = $this->problems($row);
         if ($problems !== []) {
-            throw ValidationException::withMessages($problems);
+            throw UnitIdentityConflict::withMessages($problems);
         }
     }
 

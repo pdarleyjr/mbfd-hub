@@ -118,15 +118,18 @@ final class IssueConversationApiTest extends TestCase
             ->assertJsonPath('data.messages.0.from_staff', false);
     }
 
-    public function test_a_member_who_is_not_on_the_issue_gets_403_for_read_and_reply(): void
+    public function test_a_member_who_is_not_on_the_issue_gets_404_for_read_and_reply_as_if_it_did_not_exist(): void
     {
         $stranger = $this->member('Una Unrelated');
         $this->actingAsCanonicalUser($stranger);
 
         $this->getJson("/api/public/apparatus-issues/{$this->defect->id}/history")->assertOk()->assertJsonPath('conversation.participant', false);
-        $this->getJson("/api/public/apparatus-issues/{$this->defect->id}/conversation")->assertForbidden();
+        $this->getJson("/api/public/apparatus-issues/{$this->defect->id}/conversation")->assertNotFound();
         $this->postJson("/api/public/apparatus-issues/{$this->defect->id}/conversation", ['body' => 'Hi', 'client_message_id' => self::MESSAGE_ID])
-            ->assertForbidden();
+            ->assertNotFound();
+        // Checked before the body, so an invalid reply cannot tell a stranger the issue exists either.
+        $this->postJson("/api/public/apparatus-issues/{$this->defect->id}/conversation", [])->assertNotFound();
+        $this->getJson('/api/public/apparatus-issues/999999/conversation')->assertNotFound();
         $this->assertSame(0, ApparatusIssueMessage::query()->count());
     }
 

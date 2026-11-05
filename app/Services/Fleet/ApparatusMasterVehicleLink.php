@@ -13,6 +13,7 @@ use App\Support\Fleet\VehicleIdentity;
 use App\Support\Fleet\VehicleNumber;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -348,10 +349,28 @@ final class ApparatusMasterVehicleLink
                 $updates[$apparatusField] = $value;
             }
             $row->forceFill($updates);
-            if ($row->isDirty()) {
+            if (! $row->isDirty()) {
+                return;
+            }
+            try {
                 MasterVehicleSyncGuard::propagating(static fn (): bool => $row->save());
+            } catch (UnitIdentityConflict $conflict) {
+                // The master record still saves (an import or a Fleet edit never aborts here); this truck is unlinked
+                // and left for Fleet instead of taking a number that names another unit.
+                $this->markNeedsReview($row, $this->conflictNote($row, $conflict));
             }
         });
+    }
+
+    /** The review note for a row whose copy the identity guard refused, logged for whoever runs the sync. */
+    private function conflictNote(Apparatus $apparatus, UnitIdentityConflict $conflict): string
+    {
+        Log::warning('fleet.master_link.identity_conflict', [
+            'apparatus_id' => $apparatus->getKey(),
+            'problems' => $conflict->errors(),
+        ]);
+
+        return mb_substr('Not synced from the master vehicle record: '.$conflict->summary(), 0, 255);
     }
 
     /**
@@ -361,6 +380,30 @@ final class ApparatusMasterVehicleLink
      * @return array{outcome: string, changed: bool, master: ?UnitMasterVehicle, reason: ?string, fields: list<array{field: string, label: string, from: ?string, to: ?string, side: string}>}
      */
     public function reconcile(Apparatus $apparatus, ?User $user = null): array
+    {
+        try {
+            return $this->reconcileRow($apparatus, $user);
+        } catch (UnitIdentityConflict $conflict) {
+            // The master's number would make this truck look like another unit. The link and its history rows rolled
+            // back; the row goes to Fleet and the run carries on with the next one.
+            $reason = $this->conflictNote($apparatus, $conflict);
+
+            return [
+                'outcome' => self::OUTCOME_NEEDS_REVIEW,
+                'changed' => $this->markNeedsReview($apparatus, $reason),
+                'master' => null,
+                'reason' => $reason,
+                'fields' => [],
+            ];
+        }
+    }
+
+    /**
+     * @return array{outcome: string, changed: bool, master: ?UnitMasterVehicle, reason: ?string, fields: list<array{field: string, label: string, from: ?string, to: ?string, side: string}>}
+     *
+     * @throws UnitIdentityConflict
+     */
+    private function reconcileRow(Apparatus $apparatus, ?User $user): array
     {
         return DB::transaction(function () use ($apparatus, $user): array {
             $apparatus = Apparatus::query()->findOrFail($apparatus->getKey());

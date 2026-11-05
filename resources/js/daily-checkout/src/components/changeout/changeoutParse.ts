@@ -232,6 +232,7 @@ export const parseSummary = (payload: unknown): ChangeoutSummary => {
     from_vehicle_number: label(row.from_vehicle_number),
     to_vehicle_number: label(row.to_vehicle_number),
     to_apparatus_id: id(row.to_apparatus_id),
+    without_replacement: row.without_replacement === true,
     station_id: id(row.station_id),
     effective_at: text(row.effective_at),
     old_truck_status: text(row.old_truck_status),

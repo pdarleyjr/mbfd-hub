@@ -65,6 +65,9 @@ final class SubmissionConversationActions
                     ->maxLength(SubmissionConversationService::MAX_BODY)
                     ->required()
                     ->visible(fn (): bool => SubmissionConversationAccess::canStaffReply(self::user(), $type, $subject($record))),
+                // Made once, when the reply box opens: a double click or a retry of the same box is a replay, not a second message.
+                Forms\Components\Hidden::make('client_message_id')
+                    ->default(static fn (): string => (string) Str::uuid()),
             ])
             ->action(function (array $data, ?Model $record = null) use ($type, $subject): void {
                 $model = $subject($record);
@@ -72,12 +75,25 @@ final class SubmissionConversationActions
                     return;
                 }
                 try {
-                    app(SubmissionConversationService::class)->postAsStaff(self::user() ?? abort(403), $type, (int) $model->getKey(), (string) $data['body'], (string) Str::uuid());
+                    app(SubmissionConversationService::class)->postAsStaff(self::user() ?? abort(403), $type, (int) $model->getKey(), (string) $data['body'], self::clientMessageId($data));
                 } catch (AuthorizationException) {
                     abort(403);
                 }
                 Notification::make()->title('Reply sent to the member')->success()->send();
             });
+    }
+
+    /**
+     * The id the reply box was opened with. Only a form whose hidden field was tampered with or lost gets a fresh one,
+     * which still sends the reply once.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function clientMessageId(array $data): string
+    {
+        $id = $data['client_message_id'] ?? null;
+
+        return is_string($id) && Str::isUuid($id) ? strtolower($id) : (string) Str::uuid();
     }
 
     private static function awaiting(string $type, Model $subject): bool

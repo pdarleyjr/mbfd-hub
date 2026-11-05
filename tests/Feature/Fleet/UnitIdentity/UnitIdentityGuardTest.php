@@ -6,11 +6,14 @@ namespace Tests\Feature\Fleet\UnitIdentity;
 
 use App\Models\Apparatus;
 use App\Services\Fleet\ApparatusChangeoutService;
+use App\Services\Fleet\UnitIdentityConflict;
+use App\Services\Fleet\UnitIdentityGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\Fleet\UnitIdentity\Concerns\BuildsUnitIdentityFixtures;
 use Tests\TestCase;
@@ -130,6 +133,44 @@ final class UnitIdentityGuardTest extends TestCase
         $oldTruck = $this->e1->fresh();
         self::assertSame(['E1', 'E 1', 'e1', 'In Service', '002-18'], [$newTruck->unit_id, $newTruck->designation, $newTruck->slug, $newTruck->status, $newTruck->vehicle_number]);
         self::assertSame(['E11', 'E 11', 'e11', 'Out of Service', '20503'], [$oldTruck->unit_id, $oldTruck->designation, $oldTruck->slug, $oldTruck->status, $oldTruck->vehicle_number]);
+    }
+
+    public function test_a_refusal_is_a_validation_error_and_a_failed_move_never_leaves_the_guard_open(): void
+    {
+        try {
+            UnitIdentityGuard::whileMovingUnits(static function (): never {
+                throw new RuntimeException('The swap failed halfway.');
+            });
+        } catch (RuntimeException) {
+            // Expected: the callback's failure reaches the caller.
+        }
+
+        try {
+            $this->e1->update(['unit_id' => '002-18']);
+            self::fail('The guard stayed open after a failed move.');
+        } catch (UnitIdentityConflict $conflict) {
+            self::assertInstanceOf(ValidationException::class, $conflict, 'Admin forms and the API still see a validation error.');
+            self::assertStringContainsString('vehicle number of another truck', $conflict->summary());
+        }
+        self::assertSame('E1', $this->e1->fresh()->unit_id);
+    }
+
+    public function test_a_changeout_to_a_typed_new_truck_still_creates_it(): void
+    {
+        $this->actingAs($admin = $this->superAdmin());
+
+        $result = app(ApparatusChangeoutService::class)->submit($this->e1, $admin, [
+            'client_submission_id' => (string) Str::uuid(),
+            'expected_vehicle_number' => '20503',
+            'expected_unit_slug' => 'e1',
+            'to_vehicle_number' => '24777',
+        ]);
+
+        self::assertTrue($result['created']);
+        $newTruck = Apparatus::query()->where('vehicle_number', '24777')->sole();
+        self::assertSame(['E1', 'E 1', 'e1', 'In Service'], [$newTruck->unit_id, $newTruck->designation, $newTruck->slug, $newTruck->status]);
+        self::assertSame('Out of Service', $this->e1->fresh()->status);
+        self::assertTrue($result['changeout']->move_audit['new_truck_record']);
     }
 
     /** @return array<string, list<string>> */

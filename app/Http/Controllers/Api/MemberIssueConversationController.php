@@ -19,7 +19,8 @@ use Illuminate\Http\Request;
  *
  * Only the issue's participants read and write it: the member who reported it, members who re-reported or
  * acknowledged it on a later checkout of the same truck, stretcher reporters, and members who already replied.
- * The rule is IssueMessageService::followsDefect, the same one the employee portal uses. Anyone else gets 403.
+ * The rule is IssueMessageService::followsDefect, the same one the employee portal uses. Anyone else gets 404, exactly
+ * as for an issue that does not exist, so issue ids cannot be probed.
  * Members only ever receive member-visible messages; a member can only ever write member-visible ones.
  */
 final class MemberIssueConversationController extends Controller
@@ -36,7 +37,7 @@ final class MemberIssueConversationController extends Controller
         try {
             $thread = $this->messages->memberThreadForDefect($user, $defect);
         } catch (AuthorizationException) {
-            abort(403, 'Only the members on this issue can read its conversation.');
+            abort(404);
         }
 
         return response()->json(['data' => $this->payload($user, $defect, $thread)]);
@@ -45,11 +46,11 @@ final class MemberIssueConversationController extends Controller
     public function store(Request $request, ApparatusDefect $defect): JsonResponse
     {
         $user = $this->authorizeMember($request);
+        abort_unless($this->messages->followsDefect($user, $defect), 404);
         $valid = $request->validate([
             'body' => ['required', 'string', 'max:'.IssueMessageService::MAX_BODY],
             'client_message_id' => ['required', 'uuid'],
         ]);
-        abort_unless($this->messages->followsDefect($user, $defect), 403, 'Only the members on this issue can reply to it.');
 
         try {
             // Always member-visible: this surface never writes an internal note, whoever is signed in.

@@ -29,7 +29,8 @@ vehicle changeouts and vehicle identification answers.
 - `GET /api/public/apparatus-issues/{defect}/history` now carries `conversation.participant` for the viewer.
 - `GET|POST /api/public/apparatus-issues/{defect}/conversation` (`MemberIssueConversationController`). Body
   `{body (<= 4000), client_message_id (uuid)}`; throttle 20/min. Participants only
-  (`IssueMessageService::followsDefect`), everyone else 403. Member-visible messages only, in and out.
+  (`IssueMessageService::followsDefect`); everyone else gets 404, the same as a missing issue, so ids cannot be
+  probed. Member-visible messages only, in and out.
 
 ### 2.2 Personnel requests
 
@@ -41,9 +42,11 @@ endpoint. Supporting documents (upload and download) stay beneficiary-only. Both
 - `GET|POST /api/public/submission-conversations/{type}/{id}`, type one of `station_request`,
   `station_supply_request`, `apparatus_service_ticket` (`SubmissionConversationController`). Same body, limits
   and idempotency as above; at most 10 member messages in a row before staff answer; archived records are closed.
+  Anyone but the submitter gets 404, the same as a missing record.
 - Each list row carries `member_conversation.participant` for the viewer.
 - Employee page `/employee/my-conversations/{type}/{id}` (`MySubmissionConversation`).
-- Staff answer from the record page: "Member conversation" action (`SubmissionConversationActions`).
+- Staff answer from the record page: "Member conversation" action (`SubmissionConversationActions`). Its
+  `client_message_id` is made when the reply box opens, so a double click or a retry stores the reply once.
   Nothing typed there is internal; internal notes stay in each record's own internal field.
 
 ## 3. Access

@@ -124,8 +124,10 @@ final class SubmissionConversationTest extends TestCase
         $this->actingAsCanonicalUser($this->other);
         $rows = collect($this->getJson("/api/public/stations/{$this->station->id}/requests")->assertOk()->json('data'))->keyBy('id');
         $this->assertFalse($rows[$this->request->id]['member_conversation']['participant']);
-        $this->getJson($this->path('station_request', $this->request->id))->assertForbidden();
-        $this->postJson($this->path('station_request', $this->request->id), ['body' => 'Hi', 'client_message_id' => self::FIRST_ID])->assertForbidden();
+        $this->getJson($this->path('station_request', $this->request->id))->assertNotFound();
+        $this->postJson($this->path('station_request', $this->request->id), ['body' => 'Hi', 'client_message_id' => self::FIRST_ID])->assertNotFound();
+        // Someone else's record reads exactly like a missing one, even with an invalid body.
+        $this->postJson($this->path('station_request', $this->request->id), [])->assertNotFound();
         $this->getJson($this->path('station_request', 999999))->assertNotFound();
         $this->getJson('/api/public/submission-conversations/personnel_request/'.$this->request->id)->assertNotFound();
 
@@ -174,7 +176,7 @@ final class SubmissionConversationTest extends TestCase
         $this->assertFalse(app(MemberReplyLedger::class)->isAwaiting(ReplySubject::STATION_SUPPLY_REQUEST, $supply->id));
 
         $this->actingAsCanonicalUser($this->other);
-        $this->getJson($this->path('station_supply_request', $supply->id))->assertForbidden();
+        $this->getJson($this->path('station_supply_request', $supply->id))->assertNotFound();
         $this->assertStringNotContainsString('Check stock', $this->getJson("/api/v2/station-inventory/{$this->station->id}/supply-requests")->getContent());
     }
 
@@ -194,7 +196,7 @@ final class SubmissionConversationTest extends TestCase
         $this->actingAsCanonicalUser($this->other);
         $rows = collect($this->getJson("/api/public/stations/{$this->station->id}/service-tickets?scope=all")->assertOk()->json('data'))->keyBy('id');
         $this->assertFalse($rows[$ticket->id]['member_conversation']['participant']);
-        $this->postJson($this->path('apparatus_service_ticket', $ticket->id), ['body' => 'Me too', 'client_message_id' => self::SECOND_ID])->assertForbidden();
+        $this->postJson($this->path('apparatus_service_ticket', $ticket->id), ['body' => 'Me too', 'client_message_id' => self::SECOND_ID])->assertNotFound();
     }
 
     public function test_the_employee_page_shows_the_conversation_and_takes_a_reply_only_for_the_requester(): void
