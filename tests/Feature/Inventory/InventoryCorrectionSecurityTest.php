@@ -167,7 +167,10 @@ final class InventoryCorrectionSecurityTest extends TestCase
         $items = collect($this->resolved('E1')['checklist']['compartments'])->flatMap(fn (array $compartment) => collect($compartment['items'])
             ->map(fn (array $item): array => ['compartment_id' => $compartment['id'], 'item_id' => $item['id']]))
             ->reject(fn (array $target): bool => $target['item_id'] === $passports['item_id'])->values();
-        foreach ($items->slice(1, InventoryCorrectionService::MAX_OPEN_PER_MEMBER_AND_APPARATUS - 1) as $target) {
+        foreach ($items->slice(1, InventoryCorrectionService::MAX_OPEN_PER_MEMBER_AND_APPARATUS - 1)->values() as $sent => $target) {
+            if ($sent > 0 && $sent % 40 === 0) {
+                $this->travel(61)->seconds(); // a crew correcting a whole truck by hand, not one burst: stay inside the route throttle
+            }
             $this->report('E1', ['reason' => 'no_longer_carried', ...$target])->assertCreated();
         }
         $this->report('E1', ['reason' => 'no_longer_carried', ...$items[InventoryCorrectionService::MAX_OPEN_PER_MEMBER_AND_APPARATUS + 2]])->assertUnprocessable();

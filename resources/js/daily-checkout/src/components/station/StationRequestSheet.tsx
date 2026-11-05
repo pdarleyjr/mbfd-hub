@@ -14,20 +14,22 @@ interface StationRequestSheetProps {
   returnFocusTo: () => HTMLElement | null;
   /** Called after the member marks the request resolved, so the list behind the sheet can refresh. */
   onResolved?: () => void;
+  /** Stack over another sheet. */
+  layer?: 0 | 1;
 }
 
 /**
  * One station request. Everything shown already came with the list or the Overview. When the server says this
  * member may close it (payload `member_resolution.eligible`), a "Mark resolved" button opens the short form.
  */
-export default function StationRequestSheet({ request, onClose, returnFocusTo, onResolved }: StationRequestSheetProps) {
+export default function StationRequestSheet({ request, onClose, returnFocusTo, onResolved, layer = 0 }: StationRequestSheetProps) {
   const [resolving, setResolving] = useState(false);
   const [resolvedId, setResolvedId] = useState<number | null>(null);
   useEffect(() => { setResolving(false); }, [request?.id]);
   const showResolve = request !== null && onResolved !== undefined && canMarkResolved(request) && resolvedId !== request.id;
 
   return (
-    <Sheet open={request !== null} onClose={onClose} returnFocusTo={returnFocusTo} testId="station-request-sheet" title={request?.title ?? 'Station request'} description={request?.request_number}>
+    <Sheet open={request !== null} layer={layer} onClose={onClose} returnFocusTo={returnFocusTo} testId="station-request-sheet" title={request?.title ?? 'Station request'} description={request?.request_number}>
       {request && (
         <div className="space-y-4" data-testid="station-request-detail">
           <div className="flex flex-wrap gap-2">

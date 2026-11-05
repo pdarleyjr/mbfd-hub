@@ -6,6 +6,7 @@ namespace Tests\Feature\Services;
 
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Models\ApparatusDefectEvent;
 use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
@@ -77,9 +78,24 @@ final class ApparatusInspectionProcessingTest extends TestCase
         $this->assertSame('held_for_review', $inspection->fresh()->processing_status);
     }
 
-    public function test_repeated_finding_is_one_persistent_defect_and_present_does_not_resolve_it(): void
+    public function test_repeated_finding_is_one_persistent_defect_and_present_does_not_resolve_a_damaged_item(): void
     {
-        [$apparatus, $inspection, $token] = $this->fixture(null, null, 'Missing');
+        $this->assertSame(['first_reported', 'confirmed_again', 'appears_corrected'], $this->reportedTwiceThenPresent('Damaged'));
+        $this->assertFalse(ApparatusDefect::firstOrFail()->resolved, 'Damaged equipment waits for the owner to verify the correction.');
+    }
+
+    public function test_a_routine_missing_item_found_present_on_a_later_checkout_is_resolved_by_that_checkout(): void
+    {
+        $this->assertSame(['first_reported', 'confirmed_again', 'appears_corrected'], $this->reportedTwiceThenPresent('Missing'));
+        $defect = ApparatusDefect::firstOrFail();
+        $this->assertTrue($defect->resolved);
+        $this->assertSame(1, ApparatusDefectEvent::query()->where('apparatus_defect_id', $defect->id)->where('event_type', 'resolved_by_checkout')->count());
+    }
+
+    /** One persistent defect across three checkouts; the service status never moves. Returns the observations in order. */
+    private function reportedTwiceThenPresent(string $finding): array
+    {
+        [$apparatus, $inspection, $token] = $this->fixture(null, null, $finding);
         $this->process($apparatus, $inspection, $token);
         $second = $inspection->replicate(['inspection_reference', 'processing_status']);
         $second->review_status = 'pending_review';
@@ -91,9 +107,9 @@ final class ApparatusInspectionProcessingTest extends TestCase
         $third->save();
         $this->process($apparatus, $third, $token);
         $this->assertDatabaseCount('apparatus_defects', 1);
-        $this->assertFalse(ApparatusDefect::firstOrFail()->resolved);
         $this->assertSame('In Service', $apparatus->fresh()->status);
-        $this->assertSame(['first_reported', 'confirmed_again', 'appears_corrected'], ApparatusDefectObservation::query()->orderBy('id')->pluck('observation')->all());
+
+        return ApparatusDefectObservation::query()->orderBy('id')->pluck('observation')->all();
     }
 
     public function test_paper_relocation_preserves_the_original_defect_and_appends_an_observation(): void

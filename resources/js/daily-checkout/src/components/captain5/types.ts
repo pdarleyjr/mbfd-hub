@@ -9,7 +9,7 @@ export type IssueKind = 'rescue' | 'medical';
 export type IssueActionName =
   | 'acknowledge' | 'ordered' | 'update_delivery' | 'available_for_pickup'
   | 'replaced' | 'verify' | 'dismiss' | 'reopen'
-  | 'send_to_logistics' | 'bring_back_to_captain5';
+  | 'send_to_logistics' | 'bring_back_to_captain5' | 'clear_resolution';
 
 /**
  * Everyone who can open the page can do everything on it, so there is no view-only mode. `act` stays in
@@ -62,6 +62,11 @@ export interface IssueSummary {
   /** Why no corrective action was necessary, for closure = closed_no_action. */
   closure_reason?: string | null;
   state_token: string;
+  /** Present while the issue waits for Captain 5 or Logistics to check that it is really fixed. */
+  verification?: { by: string | null; at: string | null; via: 'checkout' | 'report'; safety_critical: boolean } | null;
+  /** How a closed issue ended, in one sentence the server built ("Resolved by ... during ... checkout · time"). */
+  resolution?: { text: string; by: string | null; source: 'checkout' | 'member' | 'staff' | 'no_action' } | null;
+  resolution_cleared_at?: string | null;
   /** Set while the issue is cleared from Captain 5: still open, and it stays with Logistics. */
   captain5_cleared_at?: string | null;
   captain5_cleared_by?: string | null;
@@ -202,6 +207,9 @@ export interface Workspace {
   issues_truncated?: boolean;
   /** Open issues cleared for Logistics. Not part of `issues` or `counts`. */
   cleared_issues: IssueSummary[];
+  /** Fixed issues still on display (resolved within resolved_display_hours, not cleared). Not open, not counted. */
+  recently_resolved?: IssueSummary[];
+  resolved_display_hours?: number;
   rescue_trucks: RescueTruck[];
   rescue_truck_changes: RescueTruckChange[];
   handoff: Handoff;

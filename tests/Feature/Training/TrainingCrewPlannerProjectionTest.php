@@ -6,6 +6,8 @@ namespace Tests\Feature\Training;
 
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
+use App\Models\PromotionalList;
+use App\Models\PromotionalListEntry;
 use App\Models\Training\TrainingAttendance;
 use App\Models\Training\TrainingCourse;
 use App\Models\Training\TrainingModule;
@@ -192,6 +194,45 @@ final class TrainingCrewPlannerProjectionTest extends TestCase
         $staffing['DE']['eligible_slots'] = [];
         self::assertSame([], $this->candidates($staffing)['rows'][$bidDe->id]['eligible_slots']);
         self::assertNotEmpty($this->candidates($staffing)['rows'][$bidDe->id]['needs_review']);
+    }
+
+    public function test_show_only_groups_offer_promotional_list_members_and_driver_engineer_bidders_together(): void
+    {
+        $bidDe = $this->employee('DE');
+        $promoted = $this->employee('PROMO');
+        $both = $this->employee('BOTH');
+        $neither = $this->employee('NEITHER');
+        $expiredOnly = $this->employee('EXPIRED');
+        $this->assignment($bidDe, ['position_label' => 'Firefighter DE #2']);
+        $this->assignment($both, ['position_label' => 'Driver Engineer #4']);
+        $this->assignment($neither);
+        $lieutenant = PromotionalList::query()->create(['list_type' => 'lieutenant', 'title' => 'Lieutenant 2026', 'effective_date' => '2026-01-01',
+            'expires_on' => '2027-12-31', 'status' => PromotionalList::STATUS_ACTIVE, 'source_reference' => 'Fixture']);
+        $old = PromotionalList::query()->create(['list_type' => 'lieutenant', 'title' => 'Lieutenant 2023', 'effective_date' => '2023-01-01',
+            'expires_on' => '2024-01-01', 'status' => PromotionalList::STATUS_ACTIVE, 'source_reference' => 'Fixture']);
+        foreach ([[$lieutenant, 3, $promoted], [$lieutenant, 5, $both], [$old, 1, $expiredOnly]] as [$list, $rank, $person]) {
+            $list->entries()->create(['original_rank' => $rank, 'soi_id' => 'S'.$rank.$person->id, 'last_name' => 'Fixture', 'first_name' => 'Pat',
+                'employee_id' => $person->id, 'scores' => [], 'status' => PromotionalListEntry::STATUS_ELIGIBLE, 'current_rank' => $rank]);
+        }
+        $staffing = [];
+        foreach (['DE', 'PROMO', 'BOTH', 'NEITHER', 'EXPIRED'] as $id) {
+            $staffing[$id] = $this->duty($id);
+        }
+
+        $ids = fn (array $filters): array => collect(array_keys($this->candidates($staffing, $filters)['rows']))->sort()->values()->all();
+        self::assertSame(collect([$bidDe->id, $both->id])->sort()->values()->all(), $ids(['groups' => ['de_bid']]));
+        self::assertSame(collect([$promoted->id, $both->id])->sort()->values()->all(), $ids(['groups' => ['promotional']]));
+        self::assertSame(collect([$bidDe->id, $promoted->id, $both->id])->sort()->values()->all(), $ids(['groups' => ['promotional', 'de_bid']]));
+        self::assertCount(5, $this->candidates($staffing)['rows']);
+
+        $rows = $this->candidates($staffing)['rows'];
+        self::assertSame('Lieutenant #5', $rows[$both->id]['promotional']);
+        self::assertTrue($rows[$both->id]['is_de_bid']);
+        self::assertNull($rows[$expiredOnly->id]['promotional'], 'An expired list does not count');
+        self::assertNull($rows[$neither->id]['promotional']);
+
+        $this->expectException(ValidationException::class);
+        $this->candidates($staffing, ['groups' => ['anything']]);
     }
 
     public function test_analysis_time_and_roster_date_are_independent_and_suggestions_do_not_invent_end_time(): void

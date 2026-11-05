@@ -271,7 +271,7 @@ test('a concern is reported, the next member sees it live with its history, and 
   await next.page.getByText('Other recorded findings (1)').click();
   const card = next.page.locator('.inspection-unlocated-findings .issue-card');
   await expect(card).toContainText('Port foam line coupling is leaking');
-  await expect(card).toContainText('Awaiting verification');
+  await expect(card).toContainText('New — not yet acknowledged');
   await expect(card).toContainText(/Reported by .+ on /);
   await next.page.getByText(/^Recent notes/).click();
   await expect(next.page.locator('.findings-note').filter({ hasText: 'Tide was unusually low' })).toBeVisible();

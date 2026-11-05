@@ -82,7 +82,7 @@ final class LatestActivityComponentTest extends TestCase
         $this->defectEvent($defect, 'reported', [], 5);
 
         $html = $this->card()->assertSee('New issue')->assertSee('Needs action')->assertSee('Riley Reporter')->assertSee('R2')
-            ->assertSee('Missing: Fog nozzle')->assertSee('Awaiting verification')->html();
+            ->assertSee('Missing: Fog nozzle')->assertSee('New — not yet acknowledged')->html();
 
         $url = InspectionWorkspace::url((int) $this->activityInspection->id, 'issue-'.$defect->id);
         $this->assertStringContainsString('<a href="'.e($url).'" class="mbfd-dash-activity__link">', $html);

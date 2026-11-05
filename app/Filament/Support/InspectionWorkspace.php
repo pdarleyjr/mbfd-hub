@@ -50,7 +50,7 @@ final class InspectionWorkspace
     private const OBSERVATION_LABELS = [
         'first_reported' => 'Reported for the first time',
         'confirmed_again' => 'Confirmed again',
-        'appears_corrected' => 'Member reports it appears corrected',
+        'appears_corrected' => 'Checkout reports it present',
     ];
 
     public function __construct(

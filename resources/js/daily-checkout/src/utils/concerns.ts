@@ -91,7 +91,7 @@ export function concernIssueRefs(findings: OpenFinding[], liveById: Map<number, 
     item: finding.item,
     compartment: finding.compartment,
     issue_type: finding.issue_type,
-    status: finding.action_label?.trim() || 'Awaiting verification',
+    status: finding.action_label?.trim() || 'New — not yet acknowledged',
     description: liveById.get(finding.id)?.description ?? null,
   }));
 }

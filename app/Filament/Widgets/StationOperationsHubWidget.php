@@ -51,7 +51,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 final class StationOperationsHubWidget extends Widget
 {
     /** Queue flag for an open issue whose latest checkout observation is "appears corrected". */
-    public const MEMBER_REPORTS_CORRECTED = 'Member reports corrected — verify';
+    public const MEMBER_REPORTS_CORRECTED = 'Needs verification';
 
     protected static string $view = 'filament.widgets.station-operations-hub-widget';
 

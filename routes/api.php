@@ -74,7 +74,7 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::post('apparatuses/{apparatus}/inspection-sessions/{session}/abandon', [ApparatusController::class, 'abandonInspectionSession'])->middleware(['throttle:30,1']);
     Route::get('apparatuses/{apparatus}/service-notices', [PublicApparatusServiceTicketController::class, 'apparatusNotices']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
-    Route::post('apparatuses/{apparatus}/inventory-corrections', [\App\Http\Controllers\Api\InventoryCorrectionController::class, 'store'])->middleware(['throttle:30,1']);
+    Route::post('apparatuses/{apparatus}/inventory-corrections', [\App\Http\Controllers\Api\InventoryCorrectionController::class, 'store'])->middleware(['throttle:60,1']);
     // Vehicle changeouts and operational alerts (docs/apparatus-changeouts.md). Network only, never offline-cached.
     Route::get('apparatuses/{apparatus}/changeout-context', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'context'])->whereNumber('apparatus');
     Route::post('apparatuses/{apparatus}/changeouts', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'store'])->whereNumber('apparatus')->middleware(['throttle:30,1']);
@@ -118,6 +118,13 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
 
     // 300 Command profile: read-only, allowlisted overview of every active station.
     Route::get('command/overview', CommandOverviewController::class)->middleware('can:access-command-300');
+
+    // 300 dashboard: batched station board plus read-only drill-ins. Same gate; GET only.
+    Route::prefix('command/stations')->middleware('can:access-command-300')->controller(\App\Http\Controllers\Api\Command300StationsController::class)->group(function () {
+        Route::get('/', 'index');
+        Route::get('{station}', 'show')->whereNumber('station');
+        Route::get('{station}/checkouts/{inspection}', 'checkout')->whereNumber(['station', 'inspection']);
+    });
 
 });
 

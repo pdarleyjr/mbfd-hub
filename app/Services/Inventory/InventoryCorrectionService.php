@@ -36,9 +36,9 @@ final class InventoryCorrectionService
 
     public const MAX_MEMBER_REPLIES = 50;
 
-    public const MAX_OPEN_PER_MEMBER_AND_APPARATUS = 10;
+    public const MAX_OPEN_PER_MEMBER_AND_APPARATUS = 60;
 
-    public const MAX_PER_MEMBER_PER_DAY = 40;
+    public const MAX_PER_MEMBER_PER_DAY = 200;
 
     public const PHOTO_DISK = 'local';
 

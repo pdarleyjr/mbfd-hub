@@ -1,6 +1,6 @@
 import type { Tone } from '../ui/status';
 import { humanize } from '../ui/status';
-import { dutyLine as roleDutyLine, dutyUnset } from '../acting/format';
+import { ageText, dutyLine as roleDutyLine, dutyUnset } from '../acting/format';
 import { NO_ACTION_STATUS } from './actionForms';
 import type { IssueSummary, OnDuty } from './types';
 import { hubDateInput } from '../../../../shared/timezone.ts';
@@ -29,6 +29,19 @@ export function statusOf(issue: Pick<IssueSummary, 'action_status' | 'action_lab
 const READS_AS_BY = new Set(['acknowledged', 'action_pending', 'repair_scheduled', 'resolved']);
 
 export const statusLabel = (status: string | null | undefined): string => (status ? STATUS[status]?.label ?? humanize(status) : 'Not recorded');
+
+/**
+ * "Needs verification — Pat Lee reported it present 2 hours ago". A safety-critical issue says so: a checkout
+ * never closes those on its own.
+ */
+export function verificationText(issue: Pick<IssueSummary, 'awaiting_verification' | 'verification'>): string | null {
+  if (!issue.awaiting_verification) return null;
+  const v = issue.verification;
+  const what = v?.via === 'report' ? 'reported it fixed' : 'reported it present';
+  const who = v?.by ?? 'A crew member';
+  const when = v?.at ? ` ${ageText(v.at)}` : '';
+  return `Needs verification — ${who} ${what}${when}`;
+}
 
 export const kindLabel = (kind: string): string => (kind === 'medical' ? 'Medical' : 'Rescue');
 

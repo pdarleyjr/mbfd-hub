@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Builder;
 final class InventoryCorrectionProjection
 {
     /** Newest open reports shown as checklist markers; keeps the checklist payload bounded. */
-    private const MAX_MARKERS = 100;
+    private const MAX_MARKERS = 300;
 
     /**
      * Open corrections on one apparatus, for the "correction pending review" marker.

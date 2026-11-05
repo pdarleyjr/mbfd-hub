@@ -18,5 +18,6 @@ final readonly class FindingsResult
         public array $confirmedDefectIds = [],
         public array $appearsCorrectedDefectIds = [],
         public array $significantNewOrEscalatedDefectIds = [],
+        public array $autoClosedDefectIds = [],
     ) {}
 }

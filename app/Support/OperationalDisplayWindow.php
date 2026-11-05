@@ -16,6 +16,8 @@ final readonly class OperationalDisplayWindow
     private function __construct(
         public CarbonImmutable $start,
         public CarbonImmutable $end,
+        /** The instant the window was built for (the clock "recently" is measured from). */
+        public CarbonImmutable $now,
     ) {}
 
     public static function forNow(DateTimeInterface|string|null $now = null): self
@@ -31,7 +33,7 @@ final readonly class OperationalDisplayWindow
             $start = $start->subDay();
         }
 
-        return new self($start, $start->addDay());
+        return new self($start, $start->addDay(), $localNow);
     }
 
     public function contains(DateTimeInterface|string $value): bool
