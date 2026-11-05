@@ -22,6 +22,8 @@ export const QUANTITY_MAX = 999;
 export const PHOTO_MAX_BYTES = 5_000_000;
 
 export const SENT_TEXT = 'Sent to Logistics for review';
+/** Another member already reported this change: the server added this member to that request instead of filing a second one. */
+export const JOINED_TEXT = 'Another member already reported this. You were added to that request and will get its updates.';
 export const QUEUED_TEXT = 'Saved on this device. It will be sent when you\'re back online.';
 
 /** Everything the member has typed for one report, kept in the workspace so closing the panel never loses it. */
@@ -42,7 +44,7 @@ export interface CorrectionForm {
   showErrors: boolean;
   sending: boolean;
   error: string | null;
-  result: SubmissionOutcome | null;
+  result: SubmissionOutcome | 'joined' | null;
   /** The id of the last send of this exact payload; a retry of the same payload reuses it so the server can ignore a duplicate. */
   attempt?: { id: string; fingerprint: string };
 }
@@ -125,8 +127,10 @@ export const correctionQueueType = (apparatusId: number): string => `apparatuses
  * Sends the report, or saves it in the owner-bound offline queue when the device is offline or the server is
  * unavailable. A 4xx throws (the server will never accept this payload); nothing the member typed is touched.
  */
-export async function sendInventoryCorrection(apparatusId: number, payload: Record<string, unknown>): Promise<SubmissionOutcome> {
-  return (await submitOrQueueWithResponse(correctionQueueType(apparatusId), payload, '/api/public')).outcome;
+export async function sendInventoryCorrection(apparatusId: number, payload: Record<string, unknown>): Promise<SubmissionOutcome | 'joined'> {
+  const { outcome, response } = await submitOrQueueWithResponse(correctionQueueType(apparatusId), payload, '/api/public');
+  const joined = outcome === 'submitted' && typeof response === 'object' && response !== null && (response as { joined_existing?: unknown }).joined_existing === true;
+  return joined ? 'joined' : outcome;
 }
 
 /** Plain-language message for a failed send; the queue reports server rejections as "HTTP 422: detail". */

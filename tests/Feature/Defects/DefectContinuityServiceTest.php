@@ -110,6 +110,48 @@ final class DefectContinuityServiceTest extends TestCase
         $this->assertSame('front_cab-item-1', $legacy->fresh()->item_key);
     }
 
+    public function test_case_and_spacing_never_open_a_second_issue_for_the_same_item(): void
+    {
+        $apparatus = $this->apparatus();
+        $legacy = ApparatusDefect::query()->create(['apparatus_id' => $apparatus->id, 'compartment' => 'Front Cab', 'item' => 'Portable Radio', 'status' => 'open', 'issue_type' => 'missing']);
+        $member = User::factory()->create();
+        $inspection = $this->inspection($apparatus, [$this->compartment('front_cab', ' front  cab', [$this->item('front_cab-item-1', "portable\tRADIO ", 'Missing')])], $member);
+
+        $result = $this->record($apparatus, $inspection);
+
+        $this->assertDatabaseCount('apparatus_defects', 1);
+        $this->assertSame([$legacy->id], $result->confirmedDefectIds);
+        $this->assertSame('front_cab-item-1', $legacy->fresh()->item_key);
+        $this->assertDatabaseHas('apparatus_defect_participants', ['apparatus_defect_id' => $legacy->id, 'user_id' => $member->id]);
+    }
+
+    public function test_two_spellings_of_one_new_item_in_one_checkout_make_one_issue(): void
+    {
+        $apparatus = $this->apparatus();
+        $inspection = $this->inspection($apparatus, [
+            $this->compartment('cab', 'Cab', [$this->item('cab-1', 'Radio', 'Missing')]),
+            $this->compartment('cab-dup', 'cab ', [$this->item('cab-dup-1', 'RADIO', 'Damaged')]),
+        ]);
+
+        $this->record($apparatus, $inspection);
+
+        $this->assertDatabaseCount('apparatus_defects', 1);
+        $this->assertDatabaseCount('apparatus_defect_observations', 1);
+    }
+
+    public function test_the_legacy_path_matches_names_without_case_or_spacing(): void
+    {
+        $apparatus = $this->apparatus();
+        $service = app(DefectContinuityService::class);
+        $first = DB::transaction(fn () => $service->recordLegacyFinding((int) $apparatus->id, 'Cab', 'Radio', 'Missing', 'gone', null, null));
+
+        $second = DB::transaction(fn () => $service->recordLegacyFinding((int) $apparatus->id, ' CAB', 'radio  ', 'Missing', 'still gone', null, null));
+
+        $this->assertSame($first->id, $second->id);
+        $this->assertDatabaseCount('apparatus_defects', 1);
+        $this->assertSame('gone', $second->fresh()->notes);
+    }
+
     public function test_identical_item_names_in_two_compartments_stay_distinct(): void
     {
         $apparatus = $this->apparatus();

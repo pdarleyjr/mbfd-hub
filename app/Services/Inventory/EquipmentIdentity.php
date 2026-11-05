@@ -26,6 +26,20 @@ final class EquipmentIdentity
         return trim(preg_replace('/\s+/u', ' ', $spaced) ?? $spaced);
     }
 
+    /**
+     * Conservative match for names members type when reporting an unlisted item: case, spacing and
+     * the separators '.', '-' and '_' are ignored ("K. Tool" = "K Tool" = "K-Tool"); every other
+     * character still counts ("Ladder 14'" is not "Ladder 14"). Deliberately separate from
+     * normalize(), whose output is stored in equipment keys and must not change.
+     */
+    public static function normalizeReportedName(string $name): string
+    {
+        $lower = mb_strtolower($name);
+        $spaced = preg_replace('/[._\-]+/u', ' ', $lower) ?? $lower;
+
+        return trim(preg_replace('/\s+/u', ' ', $spaced) ?? $spaced);
+    }
+
     /** The key an item added by a correction carries on every unit it is applied to. */
     public static function forAddedItem(int $correctionId): string
     {

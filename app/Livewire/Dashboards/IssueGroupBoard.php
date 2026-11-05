@@ -63,6 +63,10 @@ final class IssueGroupBoard extends Component
     #[Locked]
     public array $sections = [];
 
+    /** @var list<array<string, mixed>> resolved, approved or dismissed rows: kept as history, never offered for action */
+    #[Locked]
+    public array $history = [];
+
     /** @var array<string, string> ref => the version shown to the admin, so a bulk action cannot overwrite a newer change */
     #[Locked]
     public array $versions = [];
@@ -278,16 +282,20 @@ final class IssueGroupBoard extends Component
 
         $issues = $this->issuesIn($snapshot);
         $sections = [];
+        $history = [];
         $versions = [];
         // Actions follow a record's status, so one fresh check per status covers the rest. perform() still checks each record.
         $offered = [];
         foreach ($issues as $issue) {
             $versions[$issue->ref()] = $issue->version;
-            $sections[$issue->type] ??= ['type' => $issue->type, 'label' => self::SECTION_LABELS[$issue->type] ?? Str::headline($issue->type), 'rows' => [], 'actions' => []];
-            $sections[$issue->type]['rows'][] = self::row($issue);
             if (! $issue->isOpen()) {
+                // Decided items stay reachable as this unit's history, never mixed in with what still needs action.
+                $history[] = [...self::row($issue), 'kind' => self::SECTION_LABELS[$issue->type] ?? Str::headline($issue->type)];
+
                 continue;
             }
+            $sections[$issue->type] ??= ['type' => $issue->type, 'label' => self::SECTION_LABELS[$issue->type] ?? Str::headline($issue->type), 'rows' => [], 'actions' => []];
+            $sections[$issue->type]['rows'][] = self::row($issue);
             $offered[$issue->type.':'.$issue->status] ??= $this->bulkActions($issue);
             foreach ($offered[$issue->type.':'.$issue->status] as $action) {
                 $sections[$issue->type]['actions'][$action['key']] ??= [...$action, 'refs' => []];
@@ -299,6 +307,7 @@ final class IssueGroupBoard extends Component
         }
 
         $this->sections = array_values($sections);
+        $this->history = $history;
         $this->versions = $versions;
         // Only apply() replaces the token: a poll must never invalidate a click on its way.
         $this->token = $issues === [] ? '' : ($this->token !== '' ? $this->token : Str::random(32));
@@ -311,7 +320,7 @@ final class IssueGroupBoard extends Component
     /** A source that could not be read must not make a good list disappear: the admin keeps it, with a warning. */
     private function keepsListAfterFailure(DashboardSnapshot $snapshot): bool
     {
-        if ($snapshot->failedSources === [] || $this->sections === []) {
+        if ($snapshot->failedSources === [] || ($this->sections === [] && $this->history === [])) {
             return false;
         }
         $this->warning = self::LOAD_FAILED;

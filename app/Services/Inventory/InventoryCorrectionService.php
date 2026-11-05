@@ -10,6 +10,7 @@ use App\Models\ApparatusInventoryChange;
 use App\Models\ApparatusInventoryChangeSet;
 use App\Models\ApparatusInventoryCorrection;
 use App\Models\ApparatusInventoryCorrectionEvent as Event;
+use App\Models\ApparatusInventoryCorrectionParticipant;
 use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Inspections\InspectionNotificationDispatcher;
@@ -47,6 +48,7 @@ final class InventoryCorrectionService
         private readonly InventoryChangePlanner $planner,
         private readonly ChecklistRevisionStore $revisions,
         private readonly InspectionNotificationDispatcher $notifications,
+        private readonly InventoryCorrectionConsolidator $consolidator,
     ) {}
 
     // ------------------------------------------------------------------ member
@@ -55,15 +57,22 @@ final class InventoryCorrectionService
      * Records a member's report. Replaying the same client_submission_id with the same
      * payload returns the stored report (`duplicate` true); a different payload is refused.
      *
+     * A member reporting a change another member already reported is added to that open request
+     * (`joined` true) instead of opening a second one (InventoryCorrectionConsolidator).
+     *
      * @param  array<string, mixed>  $data  validated request data
-     * @return array{correction: ApparatusInventoryCorrection, duplicate: bool}
+     * @return array{correction: ApparatusInventoryCorrection, duplicate: bool, joined: bool}
      */
     public function submit(User $reporter, ?int $employeeId, Apparatus $apparatus, array $data): array
     {
         $hash = $this->payloadHash([...$data, 'apparatus_id' => (int) $apparatus->getKey()]);
         $existing = $this->existingSubmission($reporter, (string) $data['client_submission_id'], $hash);
         if ($existing !== null) {
-            return ['correction' => $existing, 'duplicate' => true];
+            return ['correction' => $existing, 'duplicate' => true, 'joined' => false];
+        }
+        $rejoined = $this->consolidator->replayedJoin($reporter, (string) $data['client_submission_id'], $hash);
+        if ($rejoined !== null) {
+            return ['correction' => $rejoined, 'duplicate' => true, 'joined' => true];
         }
 
         [$checklist, $checklistType] = $this->checklistSeenBy($apparatus, (string) $data['checklist_version']);
@@ -72,9 +81,8 @@ final class InventoryCorrectionService
         // with a new id) gets their earlier report back instead of a second review item.
         $same = $this->openReportOfSameProblem($reporter, $apparatus, $data, $target);
         if ($same !== null) {
-            return ['correction' => $same, 'duplicate' => true];
+            return ['correction' => $same, 'duplicate' => true, 'joined' => false];
         }
-        $this->assertWithinReportLimits($reporter, $apparatus);
         $photoPath = null;
         if (filled($data['photo'] ?? null)) {
             $photoPath = Base64Image::store((string) $data['photo'], 'inventory-corrections', 'correction', self::PHOTO_DISK)
@@ -82,7 +90,20 @@ final class InventoryCorrectionService
         }
 
         try {
-            $correction = DB::transaction(function () use ($reporter, $employeeId, $apparatus, $data, $hash, $checklistType, $target, $photoPath): ApparatusInventoryCorrection {
+            $result = DB::transaction(function () use ($reporter, $employeeId, $apparatus, $data, $hash, $checklistType, $target, $photoPath): array {
+                $proposal = $this->cleanProposal(is_array($data['proposal'] ?? null) ? $data['proposal'] : []);
+                // Two members sending the first report of one change at the same moment make one request.
+                $this->serializeTarget((int) $apparatus->getKey(), (string) $data['reason'], $target, (string) ($proposal['name'] ?? ''));
+                // Another member already reported this change: one request, decided once, for everyone.
+                $shared = $this->consolidator->sharedReport($reporter, (int) $apparatus->getKey(), (string) $data['reason'], $target, (string) ($proposal['name'] ?? ''));
+                if ($shared !== null) {
+                    $joined = $this->consolidator->join($shared, $reporter, $employeeId, $proposal, $target['snapshot'], $this->optional($data['note'] ?? null), $photoPath, (string) $data['client_submission_id'], $hash);
+                    if ($joined !== null) {
+                        return ['correction' => $joined['correction'], 'joined' => true, 'recorded' => $joined['recorded']];
+                    }
+                }
+                $this->assertWithinReportLimits($reporter, $apparatus);
+
                 $correction = new ApparatusInventoryCorrection([
                     'client_request_id' => strtolower((string) $data['client_submission_id']),
                     'payload_hash' => $hash,
@@ -97,7 +118,7 @@ final class InventoryCorrectionService
                     'target_snapshot' => $target['snapshot'],
                     'checklist_type' => $checklistType,
                     'checklist_version' => strtolower((string) $data['checklist_version']),
-                    'proposal' => $this->cleanProposal($data['proposal'] ?? []),
+                    'proposal' => $proposal,
                     'member_note' => $this->optional($data['note'] ?? null),
                     'photo_path' => $photoPath,
                     'status' => ApparatusInventoryCorrection::STATUS_SUBMITTED,
@@ -107,25 +128,48 @@ final class InventoryCorrectionService
                 $inspection = $this->lockOperationalInspection($correction);
                 $correction->apparatus_inspection_id = $inspection?->getKey();
                 $correction->save();
+                $this->consolidator->addParticipant($correction, (int) $reporter->getKey(), $employeeId, ApparatusInventoryCorrectionParticipant::SOURCE_REPORTER, now());
                 $this->event($correction, $reporter, Event::SUBMITTED, Event::VISIBILITY_MEMBER, $correction->member_note);
                 $this->notifications->inventoryCorrectionSubmitted($correction);
 
-                return $correction;
+                return ['correction' => $correction, 'joined' => false, 'recorded' => true];
             });
         } catch (UniqueConstraintViolationException $exception) {
             $this->deletePhoto($photoPath);
             $winner = $this->existingSubmission($reporter, (string) $data['client_submission_id'], $hash);
-            if ($winner === null) {
+            if ($winner !== null) {
+                return ['correction' => $winner, 'duplicate' => true, 'joined' => false];
+            }
+            // A concurrent replay of this same join won the race.
+            $rejoined = $this->consolidator->replayedJoin($reporter, (string) $data['client_submission_id'], $hash);
+            if ($rejoined === null) {
                 throw $exception;
             }
 
-            return ['correction' => $winner, 'duplicate' => true];
+            return ['correction' => $rejoined, 'duplicate' => true, 'joined' => true];
         } catch (Throwable $exception) {
             $this->deletePhoto($photoPath);
             throw $exception;
         }
+        if (! $result['recorded']) {
+            $this->deletePhoto($photoPath); // a repeat join that added nothing keeps no photo
+        }
 
-        return ['correction' => $correction, 'duplicate' => false];
+        return ['correction' => $result['correction'], 'duplicate' => false, 'joined' => $result['joined']];
+    }
+
+    /**
+     * Serializes reports of one change on one apparatus (Postgres transaction advisory lock, taken
+     * before any row lock), so the shared-report check and the insert cannot interleave.
+     *
+     * @param  array{compartment_id: string, item_id: string|null}  $target
+     */
+    private function serializeTarget(int $apparatusId, string $reason, array $target, string $name): void
+    {
+        $key = InventoryCorrectionConsolidator::key($apparatusId, $reason, $target['compartment_id'], $target['item_id'], $name);
+        if ($key !== null && DB::connection()->getDriverName() === 'pgsql') {
+            DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['inventory-correction:'.$key]);
+        }
     }
 
     /** Links the member's corrections from one Daily Checkout draft to the inspection it became. */
@@ -172,8 +216,13 @@ final class InventoryCorrectionService
             if (($replayed = $this->replayedEvent($idempotencyKey, $correction, $author)) !== null) {
                 return $replayed;
             }
+            if ($correction->status === ApparatusInventoryCorrection::STATUS_MERGED) {
+                $survivor = $correction->duplicate_of_correction_id !== null ? 'IC-'.str_pad((string) $correction->duplicate_of_correction_id, 6, '0', STR_PAD_LEFT) : 'the other request';
+                throw ValidationException::withMessages(['body' => "This request was combined with {$survivor}. Write there instead."]);
+            }
             if (! $isReviewer) {
-                $replies = Event::query()->where('apparatus_inventory_correction_id', $correction->getKey())->where('event_type', Event::MEMBER_REPLIED)->count();
+                // Per member: several members on one request each get their own allowance.
+                $replies = Event::query()->where('apparatus_inventory_correction_id', $correction->getKey())->where('event_type', Event::MEMBER_REPLIED)->where('actor_user_id', $author->getKey())->count();
                 if ($replies >= self::MAX_MEMBER_REPLIES) {
                     throw ValidationException::withMessages(['body' => 'This conversation has reached its message limit. Contact Logistics directly.']);
                 }

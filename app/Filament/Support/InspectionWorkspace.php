@@ -424,10 +424,11 @@ final class InspectionWorkspace
                 'action_status' => (string) ($defect->action_status ?? DefectActionStatus::REPORTED),
                 'action_label' => DefectStatusAttribution::labelFor($defect, $attribution),
                 // Fixed is green; closed with no action required is neutral (nothing was repaired).
-                'action_tone' => $defect->isClosedNoAction() ? 'neutral' : ($closed ? 'success' : ($defect->action_status === DefectActionStatus::REPORTED ? 'warning' : 'info')),
+                'action_tone' => $defect->isClosedNoAction() || $defect->isMergedDuplicate() ? 'neutral' : ($closed ? 'success' : ($defect->action_status === DefectActionStatus::REPORTED ? 'warning' : 'info')),
                 'closed_no_action' => $defect->isClosedNoAction(),
+                'merged_into' => $defect->isMergedDuplicate() && $defect->duplicate_of_defect_id !== null ? (int) $defect->duplicate_of_defect_id : null,
                 'closure' => $closed ? [
-                    'kind' => DefectActionStatus::closureKind($defect->action_status),
+                    'kind' => DefectActionStatus::closureKindFor($defect->action_status, $defect->resolution_type),
                     'at' => $this->eastern($defect->resolved_at)?->format('M j, Y g:i A'),
                     'reason' => $defect->isClosedNoAction() ? ($defect->resolution_notes ?: null) : null,
                     'notes' => ! $defect->isClosedNoAction() ? ($defect->resolution_notes ?: null) : null,

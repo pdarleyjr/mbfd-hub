@@ -25,6 +25,7 @@ use App\Models\User;
 use App\Services\ApparatusDefectServiceTicketService;
 use App\Services\ApparatusServiceTicketWorkflowService;
 use App\Support\Fleet\ApparatusOverview;
+use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -352,7 +353,8 @@ final class ApparatusDefectServiceTicketTest extends TestCase
         $resolved = $this->makeDefect('Rope', ['status' => 'resolved', 'resolution_notes' => 'Done.']);
         $cancelled = $this->makeDefect('Strap', ['service_ticket_id' => $this->ticket('cancelled')->id]);
         $noAction = $this->makeDefect('Duplicate lamp', ['action_status' => 'dismissed', 'resolution_notes' => 'Duplicate of an earlier report.']);
-        $all = [$this->defect, $awaiting, $acknowledged, $ticketed, $closed, $resolved, $cancelled, $noAction];
+        $merged = $this->makeDefect('Second lamp', ['resolved' => true, 'action_status' => 'dismissed', 'resolution_type' => DefectActionStatus::MERGED_DUPLICATE, 'resolution_notes' => 'Merged into issue #1.']);
+        $all = [$this->defect, $awaiting, $acknowledged, $ticketed, $closed, $resolved, $cancelled, $noAction, $merged];
 
         $manager = $this->defectsManager();
         foreach ([
@@ -364,6 +366,7 @@ final class ApparatusDefectServiceTicketTest extends TestCase
             DefectFollowUpState::TICKET_CANCELLED => $cancelled,
             DefectFollowUpState::RESOLVED => $resolved,
             DefectFollowUpState::CLOSED_NO_ACTION => $noAction,
+            DefectFollowUpState::MERGED => $merged,
         ] as $tab => $expected) {
             $others = array_values(array_filter($all, fn (ApparatusDefect $defect): bool => $defect->id !== $expected->id));
             $manager->set('followUpTab', $tab)
@@ -390,6 +393,7 @@ final class ApparatusDefectServiceTicketTest extends TestCase
             $this->makeDefect('H', ['status' => 'resolved', 'service_ticket_id' => $open->id, 'resolution_notes' => 'x']),
             $this->makeDefect('I', ['action_status' => 'dismissed', 'resolution_notes' => 'Duplicate of an earlier report.']),
             $this->makeDefect('J', ['service_ticket_id' => $this->ticket('completed')->id]),
+            $this->makeDefect('K', ['resolved' => true, 'action_status' => 'dismissed', 'resolution_type' => DefectActionStatus::MERGED_DUPLICATE, 'resolution_notes' => 'Merged into issue #1.']),
         ];
 
         $expected = [];

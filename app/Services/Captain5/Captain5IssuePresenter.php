@@ -84,7 +84,7 @@ final class Captain5IssuePresenter
             'issue_type' => (string) ($defect->issue_type ?: 'Missing'),
             'severity' => (string) ($defect->severity ?: 'routine'),
             'action_status' => (string) ($defect->action_status ?: DefectActionStatus::REPORTED),
-            'action_label' => DefectActionStatus::label($defect->action_status),
+            'action_label' => $defect->isMergedDuplicate() ? DefectActionStatus::mergedLabel($defect->duplicate_of_defect_id) : DefectActionStatus::label($defect->action_status),
             'open' => $open,
             'details' => array_intersect_key($details, array_flip(Captain5ActorContext::DETAIL_KEYS)),
             'expected_delivery' => $expected,
@@ -101,7 +101,8 @@ final class Captain5IssuePresenter
             'resolved_at' => $this->iso($defect->resolved_at),
             'resolution_type' => $defect->resolution_type,
             // How it ended: 'resolved' (fixed) is not 'closed_no_action' (nothing was repaired); the reason shows in history.
-            'closure' => DefectActionStatus::closureKind($defect->action_status),
+            // A merged duplicate reads 'merged': the sheet then says "Closed", never "no action required".
+            'closure' => DefectActionStatus::closureKindFor($defect->action_status, $defect->resolution_type),
             'closure_reason' => $defect->isClosedNoAction() ? $defect->resolution_notes : null,
             'state_token' => ($defect->action_status ?: DefectActionStatus::REPORTED).':'.$lastEventId,
             'captain5_cleared_at' => $this->iso($defect->captain5_cleared_at),
