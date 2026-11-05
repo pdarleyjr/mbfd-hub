@@ -10,8 +10,10 @@ use App\Models\EmployeeMessaging\EmployeeLogisticsThread;
 use App\Models\User;
 use App\Notifications\SupportServices\SupportServicesMessageNotification;
 use App\Services\AiAutomation\AiIntake;
+use App\Services\MemberReplies\MemberReplyLedger;
 use App\Services\Notifications\NotificationDispatchService;
 use App\Services\Security\EmployeeLogisticsMessagingAccess;
+use App\Support\MemberReplies\ReplySubject;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -335,6 +337,10 @@ final class EmployeeLogisticsMessagingService
             $side === EmployeeLogisticsMessage::SIDE_MEMBER ? 'last_member_message_id' : 'last_logistics_message_id' => $id,
         ])->save();
         $message->setRelation('thread', $thread);
+        // The shared awaiting-staff ledger (docs/member-replies.md section 4) mirrors last_message_side.
+        $side === EmployeeLogisticsMessage::SIDE_MEMBER
+            ? app(MemberReplyLedger::class)->memberReplied(ReplySubject::LOGISTICS_THREAD, (int) $thread->getKey(), $author, $message->created_at)
+            : app(MemberReplyLedger::class)->staffReplied(ReplySubject::LOGISTICS_THREAD, (int) $thread->getKey(), $message->created_at);
         $this->announce($thread, $message, $author, $side);
 
         return $message;

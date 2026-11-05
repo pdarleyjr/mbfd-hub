@@ -14,7 +14,9 @@ use App\Models\ApparatusInventoryCorrectionParticipant;
 use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Inspections\InspectionNotificationDispatcher;
+use App\Services\MemberReplies\MemberReplyLedger;
 use App\Support\Fleet\InventoryCorrectionAccess;
+use App\Support\MemberReplies\ReplySubject;
 use App\Support\Security\Base64Image;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -889,7 +891,7 @@ final class InventoryCorrectionService
         ?string $idempotencyKey = null,
         ?string $authorContext = null,
     ): Event {
-        return Event::query()->create([
+        $event = Event::query()->create([
             'apparatus_inventory_correction_id' => $correction->getKey(),
             'actor_user_id' => $actor?->getKey(),
             'event_type' => $type,
@@ -899,6 +901,27 @@ final class InventoryCorrectionService
             'details' => $details,
             'idempotency_key' => $idempotencyKey !== null && $idempotencyKey !== '' ? $idempotencyKey : null,
         ]);
+        $this->markReplyState($correction, $event);
+
+        return $event;
+    }
+
+    /**
+     * A member's reply leaves the request waiting on Logistics; a member-visible reply, question or decision from
+     * Logistics answers it. Internal notes and bookkeeping events change nothing (docs/member-replies.md section 4).
+     */
+    private function markReplyState(ApparatusInventoryCorrection $correction, Event $event): void
+    {
+        $ledger = app(MemberReplyLedger::class);
+        $id = (int) $correction->getKey();
+        if ($event->event_type === Event::MEMBER_REPLIED) {
+            $ledger->memberReplied(ReplySubject::INVENTORY_CORRECTION, $id, $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null, $event->created_at);
+
+            return;
+        }
+        if ($event->visibility === Event::VISIBILITY_MEMBER && in_array($event->event_type, [Event::LOGISTICS_REPLIED, Event::CLARIFICATION_REQUESTED, Event::APPROVED, Event::REJECTED, Event::REVERSED], true)) {
+            $ledger->staffReplied(ReplySubject::INVENTORY_CORRECTION, $id, $event->created_at);
+        }
     }
 
     private function messageBody(string $body): string

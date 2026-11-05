@@ -6,6 +6,8 @@ namespace App\Http\Resources\Public;
 
 use App\Models\ApparatusServiceTicket;
 use App\Models\ApparatusServiceTicketUpdate;
+use App\Support\MemberReplies\ReplySubject;
+use App\Support\MemberReplies\SubmissionConversationAccess;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Http\Request;
@@ -39,6 +41,10 @@ class PublicApparatusServiceTicketResource extends JsonResource
             'created_at' => $this->iso8601($ticket->created_at),
             'updated_at' => $this->iso8601($ticket->updated_at),
             'updates' => $this->whenLoaded('updates', fn (): array => $this->publicUpdates($ticket)),
+            // Additive, per viewer: whether this member filed it and so may open its conversation (docs/member-replies.md).
+            // Only the flag leaves the server; the requester's identity does not.
+            'member_conversation' => ['participant' => array_key_exists('requested_by_employee_id', $ticket->getAttributes())
+                && SubmissionConversationAccess::isParticipant($request->user(), ReplySubject::APPARATUS_SERVICE_TICKET, $ticket)],
         ];
     }
 

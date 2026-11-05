@@ -95,6 +95,18 @@ final class MemberInspectionConversation
      */
     private function visible(Collection $thread, User $viewer): array
     {
+        return $this->present($thread, $viewer);
+    }
+
+    /**
+     * The member-safe shape of a thread, for any member surface (employee portal, Daily Checkout issue page).
+     * Member-visible messages only; the visibility flag itself never leaves this class.
+     *
+     * @param  Collection<int, ApparatusIssueMessage>  $thread
+     * @return list<array<string, mixed>>
+     */
+    public function present(Collection $thread, User $viewer): array
+    {
         return $thread
             ->filter(static fn (ApparatusIssueMessage $message): bool => $message->visibility === ApparatusIssueMessage::VISIBILITY_MEMBER)
             ->map(function (ApparatusIssueMessage $message) use ($viewer): array {

@@ -694,6 +694,8 @@ export interface StationRequestSummary {
   ai_receipt?: AiReceipt | null;
   items?: StationRequestItem[];
   updates?: StationRequestUpdate[];
+  /** Server-decided: this member sent it, so its conversation and reply box are theirs (docs/member-replies.md). */
+  member_conversation?: { participant: boolean };
 }
 
 /** A unit on a station's Overview for the current 7 AM to 7 AM window. Frontline units owe a daily inspection. */
@@ -807,6 +809,8 @@ export interface ApparatusServiceTicketSummary {
   created_at: string;
   updated_at: string;
   updates?: ApparatusServiceTicketUpdate[];
+  /** Server-decided: this member sent it, so its conversation and reply box are theirs (docs/member-replies.md). */
+  member_conversation?: { participant: boolean };
 }
 
 export interface StationActivityEntry {
@@ -1141,6 +1145,8 @@ export interface SupplyRequest {
   created_by_shift: Shift;
   created_at: string;
   updated_at: string;
+  /** Server-decided: this member sent it, so its conversation and reply box are theirs (docs/member-replies.md). */
+  member_conversation?: { participant: boolean };
 }
 
 export interface UpdateItemRequest {

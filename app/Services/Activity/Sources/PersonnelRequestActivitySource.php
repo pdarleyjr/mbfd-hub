@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Activity\Sources;
 
 use App\Enums\PersonnelRequestStatus;
-use App\Filament\Employee\Pages\MyRequestsPage;
 use App\Models\Employee;
 use App\Models\PersonnelRequest;
 use App\Models\PersonnelRequestItem;
@@ -64,7 +63,7 @@ final class PersonnelRequestActivitySource implements MemberActivitySource
         $items = PersonnelRequestItem::query()->whereIn('personnel_request_id', $ids)->orderBy('id')
             ->get(['personnel_request_id', 'item_name'])->groupBy('personnel_request_id');
 
-        return $requests->map(function (PersonnelRequest $request) use ($signals, $items, $employeeId): MemberActivityItem {
+        return $requests->map(function (PersonnelRequest $request) use ($signals, $items): MemberActivityItem {
             $id = (int) $request->getKey();
             $signal = $signals[$id] ?? ActivitySignal::none();
             $status = $request->status;
@@ -87,10 +86,8 @@ final class PersonnelRequestActivitySource implements MemberActivitySource
                 needsResponse: $status === PersonnelRequestStatus::NeedsInformation,
                 latestUpdate: $signal->latest,
                 at: $at,
-                // The detail page is for the person the request is for; a requester sees the list.
-                url: (int) $request->beneficiary_employee_id === $employeeId
-                    ? route('employee.personnel-requests.show', ['personnelRequest' => $request->public_id])
-                    : MyRequestsPage::getUrl(panel: 'employee'),
+                // The member it is for and the officer who submitted it both open the detail page (docs/member-replies.md).
+                url: route('employee.personnel-requests.show', ['personnelRequest' => $request->public_id]),
                 unreadAt: $signal->humanAt,
             );
         })->values()->all();

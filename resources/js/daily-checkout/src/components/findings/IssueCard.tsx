@@ -5,6 +5,8 @@ import { describeIssueHistoryError, fetchIssueHistory } from '../../utils/issueH
 import { formatEventDate, issuePresentation, reportedByLine } from '../../utils/issueHistoryFormat.ts';
 import Tag from '../ui/Tag';
 import { ownerName } from './findingsChanged.ts';
+import ConversationThread from '../conversation/ConversationThread';
+import { fetchIssueConversation, postIssueReply } from '../../utils/conversationApi';
 import IssueTimeline from './IssueTimeline';
 import MemberCorrectionSheet from './MemberCorrectionSheet';
 import './findings.css';
@@ -14,7 +16,7 @@ type TimelineState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'loaded'; entries: TimelineEntry[] };
+  | { status: 'loaded'; entries: TimelineEntry[]; participant: boolean };
 
 interface Props {
   issue: IssueSummary;
@@ -40,11 +42,14 @@ export default function IssueCard({ issue }: Props) {
   // Anything that adds to the history changes this, so an open timeline is read again after a refresh.
   const revision = `${issue.action_status}|${issue.history_count}|${latest?.at ?? ''}`;
 
+  const loadConversation = useCallback(() => fetchIssueConversation(issue.id), [issue.id]);
+  const sendReply = useCallback((body: string, clientMessageId: string) => postIssueReply(issue.id, body, clientMessageId), [issue.id]);
+
   const load = useCallback(() => {
     const mine = ++latestRequest.current;
     setTimeline(previous => (previous.status === 'loaded' ? previous : { status: 'loading' }));
     fetchIssueHistory(issue.id).then((history) => {
-      if (mine === latestRequest.current) setTimeline({ status: 'loaded', entries: history.timeline });
+      if (mine === latestRequest.current) setTimeline({ status: 'loaded', entries: history.timeline, participant: history.participant === true });
     }).catch((error: unknown) => {
       // A failed re-read keeps the timeline already on screen.
       if (mine === latestRequest.current) setTimeline(previous => (previous.status === 'loaded' ? previous : { status: 'error', message: describeIssueHistoryError(error, 'The history') }));
@@ -105,6 +110,12 @@ export default function IssueCard({ issue }: Props) {
             </div>
           )}
           {timeline.status === 'loaded' && <IssueTimeline entries={timeline.entries} />}
+          {/* Only the members on this issue get its conversation and a reply box; the server enforces the same rule. */}
+          {timeline.status === 'loaded' && timeline.participant && (
+            <div className="mt-4">
+              <ConversationThread id={`issue-${issue.id}`} load={loadConversation} send={sendReply} heading="Conversation with Logistics" />
+            </div>
+          )}
         </div>
       </details>
     </article>

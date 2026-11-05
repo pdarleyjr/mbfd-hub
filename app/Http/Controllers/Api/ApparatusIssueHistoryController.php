@@ -12,6 +12,7 @@ use App\Models\ApparatusInspectionConcern;
 use App\Models\User;
 use App\Services\Defects\MemberIssueHistory;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
+use App\Services\Inspections\IssueMessageService;
 use ErrorException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -54,9 +55,13 @@ final class ApparatusIssueHistoryController extends Controller
 
     public function timeline(Request $request, ApparatusDefect $defect): JsonResponse
     {
-        $this->authorizeMember($request);
+        $user = $this->authorizeMember($request);
 
-        return response()->json($this->history->timeline($defect));
+        // Additive and per viewer: whether this member is on the issue and so may open its conversation
+        // (GET/POST apparatus-issues/{defect}/conversation). The timeline itself stays the same for everyone.
+        return response()->json($this->history->timeline($defect) + [
+            'conversation' => ['participant' => app(IssueMessageService::class)->followsDefect($user, $defect)],
+        ]);
     }
 
     public function defectPhoto(Request $request, ApparatusDefect $defect): StreamedResponse

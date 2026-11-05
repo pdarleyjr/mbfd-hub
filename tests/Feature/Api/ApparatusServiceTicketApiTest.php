@@ -177,8 +177,10 @@ class ApparatusServiceTicketApiTest extends TestCase
             'id', 'ticket_number', 'apparatus_id', 'station_id', 'unit_designation', 'origin',
             'category', 'service_type', 'title', 'priority', 'status', 'is_open', 'scheduled_for',
             'scheduled_location', 'expected_return_at', 'current_public_response', 'created_at',
-            'updated_at', 'updates',
+            'updated_at', 'updates', 'member_conversation',
         ], array_keys($stationResponse->json('data.0')));
+        // Only the viewer's own flag leaves the server (docs/member-replies.md), never who requested it.
+        $this->assertSame(['participant'], array_keys($stationResponse->json('data.0.member_conversation')));
 
         foreach ([$stationResponse, $noticeResponse] as $response) {
             $body = $response->getContent();
