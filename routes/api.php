@@ -119,6 +119,13 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     // 300 Command profile: read-only, allowlisted overview of every active station.
     Route::get('command/overview', CommandOverviewController::class)->middleware('can:access-command-300');
 
+    // 300 dashboard: batched station board plus read-only drill-ins. Same gate; GET only.
+    Route::prefix('command/stations')->middleware('can:access-command-300')->controller(\App\Http\Controllers\Api\Command300StationsController::class)->group(function () {
+        Route::get('/', 'index');
+        Route::get('{station}', 'show')->whereNumber('station');
+        Route::get('{station}/checkouts/{inspection}', 'checkout')->whereNumber(['station', 'inspection']);
+    });
+
 });
 
 // =========================================================================

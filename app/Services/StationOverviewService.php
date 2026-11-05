@@ -40,12 +40,7 @@ final class StationOverviewService
         $window = StationShiftWindow::containing($now);
         /** @var Collection<int, Apparatus> $apparatuses */
         $apparatuses = $station->apparatuses()->get(['id', 'station_id', 'designation', 'name', 'unit_id', 'vehicle_number', 'type', 'slug', 'status', 'daily_checkout_requirement'])->keyBy('id');
-        $inspections = $this->submitted($apparatuses->keys()->all())
-            ->where('completed_at', '>=', $window->start->utc())
-            ->where('completed_at', '<', $window->end->utc())
-            ->orderByDesc('completed_at')
-            ->orderByDesc('id')
-            ->get(self::CHECKOUT_COLUMNS);
+        $inspections = $this->submittedInWindow($apparatuses->keys()->all(), $window);
         $units = $this->units($apparatuses, $inspections);
         $missing = array_values(array_filter($units, static fn (array $unit): bool => $unit['frontline'] && $unit['state'] === 'not_submitted'));
         [$requests, $requestsTotal] = $this->requests($station, $now);
@@ -67,6 +62,22 @@ final class StationOverviewService
                 'units' => $window->alertIsDue($now) ? $missing : [],
             ],
         ];
+    }
+
+    /**
+     * Every counted submission for these units inside one 7-to-7 window, newest first. One query however many units.
+     *
+     * @param  array<int, mixed>  $apparatusIds
+     * @return Collection<int, ApparatusInspection>
+     */
+    public function submittedInWindow(array $apparatusIds, StationShiftWindow $window): Collection
+    {
+        return $this->submitted($apparatusIds)
+            ->where('completed_at', '>=', $window->start->utc())
+            ->where('completed_at', '<', $window->end->utc())
+            ->orderByDesc('completed_at')
+            ->orderByDesc('id')
+            ->get(self::CHECKOUT_COLUMNS);
     }
 
     /**
@@ -119,7 +130,7 @@ final class StationOverviewService
      * @param  Collection<int, ApparatusInspection>  $inspections  newest first
      * @return list<array<string, mixed>>
      */
-    private function units(Collection $apparatuses, Collection $inspections): array
+    public function units(Collection $apparatuses, Collection $inspections): array
     {
         $latest = $inspections->unique('apparatus_id')->keyBy('apparatus_id');
         $units = [];
@@ -152,7 +163,7 @@ final class StationOverviewService
     }
 
     /** @return array<string, mixed> */
-    private function checkoutRow(ApparatusInspection $inspection, ?Apparatus $apparatus): array
+    public function checkoutRow(ApparatusInspection $inspection, ?Apparatus $apparatus): array
     {
         return [
             'id' => (int) $inspection->id,
