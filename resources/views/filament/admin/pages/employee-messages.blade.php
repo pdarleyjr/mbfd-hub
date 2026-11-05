@@ -81,6 +81,13 @@
                                 aria-pressed="{{ $filter === $value ? 'true' : 'false' }}"
                             >{{ $label }}</button>
                         @endforeach
+                        <button
+                            type="button"
+                            class="emsg-filter emsg-filter--bunker"
+                            x-on:click="$wire.set('reasonFilter', {{ \Illuminate\Support\Js::from($reasonFilter === 'bunker_gear_cleaning' ? '' : 'bunker_gear_cleaning') }})"
+                            aria-pressed="{{ $reasonFilter === 'bunker_gear_cleaning' ? 'true' : 'false' }}"
+                            data-emsg-bunker-filter
+                        >Bunker gear only</button>
                     </div>
                 </div>
 
@@ -107,7 +114,7 @@
                                 <button
                                     type="button"
                                     wire:click="openThread({{ $row->id }})"
-                                    @class(['emsg-row', 'emsg-row--unread' => $rowUnread])
+                                    @class(['emsg-row', 'emsg-row--unread' => $rowUnread, 'emsg-row--bunker' => $row->isBunkerGear()])
                                     aria-current="{{ $selectedId === $row->id ? 'true' : 'false' }}"
                                 >
                                     <x-employee-messages.admin-row :row="$row" :initials="$initials($row->member_name)" :details="$rowDetails" :when="$when($row->last_message_at)" />

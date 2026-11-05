@@ -49,9 +49,10 @@ final class MedicalStatisticsPageTest extends TestCase
         $this->actingAs($user->fresh());
     }
 
+    /** The Requests section: the former Medical Data / Statistics page, now one tab of Medical Supply Data. */
     private function page(): Testable
     {
-        return Livewire::test(MedicalDataStatistics::class);
+        return Livewire::test(MedicalDataStatistics::class)->set('tab', 'requests');
     }
 
     /** Two requests from Rescue 2 (tape 4, gauze 10; tape 2), a Detail request, and one cancelled; the first tape line is issued. */

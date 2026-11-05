@@ -28,7 +28,7 @@ final class MasterInventoryService
     /** Stored order status => what the master list calls it. */
     public const ORDER_STATES = [SupplyOrder::PENDING => 'pending', SupplyOrder::PLACED => 'ordered', SupplyOrder::BACKORDERED => 'backordered'];
 
-    private const SECTION_LABELS = [
+    public const SECTION_LABELS = [
         'supplies' => 'Supplies',
         'supplies-after-unlabeled-band' => 'Supplies',
         'medications' => 'Medications',
@@ -59,6 +59,7 @@ final class MasterInventoryService
             ->orderByDesc('version')->first();
 
         $states = array_count_values(array_column($rows, 'order_state'));
+        $levels = array_count_values(array_filter(array_column($rows, 'level')));
 
         return [
             'sections' => $this->sections($locations, $items),
@@ -66,6 +67,7 @@ final class MasterInventoryService
             'summary' => [
                 'needs_order' => $states['needs_order'] ?? 0, 'pending' => $states['pending'] ?? 0,
                 'ordered' => $states['ordered'] ?? 0, 'backordered' => $states['backordered'] ?? 0,
+                'red' => $levels[StockLevel::RED] ?? 0, 'yellow' => $levels[StockLevel::YELLOW] ?? 0, 'green' => $levels[StockLevel::GREEN] ?? 0,
             ],
             'units' => CountMath::units(),
             'inactive' => SupplyItem::query()->with('location:id,code')->where('active', false)->where('controlled_substance', false)->orderBy('name')->get()
@@ -320,6 +322,7 @@ final class MasterInventoryService
             $taken = $deducted[$item->getKey()] ?? 0;
             $count = $counts[$item->getKey()] ?? null;
             $labels = CountMath::LABELS[$item->count_unit] ?? [$item->count_unit, $item->count_unit];
+            $lines = StockLevel::lines($item);
 
             return [
                 'id' => $item->getKey(),
@@ -337,7 +340,10 @@ final class MasterInventoryService
                 'package_unit' => $item->package_unit,
                 'units_per_package' => $item->units_per_package,
                 'on_hand_base' => $base,
-                'on_hand' => CountMath::display($base, $per),
+                // More was taken than the ledger held (the supply room screen never refuses a member holding the
+                // item): show 0, not a negative shelf, and flag the item for a count.
+                'on_hand' => CountMath::display($base === null ? null : max(0, $base), $per),
+                'count_due' => $base !== null && $base < 0,
                 'deducted_base' => $taken,
                 'deducted' => CountMath::display($taken, $per),
                 'counted_at' => ($count['counted_at'] ?? null)?->toIso8601String(),
@@ -353,6 +359,11 @@ final class MasterInventoryService
                     $toOrder > 0 => 'needs_order',
                     default => 'ok',
                 },
+                'level' => StockLevel::of($item, $base),
+                'reorder_at' => $lines['reorder_at'] ?? null,
+                'critical_at' => $lines['critical_at'] ?? null,
+                'reorder_at_auto' => $lines['reorder_auto'] ?? true,
+                'critical_at_auto' => $lines['critical_auto'] ?? true,
                 'open_order' => $order === null ? null : $this->openOrder($order, $item, $per),
                 'order_rule_text' => CountMath::orderRuleText($item),
                 'refrigerated' => $item->refrigerated,
@@ -471,7 +482,47 @@ final class MasterInventoryService
             $changes['needs_review'] = $reasons !== [];
         }
 
-        return $changes;
+        return $changes + $this->levelChanges($item, $data, $unit, $changes);
+    }
+
+    /**
+     * The yellow and red lines a person typed, in the item's count unit; blank returns a line to its preset.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $changes  the other changes in this save, so the check sees the item as it will be
+     * @return array<string, int|null>
+     */
+    private function levelChanges(SupplyItem $item, array $data, string $unit, array $changes): array
+    {
+        if (! array_key_exists('reorder_at', $data) && ! array_key_exists('critical_at', $data)) {
+            return [];
+        }
+        $probe = (clone $item)->forceFill(['count_unit' => $unit] + array_intersect_key($changes, array_flip(['units_per_package', 'threshold_qty_base'])));
+        $out = [];
+        foreach (['reorder_at' => 'reorder_at_qty_base', 'critical_at' => 'critical_at_qty_base'] as $field => $column) {
+            if (array_key_exists($field, $data)) {
+                $out[$column] = $data[$field] === null ? null : CountMath::toBase($probe, (int) $data[$field]);
+                if ($out[$column] !== null) {
+                    StockLedger::assertWithinLimit($out[$column]);
+                }
+                $probe->setAttribute($column, $out[$column]);
+            }
+        }
+        $lines = StockLevel::lines($probe);
+        if ($lines === null) {
+            throw new EmsException('Set the expected amount before the yellow and red lines.', 'level_needs_expected', 422, [
+                (array_key_exists('reorder_at', $data) ? 'reorder_at' : 'critical_at') => ['Set the expected amount first.'],
+            ]);
+        }
+        $per = CountMath::perCountUnit($probe);
+        if ($probe->reorder_at_qty_base !== null && intdiv($probe->reorder_at_qty_base, $per) > $lines['expected']) {
+            throw new EmsException('Yellow at cannot be above the expected amount.', 'level_order', 422, ['reorder_at' => ['Yellow at cannot be above the expected amount.']]);
+        }
+        if ($probe->critical_at_qty_base !== null && intdiv($probe->critical_at_qty_base, $per) > $lines['reorder_at']) {
+            throw new EmsException('Red at cannot be above Yellow at.', 'level_order', 422, ['critical_at' => ['Red at cannot be above Yellow at.']]);
+        }
+
+        return $out;
     }
 
     /** @return array<string, mixed> */
@@ -538,6 +589,8 @@ final class MasterInventoryService
             'count_unit' => ['sometimes', 'in:'.implode(',', SupplyItem::COUNT_UNITS)],
             'units_per_package' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000000'],
             'threshold' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000'],
+            'reorder_at' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000'],
+            'critical_at' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000'],
         ];
     }
 
@@ -549,6 +602,8 @@ final class MasterInventoryService
             'count_unit.in' => 'Choose how this item is counted from the list.',
             'units_per_package.integer' => 'Enter a whole number of units.', 'units_per_package.min' => 'A package holds at least 1 unit.',
             'threshold.integer' => 'Enter a whole number.', 'threshold.min' => 'The order level cannot be negative.',
+            'reorder_at.integer' => 'Enter a whole number.', 'reorder_at.min' => 'Yellow at cannot be negative.',
+            'critical_at.integer' => 'Enter a whole number.', 'critical_at.min' => 'Red at cannot be negative.',
         ];
     }
 

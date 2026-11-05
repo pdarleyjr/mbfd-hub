@@ -89,6 +89,22 @@ final class DepartmentUpdateVisibilityTest extends TestCase
         $this->get("/updates/{$draft->id}")->assertNotFound();
     }
 
+    public function test_card_shows_expiry_and_keeps_the_body_sanitised(): void
+    {
+        $author = User::factory()->create();
+        $update = $this->update($author, 'Hydrant flushing', [
+            'body' => '<p>Read this.</p><script>alert(1)</script>',
+            'expires_at' => now()->addDays(3),
+        ]);
+
+        $this->actingAsCanonicalFixture();
+        $this->get("/updates/{$update->id}")->assertOk()
+            ->assertSee('Stays up until Sep 8, 2026')
+            ->assertSee('data-update-body', false)
+            ->assertDontSee('<script>alert(1)</script>', false);
+        $this->get('/updates')->assertOk()->assertSee('Stays up until Sep 8, 2026');
+    }
+
     /** @param array<string, mixed> $overrides */
     private function update(User $author, string $title, array $overrides = []): DepartmentUpdate
     {

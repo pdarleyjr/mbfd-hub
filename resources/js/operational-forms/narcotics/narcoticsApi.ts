@@ -26,14 +26,16 @@ interface Envelope<T> {
 }
 
 const SIGN_IN_MESSAGE = 'Your sign-in has ended. Sign in again to continue.';
-/** A photo upload on a weak connection: generous, but not endless. */
+/** A photo upload on a weak connection: generous, but not endless; each extra photo adds a minute. */
 const UPLOAD_TIMEOUT_MS = 180_000;
+const UPLOAD_TIMEOUT_PER_EXTRA_PHOTO_MS = 60_000;
+const UPLOAD_TIMEOUT_MAX_MS = 600_000;
 
 function statusMessage(status: number): string {
     if (status === 401 || status === 419) return SIGN_IN_MESSAGE;
     if (status === 403) return 'The narcotics check is not available to your account.';
     if (status === 404) return 'That could not be found.';
-    if (status === 413) return 'That photo is too large to send.';
+    if (status === 413) return 'Those photos are too large to send together.';
     if (status === 429) return 'That was sent too many times in a row. Wait a minute and try again.';
     if (status >= 500) return 'The server had a problem. Try again in a moment.';
     return `The request could not be completed (${status}).`;
@@ -71,7 +73,7 @@ export function createNarcoticsApi(endpoints: NarcoticsEndpoints, csrfToken: str
     function send(input: SendInput, onProgress: (percent: number) => void): Promise<{ check: NarcoticsCheckDetail; replayed: boolean }> {
         return new Promise((resolve, reject) => {
             const data = new FormData();
-            data.append('photo', input.photo.blob, input.photo.processed ? photoFileName(input.photo.type) : input.photo.name);
+            for (const photo of input.photos) data.append('photos[]', photo.blob, photo.processed ? photoFileName(photo.type) : photo.name);
             data.append('client_submission_id', input.clientSubmissionId);
             data.append('rescue_unit', input.rescueUnit);
             if (input.rescueUnitOther !== null) data.append('rescue_unit_other', input.rescueUnitOther);
@@ -82,7 +84,7 @@ export function createNarcoticsApi(endpoints: NarcoticsEndpoints, csrfToken: str
             const request = new XMLHttpRequest();
             request.open('POST', endpoints.store);
             request.withCredentials = true;
-            request.timeout = UPLOAD_TIMEOUT_MS;
+            request.timeout = Math.min(UPLOAD_TIMEOUT_MAX_MS, UPLOAD_TIMEOUT_MS + UPLOAD_TIMEOUT_PER_EXTRA_PHOTO_MS * Math.max(0, input.photos.length - 1));
             request.setRequestHeader('Accept', 'application/json');
             request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
             request.setRequestHeader('X-CSRF-TOKEN', csrfToken);

@@ -63,6 +63,7 @@ class EmployeePanelProvider extends PanelProvider
             ->unsavedChangesAlerts()
             ->pages([
                 EmployeeDashboard::class,
+                \App\Filament\Employee\Pages\MyActivity::class,
                 \App\Filament\Employee\Pages\TrainingHistoryPage::class,
                 \App\Filament\Employee\Pages\MyVehicleInspections::class, \App\Filament\Employee\Pages\MyVehicleInspectionView::class,
                 \App\Filament\Employee\Pages\MyInventoryCorrectionView::class,

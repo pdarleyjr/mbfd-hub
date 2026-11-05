@@ -15,9 +15,15 @@ test('every requested reading and identifier is on the boat under a heading a me
   }
   assert.equal(groupOf('fb6-fuel-level'), 'Fuel & Operating Readings');
   assert.equal(byId.get('fb6-fuel-level').inputType, 'percentage');
-  for (const id of ['fb6-scba-id-1', 'fb6-scba-id-4', 'fb6-scuba-ids', 'fb6-driver-radio-number', 'fb6-engineer-radio-number', 'fb6-officer-radio-number', 'fb6-deck-hand-radio-number', 'fb6-driver-radio-last-four-serial', 'fb6-engineer', 'fb6-officer', 'fb6-deck-hand']) {
+  for (const id of ['fb6-scba-id-1', 'fb6-scba-id-4', 'fb6-scuba-ids', 'fb6-driver-radio-number', 'fb6-engineer-radio-number', 'fb6-officer-radio-number', 'fb6-deck-hand-radio-number']) {
     assert.equal(groupOf(id), 'Crew Equipment & Radios', id);
   }
+});
+
+test('a radio is recorded once, by its ID number: the Motorola serial is the same number and is not asked twice', () => {
+  for (const id of ['fb6-driver-radio-last-four-serial', 'fb6-engineer', 'fb6-officer', 'fb6-deck-hand']) assert.equal(byId.has(id), false, id);
+  assert.equal(template.fields.some((field) => /serial/i.test(field.name)), false);
+  for (const seat of ['driver', 'engineer', 'officer', 'deck-hand']) assert.ok(byId.has(`fb6-${seat}-radio-number`), seat);
 });
 
 test('stable ids survive, and nothing but the date is required', () => {

@@ -25,6 +25,7 @@ class StationSupplyRequest extends Model
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'ai_receipt_at' => 'datetime',
     ];
 
     /**

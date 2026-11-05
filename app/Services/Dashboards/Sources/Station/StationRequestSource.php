@@ -9,8 +9,11 @@ use App\Enums\StationRequestType;
 use App\Filament\Resources\StationRequestResource;
 use App\Models\StationRequest;
 use App\Models\StationRequestUpdate;
+use App\Models\SupportTriage\SupportTriageLevel;
 use App\Models\User;
 use App\Services\StationRequestWorkflowService;
+use App\Services\SupportTriage\TriageProjector;
+use App\Services\SupportTriage\TriageSql;
 use App\Support\Dashboards\ActionResult;
 use App\Support\Dashboards\DashboardIssue;
 use App\Support\Dashboards\DashboardView;
@@ -28,9 +31,12 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 /**
  * Station requests (repair/service and equipment) from StationRequestResource.
  *
+ * Severity is the Low/Medium/High priority from the equipment catalog (support_triage_levels; a staff override wins; a
+ * member priority of high or critical already reads High there). A request not projected yet falls back to its
+ * priority: critical/high → high, normal → medium, low → low. The member's own priority field is never changed.
+ *
  * Tags come from the structured request_type: repair_service → "facilities", equipment →
- * "supplies", anything else → "other". Severity from priority: critical/high → high, normal →
- * medium, low → low. Stage from status: pending → awaiting_response; other open statuses →
+ * "supplies", anything else → "other". Stage from status: pending → awaiting_response; other open statuses →
  * in_progress; completed/denied/cancelled → resolved (in the window by completed_at/denied_at/
  * cancelled_at). Archived requests are out of scope. Every action goes through
  * StationRequestWorkflowService::transition(), exactly like the resource's "Update Status" action.
@@ -42,6 +48,10 @@ final class StationRequestSource extends QueryBackedSource
     private const TYPE_TAGS = ['repair_service' => 'facilities', 'equipment' => 'supplies'];
 
     private const ACTIONS = ['acknowledge', 'approve', 'assign', 'set_status', 'post_update', 'complete', 'deny'];
+
+    private const PRIORITY_CHOICES = ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High', 'auto' => 'Use the equipment priority'];
+
+    private const PRIORITY_FALLBACK = "CASE station_requests.priority WHEN 'critical' THEN 'high' WHEN 'high' THEN 'high' WHEN 'normal' THEN 'medium' ELSE 'low' END";
 
     public function __construct(private readonly StationRequestWorkflowService $workflow) {}
 
@@ -90,12 +100,9 @@ final class StationRequestSource extends QueryBackedSource
 
     protected function whereSeverity(Builder $query, string $severity): void
     {
-        match ($severity) {
-            'high' => $query->whereIn('priority', ['critical', 'high']),
-            'medium' => $query->where('priority', 'normal'),
-            'low' => $query->whereNotIn('priority', ['critical', 'high', 'normal']),
-            default => self::nothing($query),
-        };
+        in_array($severity, ['high', 'medium', 'low'], true)
+            ? $query->whereRaw('('.self::levelSql().') = ?', [$severity])
+            : self::nothing($query);
     }
 
     protected function tagConstraints(): array
@@ -110,8 +117,13 @@ final class StationRequestSource extends QueryBackedSource
     protected function prepareRows(Builder $query): void
     {
         $terminal = implode(',', array_map(fn (string $s): string => "'".$s."'", Status::terminalValues()));
-        $query->with('station:id,station_number,name')->withMax('updates', 'id')
+        // The newest staff/system row only: the assistant's receipt must never change the version an admin holds.
+        $query->with('station:id,station_number,name')
+            ->withMax(['updates as updates_max_id' => fn ($updates) => $updates->withoutAutoReceipts()], 'id')
             ->orderByRaw("CASE WHEN status IN ({$terminal}) THEN 1 ELSE 0 END")
+            ->addSelect(['dashboard_triage_level' => SupportTriageLevel::query()->select('level')
+                ->where('subject_type', TriageProjector::STATION_REQUEST)->whereColumn('subject_id', 'station_requests.id')->limit(1)])
+            ->orderByRaw('CASE ('.self::levelSql().") WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END")
             ->orderByRaw("CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
             ->orderByDesc('created_at')->orderByDesc('id');
     }
@@ -127,7 +139,7 @@ final class StationRequestSource extends QueryBackedSource
             id: (string) $record->getKey(),
             title: (string) $record->title,
             summary: $displayMode ? null : (str((string) $record->description)->squish()->limit(160)->toString() ?: null),
-            severity: self::severity((string) $record->priority),
+            severity: $record->getAttribute('dashboard_triage_level') ?? self::severity((string) $record->priority),
             status: $status->value,
             statusLabel: $status->label(),
             stage: self::stage($status),
@@ -159,7 +171,7 @@ final class StationRequestSource extends QueryBackedSource
         $status = Status::from($request->status);
         $timeline = $request->updates->map(fn (StationRequestUpdate $update): array => [
             'at' => CarbonImmutable::instance($update->created_at),
-            'actor' => $update->changedBy->name ?? 'System',
+            'actor' => $update->senderLabel(forStaff: true) ?? $update->changedBy->name ?? 'System',
             'text' => collect([
                 'Status: '.(Status::tryFrom((string) $update->status)?->label() ?? (string) $update->status),
                 filled($update->public_note) ? 'Update to station: '.$update->public_note : null,
@@ -172,7 +184,8 @@ final class StationRequestSource extends QueryBackedSource
             ['label' => 'Station', 'value' => StationImageKey::label($request->station) ?? 'Unknown'],
             ['label' => 'Room', 'value' => $request->room?->name ?: ($request->room_name_snapshot ?: 'Station-wide')],
             ['label' => 'Type', 'value' => StationRequestType::tryFrom((string) $request->request_type)?->label() ?? (string) $request->request_type],
-            ['label' => 'Priority', 'value' => ucfirst((string) $request->priority)],
+            ['label' => 'Priority', 'value' => $this->priorityLabel($request)],
+            ['label' => 'Requested urgency', 'value' => ucfirst((string) $request->priority)],
             ['label' => 'Status', 'value' => $status->label()],
             ['label' => 'Requested by', 'value' => (string) $request->requester_name_snapshot],
             ['label' => 'Assigned to', 'value' => $request->assignedTo?->name ?: ($request->assigned_vendor ?: 'Unassigned')],
@@ -181,7 +194,8 @@ final class StationRequestSource extends QueryBackedSource
             filled($request->current_public_response) ? ['label' => 'Latest update to station', 'value' => (string) $request->current_public_response] : null,
         ]));
 
-        $issue = $this->toIssue($request->setAttribute('updates_max_id', $request->updates->max('id')), false);
+        $request->setAttribute('dashboard_triage_level', app(TriageProjector::class)->levelFor(TriageProjector::STATION_REQUEST, (int) $request->getKey()));
+        $issue = $this->toIssue($request->setAttribute('updates_max_id', $request->updates->reject(fn (StationRequestUpdate $update): bool => $update->isAutoReceipt())->max('id')), false);
         $reason = match (true) {
             $request->isArchived() => 'This request is archived. Restore it from the full record to work on it.',
             ! $request->is_open => 'This request is '.strtolower($status->label()).'. Closed requests cannot be changed.',
@@ -197,6 +211,9 @@ final class StationRequestSource extends QueryBackedSource
         if (! $this->visibleTo($user, false) || ! $this->canManage($user)) {
             return ActionResult::forbidden();
         }
+        if ($action === 'set_priority') {
+            return $this->setPriority($user, $id, $input);
+        }
         if (! in_array($action, self::ACTIONS, true)) {
             return ActionResult::invalid(['action' => 'This action is not available.']);
         }
@@ -206,7 +223,7 @@ final class StationRequestSource extends QueryBackedSource
             if (! $request instanceof StationRequest || $request->isArchived()) {
                 return ActionResult::gone('This request no longer exists or was archived.');
             }
-            $latest = StationRequestUpdate::query()->where('station_request_id', $request->getKey())->orderByDesc('id')->first();
+            $latest = StationRequestUpdate::query()->where('station_request_id', $request->getKey())->withoutAutoReceipts()->orderByDesc('id')->first();
             $data = $this->commandData($request, $action, $input);
 
             if (self::versionOf($request, (int) $latest?->getKey()) !== $expectedVersion) {
@@ -270,6 +287,9 @@ final class StationRequestSource extends QueryBackedSource
             $note('Update to station (optional)'),
             $internal,
         ]);
+        $actions[] = new IssueAction('set_priority', 'Change priority', 'secondary', [[
+            'name' => 'level', 'label' => 'Priority', 'type' => 'select', 'required' => true, 'options' => self::PRIORITY_CHOICES,
+        ]]);
         $actions[] = new IssueAction('post_update', 'Send update to station', 'secondary', [$note('Update to station', true), $internal], bulk: IssueAction::BULK_FORM);
         $actions[] = new IssueAction('complete', 'Mark completed', 'primary', [$note('Update to station (optional)'), $internal],
             'Mark this request completed? Recording room assets is done from the full record.', IssueAction::BULK_FORM);
@@ -335,6 +355,37 @@ final class StationRequestSource extends QueryBackedSource
             && $request->status === $data['status'] && $latest->status === $data['status']
             && $latest->public_note === $data['public_note'] && $latest->internal_note === $data['internal_note']
             && (! array_key_exists('assigned_to_user_id', $data) || (int) $request->assigned_to_user_id === (int) $data['assigned_to_user_id']);
+    }
+
+    private static function levelSql(): string
+    {
+        return 'COALESCE('.TriageSql::level(TriageProjector::STATION_REQUEST, 'station_requests.id').', '.self::PRIORITY_FALLBACK.')';
+    }
+
+    /** "Medium (set by equipment priorities)" or "High (changed by Pat Smith)". */
+    private function priorityLabel(StationRequest $request): string
+    {
+        $row = SupportTriageLevel::query()->where('subject_type', TriageProjector::STATION_REQUEST)->where('subject_id', $request->getKey())
+            ->with('overriddenBy:id,name')->first();
+        $label = ucfirst($row instanceof SupportTriageLevel ? $row->level : self::severity((string) $request->priority));
+
+        return $label.($row instanceof SupportTriageLevel && $row->override_level !== null ? ' (changed by '.($row->overriddenBy?->name ?: 'staff').')' : ' (set by equipment priorities)');
+    }
+
+    /** @param array<string, mixed> $input */
+    private function setPriority(User $user, string $id, array $input): ActionResult
+    {
+        $request = StationRequest::query()->find($id);
+        if (! $request instanceof StationRequest || $request->isArchived()) {
+            return ActionResult::gone('This request no longer exists or was archived.');
+        }
+        $choice = self::text($input['level'] ?? '');
+        if (! array_key_exists($choice, self::PRIORITY_CHOICES)) {
+            return ActionResult::invalid(['level' => 'Choose Low, Medium or High.']);
+        }
+        app(TriageProjector::class)->setOverride(TriageProjector::STATION_REQUEST, (int) $request->getKey(), $choice === 'auto' ? null : $choice, $user);
+
+        return ActionResult::done($choice === 'auto' ? 'Priority set back to the equipment priority.' : 'Priority saved.');
     }
 
     private function canManage(User $user): bool

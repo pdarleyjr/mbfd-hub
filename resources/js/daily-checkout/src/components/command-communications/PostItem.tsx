@@ -4,10 +4,14 @@ import Tag from '../ui/Tag';
 import AttachmentList from './AttachmentList';
 import { formatAbsolute, formatRelative } from './format';
 import { linkify } from './linkify';
+import MessageBody from './MessageBody';
 import RemoveControl from './RemoveControl';
-import { BOTH_AUDIENCE_LABEL, SOURCE_LABEL, type CommandPost } from './types';
+import { BOTH_AUDIENCE_LABEL, type CommandPost } from './types';
 
 const VISIBLE_REPLIES = 2;
+/** Short, consistent role badges: Admin / Captain 5 / 300. */
+const ROLE_BADGE: Record<CommandPost['author']['side'], string> = { administration: 'Admin', captain5: 'Captain 5', command: '300' };
+const SIDE_ACCENT: Record<CommandPost['author']['side'], string> = { administration: 'border-l-hub-n-400', captain5: 'border-l-hub-blue', command: 'border-l-hub-blue' };
 const SMALL_ACTION = 'hub-btn hub-btn--tertiary hub-btn--compact !min-h-11 gap-1.5';
 
 const LINK_CLASS = 'font-semibold text-hub-blue underline underline-offset-2 [overflow-wrap:anywhere]';
@@ -52,7 +56,7 @@ function PostHeader({ post, now }: { post: CommandPost; now: number }) {
   return (
     <header className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <span className="font-semibold text-hub-ink">{author}</span>
-      <Tag tone={post.author.side === 'administration' ? 'neutral' : 'info'}>{SOURCE_LABEL[post.author.side]}</Tag>
+      <Tag tone={post.author.side === 'administration' ? 'neutral' : 'info'}>{ROLE_BADGE[post.author.side]}</Tag>
       {post.is_mine && <Tag>You</Tag>}
       {!post.parent_id && post.audience === 'both' && <Tag tone="warning">{BOTH_AUDIENCE_LABEL}</Tag>}
       {post.pinned && <Tag tone="warning">Pinned</Tag>}
@@ -67,11 +71,11 @@ type RemoveHandler = (post: CommandPost, reason: string) => Promise<string | nul
 
 function ReplyItem({ reply, now, onRemove }: { reply: CommandPost; now: number; onRemove?: RemoveHandler }) {
   return (
-    <li className="space-y-1" data-testid="command-reply">
+    <li className="space-y-1 rounded-md border-l-4 border-l-hub-n-400 bg-hub-surface/40 py-1 pl-3" data-testid="command-reply">
       <PostHeader post={reply} now={now} />
       {reply.deleted ? <Tombstone post={reply} now={now} /> : (
         <>
-          {reply.body && <p className="whitespace-pre-wrap text-sm text-hub-ink [overflow-wrap:anywhere]"><RichText text={reply.body} /></p>}
+          {reply.body && <MessageBody text={reply.body} testId="command-reply-body" />}
           <AttachmentList attachments={reply.attachments} />
           {reply.can_delete && onRemove && <div className="flex flex-wrap items-center gap-1"><RemoveControl post={reply} onRemove={onRemove} /></div>}
         </>
@@ -100,16 +104,16 @@ function PostItem({ post, now, onReply, onTogglePin, pinBusy, onRemove, pinnedVi
   const name = post.author.name;
 
   return (
-    <article className={pinnedView ? 'space-y-1' : 'hub-well space-y-2 p-3'} data-testid={pinnedView ? 'command-pinned-post' : 'command-post'} aria-label={post.deleted ? 'Removed message' : `Message from ${name}`}>
+    <article className={pinnedView ? 'space-y-1' : `hub-well space-y-2 border-l-4 p-3 sm:p-4 ${SIDE_ACCENT[post.author.side]}`} data-testid={pinnedView ? 'command-pinned-post' : 'command-post'} aria-label={post.deleted ? 'Removed message' : `Message from ${name}`}>
       <PostHeader post={post} now={now} />
       {post.deleted ? <Tombstone post={post} now={now} /> : (
         <>
           {post.subject && <h4 className="font-heading text-base font-bold text-hub-ink [overflow-wrap:anywhere]">{post.subject}</h4>}
-          {post.body && (
-            <p className={`whitespace-pre-wrap text-sm text-hub-ink [overflow-wrap:anywhere] ${pinnedView ? 'line-clamp-4' : ''}`}>
-              <RichText text={post.body} />
-            </p>
-          )}
+          {post.body && (pinnedView ? (
+            <p className="line-clamp-4 whitespace-pre-wrap text-sm text-hub-ink [overflow-wrap:anywhere]"><RichText text={post.body} /></p>
+          ) : (
+            <MessageBody text={post.body} testId="command-post-body" />
+          ))}
           <AttachmentList attachments={post.attachments} />
 
           <div className="flex flex-wrap items-center gap-1">
@@ -134,7 +138,7 @@ function PostItem({ post, now, onReply, onTogglePin, pinBusy, onRemove, pinnedVi
       )}
 
       {!pinnedView && replies.length > 0 && (
-        <div className="space-y-2 border-t border-hub-glass-border pt-3 pl-3">
+        <div className="space-y-2 border-t border-hub-glass-border pt-3 pl-2 sm:pl-4">
           {hidden > 0 && (
             <button type="button" className="hub-btn hub-btn--secondary hub-btn--compact !min-h-11" onClick={() => setShowAllReplies(true)}>
               Show {hidden} earlier {hidden === 1 ? 'reply' : 'replies'}

@@ -24,14 +24,25 @@ final class StationRosterPresenter
     /** @return array<string, mixed> */
     public function forStation(Station $station): array
     {
+        return $this->forStations([$station])[(int) $station->id];
+    }
+
+    /**
+     * Several stations from one roster build, so a view that lists every station reads the roster once.
+     *
+     * @param  iterable<Station>  $stations
+     * @return array<int, array<string, mixed>> keyed by station id
+     */
+    public function forStations(iterable $stations): array
+    {
         $now = CarbonImmutable::now();
         $onDutyDate = $this->calendar->dutyDate($now)->format('Y-m-d');
         $roster = $this->page->build($onDutyDate);
         $nextShiftPosted = $this->freshness->pageStatus($now)->dutyDate !== $onDutyDate;
-
-        // The page falls back to an older or a later roster; on a station page either would name the wrong crew.
+        $unavailable = null;
         if ($roster['snapshotId'] === null || $roster['displayedDate'] !== $onDutyDate) {
-            return [
+            // The page falls back to an older or a later roster; on a station page either would name the wrong crew.
+            $unavailable = [
                 'available' => false,
                 'message' => $this->freshness->status($now)->state === RosterFreshness::NEEDS_REVIEW
                     ? "Today's roster is being reviewed. It will appear here once it is accepted."
@@ -41,20 +52,25 @@ final class StationRosterPresenter
             ];
         }
 
-        return [
-            'available' => true,
-            'date_label' => $roster['displayedDateLabel'],
-            'shift' => $roster['summary']['shift'],
-            'window' => $roster['facts']['window'],
-            'updated' => $roster['facts']['updated'],
-            'tag' => $roster['tag'],
-            'notice' => $roster['notice'],
-            'next_shift_posted' => $nextShiftPosted,
-            'sections' => array_values(array_map(
-                fn (array $section): array => $this->section($section),
-                array_filter($roster['sections'], fn (array $section): bool => $this->belongsTo($section['title'], (string) $station->station_number)),
-            )),
-        ];
+        $result = [];
+        foreach ($stations as $station) {
+            $result[(int) $station->id] = $unavailable ?? [
+                'available' => true,
+                'date_label' => $roster['displayedDateLabel'],
+                'shift' => $roster['summary']['shift'],
+                'window' => $roster['facts']['window'],
+                'updated' => $roster['facts']['updated'],
+                'tag' => $roster['tag'],
+                'notice' => $roster['notice'],
+                'next_shift_posted' => $nextShiftPosted,
+                'sections' => array_values(array_map(
+                    fn (array $section): array => $this->section($section),
+                    array_filter($roster['sections'], fn (array $section): bool => $this->belongsTo($section['title'], (string) $station->station_number)),
+                )),
+            ];
+        }
+
+        return $result;
     }
 
     /** TeleStaff titles a station's sections "Station 1 / Ladder 1". Float pools and the 300 name no station, so they match none. */

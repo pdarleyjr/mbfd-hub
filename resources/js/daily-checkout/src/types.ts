@@ -312,6 +312,10 @@ export interface OpenFinding {
   severity?: 'routine' | 'significant';
   first_reported_at?: string | null;
   latest_member_update?: { text: string; at: string } | null;
+  /** Who works the issue; names the person who will verify a Present answer. */
+  owner?: 'captain5' | 'logistics';
+  /** True when marking the item present closes the issue by itself. */
+  member_correction?: { closes_immediately: boolean };
 }
 
 /** A member's inventory correction report that Logistics has not decided yet (outside the hashed checklist). */
@@ -657,6 +661,15 @@ export interface StationRequestUpdate {
   status: StationRequestStatus;
   public_note?: string | null;
   created_at: string;
+  /** 'Support Services' on the automated receipt; null on staff and system rows. */
+  sender?: string | null;
+  is_auto_receipt?: boolean;
+}
+
+/** "Received by the assistant". Never a staff acknowledgment: that is acknowledged_at. */
+export interface AiReceipt {
+  sender: string;
+  at: string;
 }
 
 export interface StationRequestSummary {
@@ -678,6 +691,7 @@ export interface StationRequestSummary {
   completed_at?: string | null;
   created_at: string;
   updated_at: string;
+  ai_receipt?: AiReceipt | null;
   items?: StationRequestItem[];
   updates?: StationRequestUpdate[];
 }
@@ -1121,6 +1135,8 @@ export interface SupplyRequest {
   request_text: string;
   status: 'open' | 'ordered' | 'denied' | 'replenished';
   public_response?: string | null;
+  /** The assistant's automatic receipt; separate from Support Services' own response. */
+  ai_response?: { sender: string; text: string; at?: string | null } | null;
   created_by_name: string;
   created_by_shift: Shift;
   created_at: string;

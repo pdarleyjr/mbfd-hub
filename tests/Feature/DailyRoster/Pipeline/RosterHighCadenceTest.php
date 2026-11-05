@@ -184,8 +184,8 @@ final class RosterHighCadenceTest extends TestCase
 
         Artisan::call('daily-roster:reconcile');
 
-        self::assertTrue(Cache::has('daily_roster_alert:rejected:'.self::DATE));
-        self::assertTrue(Cache::has('daily_roster_alert:needs_review:'.self::DATE));
+        self::assertTrue($this->alerted('daily_roster_alert:rejected:'.self::DATE));
+        self::assertTrue($this->alerted('daily_roster_alert:needs_review:'.self::DATE));
     }
 
     public function test_with_no_cadence_configured_a_roster_is_never_called_stale(): void
@@ -251,14 +251,14 @@ final class RosterHighCadenceTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-10-30 14:00:00', 'UTC'));
         Artisan::call('daily-roster:reconcile');
         Artisan::call('daily-roster:reconcile');
-        self::assertTrue(Cache::has('daily_roster_alert:stale:'.self::DATE.':'.$firstHeard));
+        self::assertTrue($this->alerted('daily_roster_alert:stale:'.self::DATE.':'.$firstHeard));
         self::assertSame(1, RosterEvent::query()->where('action', 'roster_stale')->count());
 
         $this->importExport(RosterPipelineFixtures::report(self::DATE, ['generated_at' => '2026-10-30 13:59:50']));
         $this->travelTo(CarbonImmutable::parse('2026-10-30 15:00:00', 'UTC'));
         Artisan::call('daily-roster:reconcile');
         self::assertSame(2, RosterEvent::query()->where('action', 'roster_stale')->count());
-        self::assertTrue(Cache::has('daily_roster_alert:stale:'.self::DATE.':'.CarbonImmutable::parse('2026-10-30 13:59:50', 'UTC')->getTimestamp()));
+        self::assertTrue($this->alerted('daily_roster_alert:stale:'.self::DATE.':'.CarbonImmutable::parse('2026-10-30 13:59:50', 'UTC')->getTimestamp()));
     }
 
     public function test_with_a_cadence_a_missing_roster_is_late_soon_after_the_duty_day_starts(): void
@@ -412,6 +412,11 @@ final class RosterHighCadenceTest extends TestCase
         app(RosterImportCleanup::class)->run($rejected->fresh());
 
         self::assertTrue(InboundEmail::query()->whereKey($email->getKey())->exists());
+    }
+
+    private function alerted(string $key): bool
+    {
+        return DB::table('roster_alert_deliveries')->where('alert_key', $key)->exists();
     }
 
     /** @return array<string, mixed> */

@@ -128,7 +128,7 @@ final class StationRequestSourceTest extends TestCase
         $manager = $this->adminWith(['admin.stations.view', 'admin.stations.manage']);
         $request = $this->stationRequest();
         $detail = $this->source()->detail($manager, (string) $request->id);
-        $this->assertSame(['acknowledge', 'approve', 'assign', 'set_status', 'post_update', 'complete', 'deny'], array_map(fn ($a) => $a->key, $detail->actions));
+        $this->assertSame(['acknowledge', 'approve', 'assign', 'set_status', 'set_priority', 'post_update', 'complete', 'deny'], array_map(fn ($a) => $a->key, $detail->actions));
 
         $result = $this->source()->perform($manager, (string) $request->id, 'acknowledge', ['public_note' => 'We are on it.'], $detail->issue->version);
 

@@ -13,7 +13,7 @@ export interface IssueGroup {
 const WORST_ORDER: Array<{ test: (issue: IssueSummary) => boolean; label: string; tone: Tone }> = [
   { test: (issue) => issue.overdue, label: 'Overdue', tone: 'danger' },
   { test: (issue) => issue.severity === 'significant', label: 'Significant damage', tone: 'danger' },
-  { test: (issue) => issue.awaiting_verification, label: 'Awaiting verification', tone: 'warning' },
+  { test: (issue) => issue.awaiting_verification, label: 'Needs verification', tone: 'danger' },
   { test: (issue) => issue.action_status === 'reported', label: 'Needs acknowledgement', tone: 'warning' },
   { test: (issue) => issue.action_status === 'replacement_available', label: 'Ready for pickup', tone: 'success' },
   { test: (issue) => issue.action_status === 'action_pending', label: 'Ordered', tone: 'info' },

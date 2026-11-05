@@ -13,7 +13,7 @@ Owner: EMS / Captain 5. This file is the source of truth for the data model and 
 3. **Medical Supply Room** (Captain 5 tab and Admin → EMS). The Captain 5 supply room catalogue imported from the
    2021 order sheet, physical counts by location, an append-only stock-movement ledger, a reconcile-since-last-count
    preview, reorder advisories and "order placed" records.
-4. **Medical Data / Statistics** (Admin → EMS). Request analytics from the transactional tables, labeled as requests, not consumption.
+4. **Medical Supply Data** (Admin → EMS; formerly Medical Data / Statistics). Two sections: Supply data (every figure from `SupplyDataReport`, see `supply-data-contract.md`) and Requests (request analytics from the transactional tables, labeled as requests, not consumption).
 
 Since the November 2026 release the single Medical Inventory Request is four forms (ALS Transport, ALS Non Transport, Fire Boat 6,
 BLS Detail) on this same request engine. `docs/ems/four-inventory-forms.md` defines the families, their lists and the API additions; everything below
@@ -313,7 +313,7 @@ The actor is never notified. `redeliver()` is ready; `inspections:retry-notifica
 ### 9.6 Four forms (as built, branch feat/four-ems-forms-20261102)
 
 Implemented as `docs/ems/four-inventory-forms.md` describes: `App\Services\Ems\FormFamilies` is the table, `ems_inventory_requests.form_family` (migration
-`2026_11_02_120000_add_form_family_to_ems_inventory_requests`) stores it, and the snapshot adds `form_family` and `form_family_title`. Details the contract
+`2026_11_05_140000_add_form_family_to_ems_inventory_requests`) stores it, and the snapshot adds `form_family` and `form_family_title`. Details the contract
 leaves open:
 
 - `GET /form` with no `family` answers for ALS Transport (its lists are the imported ones of airway-bag, als-med-bag, als-transport-vehicle, handtevy). A
@@ -340,7 +340,7 @@ page; everyone else goes through `EmsAccess` unchanged.
 |---|---|---|
 | Rescue Inventory (sort 10, `/admin/rescue-inventory`) | `InventoryRequestResource` | List and view only; no create, edit or delete. Default filter: open statuses. Header actions Export Excel and Export PDF use the current filters and search. The view page offers Review, Prepare quantities, Issue, Mark not issued (per line), Close, Reopen, Correct an issuance and Message the member. Close reasons are `RequestWorkflowService::CLOSE_REASONS` plus a typed reason. |
 | Medical Supply Room (sort 20, `/admin/medical-supply-room`) | `MedicalSupplyRoom` | Tabs: Stock (Filament table, item details and settings, controlled items listed apart), Counts, Reconcile, Reorder (advice, orders), Movements, Snapshots (view, Excel, PDF). |
-| Medical Data / Statistics (sort 30, `/admin/medical-statistics`) | `MedicalDataStatistics` | Built only from `EmsStatistics::report()`; each metric shows its written definition. The files are built from the same `StatisticsView` as the screen. Default range: last 90 days, Eastern time. |
+| Medical Supply Data (sort 30, `/admin/medical-statistics`, one navigation entry) | `MedicalDataStatistics` | Two tabs. **Supply data** (default): filters, needs-attention counts, trend, supplies, units, stock, drill-downs and the export link, all from `SupplyDataReport` and never computed on the page; read access (`admin.ems.view`) is enough and nothing on it writes. **Requests**: the former Medical Data / Statistics page, built only from `EmsStatistics::report()`; each metric shows its written definition, and the Excel and PDF files are built from the same `StatisticsView` as the screen (default range: last 90 days, Eastern time). |
 
 - **Idempotency.** Each modal chooses its idempotency key when it opens, so a double click or a retry after a refusal is one write. A refusal
   (`EmsException`) shows its plain message and keeps the modal open.

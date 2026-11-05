@@ -160,7 +160,7 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
         $this->assertSame($ref['compartment_id'], $findings[0]['compartment_id']);
         $this->assertSame($ref['item_id'], $findings[0]['item_id']);
         $this->assertSame('reported', $findings[0]['action_status']);
-        $this->assertSame('Awaiting verification', $findings[0]['action_label']);
+        $this->assertSame('New — not yet acknowledged', $findings[0]['action_label']);
         $this->assertSame('missing', $findings[0]['issue_type']);
         $this->assertNotNull($findings[0]['first_reported_at']);
         $this->assertArrayNotHasKey('internal_note', $findings[0]);
@@ -826,6 +826,7 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
 
     public function test_dashboard_queues_count_each_inspection_and_issue_once_and_move_an_acknowledged_issue_to_corrective_actions(): void
     {
+        config(['captain5.auto_close_on_checkout' => false]); // this test is about the verification path
         ['defect' => $defect] = $this->reportedByAlphaConfirmedByBeta();
         $gamma = $this->newMember('Gamma Member');
         $this->actAs($gamma);
@@ -935,7 +936,7 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
     {
         $this->actAs($this->alpha);
         $payload = $this->payload();
-        $this->markItem($payload, 0, 0, 'Missing', ['notes' => 'Not in the charger.']);
+        $this->markItem($payload, 0, 0, 'Damaged', ['notes' => 'Cracked housing.']); // damaged is never routine
         $this->submit($payload)->assertCreated();
         $defect = ApparatusDefect::query()->sole();
 

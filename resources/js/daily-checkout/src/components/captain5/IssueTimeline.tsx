@@ -15,6 +15,11 @@ const asText = (value: unknown): string | null => (typeof value === 'string' && 
 /** Plain lines for the details an event carries; internal bookkeeping never reaches the client. */
 function eventLines(event: IssueEvent): string[] {
   const lines: string[] = [];
+  const checkoutBy = asText(event.details.resolved_by);
+  if (event.type === 'resolved_by_checkout' && checkoutBy) {
+    const unit = asText(event.details.unit);
+    lines.push(`Resolved by ${checkoutBy} during ${unit ? `${unit} ` : 'a '}checkout.`);
+  }
   const reason = asText(event.details.reason);
   if (reason) lines.push(`Reason: ${reason}`);
   const resolution = asText(event.details.resolution_type);
@@ -31,9 +36,20 @@ function eventLines(event: IssueEvent): string[] {
   return lines;
 }
 
-function eventTitle(event: IssueEvent): string {
-  if (event.type === 'cleared_from_captain5') return `Cleared from Captain 5 by ${event.actor}`;
+/** One vocabulary for how an issue was reported fixed, resolved or verified; the rest falls back to the status change. */
+const EVENT_TITLES: Record<string, string> = {
+  appears_corrected: 'Needs verification: a checkout reported it present',
+  correction_reported: 'Needs verification: a member reported it fixed',
+  member_resolved: 'Resolved by a member',
+  resolved_by_checkout: 'Resolved during checkout',
+  correction_verified: 'Correction verified',
+  resolution_cleared: 'Cleared from the resolved list',
+};
+
+export function eventTitle(event: IssueEvent): string {
+  if (event.type === 'cleared_from_captain5') return `Sent to Logistics by ${event.actor}`;
   if (event.type === 'returned_to_captain5') return `Brought back to Captain 5 by ${event.actor}`;
+  if (EVENT_TITLES[event.type]) return EVENT_TITLES[event.type];
   if (event.from && event.to && event.from !== event.to) return `${statusLabel(event.from)} to ${statusLabel(event.to)}`;
   return humanize(event.type);
 }

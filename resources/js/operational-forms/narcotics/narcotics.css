@@ -78,6 +78,28 @@
     background: var(--nc-surface); border: 1px solid var(--nc-line); border-radius: var(--hub-radius-pill);
 }
 
+/* Several photos: a grid of square tiles, each with its own Remove; one photo keeps the full-width preview. */
+.nc-photos { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); margin: 0; padding: 0; list-style: none; }
+.nc-photos--one { grid-template-columns: minmax(0, 1fr); }
+.nc-photo { display: grid; gap: 4px; min-width: 0; }
+.nc-photos:not(.nc-photos--one) .nc-preview-frame img { aspect-ratio: 1 / 1; max-height: none; object-fit: cover; }
+.nc-photo-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
+.nc-photo-bar .nc-hint { min-width: 0; overflow-wrap: anywhere; }
+.nc-gallery { display: grid; gap: 10px; }
+.nc-gallery-strip { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); margin: 0; padding: 0; list-style: none; }
+.nc-gallery-strip button {
+    display: block; width: 100%; padding: 0; overflow: hidden; cursor: pointer; aspect-ratio: 1 / 1; min-height: 44px;
+    background: var(--nc-surface); border: 2px solid var(--nc-line); border-radius: var(--hub-radius-control, 8px);
+}
+.nc-gallery-strip button[aria-current="true"] { border-color: rgb(var(--hub-focus)); }
+.nc-gallery-strip button:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.nc-gallery-strip img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.nc-thumb-wrap { position: relative; display: block; }
+.nc-thumb-count {
+    position: absolute; right: 2px; bottom: 2px; padding: 1px 6px; font-size: 11.5px; font-weight: 700; color: var(--nc-ink);
+    background: var(--nc-surface); border: 1px solid var(--nc-line); border-radius: var(--hub-radius-pill);
+}
+
 /* In-page camera (computers and tablets with a camera) */
 .nc-camera { display: grid; gap: 10px; }
 .nc-camera-frame { position: relative; display: grid; place-items: center; min-height: 220px; background: rgb(var(--hub-n-900, 15 23 42)); border-radius: var(--hub-radius-control); overflow: hidden; }

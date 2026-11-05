@@ -51,7 +51,9 @@ test("Communications is the first and default tab", () => {
   const tabs = /const tabs: TabItem<string>\[\] = \[\s*\{ id: COMMS_TAB, label: 'Communications'/;
   assert.match(page, tabs);
   assert.match(page, /const COMMS_TAB = 'communications'/);
-  assert.match(page, /\(known \|\| pending\) && requested \? requested : COMMS_TAB/);
+  // Only ?tab=updates opens Department Updates; anything else lands on Communications.
+  assert.match(page, /active=\{updatesOpen \? UPDATES_TAB : COMMS_TAB\}/);
+  assert.match(page, /searchParams\.get\('tab'\) === UPDATES_PARAM/);
   assert.match(page, /next\.delete\('station'\)/);
 });
 
@@ -73,8 +75,11 @@ test("access gating reads the server capability and 403 is distinct from network
   const list = read("components/StationListPage.tsx");
   assert.match(list, /commandAccess === 'allowed' && <Command300Card \/>/);
   const page = read("components/Command300Page.tsx");
-  assert.match(page, /isForbiddenError\(err\)/);
   assert.match(page, /<AccessDenied \/>/);
+  // The station board's loader hands a 403 to the page's denied state; a dropped network keeps the last data instead.
+  const poll = read("components/command300/useVisiblePoll.ts");
+  assert.match(poll, /reason instanceof ApiRequestError && reason\.status === 403\) \{ forbidden\.current\?\.\(\); return; \}/);
+  assert.match(poll, /if \(mode === 'background'\) \{ setStale\(true\); return; \}/);
 });
 
 test("the panel is channel-aware and the 300 channel stays the default", () => {

@@ -413,6 +413,23 @@ test("production activation is manual, main-only, and blocked by every Hub relea
     recreateIndex > policyVerifyIndex,
     "laravel.test must be recreated only after migration, approved policy, ledger activation, and policy verification succeed",
   );
+  // One owner per equipment issue: projected and verified in maintenance mode before the switch, re-checked after it.
+  const ownershipDryRunIndex = activation.indexOf("defects:project-ownership --dry-run --no-interaction >");
+  const ownershipApplyIndex = activation.indexOf("defects:project-ownership --summary --no-interaction");
+  const ownershipVerifyIndex = activation.indexOf("defects:project-ownership --verify --no-interaction");
+  const ownershipPendingIndex = activation.indexOf("defects:project-ownership --pending --no-interaction");
+  const ownershipFinalVerifyIndex = activation.lastIndexOf("defects:project-ownership --verify --no-interaction");
+  assert.ok(
+    ownershipDryRunIndex > policyVerifyIndex &&
+      ownershipApplyIndex > ownershipDryRunIndex &&
+      ownershipVerifyIndex > ownershipApplyIndex &&
+      recreateIndex > ownershipVerifyIndex &&
+      ownershipPendingIndex > recreateIndex &&
+      ownershipFinalVerifyIndex > ownershipPendingIndex,
+    "equipment ownership must be dry-run, projected and verified before the switch, then caught up and verified after it",
+  );
+  assert.match(activation, /release-evidence\/ownership-dry-run-\$RELEASE_SHA\.txt/);
+  assert.doesNotMatch(activation, /defects:project-ownership[^\r\n]*\|\|\s*true/);
   const policyCommand = activation.match(/[^\r\n]*daily-checkout:apply-approved-policy[^\r\n]*/)?.[0] ?? "";
   assert.doesNotMatch(policyCommand, /--dry-run|\|\|\s*true/);
   const cutoverCommand = activation.match(/[^\r\n]*daily-checkout:activate-ledger[^\r\n]*/)?.[0] ?? "";
@@ -738,6 +755,13 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
 
   const daily = workflowJob(gates, "daily-contract-integrity");
   assert.match(workflowStep(daily, "Daily TypeScript typecheck"), /npm run typecheck/);
+  // The Daily component tests (Vitest on jsdom) run in the job that already installs Daily's dependencies, before its build.
+  const componentTests = workflowStep(daily, "Daily component tests");
+  assert.match(componentTests, /working-directory:\s*resources\/js\/daily-checkout/);
+  assert.match(componentTests, /run:\s*npm test\s*$/m);
+  assert.equal(JSON.parse(readFileSync(resolve(root, "resources/js/daily-checkout/package.json"), "utf8")).scripts.test, "vitest run");
+  assert.ok(daily.indexOf("Daily component tests") > daily.indexOf("Daily TypeScript typecheck"));
+  assert.ok(daily.indexOf("Daily component tests") < daily.indexOf("Daily production build"));
   assert.match(workflowStep(daily, "Daily production build"), /npm run build/);
   assert.match(
     workflowStep(daily, "Run Daily Checkout contract and integrity tests"),

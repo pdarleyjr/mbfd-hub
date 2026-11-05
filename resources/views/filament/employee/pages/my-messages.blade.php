@@ -58,7 +58,7 @@
                                         <span @class(['emsg-status', 'emsg-status--answered' => $row->last_message_side === 'logistics']) data-emsg-status>{{ $row->memberStatus() }}</span>
                                     @endif
                                     @if ($isUnread)
-                                        <span class="emsg-unread-dot">New<span class="sr-only"> reply from Support Services</span></span>
+                                        <span class="emsg-unread-dot">New<span class="sr-only"> reply in this conversation</span></span>
                                     @endif
                                 </span>
                             </button>

@@ -29,7 +29,8 @@ final class RosterImportRegistrar
             return null;
         }
 
-        $classification = $this->classifier->classify($email);
+        $outlook = RosterOutlook::isEnabled() ? $this->classifier->classifyOutlook($email) : null;
+        $classification = $outlook ?? $this->classifier->classify($email);
         if ($classification->isOrdinary()) {
             return null;
         }
@@ -60,6 +61,7 @@ final class RosterImportRegistrar
             'classification' => json_encode($classification->toLedger(), JSON_THROW_ON_ERROR),
             'created_at' => $now,
             'updated_at' => $now,
+            ...($outlook === null ? [] : ['source' => RosterOutlook::SOURCE]),
         ]);
 
         $import = RosterImport::query()->where('message_id_sha256', $messageHash)->firstOrFail();
@@ -94,6 +96,7 @@ final class RosterImportRegistrar
             $older = RosterImport::query()
                 ->where('state', RosterImport::STATE_NEEDS_REVIEW)
                 ->whereNull('duty_date')
+                ->where(static fn ($source) => $newest->source === null ? $source->whereNull('source') : $source->where('source', $newest->source))
                 ->where('received_at', '<', $newest->received_at)
                 ->whereKeyNot($newest->getKey())
                 ->orderBy('id')

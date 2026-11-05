@@ -38,7 +38,7 @@ const makeItem = (type: StationRequestType): DraftItem => ({
   id: createClientSubmissionId(),
   roomAssetId: '',
   itemName: '',
-  category: type === 'repair_service' ? 'appliance' : '',
+  category: '',
   quantity: 1,
   reason: type === 'repair_service' ? 'Damaged/Broken' : 'Needed',
   requestedAction: type === 'repair_service' ? 'inspect' : 'replace',
@@ -290,7 +290,8 @@ export default function StationRequestWizard() {
         items: items.map((item) => ({
           room_asset_id: item.roomAssetId ? Number(item.roomAssetId) : null,
           item_name: item.itemName.trim(),
-          category: item.category || subjectType,
+          // The picked category is the form-level subjectType; an item default must never mask it.
+          category: requestType === 'repair_service' ? subjectType : (item.category || subjectType),
           quantity: item.quantity,
           reason: item.reason,
           requested_action: item.requestedAction,

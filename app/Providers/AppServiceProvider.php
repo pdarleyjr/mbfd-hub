@@ -43,6 +43,8 @@ class AppServiceProvider extends ServiceProvider
     {
         // One messaging access decision per user per request (navigation, badge and page all ask).
         $this->app->scoped(\App\Services\Security\EmployeeLogisticsMessagingAccess::class);
+        // Support Services equipment priorities: one catalog read per request (docs/support-services-triage.md).
+        $this->app->scoped(\App\Services\SupportTriage\Contracts\EquipmentClassifier::class, \App\Services\SupportTriage\CatalogEquipmentClassifier::class);
         // Lucide icons Heroicons lacks (e.g. the EMS navigation group's medical bag), as lucide-* blade icons.
         $this->callAfterResolving(\BladeUI\Icons\Factory::class, static function (\BladeUI\Icons\Factory $icons): void {
             $icons->add('lucide', ['path' => resource_path('svg/lucide'), 'prefix' => 'lucide']);
@@ -322,8 +324,9 @@ class AppServiceProvider extends ServiceProvider
         // Daily Checkouts have no default fan-out. Reviewers are told by InspectionNotificationDispatcher
         // (review required, significant damage, member replies) and a routine accepted checkout notifies
         // nobody (docs/daily-inspection-continuity.md section 4.5). The ONE exception is the opt-in
-        // category "Every Daily Checkout as it's submitted": it shows in the bell by default (phone alerts
-        // off), goes only to eligible reviewers, and skips excluded tests and the submitter.
+        // category "Every Daily Checkout as it's submitted": off on every channel until a reviewer saves a
+        // choice turning it on (NotificationPresetPolicy::DATABASE_OFF_BY_DEFAULT), goes only to eligible
+        // reviewers, and skips excluded tests and the submitter.
         ApparatusInspection::created(fn (ApparatusInspection $inspection) => $this->guardNotificationHook(function () use ($inspection): void {
             if ($inspection->test_excluded_at !== null) {
                 return;

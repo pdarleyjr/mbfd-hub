@@ -99,6 +99,24 @@ final class CommandCommunicationsPageTest extends TestCase
             ->assertDontSee('href="javascript:', false);
     }
 
+    public function test_bodies_render_as_paragraphs_and_long_ones_can_be_expanded(): void
+    {
+        $this->actingAsCanonicalUser($this->admin());
+        $body = "First paragraph with <b>tags</b>.\n\nSecond paragraph.\n".str_repeat('More detail. ', 60);
+
+        Livewire::test(CommandCommunications::class)
+            ->fillForm(['body' => $body])->call('submit')->assertHasNoFormErrors()
+            ->assertSeeHtml('data-message-body')
+            ->assertSeeHtml('data-message-body-toggle')
+            ->assertSee('Show full message')
+            ->assertSeeHtml('<p>First paragraph with &lt;b&gt;tags&lt;/b&gt;.</p>')
+            ->assertSeeHtml('<p>Second paragraph.')
+            ->assertDontSeeHtml('<b>tags</b>');
+
+        $short = Livewire::test(CommandCommunications::class)->fillForm(['body' => 'Short note'])->call('submit');
+        $this->assertSame(1, substr_count($short->html(), 'data-message-body-toggle'));
+    }
+
     public function test_reply_and_pin_through_livewire_share_the_same_records(): void
     {
         $admin = $this->admin();

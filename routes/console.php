@@ -105,6 +105,23 @@ Schedule::command('fleet:prune-take-home-uploads')
     ->withoutOverlapping()
     ->onOneServer();
 
+// EMS low-stock alerts: a safety net behind the check that follows every stock change.
+Schedule::command('ems:stock-alerts')
+    ->everyTenMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
+// EMS supply room screen: one email a day of every withdrawal, and an alert when a paired screen goes silent.
+Schedule::command('ems:kiosk-daily-summary')
+    ->dailyAt('07:00')
+    ->timezone(\App\Support\HubTimezone::NAME)
+    ->withoutOverlapping(30)
+    ->onOneServer();
+Schedule::command('ems:kiosk-watch')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(5)
+    ->onOneServer();
+
 // EMS idempotency keys older than 30 days (a retry window, not history).
 Schedule::command('ems:prune-idempotency')
     ->dailyAt('03:50')
@@ -165,6 +182,15 @@ Schedule::command('daily-roster:reconcile')
     ->withoutOverlapping(5)
     ->onOneServer();
 
+// Unit Status pulls PulsePoint calls from Command. Every minute, not every 30 seconds: production runs the scheduler as
+// `schedule:run; sleep 60`, and a sub-minute task makes schedule:run block until the end of the minute, which would skip
+// every other minute and delay daily-roster:reconcile. One missed run is tolerated (sync_fresh_seconds = 150).
+Schedule::command('unit-status:sync')
+    ->everyMinute()
+    ->runInBackground()
+    ->withoutOverlapping(2)
+    ->onOneServer();
+
 // Alerts the queue would not take during an outage. Normally one empty read.
 Schedule::command('notifications:retry-dispatch')
     ->everyMinute()
@@ -187,6 +213,13 @@ Schedule::command('daily-roster:prune')
 Schedule::command('inspections:retry-notifications')
     ->everyTenMinutes()
     ->withoutOverlapping()
+    ->onOneServer();
+
+// One queue per equipment issue (docs/unified-activity-and-ownership.md): owns any issue the previous image wrote or
+// cleared, or whose projection failed. Writes nothing and prints nothing when there is nothing pending.
+Schedule::command('defects:project-ownership --pending')
+    ->everyTenMinutes()
+    ->withoutOverlapping(10)
     ->onOneServer();
 
 Schedule::command('support:retry-notifications --limit=100')
@@ -241,5 +274,11 @@ Schedule::command('mbfd:email-delivery-reconcile')
 
 Schedule::command('mbfd:nextcloud-access-sync')
     ->everyMinute()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
+// AI Response safety net: re-queues stalled automated replies. Does nothing while AI automations are OFF.
+Schedule::command('ai-automation:sweep')
+    ->everyFiveMinutes()
     ->withoutOverlapping(10)
     ->onOneServer();

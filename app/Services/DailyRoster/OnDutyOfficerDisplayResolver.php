@@ -151,13 +151,27 @@ final class OnDutyOfficerDisplayResolver
         }
         $employeeId = (string) $identified->first();
 
-        $otherUnclassified = $unclassified->contains(fn (RosterAssignment $row): bool => (string) $row->employee_id !== $employeeId);
+        $otherUnclassified = $unclassified->contains(fn (RosterAssignment $row): bool => (string) $row->employee_id !== $employeeId
+            && ! $this->isBackfilledAbsence($row, $working));
         if ($otherUnclassified || $this->isAbsentAt($snapshot, $employeeId, $working, $moment)) {
             return $unknown(OnDutyOfficerDisplay::REASON_NEEDS_REVIEW);
         }
 
         return $this->person($seat, $working->first(), $employeeId, $asOf)
             ?? $unknown(OnDutyOfficerDisplay::REASON_NEEDS_REVIEW);
+    }
+
+    /**
+     * The export's own shape for "seat holder out, someone else on the seat": the seat's first (rank-printed) row
+     * carries the holder's absence, and the rows below it, continuation rows, carry whoever backfills. An unlisted
+     * code on that leading row is the holder's absence, not a second person working. Anyone else's unlisted code,
+     * in another seat or on a row that is not backfilled, still fails closed.
+     */
+    private function isBackfilledAbsence(RosterAssignment $row, Collection $working): bool
+    {
+        return ! $row->is_continuation
+            && $working->contains(static fn (RosterAssignment $worker): bool => $worker->is_continuation
+                && $worker->seat_position === $row->seat_position);
     }
 
     /** The same person marked absent at this instant, anywhere in the export, unless the seat row explains it. */

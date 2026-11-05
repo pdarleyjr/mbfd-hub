@@ -7,6 +7,7 @@ namespace App\Services\Notifications;
 use App\Models\ApparatusServiceTicket;
 use App\Models\AssignedEquipment;
 use App\Models\CapitalProject;
+use App\Models\Ems\StockAlertRecipient;
 use App\Models\EvaluationSubmission;
 use App\Models\HubSupportTicket;
 use App\Models\PersonnelRequest;
@@ -14,6 +15,7 @@ use App\Models\Station;
 use App\Models\StationInspection;
 use App\Models\Todo;
 use App\Models\User;
+use App\Services\Ems\EmsAccess;
 use App\Services\Security\Captain5Access;
 use App\Services\Security\Command300Access;
 use App\Services\Security\EmployeeLogisticsMessagingAccess;
@@ -65,6 +67,10 @@ final class NotificationCategoryRegistry
     public const SUPPORT_SERVICES_MESSAGES = 'support_services_messages';
 
     public const ROSTER_MOVES = 'roster_moves';
+
+    public const EMS_LOW_STOCK = 'ems_low_stock';
+
+    public const EMS_SUPPLY_WITHDRAWALS = 'ems_supply_withdrawals';
 
     /** @var array<string, NotificationCategory>|null */
     private ?array $categories = null;
@@ -185,14 +191,14 @@ final class NotificationCategoryRegistry
                     ? 'inspection_reviewer' : null,
                 candidates: $fleetReviewers,
             ),
-            // Restores the old "tell me when a vehicle inspection is submitted" choice. The bell is on by default;
-            // phone alerts stay off (one per apparatus checkout a day would bury real alerts, see
-            // NotificationPresetPolicy). A saved choice never grants access: a person who stops being a
-            // reviewer stops receiving it at once.
+            // Restores the old "tell me when a vehicle inspection is submitted" choice. Opt-in on every channel
+            // (one per apparatus checkout a day would bury real alerts, see NotificationPresetPolicy): nobody gets
+            // it until they save a choice, and saved choices are always honored. A saved choice never grants
+            // access: a person who stops being a reviewer stops receiving it at once.
             new NotificationCategory(
                 key: User::NOTIFICATION_PREFERENCE_DAILY_CHECKOUT_EVERY_SUBMISSION,
                 label: "Every Daily Checkout as it's submitted",
-                description: 'A message each time a crew submits a Daily Checkout, even when nothing is wrong. It shows in the bell; phone alerts for it are off unless you turn them on.',
+                description: 'A message each time a crew submits a Daily Checkout, even when nothing is wrong. Everything is off until you turn on the bell, phone or email here.',
                 group: self::GROUP_FLEET,
                 channels: $all,
                 locked: [],
@@ -443,6 +449,36 @@ final class NotificationCategoryRegistry
                 eligibility: static fn (EligibilityContext $c): ?string => self::captain5Allows($c->user)
                     ? 'captain5_duty_access' : null,
             ),
+            // Two conditions, both asked live: the person is on the EMS low-stock alert list, and can still read the
+            // supply room inventory. The list alone grants nothing, so someone whose access ends stops getting these.
+            new NotificationCategory(
+                key: self::EMS_LOW_STOCK,
+                label: 'EMS supplies low or out',
+                description: 'A medical supply room item dropped to its red line (low or out), with how many to order. Sent to the people on the EMS low-stock alert list.',
+                group: self::GROUP_COMMAND,
+                channels: $all,
+                locked: [],
+                significance: 'important',
+                eligibility: static fn (EligibilityContext $c): ?string => self::emsLowStockAllows($c->user)
+                    ? 'ems_low_stock_list' : null,
+                candidates: static fn (): Builder => User::query()->where('account_status', 'active')
+                    ->whereIn('id', StockAlertRecipient::query()->select('user_id')),
+            ),
+            // The same list and live access check as the low-stock alerts. Each withdrawal is an in-app notice only;
+            // the email is one daily summary (docs/ems/supply-room-kiosk.md section 7).
+            new NotificationCategory(
+                key: self::EMS_SUPPLY_WITHDRAWALS,
+                label: 'EMS supply room screen withdrawals',
+                description: 'A member took supplies at the supply room screen: an in-app notice for each one and one email a day listing them all. Sent to the people on the EMS low-stock alert list.',
+                group: self::GROUP_COMMAND,
+                channels: [$db, $mail],
+                locked: [],
+                significance: 'important',
+                eligibility: static fn (EligibilityContext $c): ?string => self::emsLowStockAllows($c->user)
+                    ? 'ems_low_stock_list' : null,
+                candidates: static fn (): Builder => User::query()->where('account_status', 'active')
+                    ->whereIn('id', StockAlertRecipient::query()->select('user_id')),
+            ),
             new NotificationCategory(
                 key: 'command_communications',
                 label: '300 Command messages',
@@ -469,6 +505,16 @@ final class NotificationCategoryRegistry
     {
         try {
             return $context->user->canAccessPanel(Filament::getPanel('training'));
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private static function emsLowStockAllows(User $user): bool
+    {
+        try {
+            return StockAlertRecipient::query()->where('user_id', $user->getKey())->exists()
+                && app(EmsAccess::class)->canReadInventory($user);
         } catch (Throwable) {
             return false;
         }

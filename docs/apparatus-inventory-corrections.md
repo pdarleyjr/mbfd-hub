@@ -199,10 +199,12 @@ item_id, reason, reason_label, status, reported_at, mine }]`. Items may carry `m
 
 ## 5a. Limits (abuse resistance)
 
-- Per member: at most 10 open corrections per apparatus and 40 reports per 24 h; a repeat of an
+- Per member: at most 60 open corrections per apparatus and 200 reports per 24 h (raised 2026-11-05
+  from 10 and 40: crews correcting a whole truck in one checkout hit the old cap); the endpoint allows
+  60 requests a minute so a queued batch replays after a dead zone; a repeat of an
   open report (same item or unlisted name, same reason) returns the existing report.
 - Member text in names/descriptions is plain text (`<` and `>` refused); notifications strip markup.
-- Checklist markers: at most the 100 newest open reports; another member's report is shown only as
+- Checklist markers: at most the 300 newest open reports; another member's report is shown only as
   "pending" (no id, reason, time or name). Member replies: 50 per correction; idempotency keys are
   matched only for the same actor and correction, after authorization.
 - Someone else's correction page or photo is a 404.

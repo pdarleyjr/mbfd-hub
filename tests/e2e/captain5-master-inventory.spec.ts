@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import type { EmsMeta } from '../../resources/js/daily-checkout/src/components/captain5/ems/types';
 import type {
-  CountUnit, EntryMap, MasterItem, MasterSection, OpenOrder, OrderState, UnitOption,
+  CountUnit, EntryMap, MasterItem, MasterSection, OpenOrder, OrderState, ScreenWithdrawal, SupplyScreenData, UnitOption,
 } from '../../resources/js/daily-checkout/src/components/captain5/ems/master/types';
 
 /**
@@ -38,7 +38,9 @@ function item(id: number, name: string, shelf: string, overrides: Partial<Master
     base_unit: 'each', count_unit: 'each', count_unit_label: 'each', count_unit_label_plural: 'each', units_per_count_unit: 1,
     package_unit: null, units_per_package: null, on_hand_base: 10, on_hand: 10, deducted_base: 0, deducted: 0, counted_at: '2026-10-26T14:00:00Z', counted_by: 'Alex Rivera',
     required_base: null, order_rule_text: null, refrigerated: false, needs_review: false, review_reasons: [], config_problem: null,
-    expected: null, to_order: null, order_state: 'ok', open_order: null, ...overrides,
+    expected: null, to_order: null, order_state: 'ok', open_order: null,
+    // Worked out by present(); a test sets reorder_at/critical_at with *_auto false for a person's own line.
+    level: null, reorder_at: null, critical_at: null, reorder_at_auto: true, critical_at_auto: true, ...overrides,
   };
   // The expected amount is the old order level in count units unless a test sets it.
   const expected = 'expected' in overrides ? base.expected : base.required_base === null ? null : base.required_base / base.units_per_count_unit;
@@ -83,10 +85,19 @@ interface Server {
   submitted: boolean;
   nextOrderId: number;
   meta?: EmsMeta;
+  /** GET /supply/screen: the supply room kiosk section. */
+  screen: SupplyScreenData;
+  screenForbidden: boolean;
+  screenReads: number;
 }
 
+const NO_SCREEN: SupplyScreenData = { withdrawals: [], screens: [], search_words_waiting: 0 };
+
 function newServer(overrides: Partial<Server> = {}): Server {
-  return { items: catalog(), inactive: [], entries: null, putMode: 'ok', batchMode: 'ok', batchDelayMs: 0, masterDelayMs: 0, orderForbidden: false, submitDelayMs: 0, conflictOnce: false, writes: [], submitted: false, nextOrderId: 500, ...overrides };
+  return {
+    items: catalog(), inactive: [], entries: null, putMode: 'ok', batchMode: 'ok', batchDelayMs: 0, masterDelayMs: 0, orderForbidden: false, submitDelayMs: 0, conflictOnce: false,
+    writes: [], submitted: false, nextOrderId: 500, screen: NO_SCREEN, screenForbidden: false, screenReads: 0, ...overrides,
+  };
 }
 
 const sectionsOf = (server: Server): MasterSection[] => {
@@ -94,12 +105,33 @@ const sectionsOf = (server: Server): MasterSection[] => {
   return codes.map((code) => ({ code, label: SHELF_LABELS[code] ?? code, item_count: server.items.filter((entry) => entry.location_code === code).length }));
 };
 
-/** The server's own working: to order and the state, with an open order winning. */
+/** The server's stock lines: yellow at half the expected amount, red at a quarter, unless a person set their own. */
+function linesOf(entry: MasterItem): { reorder: number; critical: number } | null {
+  if (entry.expected === null || entry.expected < 1) return null;
+  // A person's yellow line above a lowered expected amount sits at the expected amount.
+  const reorder = Math.min(Math.floor(entry.expected), entry.reorder_at_auto || entry.reorder_at === null ? Math.floor(entry.expected / 2) : entry.reorder_at);
+  const critical = entry.critical_at_auto || entry.critical_at === null ? Math.floor(entry.expected / 4) : entry.critical_at;
+  return { reorder, critical: Math.min(critical, reorder) };
+}
+
+function levelOf(entry: MasterItem): MasterItem['level'] {
+  const lines = linesOf(entry);
+  if (lines === null || entry.on_hand === null) return null;
+  if (entry.on_hand <= 0 || entry.on_hand <= lines.critical) return 'red';
+  return entry.on_hand <= lines.reorder ? 'yellow' : 'green';
+}
+
+/** The server's own working: to order, the state (an open order winning) and the stock level. */
 function present(entry: MasterItem): MasterItem {
   const toOrder = entry.on_hand === null || entry.expected === null ? null : Math.max(0, Math.ceil(entry.expected - entry.on_hand - 1e-9));
   const state: OrderState = entry.open_order ? entry.open_order.status
     : entry.on_hand === null ? 'not_counted' : entry.expected === null ? 'no_level' : (toOrder ?? 0) > 0 ? 'needs_order' : 'ok';
-  return { ...entry, location_label: entry.location_code ? SHELF_LABELS[entry.location_code] ?? entry.location_code : null, to_order: toOrder, order_state: state };
+  const lines = linesOf(entry);
+  return {
+    ...entry, location_label: entry.location_code ? SHELF_LABELS[entry.location_code] ?? entry.location_code : null, to_order: toOrder, order_state: state,
+    level: levelOf(entry), reorder_at: lines?.reorder ?? null, critical_at: lines?.critical ?? null,
+    reorder_at_auto: entry.reorder_at_auto || entry.reorder_at === null, critical_at_auto: entry.critical_at_auto || entry.critical_at === null,
+  };
 }
 
 const presentAll = (server: Server): MasterItem[] => server.items.map(present);
@@ -107,7 +139,8 @@ const presentAll = (server: Server): MasterItem[] => server.items.map(present);
 function summaryOf(server: Server) {
   const rows = presentAll(server);
   const count = (state: OrderState) => rows.filter((row) => row.order_state === state).length;
-  return { needs_order: count('needs_order'), pending: count('pending'), ordered: count('ordered'), backordered: count('backordered') };
+  const level = (name: 'red' | 'yellow' | 'green') => rows.filter((row) => row.level === name).length;
+  return { needs_order: count('needs_order'), pending: count('pending'), ordered: count('ordered'), backordered: count('backordered'), red: level('red'), yellow: level('yellow'), green: level('green') };
 }
 
 const orderOf = (entry: MasterItem, typed: number): number => {
@@ -145,6 +178,9 @@ function applyBatch(server: Server, changes: Array<Record<string, unknown>>): Ma
       target.expected = expectedBase === null ? null : expectedBase / size;
     }
     if ('expected' in change) target.expected = change.expected as number | null;
+    // null puts a line back to the preset.
+    if ('reorder_at' in change) Object.assign(target, { reorder_at: change.reorder_at as number | null, reorder_at_auto: change.reorder_at === null });
+    if ('critical_at' in change) Object.assign(target, { critical_at: change.critical_at as number | null, critical_at_auto: change.critical_at === null });
     if (typeof change.on_hand === 'number') { setOnHand(target, change.on_hand); target.deducted = 0; target.deducted_base = 0; target.estimated = false; }
     return present(target);
   });
@@ -203,6 +239,11 @@ async function handleEms(route: Route, server: Server, url: URL): Promise<void> 
   if (method !== 'GET') server.writes.push(recorded);
 
   if (path === '/meta') return ok(route, server.meta ?? META);
+  if (path === '/supply/screen') {
+    server.screenReads++;
+    if (server.screenForbidden) return fail(route, 403, 'forbidden', 'You do not have access to the supply room inventory.');
+    return ok(route, server.screen);
+  }
   if (path === '/supply/master') {
     const body = {
       sections: sectionsOf(server), items: presentAll(server), inactive: server.inactive,
@@ -1236,4 +1277,298 @@ test('every control is at least 44px on a phone', async ({ page }) => {
   await expectTouchTarget(page.getByTestId('missing-item').first(), 'Missing item');
   await expectTouchTarget(page.getByTestId('submit-inventory'), 'Submit inventory');
   await expectTouchTarget(page.getByTestId('back-to-counting'), 'Back to counting');
+});
+
+// ------------------------------------------------------------------------- stock levels
+
+const backgroundOf = (locator: Locator) => locator.evaluate((element) => getComputedStyle(element).backgroundColor);
+const TRANSPARENT = 'rgba(0, 0, 0, 0)';
+
+test.describe('stock levels', () => {
+  test('view mode tints each row by level and says it in words; an item with no level stays plain', async ({ page }) => {
+    await open(page, newServer(), SUPPLY);
+    // Oral Airway 6 of 4 is stocked, Nasal Airway 2 of 4 is at the yellow line (half).
+    await expect(rowById(page, 1)).toHaveAttribute('data-level', 'green');
+    await expect(rowById(page, 1).getByTestId('stock-level')).toHaveText('Stocked');
+    await expect(rowById(page, 2)).toHaveAttribute('data-level', 'yellow');
+    await expect(rowById(page, 2).getByTestId('stock-level')).toHaveText('Reorder soon');
+    const green = await backgroundOf(rowById(page, 1));
+    const yellow = await backgroundOf(rowById(page, 2));
+
+    // Gauze 5 of 20 is at the red line (a quarter); Tape has no expected amount.
+    await page.getByTestId('shelf-next-top').click();
+    await expect(rowById(page, 3)).toHaveAttribute('data-level', 'red');
+    await expect(rowById(page, 3).getByTestId('stock-level')).toHaveText('Low or out');
+    await expect(rowById(page, 4)).toHaveAttribute('data-level', 'none');
+    await expect(rowById(page, 4).getByTestId('stock-level')).toHaveCount(0);
+    const red = await backgroundOf(rowById(page, 3));
+    const plain = await backgroundOf(rowById(page, 4));
+    expect(plain).toBe(TRANSPARENT);
+    expect(new Set([green, yellow, red, plain]).size).toBe(4);
+  });
+
+  test('the standalone Admin page colours the rows the same way', async ({ page }) => {
+    const server = newServer({ meta: { ...META, permissions: { view: false, act: false, configure: false }, inventory: { read: true, edit: true } } });
+    await open(page, server, `${STANDALONE}?shelf=A2`);
+    await expect(rowById(page, 3)).toHaveAttribute('data-level', 'red');
+    await expect(rowById(page, 3).getByTestId('stock-level')).toHaveText('Low or out');
+    await expect(page.getByTestId('low-stock-card').getByRole('heading', { level: 2 })).toHaveText('1 item is low or out');
+  });
+
+  test('the Low or out card lists every red item with exactly what to order, or its open order, and opens the item', async ({ page }) => {
+    const server = newServer();
+    Object.assign(server.items[1], {
+      on_hand: 1, on_hand_base: 1,
+      open_order: { id: 902, status: 'backordered', quantity: 3, unit_label: 'each', expected_on: '2026-11-09', note: null, placed_at: null, placed_by: null, updated_at: null, updated_by: null },
+    });
+    Object.assign(server.items[2], { estimated: true });
+    Object.assign(server.items[6], { on_hand: 0, on_hand_base: 0 });
+    await open(page, server, SUPPLY);
+
+    const card = page.getByTestId('low-stock-card');
+    await expect(card.getByTestId('low-stock-heading')).toHaveText('3 items are low or out');
+    await expect(card.getByTestId('low-stock-name')).toHaveText(['Nasal Airway 28 Fr', 'Gauze 4x4', 'Saline Flush']);
+    const lowItem = (name: string) => card.getByTestId('low-stock-item').filter({ hasText: name });
+
+    const gauze = lowItem('Gauze 4x4');
+    await expect(gauze.getByTestId('low-stock-shelf')).toHaveText('A2 Wound care');
+    await expect(gauze.getByTestId('low-stock-amount')).toHaveText('5 of 20');
+    await expect(gauze.getByTestId('low-stock-advice')).toHaveText('Order 15');
+    await expect(gauze.getByTestId('low-stock-estimate')).toHaveText('Estimate');
+    await expect(lowItem('Saline Flush').getByTestId('low-stock-amount')).toHaveText('0 of 2 boxes');
+    await expect(lowItem('Saline Flush').getByTestId('low-stock-advice')).toHaveText('Order 2 boxes');
+    await expect(lowItem('Saline Flush').getByTestId('low-stock-estimate')).toHaveCount(0);
+    // An open order is shown instead of asking for another one.
+    await expect(lowItem('Nasal Airway').getByTestId('low-stock-advice')).toHaveText('Back ordered 3, expected Nov 9');
+    await expect(lowItem('Nasal Airway').getByTestId('low-stock-advice')).toHaveAttribute('data-kind', 'open');
+
+    await gauze.click();
+    const sheet = page.getByTestId('item-sheet');
+    await expect(sheet.getByRole('heading', { name: 'Gauze 4x4' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await expect(gauze).toBeFocused();
+
+    await page.getByTestId('edit-mode').click();
+    await expect(page.getByTestId('master-inventory')).toHaveAttribute('data-mode', 'edit');
+    await expect(card.getByTestId('low-stock-item')).toHaveCount(3);
+  });
+
+  test('with nothing red the card is one short line, and a long list folds after five', async ({ page }) => {
+    const server = newServer();
+    Object.assign(server.items[2], { on_hand: 15, on_hand_base: 15 });
+    await open(page, server, SUPPLY);
+    await expect(page.getByTestId('low-stock-none')).toHaveText('Nothing is low or out.');
+    await expect(page.getByTestId('low-stock-card')).toHaveCount(0);
+
+    server.items = Array.from({ length: 7 }, (_, index) => item(20 + index, `Splint size ${index + 1}`, 'D1', { on_hand: 0, on_hand_base: 0, required_base: 4 }));
+    await page.reload();
+    const card = page.getByTestId('low-stock-card');
+    await expect(card.getByTestId('low-stock-heading')).toHaveText('7 items are low or out');
+    await expect(card.getByTestId('low-stock-item')).toHaveCount(5);
+    await expect(card.getByTestId('low-stock-more')).toHaveText('Show all 7');
+    await card.getByTestId('low-stock-more').click();
+    await expect(card.getByTestId('low-stock-item')).toHaveCount(7);
+    await expect(card.getByTestId('low-stock-more')).toHaveText('Show fewer');
+    await expect(card.getByTestId('low-stock-more')).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('Edit mode: Yellow at and Red at start on Auto, recolour the row live, are checked, and save only when changed', async ({ page }) => {
+    const server = newServer();
+    await open(page, server, `${SUPPLY}&shelf=A2`);
+    await page.getByTestId('edit-mode').click();
+    const gauze = editRow(page, 3);
+    await expect(gauze).toHaveAttribute('data-level', 'red');
+    await expect(gauze.getByTestId('edit-level')).toHaveText('Low or out');
+    await expect(gauze.getByTestId('edit-reorder')).toHaveValue('');
+    await expect(gauze.getByTestId('edit-reorder')).toHaveAttribute('placeholder', '10');
+    await expect(gauze.getByTestId('edit-reorder-auto')).toHaveText('Auto: 10');
+    await expect(gauze.getByTestId('edit-critical-auto')).toHaveText('Auto: 5');
+    await expect(gauze.getByLabel('Yellow at (single units)')).toBeVisible();
+    await expect(gauze.getByLabel('Red at (single units)')).toBeVisible();
+
+    // A new expected amount works the Auto lines out again, and the colour follows.
+    await gauze.getByTestId('edit-expected').fill('8');
+    await expect(gauze.getByTestId('edit-reorder-auto')).toHaveText('Auto: 4');
+    await expect(gauze.getByTestId('edit-critical-auto')).toHaveText('Auto: 2');
+    await expect(gauze).toHaveAttribute('data-level', 'green');
+    await gauze.getByTestId('edit-expected').fill('20');
+    await expect(gauze).toHaveAttribute('data-level', 'red');
+
+    // Combinations the server would refuse are refused here first, and nothing is sent.
+    await gauze.getByTestId('edit-critical').fill('12');
+    await page.getByTestId('edit-save').click();
+    await expect(gauze.getByText('Red at cannot be above Yellow at.')).toBeVisible();
+    await expect(gauze.getByTestId('edit-critical')).toHaveAttribute('aria-invalid', 'true');
+    await gauze.getByTestId('edit-reorder').fill('25');
+    await expect(gauze.getByText('Yellow at cannot be above the expected amount.')).toBeVisible();
+    await page.getByTestId('edit-save').click();
+    expect(batchWrites(server)).toHaveLength(0);
+
+    // Valid lines recolour the row before anything is saved; so does a typed on hand.
+    await gauze.getByTestId('edit-reorder').fill('12');
+    await gauze.getByTestId('edit-critical').fill('4');
+    await expect(gauze).toHaveAttribute('data-level', 'yellow');
+    await expect(gauze.getByTestId('edit-level')).toHaveText('Reorder soon');
+    await gauze.getByTestId('edit-on-hand').fill('13');
+    await expect(gauze).toHaveAttribute('data-level', 'green');
+    await gauze.getByTestId('edit-on-hand').fill('');
+    await expect(gauze).toHaveAttribute('data-level', 'yellow');
+
+    await page.getByTestId('edit-save').click();
+    await expect(page.getByTestId('edit-saved')).toHaveText('Saved 1 item.');
+    expect(batchWrites(server)[0].body).toEqual({ changes: [{ id: 3, reorder_at: 12, critical_at: 4 }] });
+    await expect(gauze.getByTestId('edit-reorder')).toHaveValue('12');
+    await expect(gauze.getByTestId('edit-reorder-auto')).toHaveCount(0);
+
+    // Clearing a box puts that line back to Auto: null is sent.
+    await gauze.getByTestId('edit-reorder').fill('');
+    await expect(gauze.getByTestId('edit-reorder-auto')).toHaveText('Auto: 10');
+    await page.getByTestId('edit-save').click();
+    await expect(page.getByTestId('edit-saved')).toBeVisible();
+    expect(batchWrites(server)[1].body).toEqual({ changes: [{ id: 3, reorder_at: null }] });
+
+    await page.getByTestId('edit-mode').click();
+    await expect(rowById(page, 3)).toHaveAttribute('data-level', 'yellow');
+    await expect(rowById(page, 3).getByTestId('stock-level')).toHaveText('Reorder soon');
+  });
+
+  test('the count page shows the expected amount, colours each row, and recolours as soon as a number is typed', async ({ page }) => {
+    const server = newServer();
+    await open(page, server, `${COUNT}&shelf=A2`);
+    const gauze = countRow(page, 'Gauze 4x4');
+    await expect(gauze.getByTestId('count-expected')).toHaveText('Expected 20');
+    // Blank: where the item stands now.
+    await expect(gauze).toHaveAttribute('data-level', 'red');
+    await expect(gauze.getByTestId('count-level')).toContainText('Low or out');
+
+    await countInput(page, 'Gauze 4x4').fill('15');
+    await expect(gauze).toHaveAttribute('data-level', 'green');
+    await expect(gauze.getByTestId('count-level')).toHaveText('Stocked');
+    await countInput(page, 'Gauze 4x4').fill('8');
+    await expect(gauze).toHaveAttribute('data-level', 'yellow');
+    await expect(gauze.getByTestId('count-level')).toHaveText('Reorder soon');
+    await countInput(page, 'Gauze 4x4').fill('0');
+    await expect(gauze).toHaveAttribute('data-level', 'red');
+    await expect(gauze.getByTestId('order-result')).toHaveText('Order 20');
+
+    const tape = countRow(page, 'Tape 1 inch');
+    await expect(tape.getByTestId('count-expected')).toHaveText('No expected amount');
+    await expect(tape).toHaveAttribute('data-level', 'none');
+    await expect(tape.getByTestId('count-level')).toHaveCount(0);
+
+    await page.getByTestId('shelf-next-bottom').click();
+    await expect(countRow(page, 'Saline Flush').getByTestId('count-expected')).toHaveText('Expected 2 boxes');
+    await expect(countRow(page, 'IV Catheter 20 Gauge')).toHaveAttribute('data-level', 'none');
+
+    // Every box stays optional: one number is enough to submit.
+    await waitSaved(page);
+    await page.getByTestId('review-bottom').click();
+    await expect(page.getByTestId('submit-inventory')).toBeEnabled();
+  });
+});
+
+// ------------------------------------------------------------------ supply room screen
+
+const withdrawal = (n: number, overrides: Partial<ScreenWithdrawal> = {}): ScreenWithdrawal => ({
+  uuid: `00000000-aaaa-4aaa-8aaa-${String(n).padStart(12, '0')}`, number: `W-${String(n).padStart(6, '0')}`, employee_name: 'Lt. J. Smith', unit_label: 'R22',
+  taken_at: `Nov 3, 9:${String(10 + n).padStart(2, '0')} AM`, taken_at_iso: `2026-11-03T14:${String(10 + n).padStart(2, '0')}:00Z`, status: 'taken', note: null, count_due: false,
+  lines: [{ name: 'Gauze 4x4', quantity: 2, unit_label: 'each', count_due: false }], ...overrides,
+});
+
+const ONLINE_SCREEN: SupplyScreenData['screens'][number] = {
+  id: 1, name: 'Supply room screen', state: 'online', state_label: 'Online', last_seen: 'Nov 3, 9:15 AM', paired_at: 'Nov 1, 8:00 AM', paired_by: 'Alex Rivera',
+};
+
+test.describe('supply room screen section', () => {
+  test('shows the screen, recent withdrawals with Undone and Count due, the note and the search words; it refreshes with the list', async ({ page }) => {
+    const server = newServer({
+      screen: {
+        screens: [ONLINE_SCREEN, { ...ONLINE_SCREEN, id: 2, name: 'Old screen', state: 'revoked', state_label: 'Revoked' }],
+        withdrawals: [
+          withdrawal(1, { unit_label: null, note: 'Shelf was empty', count_due: true,
+            lines: [{ name: 'IV Catheter 18 Gauge', quantity: 3, unit_label: 'each', count_due: true }, { name: 'Saline Flush', quantity: 1, unit_label: 'box', count_due: false }] }),
+          withdrawal(2, { status: 'undone', employee_name: 'FF A. Jones' }),
+        ],
+        search_words_waiting: 2,
+      },
+    });
+    await open(page, server, SUPPLY);
+    const section = page.getByTestId('supply-screen');
+    await expect(section.getByTestId('screen-status')).toHaveText(['Supply room screen: Online, last checked in Nov 3, 9:15 AM']);
+    await expect(section.getByTestId('screen-status')).toHaveAttribute('data-state', 'online');
+    // Collapsed until opened; the master list is still right there.
+    await expect(section.getByTestId('screen-withdrawal')).toHaveCount(0);
+    await expect(page.getByTestId('master-row').first()).toBeVisible();
+    await section.getByTestId('supply-screen-toggle').click();
+    await expect(section.getByTestId('supply-screen-toggle')).toHaveAttribute('aria-expanded', 'true');
+
+    const rows = section.getByTestId('screen-withdrawal');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0).getByTestId('screen-withdrawal-time')).toHaveText('Nov 3, 9:11 AM');
+    await expect(rows.nth(0).getByTestId('screen-withdrawal-who')).toHaveText('Lt. J. Smith, No unit');
+    await expect(rows.nth(0).getByTestId('screen-withdrawal-line')).toHaveText(['IV Catheter 18 Gauge: 3 eachCount due', 'Saline Flush: 1 box']);
+    await expect(rows.nth(0).getByTestId('screen-line-count-due')).toHaveCount(1);
+    await expect(rows.nth(0).getByTestId('screen-withdrawal-note')).toHaveText('Note: Shelf was empty');
+    await expect(rows.nth(0).getByTestId('screen-withdrawal-undone')).toHaveCount(0);
+    await expect(rows.nth(1)).toHaveAttribute('data-status', 'undone');
+    await expect(rows.nth(1).getByTestId('screen-withdrawal-undone')).toHaveText('Undone');
+    await expect(rows.nth(1).getByTestId('screen-withdrawal-who')).toHaveText('FF A. Jones, R22');
+    await expect(section.getByTestId('screen-search-words')).toHaveText('2 search words to review in Admin > Medical Supply Room > Supply room screen.');
+
+    // The section follows the master list's refresh.
+    const before = server.screenReads;
+    server.screen = { ...server.screen, screens: [{ ...ONLINE_SCREEN, state: 'offline', state_label: 'Offline', last_seen: 'Nov 3, 8:40 AM' }] };
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(section.getByTestId('screen-status')).toHaveText(['Supply room screen: Offline, last checked in Nov 3, 8:40 AM']);
+    await expect(section.getByTestId('screen-status')).toHaveAttribute('data-state', 'offline');
+    expect(server.screenReads).toBeGreaterThan(before);
+  });
+
+  test('with no screen paired it says where to pair one, and a long list folds after ten', async ({ page }) => {
+    const server = newServer({ screen: { screens: [], withdrawals: Array.from({ length: 12 }, (_, i) => withdrawal(i + 1)), search_words_waiting: 0 } });
+    await open(page, server, SUPPLY);
+    const section = page.getByTestId('supply-screen');
+    await expect(section.getByTestId('screen-status-none')).toHaveText('No screen is paired yet. Pair one from Admin > Medical Supply Room > Supply room screen.');
+    await section.getByTestId('supply-screen-toggle').click();
+    await expect(section.getByTestId('screen-withdrawal')).toHaveCount(10);
+    await expect(section.getByTestId('screen-search-words')).toHaveCount(0);
+    await section.getByTestId('screen-withdrawals-more').click();
+    await expect(section.getByTestId('screen-withdrawal')).toHaveCount(12);
+  });
+
+  test('a 403 leaves the section out and the master list in place', async ({ page }) => {
+    const server = newServer({ screenForbidden: true });
+    await open(page, server, SUPPLY);
+    await expect(page.getByTestId('master-row').first()).toBeVisible();
+    await expect.poll(() => server.screenReads).toBeGreaterThan(0);
+    await expect(page.getByTestId('supply-screen')).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Master Supply Room Inventory' })).toBeVisible();
+  });
+
+  for (const width of [320, 390]) {
+    test(`no horizontal scrolling at ${width}px with the section open`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      const server = newServer({
+        screen: { screens: [ONLINE_SCREEN], withdrawals: [withdrawal(1, { note: `${LONG_NAME} note`, lines: [{ name: LONG_NAME, quantity: 120, unit_label: 'boxes of 50', count_due: true }] })], search_words_waiting: 1 },
+      });
+      await open(page, server, SUPPLY);
+      await page.getByTestId('supply-screen-toggle').click();
+      await expect(page.getByTestId('screen-withdrawal')).toHaveCount(1);
+      await expect(page.getByTestId('screen-search-words')).toHaveText('1 search word to review in Admin > Medical Supply Room > Supply room screen.');
+      await expectTouchTarget(page.getByTestId('supply-screen-toggle'), 'Supply room screen toggle');
+      await noHorizontalOverflow(page);
+    });
+  }
+});
+
+test('more taken than the ledger held shows Count due by the on-hand number, in view and Edit mode', async ({ page }) => {
+  const server = newServer({ items: [item(1, 'Oral Airway Size 3', 'A1', { on_hand: 0, on_hand_base: 0, count_due: true }), item(2, 'Nasal Airway 28 Fr', 'A1', { on_hand: 2, on_hand_base: 2 })] });
+  await open(page, server, SUPPLY);
+  await expect(rowById(page, 1).getByTestId('on-hand-number')).toHaveText('0');
+  await expect(rowById(page, 1).getByTestId('on-hand-count-due')).toHaveText('Count due');
+  await expect(rowById(page, 2).getByTestId('on-hand-count-due')).toHaveCount(0);
+  await page.getByTestId('edit-mode').click();
+  await expect(editRow(page, 1).getByTestId('edit-count-due')).toHaveText('Count due');
+  await expect(editRow(page, 2).getByTestId('edit-count-due')).toHaveCount(0);
 });

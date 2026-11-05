@@ -2,6 +2,12 @@
 
 return [
     /*
+     * Hours a resolved equipment issue stays on the Captain 5 workspace ("Recently resolved") and the Admin issue board
+     * before it drops off. Staff can clear one earlier. The resolution and the history are never removed.
+     */
+    'resolved_display_hours' => (int) env('DASHBOARD_RESOLVED_DISPLAY_HOURS', 72),
+
+    /*
      * IssueSource adapters shown on the admin dashboards (each implements
      * App\Support\Dashboards\IssueSource). Grouped by owning stream so parallel
      * work never edits the same list; the provider merges them in this order.

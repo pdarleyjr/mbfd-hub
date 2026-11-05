@@ -40,6 +40,8 @@ class PublicStationRequestResource extends JsonResource
             'current_public_response' => $stationRequest->current_public_response,
             'acknowledged_at' => $stationRequest->acknowledged_at,
             'completed_at' => $stationRequest->completed_at,
+            // Whether this member may mark it resolved (docs/unified-activity-and-ownership.md section 3). Server-decided.
+            'member_resolution' => \App\Support\Stations\StationRequestMemberAccess::resolutionFor($request->user(), $stationRequest),
             'created_at' => $stationRequest->created_at,
             'updated_at' => $stationRequest->updated_at,
             'items' => $this->whenLoaded('items', fn () => $stationRequest->items->map(fn (StationRequestItem $item): array => [
@@ -57,7 +59,21 @@ class PublicStationRequestResource extends JsonResource
                 'status' => $update->status,
                 'public_note' => $update->public_note,
                 'created_at' => $update->created_at,
+                // Additive. The department name on the automated receipt, null for every staff/system row.
+                'sender' => $update->senderLabel(),
+                'is_auto_receipt' => $update->isAutoReceipt(),
             ])->all()),
+            // Additive "received by the assistant" indication. Not a human acknowledgment: acknowledged_at above
+            // is only ever set by staff.
+            'ai_receipt' => $this->whenLoaded('updates', function () use ($stationRequest): ?array {
+                /** @var StationRequestUpdate|null $receipt */
+                $receipt = $stationRequest->updates->first(fn (StationRequestUpdate $update): bool => $update->isAutoReceipt());
+
+                return $receipt === null ? null : [
+                    'sender' => StationRequestUpdate::autoReceiptSender(),
+                    'at' => $receipt->created_at,
+                ];
+            }),
         ];
     }
 }

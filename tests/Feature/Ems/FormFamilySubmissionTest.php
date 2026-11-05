@@ -279,7 +279,7 @@ final class FormFamilySubmissionTest extends TestCase
     {
         $this->send([self::TAPE_BLS + ['quantity' => 1]], 'bls-detail')->assertCreated();
         $this->send([self::TAPE_ALS + ['quantity' => 1]])->assertCreated();
-        $migration = require base_path('database/migrations/2026_11_02_120000_add_form_family_to_ems_inventory_requests.php');
+        $migration = require base_path('database/migrations/2026_11_05_140000_add_form_family_to_ems_inventory_requests.php');
 
         // Back to the state before the migration, then forward: every row that already existed becomes ALS Transport.
         $migration->down();

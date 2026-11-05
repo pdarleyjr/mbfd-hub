@@ -10,6 +10,7 @@ use App\Models\DailyRoster\RosterImport;
 use App\Models\DailyRoster\RosterSection;
 use App\Models\DailyRoster\RosterSnapshot;
 use App\Services\DailyRoster\Parsing\TeleStaffRosterReport;
+use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -32,7 +33,11 @@ final class RosterPublisher
 
     private const HELD_SUPERSEDE_LIMIT = 50;
 
-    public function __construct(private readonly RosterStateRecorder $recorder) {}
+    public function __construct(
+        private readonly RosterStateRecorder $recorder,
+        private readonly DutyCalendar $calendar,
+        private readonly RosterFreshnessResolver $freshness,
+    ) {}
 
     public function publish(RosterImport $import, TeleStaffRosterReport $report): void
     {
@@ -70,8 +75,19 @@ final class RosterPublisher
         $hash = $report->normalizedSha256();
         $active = $pointer->roster_snapshot_id === null ? null : RosterSnapshot::query()->find($pointer->roster_snapshot_id);
 
+        if ($current->source === RosterOutlook::SOURCE) {
+            $this->applyOutlook($current, $report, $pointer, $active, $generatedAt, $hash);
+
+            return null;
+        }
         if ($pointer->pinned_at !== null) {
             return $this->hold($current, self::HOLD_PINNED);
+        }
+        // The 5-minute export takes a date back from the outlook whatever its export time: it is what TeleStaff shows now.
+        if ($pointer->source === RosterOutlook::SOURCE && $generatedAt !== null) {
+            $this->takeOverFromOutlook($current, $report, $pointer, $active, $generatedAt, $hash);
+
+            return null;
         }
         if ($active !== null && hash_equals($active->normalized_sha256, $hash)) {
             $this->confirm($current, $pointer, $active, $generatedAt);
@@ -126,11 +142,13 @@ final class RosterPublisher
      * The same roster again. A newer export of it also moves the effective time forward, or an export
      * generated between the two could wrongly replace what TeleStaff has since re-confirmed.
      */
-    private function confirm(RosterImport $import, RosterActiveVersion $pointer, RosterSnapshot $active, ?CarbonImmutable $generatedAt): void
+    private function confirm(RosterImport $import, RosterActiveVersion $pointer, RosterSnapshot $active, ?CarbonImmutable $generatedAt, bool $takingOver = false): void
     {
+        // Taking a date back from the outlook starts the 5-minute export's own clock, whatever the outlook said.
         $pointer->forceFill([
-            'effective_generated_at' => self::latest($pointer->effective_generated_at, $generatedAt),
-            'last_confirmed_at' => self::latest($pointer->last_confirmed_at, $generatedAt),
+            'effective_generated_at' => $takingOver ? $generatedAt : self::latest($pointer->effective_generated_at, $generatedAt),
+            'last_confirmed_at' => $takingOver ? $generatedAt : self::latest($pointer->last_confirmed_at, $generatedAt),
+            'source' => $import->source,
         ])->save();
 
         $this->recorder->transition($import, RosterImport::STATE_DUPLICATE, [
@@ -154,6 +172,7 @@ final class RosterPublisher
             'effective_generated_at' => $generatedAt,
             'last_confirmed_at' => $generatedAt,
             'content_changed_at' => CarbonImmutable::now('UTC'),
+            'source' => $import->source,
         ])->save();
 
         $this->recorder->transition($import, RosterImport::STATE_PUBLISHED, [
@@ -169,6 +188,55 @@ final class RosterPublisher
         ], snapshotId: (int) $snapshot->getKey());
 
         $this->supersedeOlderHeld($import, $generatedAt);
+    }
+
+    private function takeOverFromOutlook(RosterImport $import, TeleStaffRosterReport $report, RosterActiveVersion $pointer, ?RosterSnapshot $active, CarbonImmutable $generatedAt, string $hash): void
+    {
+        if ($active !== null && hash_equals($active->normalized_sha256, $hash)) {
+            $this->confirm($import, $pointer, $active, $generatedAt, takingOver: true);
+
+            return;
+        }
+
+        $existing = RosterSnapshot::query()->whereDate('duty_date', $report->dutyDate)->where('normalized_sha256', $hash)->first();
+        $this->repoint($import, $pointer, $existing ?? $this->storeSnapshot($import, $report), $generatedAt);
+    }
+
+    /**
+     * Outlook mail fills a date the 5-minute export has not reached, replaces an older outlook, or covers a
+     * current day that export has stopped keeping current. Anything else changes nothing and stores nothing.
+     */
+    private function applyOutlook(RosterImport $import, TeleStaffRosterReport $report, RosterActiveVersion $pointer, ?RosterSnapshot $active, ?CarbonImmutable $generatedAt, string $hash): void
+    {
+        $liveOwns = $active !== null && $pointer->source === null;
+        $sameRoster = $active !== null && hash_equals($active->normalized_sha256, $hash);
+        $reason = match (true) {
+            $pointer->pinned_at !== null => 'outlook_date_pinned',
+            $report->dutyDate < $this->calendar->dutyDate()->format('Y-m-d') => 'outlook_date_passed',
+            $generatedAt === null => 'outlook_generated_missing',
+            $liveOwns && ($sameRoster || ! $this->freshness->isStale($pointer, CarbonImmutable::now('UTC'))) => 'live_export_owns_date',
+            $sameRoster => null,
+            $pointer->effective_generated_at !== null && ! $generatedAt->greaterThan($pointer->effective_generated_at) => 'older_than_effective',
+            default => null,
+        };
+
+        if ($reason !== null) {
+            $this->recorder->transition($import, RosterImport::STATE_SUPERSEDED, [
+                'outcome' => RosterImport::OUTCOME_SUPERSEDED,
+                'duplicate_of_import_id' => $active?->roster_import_id,
+                'error_code' => null,
+            ], $reason);
+
+            return;
+        }
+        if ($sameRoster) {
+            $this->confirm($import, $pointer, $active, $generatedAt);
+
+            return;
+        }
+
+        $existing = RosterSnapshot::query()->whereDate('duty_date', $report->dutyDate)->where('normalized_sha256', $hash)->first();
+        $this->repoint($import, $pointer, $existing ?? $this->storeSnapshot($import, $report), $generatedAt);
     }
 
     /** An old export arriving late is kept for the record. It never replaces newer data. */
@@ -196,6 +264,8 @@ final class RosterPublisher
         $held = RosterImport::query()
             ->where('state', RosterImport::STATE_NEEDS_REVIEW)
             ->whereDate('duty_date', $winner->duty_date->format('Y-m-d'))
+            // Each feed's held exports are its own: an outlook never settles trouble with the 5-minute export.
+            ->where(static fn ($source) => $winner->source === null ? $source->whereNull('source') : $source->where('source', $winner->source))
             ->where('source_generated_at', '<', $generatedAt)
             ->whereNull('published_at')
             ->whereKeyNot($winner->getKey())

@@ -65,7 +65,7 @@ const checklistFinding = (extra = {}) => ({
   last_observation: null,
   last_observed_at: null,
   service_status: null,
-  action_label: 'Awaiting verification',
+  action_label: 'New — not yet acknowledged',
   latest_member_update: { text: 'Ordered.', at: '2026-10-31T09:00:00Z' },
   ...extra,
 });
@@ -340,7 +340,7 @@ test('the open issues offered to a concern leave out the ones no longer open', (
 
 const refs = [
   { id: 41, item: "Driver's Gear", compartment: 'Driver L4', issue_type: 'missing', status: 'Replacement available', description: 'The gear bag was not in the compartment.' },
-  { id: 52, item: 'Rear step', compartment: 'Rear', issue_type: 'damaged', status: 'Awaiting verification', description: null },
+  { id: 52, item: 'Rear step', compartment: 'Rear', issue_type: 'damaged', status: 'New — not yet acknowledged', description: null },
 ];
 
 test('a description that shares most of its words with an open issue suggests that issue', () => {

@@ -9,6 +9,7 @@ use App\Models\EmployeeMessaging\EmployeeLogisticsMessage;
 use App\Models\EmployeeMessaging\EmployeeLogisticsThread;
 use App\Models\User;
 use App\Notifications\SupportServices\SupportServicesMessageNotification;
+use App\Services\AiAutomation\AiIntake;
 use App\Services\Notifications\NotificationDispatchService;
 use App\Services\Security\EmployeeLogisticsMessagingAccess;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -53,6 +54,9 @@ final class EmployeeLogisticsMessagingService
 
     private const PREVIEW_LENGTH = 140;
 
+    /** AI Response automation source type (SupportServicesAdapter::SOURCE_TYPE); literal so a save never depends on that class loading. */
+    private const AI_SOURCE_TYPE = 'employee_logistics_message';
+
     public function __construct(
         private readonly EmployeeLogisticsMessagingAccess $access,
     ) {}
@@ -80,7 +84,10 @@ final class EmployeeLogisticsMessagingService
                 $this->snapshotMember($thread, $member, $employee);
                 $thread->save();
 
-                return $this->append($thread, $member, EmployeeLogisticsMessage::SIDE_MEMBER, $this->memberName($member, $employee), $body, $clientRequestId);
+                $message = $this->append($thread, $member, EmployeeLogisticsMessage::SIDE_MEMBER, $this->memberName($member, $employee), $body, $clientRequestId);
+                AiIntake::record(self::AI_SOURCE_TYPE, (int) $message->getKey());
+
+                return $message;
             }, 3);
         } catch (UniqueConstraintViolationException $exception) {
             return $this->replayed($this->existing($member, $clientRequestId) ?? throw $exception, null, $body);
@@ -106,7 +113,10 @@ final class EmployeeLogisticsMessagingService
                     ->where('member_user_id', $member->getKey())->lockForUpdate()->firstOrFail();
                 $this->snapshotMember($thread, $member, $employee);
 
-                return $this->append($thread, $member, EmployeeLogisticsMessage::SIDE_MEMBER, $this->memberName($member, $employee), $body, $clientRequestId);
+                $message = $this->append($thread, $member, EmployeeLogisticsMessage::SIDE_MEMBER, $this->memberName($member, $employee), $body, $clientRequestId);
+                AiIntake::record(self::AI_SOURCE_TYPE, (int) $message->getKey());
+
+                return $message;
             }, 3);
         } catch (UniqueConstraintViolationException $exception) {
             return $this->replayed($this->existing($member, $clientRequestId) ?? throw $exception, $threadId, $body);
@@ -146,7 +156,7 @@ final class EmployeeLogisticsMessagingService
     public function markReadByMember(User $member, int $threadId, int $seenUpToMessageId): void
     {
         $thread = $this->memberThread($member, $threadId);
-        $upTo = $this->clampSeen($thread, $seenUpToMessageId);
+        $upTo = $this->clampSeen($thread, $seenUpToMessageId, includeAssistant: true);
         if ($upTo === null) {
             return;
         }
@@ -482,10 +492,17 @@ final class EmployeeLogisticsMessagingService
         return strtr(mb_substr($term, 0, 100), ['!' => '!!', '%' => '!%', '_' => '!_']);
     }
 
-    /** Never record "seen" beyond a message that exists in this thread. */
-    private function clampSeen(EmployeeLogisticsThread $thread, int $seenUpToMessageId): ?int
+    /**
+     * Never record "seen" beyond a message that exists in this thread. Only the member's own marker may reach the
+     * AI Response message; the Logistics marker keeps ignoring it (the assistant is not a team reply).
+     */
+    private function clampSeen(EmployeeLogisticsThread $thread, int $seenUpToMessageId, bool $includeAssistant = false): ?int
     {
-        $newest = max((int) $thread->last_member_message_id, (int) $thread->last_logistics_message_id);
+        $newest = max(
+            (int) $thread->last_member_message_id,
+            (int) $thread->last_logistics_message_id,
+            $includeAssistant ? (int) $thread->last_assistant_message_id : 0,
+        );
         $upTo = min($seenUpToMessageId, $newest);
 
         return $upTo > 0 ? $upTo : null;

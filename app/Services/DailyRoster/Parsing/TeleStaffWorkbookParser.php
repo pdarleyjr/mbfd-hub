@@ -49,12 +49,16 @@ final class TeleStaffWorkbookParser
         private readonly TeleStaffWorkbookPreflight $preflight = new TeleStaffWorkbookPreflight,
     ) {}
 
-    /** @throws TeleStaffWorkbookException */
-    public function parse(string $absolutePath, string $sourceSha256): TeleStaffRosterReport
+    /**
+     * @param  int  $maxDaysAhead  How far after its export time the duty date may fall. The 7-day outlook passes more.
+     *
+     * @throws TeleStaffWorkbookException
+     */
+    public function parse(string $absolutePath, string $sourceSha256, int $maxDaysAhead = self::MAX_DAYS_FROM_GENERATED): TeleStaffRosterReport
     {
         $package = $this->preflight->inspect($absolutePath);
         $dutyDate = $this->dutyDate($package['oddHeader']);
-        [$generatedAt, $warnings] = $this->generatedAt($package['oddFooter'], $dutyDate);
+        [$generatedAt, $warnings] = $this->generatedAt($package['oddFooter'], $dutyDate, $maxDaysAhead);
 
         $sheetName = (string) config('daily_roster.workbook.sheet');
         $blocks = $this->splitBlocks($this->readRows($absolutePath, $sheetName));
@@ -99,7 +103,7 @@ final class TeleStaffWorkbookParser
     }
 
     /** @return array{0: string, 1: list<string>} The UTC export time and any warnings */
-    private function generatedAt(?string $footer, string $dutyDate): array
+    private function generatedAt(?string $footer, string $dutyDate, int $maxDaysAhead): array
     {
         $pattern = '/&L\s*(\d{2})\/(\d{2})\/(\d{4}) ([01]\d|2[0-3]):([0-5]\d):([0-5]\d)\s*(?=&|$)/D';
         if ($footer === null || preg_match($pattern, $footer, $match) !== 1 || ! checkdate((int) $match[1], (int) $match[2], (int) $match[3])) {
@@ -109,9 +113,10 @@ final class TeleStaffWorkbookParser
         $wallClock = "{$match[3]}-{$match[1]}-{$match[2]} {$match[4]}:{$match[5]}:{$match[6]}";
         $local = CarbonImmutable::createFromFormat('!Y-m-d H:i:s', $wallClock, HubTimezone::NAME);
 
-        $days = abs(CarbonImmutable::createFromFormat('!Y-m-d', $dutyDate, 'UTC')
-            ->diffInDays(CarbonImmutable::createFromFormat('!Y-m-d', $local->format('Y-m-d'), 'UTC'), false));
-        if ($days > self::MAX_DAYS_FROM_GENERATED) {
+        // Positive when the duty date falls after the export day.
+        $days = (int) CarbonImmutable::createFromFormat('!Y-m-d', $local->format('Y-m-d'), 'UTC')
+            ->diffInDays(CarbonImmutable::createFromFormat('!Y-m-d', $dutyDate, 'UTC'), false);
+        if ($days > max(self::MAX_DAYS_FROM_GENERATED, $maxDaysAhead) || $days < -self::MAX_DAYS_FROM_GENERATED) {
             throw new TeleStaffWorkbookException('generated_far_from_date');
         }
 

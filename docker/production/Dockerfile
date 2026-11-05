@@ -275,4 +275,12 @@ RUN set -eux; \
     command -v pdfinfo; \
     pdfinfo -v
 
+# apt is build tooling only: the running Hub never installs packages, so the shipped image carries no apt front end
+# (removes CVE-2026-109518, an apt download weakness with no Ubuntu fix yet, and every future apt finding).
+RUN set -eux; \
+    dpkg --purge apt libapt-pkg6.0t64; \
+    rm -rf /etc/apt /var/lib/apt /var/cache/apt /var/log/apt; \
+    if command -v apt-get || command -v apt; then echo 'apt must not ship in the production image.' >&2; exit 1; fi; \
+    if dpkg-query -W -f='${Status}\n' apt libapt-pkg6.0t64 2>/dev/null | grep -q 'ok installed'; then exit 1; fi
+
 USER sail

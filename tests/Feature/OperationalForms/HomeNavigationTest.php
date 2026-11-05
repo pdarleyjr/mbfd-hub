@@ -104,11 +104,13 @@ class HomeNavigationTest extends TestCase
         $response->assertSeeInOrder([
             'Station / Vehicles / Equipment',
             'Employee Portal',
+            'Training Tools',
+            'Command Board Sandbox',
+            'Vehicle Placement Simulator',
+            'Pump Panel',
             'Additional Links',
             'Fleet operations',
             'Workgroup Dashboard',
-            'Pump Panel',
-            'Vehicle Placement Simulator',
             'Videos',
             'Media Control',
         ]);
@@ -124,6 +126,7 @@ class HomeNavigationTest extends TestCase
             url('/employee'),
             url('/admin/apparatuses'),
             url('/workgroups'),
+            route('training.command-board'),
             'https://pump-panel.pages.dev/',
             'https://firesim.mbfdhub.com',
             'https://videos.mbfdhub.com',
@@ -247,7 +250,7 @@ class HomeNavigationTest extends TestCase
         $response->assertDontSee('https://media.mbfdhub.com/api/auth/hub/start', false);
     }
 
-    public function test_additional_links_is_one_collapsed_native_disclosure_with_the_six_items_in_order(): void
+    public function test_additional_links_is_one_collapsed_native_disclosure_with_the_four_items_in_order(): void
     {
         $this->withoutVite();
         $user = $this->actingAsCanonicalFixture();
@@ -283,8 +286,6 @@ class HomeNavigationTest extends TestCase
         self::assertSame([
             ['Fleet operations', url('/admin/apparatuses'), '', ''],
             ['Workgroup Dashboard', url('/workgroups'), '', ''],
-            ['Pump Panel', 'https://pump-panel.pages.dev/', '_blank', 'noopener noreferrer'],
-            ['Vehicle Placement Simulator', 'https://firesim.mbfdhub.com', '_blank', 'noopener noreferrer'],
             ['Videos', 'https://videos.mbfdhub.com', '_blank', 'noopener noreferrer'],
             ['Media Control', 'https://media.mbfdhub.com/api/auth/hub/start', '_blank', 'noopener noreferrer'],
         ], $actual);
@@ -293,7 +294,7 @@ class HomeNavigationTest extends TestCase
         self::assertStringContainsString('(opens in a new tab)', $xpath->query('(.//a[@data-additional-link])[3]', $card)->item(0)->textContent);
         self::assertStringNotContainsString('(opens in a new tab)', $xpath->query('(.//a[@data-additional-link])[1]', $card)->item(0)->textContent);
 
-        // The six are not repeated as standalone cards.
+        // The four are not repeated as standalone cards, and the simulators now live only in Training Tools.
         $standalone = $xpath->query('//a[@data-quick-access-card]');
         self::assertSame(['Station / Vehicles / Equipment', 'Message Support Services', 'Employee Portal'], array_map(
             fn (\DOMNode $node): string => trim($xpath->query('.//*[contains(@class,"hub-tile__title")]', $node)->item(0)->textContent),
@@ -372,7 +373,7 @@ class HomeNavigationTest extends TestCase
         foreach ($xpath->query('//details[@data-additional-links]//a[@data-additional-link]') as $link) {
             $titles[] = trim($xpath->query('.//*[contains(@class,"hub-tile__title")]', $link)->item(0)->textContent);
         }
-        self::assertSame(['Pump Panel', 'Vehicle Placement Simulator', 'Videos'], $titles);
+        self::assertSame(['Videos'], $titles);
 
         $response->assertDontSee('Fleet operations');
         $response->assertDontSee('/admin/apparatuses', false);

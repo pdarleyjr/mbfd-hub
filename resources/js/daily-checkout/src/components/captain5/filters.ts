@@ -18,7 +18,7 @@ export const QUEUE_FILTERS: FilterDef[] = [
   { id: 'ordered', label: 'Ordered', count: 'ordered', test: (i) => i.action_status === 'action_pending' },
   { id: 'ready_for_pickup', label: 'Ready for pickup', count: 'ready_for_pickup', test: (i) => i.action_status === 'replacement_available' },
   { id: 'overdue', label: 'Overdue', count: 'overdue', test: (i) => i.overdue },
-  { id: 'awaiting_verification', label: 'Awaiting verification', count: 'awaiting_verification', test: (i) => i.awaiting_verification },
+  { id: 'awaiting_verification', label: 'Needs verification', count: 'awaiting_verification', test: (i) => i.awaiting_verification },
   { id: 'significant', label: 'Significant damage', count: 'significant', test: (i) => i.severity === 'significant' },
 ];
 

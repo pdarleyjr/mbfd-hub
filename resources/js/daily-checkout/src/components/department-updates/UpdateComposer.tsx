@@ -4,6 +4,7 @@ import { useOffline } from '../../hooks/useOffline';
 import { isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../../utils/api';
 import { DepartmentUpdateError, postDepartmentUpdate } from '../../utils/departmentUpdatesApi';
 import { newKey, todayYmd } from '../captain5/format';
+import MessageBody from '../command-communications/MessageBody';
 import {
   ATTACHMENT_ACCEPT, BODY_MAX, CATEGORY_OPTIONS, DEFAULT_CATEGORY, IMAGE_ACCEPT, MAX_EXPIRY_DAYS, TITLE_MAX,
   attachmentProblem, fileSizeText, imageProblem,
@@ -76,6 +77,7 @@ export default function UpdateComposer({ origin, onPosted }: Props) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [posted, setPosted] = useState<PostedUpdate | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   // The same key goes out again while a retry sends the same thing, so a lost answer never posts twice.
   const attempt = useRef<{ signature: string; key: string } | null>(null);
   const keyRef = useRef(newKey());
@@ -168,7 +170,7 @@ export default function UpdateComposer({ origin, onPosted }: Props) {
       )}
 
       <div>
-        <label className={LABEL} htmlFor={`${ids}-title`}>Title</label>
+        <label className={LABEL} htmlFor={`${ids}-title`}>Title <span className="font-normal text-hub-n-600">({draft.title.length}/{TITLE_MAX}; short and specific reads best)</span></label>
         <input
           id={`${ids}-title`} type="text" className={FIELD} value={draft.title} maxLength={TITLE_MAX} disabled={busy} autoComplete="off"
           aria-invalid={errors.title ? true : undefined} aria-describedby={errors.title ? `${ids}-title-error` : undefined}
@@ -184,7 +186,10 @@ export default function UpdateComposer({ origin, onPosted }: Props) {
           aria-invalid={errors.body ? true : undefined} aria-describedby={`${ids}-body-hint${errors.body ? ` ${ids}-body-error` : ''}`}
           onChange={(event) => change({ body: event.target.value })}
         />
-        <p id={`${ids}-body-hint`} className={`${HINT} mt-1`}>Plain text. Leave a blank line between paragraphs.</p>
+        <p id={`${ids}-body-hint`} className={`${HINT} mt-1 flex flex-wrap justify-between gap-x-3`}>
+          <span>Plain text. Leave a blank line between paragraphs. Lead with what people need to do and by when.</span>
+          <span data-testid="update-body-count" className={draft.body.length > BODY_MAX * 0.9 ? 'font-semibold text-hub-warning-strong' : ''}>{draft.body.length.toLocaleString('en-US')} / {BODY_MAX.toLocaleString('en-US')}</span>
+        </p>
         <FieldError id={`${ids}-body-error`} text={errors.body} />
       </div>
 
@@ -248,9 +253,28 @@ export default function UpdateComposer({ origin, onPosted }: Props) {
         </div>
       )}
 
-      <button type="submit" className={`${BTN} hub-btn--primary`} disabled={busy} aria-busy={busy}>
-        {busy ? 'Posting…' : failure ? 'Try posting again' : 'Post to Department Updates'}
-      </button>
+      <p className="hub-callout p-3 text-sm text-hub-ink" data-testid="update-audience">
+        <strong>Who sees this:</strong> everyone in the department, on the home page and in Department Updates
+        {draft.expiresOn ? `, until ${draft.expiresOn}` : ', until someone takes it down'}.
+      </p>
+
+      {previewing && (
+        <article className="hub-well space-y-2 border-l-4 border-l-hub-blue p-4" aria-label="Preview of your update" data-testid="update-preview">
+          <p className="text-[13px] font-semibold uppercase tracking-wide text-hub-n-600">Preview ({CATEGORY_OPTIONS.find((o) => o.value === draft.category)?.label})</p>
+          <h4 className="font-heading text-lg font-bold text-hub-ink [overflow-wrap:anywhere]">{draft.title.trim() || 'Untitled update'}</h4>
+          {draft.body.trim() ? <MessageBody text={draft.body} testId="update-preview-body" /> : <p className={HINT}>Nothing written yet.</p>}
+          {(image || attachment) && <p className={HINT}>{[image && `Picture: ${image.name}`, attachment && `File: ${attachment.name}`].filter(Boolean).join(' · ')}</p>}
+        </article>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={`${BTN} hub-btn--secondary`} disabled={busy} aria-pressed={previewing} onClick={() => setPreviewing((value) => !value)}>
+          {previewing ? 'Hide preview' : 'Preview'}
+        </button>
+        <button type="submit" className={`${BTN} hub-btn--primary`} disabled={busy} aria-busy={busy}>
+          {busy ? 'Posting…' : failure ? 'Try posting again' : 'Post to Department Updates'}
+        </button>
+      </div>
 
       {posted && (
         <div className="hub-callout flex items-start gap-2 p-3 text-sm" role="status" data-testid="department-update-success">

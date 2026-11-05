@@ -983,7 +983,7 @@ test('non-empty checklist permits a complete inspection and sends its submission
   await completeInspection(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
   expect(api.submissions).toHaveLength(1);
   expect(api.submissions[0]).toMatchObject({
     client_submission_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
@@ -1009,7 +1009,7 @@ test('an accepted inspection with meter exceptions has a plain member receipt wh
   await completeInspection(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
   await expect(page.locator('main')).not.toContainText('follow-up');
   await expect(page.locator('main')).not.toContainText('exception');
   await expect(page).not.toHaveURL(/review=/);
@@ -1047,7 +1047,7 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
   await expect(page.getByText('Physical vehicle', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
   expect(api.submissions).toHaveLength(1);
   expect(api.submissions[0]).not.toHaveProperty('physical_vehicle');
   expect(api.submissions[0]).not.toHaveProperty('vehicle_identification');
@@ -1100,7 +1100,7 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
   expect(api.submissions).toHaveLength(1);
   expect(pageErrors).toEqual([]);
 });
@@ -1139,7 +1139,7 @@ test('SCBA and radio numbers come filled in, one box each, and only a change or 
   await page.getByLabel('Additional SCBA').fill('2300');
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
 
   const submitted = api.submissions[0] as { field_values: Array<{ id: string; value: unknown }>; compartments: Array<{ items: Array<{ id: string; value?: unknown }> }>; extra_equipment_numbers: Array<Record<string, unknown>> };
   expect(submitted.field_values.find((field) => field.id === 'radio_de')?.value).toBe('1741');
@@ -1188,7 +1188,7 @@ test('notes and numbers are one tap away from the first screen, before anything 
   await expect(page.getByLabel('Radio # - DE')).toHaveValue('1999');
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
 
   const submitted = api.submissions[0] as { concerns: Array<{ kind: string; description: string }>; field_values: Array<{ id: string; value: unknown }> };
   expect(submitted.concerns.map((concern) => [concern.kind, concern.description])).toEqual([['note', 'Port rail scratched at the stern']]);
@@ -1231,7 +1231,7 @@ test('a draft saved before numbers carried over picks them up instead of clearin
   await expect(page.getByLabel('Additional radio')).toHaveValue('1800');
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
 
   const submitted = api.submissions[0] as { field_values: Array<{ id: string; value: unknown }>; equipment_numbers_seen: Array<{ slot: string; number: string }> };
   expect(submitted.field_values.find((field) => field.id === 'radio_de')?.value).toBe('1741');
@@ -1439,8 +1439,8 @@ test('a pending-review receipt confirms recording without exposing internal revi
   await completeInspection(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
-  await expect(page.getByText('Your daily checkout has been recorded.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
+  await expect(page.getByText('Inspection received and recorded.')).toBeVisible();
   await expect(page.locator('main')).not.toContainText('review');
   await expect(page).not.toHaveURL(/review=/);
 });
@@ -1748,7 +1748,7 @@ test('queued inspection reports pending review after reconnect without retaining
 
   await context.setOffline(false);
   await expect.poll(() => api.submissions.length).toBe(1);
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
   await expect(page.locator('main')).not.toContainText('review');
   await expect(page.locator('main')).not.toContainText('follow-up');
   await expect(page).not.toHaveURL(/review=/);
@@ -1794,7 +1794,7 @@ test('Retry now replays an ambiguous online failure with its durable client id w
 
   await page.getByRole('button', { name: 'Retry now' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
   await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
   expect(api.submissions.map((submission) => submission.client_submission_id)).toEqual([clientSubmissionId, clientSubmissionId]);
   expect(api.accepted()).toBe(1);
@@ -1838,7 +1838,7 @@ test('an expired session token (419) stays pending and is sent after the member 
   const contextRequestsBeforeRetry = api.contextRequests();
   await page.getByRole('button', { name: 'Retry now' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
   expect(api.contextRequests()).toBeGreaterThan(contextRequestsBeforeRetry);
   expect(api.accepted()).toBe(1);
   expect(new Set(api.submissions.map((submission) => submission.client_submission_id)).size).toBe(1);
@@ -1932,7 +1932,7 @@ test('on a shared device another member’s unsent checkout for the truck never 
 
   await completeInspection(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
 
   // Only this member's checkout was sent; the other member's record is exactly as it was.
   expect(api.submissions).toHaveLength(1);
@@ -1997,7 +1997,7 @@ test('the receipt returns the member to the station they came from', async ({ pa
   await completeInspection(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
   const back = page.getByRole('link', { name: 'Back to station' });
   await expect(back).toHaveAttribute('href', '/daily/stations/1');
   expect((await back.boundingBox())?.height).toBeGreaterThanOrEqual(44);
@@ -2029,7 +2029,7 @@ test('queued receipt never claims the inspection was sent until the replay is ac
 
   await context.setOffline(false);
   await expect.poll(() => api.accepted()).toBe(1);
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible();
   await expect(page.locator('main')).not.toContainText('not been sent');
 });
 
@@ -2108,7 +2108,7 @@ test('a background replay that sends the blocking record shows its receipt inste
 
   // The receipt appears as soon as the blocking record is accepted, before
   // the pass finishes; the form is never reset for a second submission.
-  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 2_500 });
+  await expect(page.getByRole('heading', { name: 'Inspection received' })).toBeVisible({ timeout: 2_500 });
   expect(api.accepted()).toBe(1);
   expect(api.submissions.map((submission) => submission.client_submission_id)).toEqual([
     queued.data.client_submission_id,

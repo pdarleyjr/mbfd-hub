@@ -84,6 +84,7 @@ class StationSupplyRequestsRelationManager extends RelationManager implements Ex
                     Infolists\Components\TextEntry::make('created_by_name')->label('Requested by'),
                     Infolists\Components\TextEntry::make('status')->badge(),
                     Infolists\Components\TextEntry::make('public_response')->label('Member response'),
+                    Infolists\Components\TextEntry::make('ai_receipt_text')->label('Support Services (automated)')->helperText('Automatic receipt only. Not a staff reply or approval.')->placeholder('—'),
                     Infolists\Components\TextEntry::make('admin_notes')->label('Internal notes'),
                     Infolists\Components\TextEntry::make('history')->label('History')
                         ->state(fn (StationSupplyRequest $record): string => StationInventoryAudit::query()

@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { CommandPost } from '../../resources/js/daily-checkout/src/components/command-communications/types';
+import { BOARD_BASE, handleBoardRoute, newBoardServer } from './support/command300-board';
 import { SHIFT_BASE, handleShiftRoute, newShiftServer, type ShiftServer } from './support/command300-shift';
 
 /**
@@ -55,15 +56,6 @@ const stations = [1, 2].map((number) => ({
   station_number: number, is_active: true, created_at: '2026-08-31T00:00:00.000000Z', updated_at: '2026-08-31T00:00:00.000000Z',
 }));
 
-const overview = {
-  generated_at: new Date().toISOString(),
-  total: stations.length,
-  stations: stations.map((station) => ({
-    ...station, apparatus_count: 0, open_defects: 0, open_service_tickets: 0, last_checkout_at: null,
-    daily_checkout: { required_total: 0, completed: 0, not_checked: 0, review_pending: 0, out_of_service: 0, completion_percent: null },
-    apparatuses: [],
-  })),
-};
 
 const pinnedOf = (server: ServerState) => server.posts.filter((post) => post.pinned);
 
@@ -95,6 +87,8 @@ async function handleCreate(route: Route, server: ServerState): Promise<void> {
 }
 
 async function mockApi(page: Page, server: ServerState): Promise<void> {
+  // The station board (all 3 fixture stations) answers with the status the test chose.
+  const board = newBoardServer({ status: server.overviewStatus });
   await page.route('**/images/**', (route) => route.fulfill({ status: 204 }));
   await page.route('**/favicon*', (route) => route.fulfill({ status: 204 }));
   await page.route('**/api/**', async (route) => {
@@ -116,11 +110,7 @@ async function mockApi(page: Page, server: ServerState): Promise<void> {
       });
     }
     if (pathname === '/api/public/stations') return route.fulfill({ json: { stations } });
-    if (pathname === '/api/public/command/overview') {
-      return server.overviewStatus === 200
-        ? route.fulfill({ json: overview })
-        : route.fulfill({ status: server.overviewStatus, json: { message: server.overviewStatus === 403 ? 'Forbidden' : 'Service unavailable' } });
-    }
+    if (pathname.startsWith(BOARD_BASE)) return void await handleBoardRoute(route, pathname, board);
     if (pathname.startsWith(`${BASE}/files/`)) return route.fulfill({ body: PNG_1X1, contentType: 'image/png' });
     if (pathname === `${BASE}/posts` && method === 'GET') {
       if (server.postsStatus !== 200) return route.fulfill({ status: server.postsStatus, json: { message: 'Forbidden' } });
@@ -158,34 +148,33 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client);
 }
 
-test('Communications is the first and default tab; unknown stations fall back to it and station links still work', async ({ page }) => {
+test('Communications is the default messages tab; the station board sits above it and a station link opens the read-only detail', async ({ page }) => {
   const server = newServer({ posts: [makePost('a')] });
   await open(page, server);
-  const tabs = page.getByRole('tablist', { name: 'Communications and stations' });
-  await expect(tabs.getByRole('tab')).toHaveCount(4);
+  const tabs = page.getByRole('tablist', { name: 'Communications and Department Updates' });
+  await expect(tabs.getByRole('tab')).toHaveCount(2);
   await expect(tabs.getByRole('tab').first()).toHaveText('Communications');
   await expect(tabs.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('command-post')).toHaveCount(1);
+  await expect(page.getByTestId('command-station-card')).toHaveCount(3);
 
-  await tabs.getByRole('tab', { name: 'Station 2', exact: true }).click();
+  await page.getByTestId('command-station-card').nth(1).click();
   await expect(page).toHaveURL(/station=42$/);
-  await expect(page.getByTestId('command-station')).toHaveCount(1);
-  await tabs.getByRole('tab', { name: 'Communications' }).click();
-  await expect(page).not.toHaveURL(/station=/);
+  await expect(page.getByTestId('command-station-sheet')).toBeVisible();
 
   await page.goto('/daily/command-300?station=999');
   await expect(page.getByTestId('command-comms')).toBeVisible();
+  await expect(page.getByTestId('command-station-sheet')).toHaveCount(0);
   await page.goto('/daily/command-300?station=41');
-  await expect(page.getByRole('heading', { name: 'Station 1', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Open Station 1', exact: true })).toHaveAttribute('href', /return_to=%2Fdaily%2Fcommand-300%3Fstation%3D41$/);
+  await expect(page.getByTestId('command-station-sheet').getByRole('heading', { name: 'Station 1', exact: true })).toBeVisible();
 });
 
-test('Communications stays usable with no stations and when the overview fails', async ({ page }) => {
+test('Communications stays usable when the station board fails', async ({ page }) => {
   const server = newServer({ overviewStatus: 503 });
   await open(page, server);
   await expect(page.getByTestId('command-comms')).toBeVisible();
   await expect(page.getByRole('tab')).toHaveCount(2);
-  await expect(page.getByRole('alert').filter({ hasText: 'Station overview unavailable' })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'The station board is unavailable' })).toBeVisible();
   await expect(page.getByText('No messages yet')).toBeVisible();
 });
 
@@ -562,11 +551,11 @@ test('Messages says who can read it and points to Department Updates', async ({ 
   await expectNoHorizontalOverflow(page);
 });
 
-test('Department Updates is its own tab: the link in Messages opens it, stations still work, and the URL is shareable', async ({ page }) => {
+test('Department Updates is its own tab: the link in Messages opens it, the board stays above it, and the URL is shareable', async ({ page }) => {
   const server = newServer();
   await openWithUpdates(page, server, newUpdates(), '/daily/command-300');
-  const tabs = page.getByRole('tablist', { name: 'Communications and stations' });
-  await expect(tabs.getByRole('tab')).toHaveText([/Communications/, 'Department Updates', 'Station 1', 'Station 2']);
+  const tabs = page.getByRole('tablist', { name: 'Communications and Department Updates' });
+  await expect(tabs.getByRole('tab')).toHaveText([/Communications/, 'Department Updates']);
   await page.getByTestId('command-comms-about').getByRole('button', { name: 'Post to Department Updates' }).click();
   await expect(page).toHaveURL(/tab=updates$/);
   await expect(tabs.getByRole('tab', { name: 'Department Updates' })).toHaveAttribute('aria-selected', 'true');
@@ -575,9 +564,9 @@ test('Department Updates is its own tab: the link in Messages opens it, stations
   await expect(page.getByTestId('command-comms')).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
-  await tabs.getByRole('tab', { name: 'Station 2', exact: true }).click();
-  await expect(page).toHaveURL(/station=42$/);
-  await expect(page).not.toHaveURL(/tab=updates/);
+  await page.getByTestId('command-station-card').nth(1).click();
+  await expect(page).toHaveURL(/station=42/);
+  await expect(page.getByTestId('command-station-sheet')).toBeVisible();
   await page.goto('/daily/command-300?tab=updates');
   await expect(page.getByTestId('department-updates')).toBeVisible();
   await page.getByTestId('department-updates').getByRole('button', { name: 'Go to Messages' }).click();

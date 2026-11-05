@@ -63,7 +63,20 @@ final class MedicalScopeMappingTest extends TestCase
         self::assertSame(MedicalScope::UNCLASSIFIED, $scope->classify('engine', 'comp_b4-water-cooler-cups'));
         self::assertSame(MedicalScope::UNCLASSIFIED, $scope->classify('engine2', 'inv-c42'), 'Inventory additions wait for a decision');
         self::assertSame(MedicalScope::UNCLASSIFIED, $scope->classify('engine', null));
-        self::assertSame(MedicalScope::UNCLASSIFIED, $scope->classify('rescue', 'front_cab-item-1'), 'Rescue is not a medical-only template');
+        // A Rescue is classified item by item like everything else: its tools and SCBA are Logistics'.
+        self::assertSame(MedicalScope::NOT_MEDICAL, $scope->classify('rescue', 'front_cab-item-1'));        // Lights
+        self::assertSame(MedicalScope::NOT_MEDICAL, $scope->classify('rescue', 'compartment_c-item-3'));    // Bolt Cutters
+        self::assertSame(MedicalScope::NOT_MEDICAL, $scope->classify('rescue', 'compartment_b-item-6'));    // DeWalt K-Saw with spare battery
+        self::assertSame(MedicalScope::NOT_MEDICAL, $scope->classify('rescue', 'compartment_d-item-4'));    // SCBAs
+        self::assertSame(MedicalScope::NOT_MEDICAL, $scope->classify('rescue', 'compartment_b-item-8'));    // 600' Poly Rescue Rope
+        self::assertSame(MedicalScope::MEDICAL, $scope->classify('rescue', 'patient_compartment-item-5'));  // LifePak 15
+        self::assertSame(MedicalScope::MEDICAL, $scope->classify('rescue', 'stretcher-item-2'));            // Stretcher Charging
+        self::assertSame(MedicalScope::MEDICAL, $scope->classify('rescue', 'compartment_b-item-12'));       // the stretcher's spare battery
+        self::assertSame(MedicalScope::MEDICAL, $scope->classify('rescue', 'stretcher-item-1'));            // restraint
+        self::assertSame(MedicalScope::UNCLASSIFIED, $scope->classify('rescue', 'compartment_d-item-11'), 'Ambiguous: an administrator decides');
+        self::assertSame(MedicalScope::MEDICAL, $scope->classify('fireboat6', 'fb6-medical-lifepak-15'));
+        self::assertSame(MedicalScope::NOT_MEDICAL, $scope->classify('fireboat6', 'fb6-seats-starboard-scba-bottles'));
+        self::assertSame(MedicalScope::UNCLASSIFIED, $scope->classify('default', 'safe-2'), 'Staff vehicles have no medical template');
         // Same item id means different equipment in another template: lookups are per template.
         self::assertSame(MedicalScope::NOT_MEDICAL, $scope->classify('ladder3', 'comp_4-item-1'));      // Res-Q Jacks
     }

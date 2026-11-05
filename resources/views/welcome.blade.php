@@ -27,6 +27,8 @@
         // so the shell navigation hands them the inspection as their own entry.
         $takeHomeFallback = collect($hubNavigation['moreNavigation'])->firstWhere('key', 'take-home-inspection');
         $showDailyRoster = app(\App\Services\Security\DailyRosterAccess::class)->canSeeHomeEntry($currentUser);
+        // Unit Status shows on-duty names, so it follows the Daily Roster's own access rule (and its feature flag).
+        $showUnitStatus = (bool) config('unit_status.enabled') && app(\App\Services\Security\DailyRosterAccess::class)->canView($currentUser);
         $quickAccessItems = [
             [
                 'title' => 'Station / Vehicles / Equipment',
@@ -70,6 +72,34 @@
         // Rescue Forms shortcuts and the Command Board button: each is offered only to members the destination admits.
         $rescueForms = \App\Support\Home\HomeQuickActions::rescueForms($currentUser);
         $commandBoardUrl = \App\Support\Home\HomeQuickActions::commandBoardUrl($currentUser);
+        // Training Tools: one expandable card for every signed-in member (no extra permission). The Command Board
+        // Sandbox is a Hub page and opens in this window; the two simulators are separate sites and keep opening in a new tab.
+        $trainingTools = [
+            [
+                'key' => 'command-board-sandbox',
+                'title' => 'Command Board Sandbox',
+                'description' => 'Practice with the Command Board. Nothing here is saved or shared.',
+                'href' => route('training.command-board'),
+                'icon' => 'M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z',
+                'external' => false,
+            ],
+            [
+                'key' => 'vehicle-placement-simulator',
+                'title' => 'Vehicle Placement Simulator',
+                'description' => 'Training simulator',
+                'href' => 'https://firesim.mbfdhub.com',
+                'icon' => 'M8 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3 5h11v10H3zM14 9h4l3 3v3h-7',
+                'external' => true,
+            ],
+            [
+                'key' => 'pump-panel',
+                'title' => 'Pump Panel',
+                'description' => 'Training simulator',
+                'href' => 'https://pump-panel.pages.dev/',
+                'icon' => 'M13 10V3L4 14h7v7l9-11h-7Z',
+                'external' => true,
+            ],
+        ];
         // One expandable card holds the less-used destinations. Each keeps its own visibility rule.
         $additionalLinks = collect([
             [
@@ -89,24 +119,6 @@
                 'external' => false,
                 'visible' => $showWorkgroups,
                 'domain' => 'programs',
-            ],
-            [
-                'title' => 'Pump Panel',
-                'description' => 'Training simulator',
-                'href' => 'https://pump-panel.pages.dev/',
-                'icon' => 'M13 10V3L4 14h7v7l9-11h-7Z',
-                'external' => true,
-                'visible' => true,
-                'domain' => 'training',
-            ],
-            [
-                'title' => 'Vehicle Placement Simulator',
-                'description' => 'Training simulator',
-                'href' => 'https://firesim.mbfdhub.com',
-                'icon' => 'M8 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3 5h11v10H3zM14 9h4l3 3v3h-7',
-                'external' => true,
-                'visible' => true,
-                'domain' => 'training',
             ],
             [
                 'title' => 'Videos',
@@ -135,7 +147,7 @@
     <main id="main-content" class="hub-page">
         <section class="home-today" aria-labelledby="home-greeting">
             <x-hub.home-duty :lines="$dutyLines" />
-            @if($showEmployeePortal || $showDailyRoster || $commandBoardUrl !== null)
+            @if($showEmployeePortal || $showDailyRoster || $showUnitStatus || $commandBoardUrl !== null)
                 <div class="hub-page-header__actions">
                     @if($showEmployeePortal)
                     <a href="{{ url('/daily/vehicle-inspections') }}" data-important-target class="hub-btn hub-btn--primary hub-btn--field">
@@ -144,14 +156,20 @@
                     </a>
                     @endif
                     @if($showDailyRoster)
-                        <a href="{{ route('daily-roster.show') }}" data-important-target data-home-daily-roster class="hub-btn hub-btn--secondary hub-btn--field">
+                        <a href="{{ route('daily-roster.show') }}" data-important-target data-home-daily-roster class="hub-btn hub-btn--brand hub-btn--field">
                             <x-heroicon-o-calendar-days class="hub-btn__icon" aria-hidden="true" />
                             Daily Roster
                         </a>
                     @endif
+                    @if($showUnitStatus)
+                        <a href="{{ route('unit-status.show') }}" data-important-target data-home-unit-status class="hub-btn hub-btn--brand hub-btn--field">
+                            <x-heroicon-o-signal class="hub-btn__icon" aria-hidden="true" />
+                            Unit Status
+                        </a>
+                    @endif
                     {{-- Only for members Command300Access admits. The board's own Hub sign-in checks the same rule again. --}}
                     @if($commandBoardUrl !== null)
-                        <a href="{{ $commandBoardUrl }}" target="_blank" rel="noopener noreferrer" data-important-target data-home-command-board class="hub-btn hub-btn--secondary hub-btn--field">
+                        <a href="{{ $commandBoardUrl }}" target="_blank" rel="noopener noreferrer" data-important-target data-home-command-board class="hub-btn hub-btn--brand hub-btn--field">
                             <x-heroicon-o-squares-2x2 class="hub-btn__icon" aria-hidden="true" />
                             Command Board<span class="hub-visually-hidden"> (opens in a new tab)</span>
                         </a>
@@ -274,13 +292,50 @@
                             </details>
                         @endif
 
+                        {{-- Training Tools: the same native disclosure as Additional Links (summary/details carries keyboard and screen reader behavior). /#training-tools (the Command Board Sandbox's way back) opens it: resources/js/home-duty.js. --}}
+                        <details data-training-tools class="hub-tile hub-tile--training hub-additional bg-hub-surface" id="training-tools">
+                            <summary class="hub-additional__summary">
+                                <svg class="hub-tile__glyph" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"></path></svg>
+                                <span class="hub-tile__body">
+                                    <span class="hub-tile__title">Training Tools</span>
+                                    <span class="hub-tile__description">Command Board sandbox and training simulators</span>
+                                </span>
+                                <svg class="hub-tile__affordance hub-additional__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                            </summary>
+                            <ul class="hub-additional__list" aria-label="Training Tools">
+                                @foreach($trainingTools as $tool)
+                                    <li>
+                                        <a
+                                            href="{{ $tool['href'] }}"
+                                            @if($tool['external']) target="_blank" rel="noopener noreferrer" @endif
+                                            data-training-tool-link="{{ $tool['key'] }}"
+                                            data-important-target
+                                            class="hub-additional__link hub-tile--training"
+                                        >
+                                            <svg class="hub-tile__glyph" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $tool['icon'] }}"></path></svg>
+                                            <span class="hub-tile__body">
+                                                <span class="hub-tile__title">{{ $tool['title'] }}</span>
+                                                <span class="hub-tile__description">{{ $tool['description'] }}</span>
+                                            </span>
+                                            @if($tool['external'])
+                                                <svg class="hub-tile__affordance text-hub-blue" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+                                                <span class="hub-visually-hidden">(opens in a new tab)</span>
+                                            @else
+                                                <svg class="hub-tile__affordance" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                                            @endif
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </details>
+
                         @if($additionalLinks->isNotEmpty())
                             <details data-quick-access-card data-additional-links class="hub-tile hub-tile--programs hub-additional bg-hub-surface">
                                 <summary class="hub-additional__summary">
                                     <svg class="hub-tile__glyph" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"></path></svg>
                                     <span class="hub-tile__body">
                                         <span class="hub-tile__title">Additional Links</span>
-                                        <span class="hub-tile__description">Fleet, workgroups, training, and media tools</span>
+                                        <span class="hub-tile__description">Fleet, workgroups, videos, and media tools</span>
                                     </span>
                                     <svg class="hub-tile__affordance hub-additional__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
                                 </summary>

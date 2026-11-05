@@ -2,34 +2,46 @@
 
 namespace App\Observers;
 
+use App\Models\AdminAlertEvent;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectRecommendation;
-use App\Models\AdminAlertEvent;
+use App\Services\Defects\DefectOwnership;
 use App\Services\EquipmentMatchingService;
 use Illuminate\Support\Facades\Log;
 
 class ApparatusDefectObserver
 {
     protected EquipmentMatchingService $matchingService;
-    
+
     public function __construct(EquipmentMatchingService $matchingService)
     {
         $this->matchingService = $matchingService;
     }
-    
+
     /**
      * Handle the ApparatusDefect "created" event
      */
     public function created(ApparatusDefect $defect): void
     {
+        // One responsible queue from the first moment (docs/unified-activity-and-ownership.md). A failure here leaves
+        // the owner unprojected; every reader then falls back to the same rule, so nothing is lost.
+        try {
+            app(DefectOwnership::class)->project($defect, 'created');
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+        if ($defect->getAttribute('responsible_owner') === ApparatusDefect::OWNER_CAPTAIN5) {
+            return; // Captain 5 works it and is told by Captain5Notifier; Logistics gets no alert or replacement suggestion
+        }
+
         try {
             // Create admin alert for new defect
             $this->createDefectAlert($defect);
-            
+
             // Generate equipment recommendations for missing or damaged findings.
             if (in_array($defect->issue_type, ['missing', 'damaged'], true)) {
                 $recommendation = $this->matchingService->generateRecommendationForDefect($defect);
-                
+
                 if ($recommendation && $recommendation->equipment_item_id) {
                     $this->createRecommendationAlert($recommendation);
                 }
@@ -43,14 +55,35 @@ class ApparatusDefectObserver
             ]);
         }
     }
-    
+
+    /**
+     * A staff or member flag (severity, operational impact) changed: refresh the Low/Medium/High triage level the
+     * flag feeds into. Staff overrides are kept; nothing is sent; a problem here never fails the save.
+     */
+    public function updated(ApparatusDefect $defect): void
+    {
+        if (! $defect->wasChanged(['severity', 'operational_impact'])) {
+            return;
+        }
+        $this->refreshTriage($defect);
+    }
+
+    private function refreshTriage(ApparatusDefect $defect): void
+    {
+        try {
+            \Illuminate\Support\Facades\DB::transaction(static fn () => app(\App\Services\SupportTriage\TriageProjector::class)->refreshDefect($defect));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
     /**
      * Create alert for new defect
      */
     protected function createDefectAlert(ApparatusDefect $defect): void
     {
         $severity = $defect->issue_type === 'missing' ? 'warning' : 'info';
-        
+
         AdminAlertEvent::create([
             'type' => 'defect_created',
             'severity' => $severity,
@@ -59,7 +92,7 @@ class ApparatusDefectObserver
             'related_id' => $defect->id,
         ]);
     }
-    
+
     /**
      * Create alert for new recommendation
      */

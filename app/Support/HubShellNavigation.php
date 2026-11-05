@@ -78,6 +78,14 @@ final class HubShellNavigation
                 'href' => route('daily-roster.show', absolute: false),
             ];
         }
+        // Unit Status shows roster names, so it follows the Daily Roster's access and its own switch.
+        if (config('unit_status.enabled') && app(DailyRosterAccess::class)->canView($user)) {
+            $navigation['moreNavigation'][] = [
+                'key' => 'unit-status',
+                'label' => 'Unit Status',
+                'href' => route('unit-status.show', absolute: false),
+            ];
+        }
         // Members with an employee profile reach the inspection through Employee > Forms.
         // Accounts without a profile cannot open that panel, so they keep a direct entry here.
         if (! $canAccessEmployeePanel) {

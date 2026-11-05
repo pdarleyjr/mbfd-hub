@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Captain5;
 
 use App\Models\Apparatus;
+use App\Models\ApparatusDefect;
 use App\Models\Captain5\Captain5ItemClassification;
 use App\Services\DailyCheckoutChecklistResolver;
+use App\Services\Defects\DefectOwnership;
 use App\Services\InspectionPaperFields;
 use Carbon\CarbonImmutable;
 
@@ -133,7 +135,13 @@ final class MedicalScopeReview
     {
         $counts = [];
         $unmatched = 0;
-        foreach ($this->scope->candidateQuery()->where('resolved', false)->get() as $defect) {
+        // Unclassified items are Logistics' until decided (DefectOwnership), so they are found by their stored basis,
+        // plus rows not projected yet; never through Captain 5's own queue.
+        $open = ApparatusDefect::query()->where('resolved', false)
+            ->where(fn ($basis) => $basis->whereNull('owner_basis')->orWhere('owner_basis', DefectOwnership::BASIS_UNCLASSIFIED))
+            ->orderByDesc('id')->limit(2000) // bounded: unprojected rows exist only briefly (defects:project-ownership --pending)
+            ->get();
+        foreach ($open as $defect) {
             $result = $this->scope->classify($defect);
             if (! in_array($result->checklistType, MedicalScope::MEDICAL_ONLY_TYPES, true) || $result->classification !== MedicalScope::UNCLASSIFIED) {
                 continue;

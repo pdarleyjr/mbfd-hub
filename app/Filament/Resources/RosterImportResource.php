@@ -8,6 +8,7 @@ use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\RosterImportResource\Pages;
 use App\Models\DailyRoster\RosterImport;
 use App\Services\DailyRoster\RosterImportActions;
+use App\Services\DailyRoster\RosterOutlook;
 use Filament\Forms;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -45,7 +46,8 @@ final class RosterImportResource extends Resource
         return self::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('received_at')->label('Received')->dateTime('M j, Y g:i A', 'America/New_York')->sortable(),
-                Tables\Columns\TextColumn::make('duty_date')->label('Duty date')->date('M j, Y')->placeholder('Not read')->sortable(),
+                Tables\Columns\TextColumn::make('duty_date')->label('Duty date')->date('M j, Y')->placeholder('Not read')->sortable()
+                    ->description(static fn (RosterImport $import): ?string => $import->source === RosterOutlook::SOURCE ? '7-day outlook' : null),
                 Tables\Columns\TextColumn::make('shift_letter')->label('Shift')->placeholder('Not read'),
                 Tables\Columns\TextColumn::make('state')->label('Status')->badge()
                     ->formatStateUsing(static fn (string $state): string => self::stateLabel($state))

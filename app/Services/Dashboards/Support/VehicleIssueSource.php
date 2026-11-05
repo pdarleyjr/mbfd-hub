@@ -68,6 +68,15 @@ abstract class VehicleIssueSource implements IssueSource
     /** @return Builder<TModel> */
     abstract protected function newQuery(): Builder;
 
+    /**
+     * SQL (a boolean expression) that is true for a record resolved inside the operational day, for a source whose board
+     * also keeps older resolved records on display. Null: every record in the 'resolved' stage was resolved today.
+     */
+    protected function resolvedTodaySql(OperationalDisplayWindow $window): ?string
+    {
+        return null;
+    }
+
     /** Open records, plus records closed inside the window. @param Builder<TModel> $query */
     abstract protected function scopeToBoard(Builder $query, OperationalDisplayWindow $window): void;
 
@@ -142,13 +151,15 @@ abstract class VehicleIssueSource implements IssueSource
             return $counts;
         }
 
+        $todaySql = $this->resolvedTodaySql($query->window);
         $inner = $builder->toBase()->selectRaw(implode(', ', [
             $builder->getModel()->qualifyColumn($this->apparatusColumn()).' AS apparatus_id',
             '('.$this->severitySql().') AS dashboard_severity',
             '('.$this->stageSql().') AS dashboard_stage',
+            '(CASE WHEN '.($todaySql ?? '1 = 1').' THEN 1 ELSE 0 END) AS dashboard_today',
             ...$this->sourceTagColumns(),
         ]));
-        $groupColumns = ['apparatus_id', 'dashboard_severity', 'dashboard_stage', ...array_map(static fn (string $tag): string => 'dashboard_tag_'.$tag, array_keys($this->sourceTagSql()))];
+        $groupColumns = ['apparatus_id', 'dashboard_severity', 'dashboard_stage', 'dashboard_today', ...array_map(static fn (string $tag): string => 'dashboard_tag_'.$tag, array_keys($this->sourceTagSql()))];
         $groups = DB::query()->fromSub($inner, 'board')
             ->select($groupColumns)
             ->selectRaw('COUNT(*) AS aggregate')
@@ -163,7 +174,7 @@ abstract class VehicleIssueSource implements IssueSource
             $counts['awaiting_response'] += $group->dashboard_stage === 'awaiting_response' ? $n : 0;
             $counts['in_progress'] += $group->dashboard_stage === 'in_progress' ? $n : 0;
             $counts['high'] += $open && $group->dashboard_severity === 'high' ? $n : 0;
-            $counts['resolved_today'] += $group->dashboard_stage === 'resolved' ? $n : 0;
+            $counts['resolved_today'] += $group->dashboard_stage === 'resolved' && (int) $group->dashboard_today === 1 ? $n : 0;
             if (! $open) {
                 continue;
             }

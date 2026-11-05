@@ -11,10 +11,12 @@ use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Services\Defects\DefectCorrectiveActionService;
+use App\Services\Defects\DefectMemberCorrection;
 use App\Services\Inspections\IssueMessageService;
 use App\Services\Security\Captain5AccessDecision;
 use App\Support\Captain5\EventActorLabel;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\DefectResolutionLine;
 use App\Support\Fleet\DefectStatusAttribution;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -42,8 +44,9 @@ final class Captain5IssuePresenter
         }
         $ids = $defects->pluck('id')->all();
         $latestObservation = ApparatusDefectObservation::query()->whereIn('apparatus_defect_id', $ids)
-            ->orderBy('id')->get(['apparatus_defect_id', 'observation', 'created_at'])
+            ->orderBy('id')->get(['apparatus_defect_id', 'apparatus_inspection_id', 'actor_user_id', 'observation', 'created_at'])
             ->keyBy('apparatus_defect_id');
+        $resolutions = DefectResolutionLine::forDefects($defects);
         $lastEvent = ApparatusDefectEvent::query()->changingTheIssue()->whereIn('apparatus_defect_id', $ids)
             ->selectRaw('apparatus_defect_id, max(id) as last_id')->groupBy('apparatus_defect_id')
             ->pluck('last_id', 'apparatus_defect_id');
@@ -53,11 +56,12 @@ final class Captain5IssuePresenter
             $defect,
             $latestObservation->get($defect->getKey()),
             (int) ($lastEvent[$defect->getKey()] ?? 0),
+            $resolutions[(int) $defect->getKey()] ?? null,
         ) + ['action_by' => $attribution[(int) $defect->getKey()]['actor'] ?? null])->values()->all();
     }
 
     /** @return array<string, mixed> */
-    public function summary(ApparatusDefect $defect, ?ApparatusDefectObservation $latest = null, ?int $lastEventId = null): array
+    public function summary(ApparatusDefect $defect, ?ApparatusDefectObservation $latest = null, ?int $lastEventId = null, ?array $resolution = null): array
     {
         $scope = $this->scope->classify($defect);
         $apparatus = $defect->getRelationValue('apparatus');
@@ -67,6 +71,8 @@ final class Captain5IssuePresenter
         $open = ! DefectActionStatus::isClosed($defect->action_status);
         $lastEventId ??= (int) ApparatusDefectEvent::query()->changingTheIssue()->where('apparatus_defect_id', $defect->getKey())->max('id');
         $reporter = $defect->getRelationValue('firstReporter');
+        $awaiting = DefectMemberCorrection::awaitingVerification($defect, $latest);
+        $resolution ??= $open ? null : (DefectResolutionLine::forDefects([$defect])[(int) $defect->getKey()] ?? null);
 
         return [
             'id' => (int) $defect->getKey(),
@@ -83,7 +89,12 @@ final class Captain5IssuePresenter
             'details' => array_intersect_key($details, array_flip(Captain5ActorContext::DETAIL_KEYS)),
             'expected_delivery' => $expected,
             'overdue' => $open && $expected !== null && $expected < $today,
-            'awaiting_verification' => $open && $latest?->observation === 'appears_corrected',
+            'awaiting_verification' => $awaiting,
+            // Who said it is fixed or present, how, and when; "safety_critical" ones are never closed by a checkout alone.
+            'verification' => $awaiting ? $this->verification($defect, $latest) : null,
+            // How a closed issue ended: one sentence ("Resolved by Pat Lee during Rescue 5 checkout · Nov 5, 7:42 AM").
+            'resolution' => $resolution,
+            'resolution_cleared_at' => $this->iso($defect->resolution_cleared_at),
             'first_reported_at' => $this->iso($defect->first_reported_at ?? $defect->created_at),
             'first_reported_by' => $reporter instanceof User ? $this->name($reporter) : null,
             'last_observed_at' => $this->iso($defect->last_observed_at),
@@ -95,6 +106,22 @@ final class Captain5IssuePresenter
             'state_token' => ($defect->action_status ?: DefectActionStatus::REPORTED).':'.$lastEventId,
             'captain5_cleared_at' => $this->iso($defect->captain5_cleared_at),
             'captain5_cleared_by' => $this->clearedBy($defect),
+        ];
+    }
+
+    /** @return array{by: ?string, at: ?string, via: string, safety_critical: bool} */
+    private function verification(ApparatusDefect $defect, ?ApparatusDefectObservation $latest): array
+    {
+        $reported = $defect->correction_reported_at;
+        $viaReport = $reported !== null && ($latest === null || $reported->greaterThanOrEqualTo($latest->created_at));
+        $userId = $viaReport ? $defect->correction_reported_by_user_id : $latest?->actor_user_id;
+        $user = $userId !== null ? User::query()->find($userId, ['id', 'name', 'display_name']) : null;
+
+        return [
+            'by' => $user instanceof User ? $this->name($user) : null,
+            'at' => $this->iso($viaReport ? $reported : $latest?->created_at),
+            'via' => $viaReport ? 'report' : 'checkout',
+            'safety_critical' => $defect->severity === 'significant' || $defect->operational_impact === 'out_of_service',
         ];
     }
 
@@ -147,7 +174,7 @@ final class Captain5IssuePresenter
             'at' => $this->iso($message->created_at),
         ])->values()->all();
 
-        $actions = $this->allowedActions($defect, $decision, $latest?->observation === 'appears_corrected');
+        $actions = $this->allowedActions($defect, $decision, DefectMemberCorrection::awaitingVerification($defect, $latest instanceof ApparatusDefectObservation ? $latest : null));
 
         return [
             ...$this->summary($defect, $latest instanceof ApparatusDefectObservation ? $latest : null),
@@ -165,8 +192,8 @@ final class Captain5IssuePresenter
             'can_post_internal' => $seesInternal,
             'can_post' => $this->messages->canPost($viewer, $defect),
             // A page cached before these two existed throws on an action name it does not know, so they travel apart.
-            'actions' => array_values(array_diff($actions, Captain5IssueClearing::ACTIONS)),
-            'clearing_actions' => array_values(array_intersect($actions, Captain5IssueClearing::ACTIONS)),
+            'actions' => array_values(array_diff($actions, Captain5IssueClearing::LATE_ACTIONS)),
+            'clearing_actions' => array_values(array_intersect($actions, Captain5IssueClearing::LATE_ACTIONS)),
             'origin_inspection_id' => $defect->first_reported_inspection_id !== null ? (int) $defect->first_reported_inspection_id : null,
         ];
     }
@@ -178,7 +205,7 @@ final class Captain5IssuePresenter
             return [];
         }
         if (DefectActionStatus::isClosed($defect->action_status)) {
-            return ['reopen'];
+            return $defect->resolution_cleared_at === null ? ['reopen', Captain5IssueClearing::ACTION_CLEAR_RESOLUTION] : ['reopen'];
         }
         if (Captain5IssueClearing::isCleared($defect)) {
             return [Captain5IssueClearing::ACTION_BRING_BACK]; // it is with Logistics now; bringing it back restores the rest
@@ -201,7 +228,9 @@ final class Captain5IssuePresenter
         if ($decision->canDismiss) {
             $actions[] = 'dismiss';
         }
-        $actions[] = Captain5IssueClearing::ACTION_CLEAR;
+        if ((string) $defect->compartment_key !== ApparatusDefect::STRETCHER_REPORT_COMPARTMENT) {
+            $actions[] = Captain5IssueClearing::ACTION_CLEAR; // stretcher reports always stay with Captain 5
+        }
 
         return $actions;
     }
@@ -227,7 +256,7 @@ final class Captain5IssuePresenter
     private function publicDetails(ApparatusDefectEvent $event): array
     {
         $details = is_array($event->details) ? $event->details : [];
-        $keep = array_intersect_key($details, array_flip(['resolution_type', 'resolution_notes', 'reason', 'previous_action_status', 'details', 'changed_details', 'actor_context']));
+        $keep = array_intersect_key($details, array_flip(['source', 'resolved_by', 'unit', 'resolution_type', 'resolution_notes', 'reason', 'previous_action_status', 'details', 'changed_details', 'actor_context']));
         if (isset($keep['details']) && is_array($keep['details'])) {
             $keep['details'] = array_intersect_key($keep['details'], array_flip(Captain5ActorContext::DETAIL_KEYS));
         }
@@ -244,6 +273,7 @@ final class Captain5IssuePresenter
         $name = $author instanceof User ? $this->name($author) : '';
 
         return match (true) {
+            $message->isFromAssistant() => ApparatusIssueMessage::assistantLabel(forStaff: true),
             $message->isFromCaptain5() => $name !== '' ? 'Captain 5 · '.$name : 'Captain 5',
             $message->isFromLogistics() => $name !== '' ? 'Logistics · '.$name : 'Logistics',
             default => $name !== '' ? $name : 'Crew member',

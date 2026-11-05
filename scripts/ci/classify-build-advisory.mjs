@@ -35,18 +35,24 @@ const expires = Date.parse('2026-11-12T00:00:00Z');
 // package-lock.json is byte-identical.
 // 2026-10-30: root lock re-pinned for follow-redirects 1.16.1 -> 1.16.2 (HIGH GHSA-mrwp-f3q8-3g9p;
 // dev tooling only). Only that entry moved; the Tailwind 3 / braces graph is unchanged.
+// 2026-11-02: Daily Checkout package.json and lock re-pinned for the new component-test tooling (devDependencies only: vitest 5.0.5, jsdom 30.1.3,
+// @testing-library/react, /dom, /jest-dom and /user-event, plus a `test` script). No runtime dependency moved; braces stays 3.0.3 (dev) under
+// Tailwind 3, and `npm audit --audit-level=high` on the new lock reports no vulnerabilities. The root files are unchanged.
+// 2026-11-05: docker/production/Dockerfile re-pinned for one added step in the final stage that purges apt and
+// libapt-pkg from the shipped image (HIGH CVE-2026-109518, no Ubuntu fix yet; apt is build tooling only). No build
+// dependency, version or lock changed; the Tailwind 3 / braces graph is byte-identical.
 const inputs = {
     '.': {
         'package.json': 'b5e98205856a0c21842199c5a88a0b34ff1476fd94582645c95350b07be23989',
         'package-lock.json': '4c2e8aa7d638cdbc299b2f280a2cdc5ce2025113f3fb85acf904c6bba85088d9',
     },
     'resources/js/daily-checkout': {
-        'resources/js/daily-checkout/package.json': 'dd808f286eff6301a2e51dd39dc08739868eac9d473c08ea818776c5ebbcfb81',
-        'resources/js/daily-checkout/package-lock.json': '3c4419f65bcca76d340ff9f537ff51b85f6e265961cdcba570d9225ad4a71903',
+        'resources/js/daily-checkout/package.json': 'a7d04913ad864992b4a443c0584df61b9a3e235fed193048b1973e2e29070259',
+        'resources/js/daily-checkout/package-lock.json': '6a42af096e8e3d9bbe54d769d1d00683809bcd31acfe2e43ebc8f6971ec766ce',
     },
 };
 const runtimeInputs = {
-    'docker/production/Dockerfile': 'ed5a4d865fa96f674b54129db7aefb066341df0c1db9c79225eafb72b0108c8c',
+    'docker/production/Dockerfile': '7dc4d8f038a662bfc0466b5f575795bc9b4faeb16daf836016f9b9e01c7743b4',
     '.dockerignore': 'c360145b9617b149ed9b27b613b63cc577e2abd22005efa5367f608e71c67dbc',
 };
 const vacationInputs = {

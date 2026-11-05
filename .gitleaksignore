@@ -21,3 +21,12 @@ ef43c0afa271ea1a5268de07a4ff90395a959630:tests/Node/operational-forms/ems-four-f
 ef43c0afa271ea1a5268de07a4ff90395a959630:database/data/ems/bls_detail_bag_inventory.json:generic-api-key:860
 ef43c0afa271ea1a5268de07a4ff90395a959630:tests/e2e/ems-four-forms.spec.ts:generic-api-key:19
 ef43c0afa271ea1a5268de07a4ff90395a959630:database/data/ems/fire_boat_6_als_inventory.json:generic-api-key:5585
+
+# Station request member-resolve test: two synthetic client_action_id UUIDs (constants once named KEY_ONE/KEY_TWO). Not credentials.
+bc1f838c225c8549aaac58f98394ab6de85bd1a3:tests/Feature/Api/StationRequestMemberResolveTest.php:generic-api-key:30
+bc1f838c225c8549aaac58f98394ab6de85bd1a3:tests/Feature/Api/StationRequestMemberResolveTest.php:generic-api-key:32
+
+# Captain 5 PostgreSQL integrity test: `item_key` is a stable Rescue checklist label (`patient_compartment-item-5`), not a credential. Narrow single-fingerprint false positive; secret scanning stays active.
+c4b46df7a9e411b545f6fc9d1dd77adfdf8f5d8b:tests/Integration/Captain5PostgresIntegrityTest.php:generic-api-key:105
+# Member-correction PostgreSQL race test: the same stable Rescue checklist label (`patient_compartment-item-5`, the LifePak 15) as above, not a credential. Narrow single-fingerprint false positive; secret scanning stays active.
+3c0ef9f27a58749c0db039ae6428710b81211f16:tests/Integration/MemberCorrectionOwnershipPostgresRaceTest.php:generic-api-key:229

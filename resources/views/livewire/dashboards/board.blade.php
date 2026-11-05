@@ -12,6 +12,11 @@
         $links,
         $snapshot->filter !== 'all' ? ($activeChip['label'] ?? null) : null,
     );
+    $isOverview = $view === \App\Support\Dashboards\DashboardView::Overview;
+    // The person's chosen lane order (Overview only). The default leaves the layout exactly as built.
+    if ($isOverview) {
+        $layout = \App\Services\Activity\OperationsIssueSort::apply($layout, $snapshot, $issueSort);
+    }
 @endphp
 <div class="mbfd-dash-board" data-dashboard="{{ $view->value }}"
     wire:poll.30s.visible
@@ -59,6 +64,16 @@
                 <span x-text="state === 'live' ? 'Live' : (state === 'offline' ? 'Offline' : 'Stale')"></span>
             </span>
             <span class="mbfd-dash-banner__updated">Updated <time datetime="{{ $snapshot->loadedAt->toIso8601String() }}" data-updated>{{ $snapshot->loadedAt->format('g:i:s A') }}</time></span>
+            @if ($isOverview)
+                <label class="mbfd-dash-sort">
+                    <span class="mbfd-dash-sort__label">Sort lists by</span>
+                    <select class="mbfd-dash-sort__select" wire:model.live="issueSort">
+                        @foreach (\App\Services\Activity\OperationsIssueSort::OPTIONS as $sortValue => $sortLabel)
+                            <option value="{{ $sortValue }}">{{ $sortLabel }}</option>
+                        @endforeach
+                    </select>
+                </label>
+            @endif
             <button type="button" class="mbfd-dash-refresh" wire:click="refresh" wire:loading.attr="disabled" wire:target="refresh">
                 <x-filament::icon icon="heroicon-m-arrow-path" class="mbfd-dash-refresh__icon" wire:loading.class="is-spinning" wire:target="refresh" />
                 <span>Refresh</span>
@@ -92,6 +107,11 @@
                 </button>
             @endforeach
         </div>
+    @endif
+
+    {{-- Latest activity is its own component, so this board's query count does not change with it. Overview only. --}}
+    @if ($isOverview)
+        <livewire:dashboards.latest-activity :filter="$snapshot->filter" wire:key="latest-activity" />
     @endif
 
     @if ($layout['stats'] !== [])

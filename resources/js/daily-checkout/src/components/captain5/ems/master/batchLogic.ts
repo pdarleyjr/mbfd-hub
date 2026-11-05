@@ -10,6 +10,7 @@
  */
 import { MAX_NAME, MAX_SHELF_LABEL, NEW_SHELF } from './editLogic.ts';
 import { formatQty } from './logic.ts';
+import { itemLines, levelFor, presetReorder, stockLines, type StockLevel, type StockLines } from './stockLevel.ts';
 import type { BatchChange, CountUnit, MasterItem } from './types.ts';
 
 export interface RowDraft {
@@ -20,18 +21,34 @@ export interface RowDraft {
   perPackage: string;
   onHand: string;
   expected: string;
+  /** The "Yellow at" box. Blank means the preset (half the expected amount). */
+  reorder: string;
+  /** The "Red at" box. Blank means the preset (a quarter of the expected amount). */
+  critical: string;
   onHandTouched: boolean;
   expectedTouched: boolean;
+  reorderTouched: boolean;
+  criticalTouched: boolean;
   /** A unit or size change threw away numbers typed in the old unit. Cleared when a number is typed again. */
   numbersReset: boolean;
 }
 
-export type RowField = 'name' | 'shelf' | 'countUnit' | 'perPackage' | 'onHand' | 'expected' | 'row';
+export type RowField = 'name' | 'shelf' | 'countUnit' | 'perPackage' | 'onHand' | 'expected' | 'reorder' | 'critical' | 'row';
 export type RowErrors = Partial<Record<RowField, string>>;
 export type Drafts = Readonly<Record<string, RowDraft>>;
 
+/** The two editable stock lines. */
+export type LineField = 'reorder' | 'critical';
+
+// The level fields are optional here so an older answer (or a test item) without them still plans and colours.
 type DraftBasis = Pick<MasterItem,
-  'id' | 'name' | 'location_code' | 'count_unit' | 'units_per_package' | 'units_per_count_unit' | 'on_hand' | 'on_hand_base' | 'expected' | 'required_base' | 'to_order'>;
+  'id' | 'name' | 'location_code' | 'count_unit' | 'units_per_package' | 'units_per_count_unit' | 'on_hand' | 'on_hand_base' | 'expected' | 'required_base' | 'to_order'>
+  & Partial<Pick<MasterItem, 'level' | 'reorder_at' | 'critical_at' | 'reorder_at_auto' | 'critical_at_auto'>>;
+
+export const REORDER_ABOVE_EXPECTED = 'Yellow at cannot be above the expected amount.';
+export const CRITICAL_ABOVE_REORDER = 'Red at cannot be above Yellow at.';
+export const LINE_NEEDS_EXPECTED = 'Set the expected amount first.';
+export const LINE_MESSAGE = 'Type a whole number, 0 or more. Leave it blank for the automatic amount.';
 
 const WHOLE = /^\d{1,6}$/;
 const DECIMAL = /^\d{1,6}(\.\d)?$/;
@@ -51,8 +68,12 @@ export function startDraft(item: DraftBasis): RowDraft {
     perPackage: startSize(item),
     onHand: '',
     expected: '',
+    reorder: '',
+    critical: '',
     onHandTouched: false,
     expectedTouched: false,
+    reorderTouched: false,
+    criticalTouched: false,
     numbersReset: false,
   };
 }
@@ -64,8 +85,13 @@ export function startDraft(item: DraftBasis): RowDraft {
 export function withCounting(draft: RowDraft, patch: { countUnit?: CountUnit; perPackage?: string }): RowDraft {
   const next = { ...draft, ...patch };
   if (next.countUnit === draft.countUnit && next.perPackage === draft.perPackage) return next;
-  const hadTyped = draft.onHandTouched || draft.expectedTouched;
-  return { ...next, onHand: '', expected: '', onHandTouched: false, expectedTouched: false, numbersReset: draft.numbersReset || hadTyped };
+  const hadTyped = draft.onHandTouched || draft.expectedTouched || draft.reorderTouched || draft.criticalTouched;
+  return {
+    ...next,
+    onHand: '', expected: '', reorder: '', critical: '',
+    onHandTouched: false, expectedTouched: false, reorderTouched: false, criticalTouched: false,
+    numbersReset: draft.numbersReset || hadTyped,
+  };
 }
 
 /** A number typed in the on-hand or expected box, in the row's current unit. */
@@ -73,6 +99,13 @@ export function withNumber(draft: RowDraft, field: 'onHand' | 'expected', text: 
   return field === 'onHand'
     ? { ...draft, onHand: text, onHandTouched: true, numbersReset: false }
     : { ...draft, expected: text, expectedTouched: true, numbersReset: false };
+}
+
+/** A number typed in the Yellow at or Red at box, in the row's current unit. Blank means back to the preset. */
+export function withLine(draft: RowDraft, field: LineField, text: string): RowDraft {
+  return field === 'reorder'
+    ? { ...draft, reorder: text, reorderTouched: true, numbersReset: false }
+    : { ...draft, critical: text, criticalTouched: true, numbersReset: false };
 }
 /** Single units in one count unit, or null while the size box is not a whole number of 1 or more. */
 export function sizeOf(unit: CountUnit, perPackage: string): number | null {
@@ -97,6 +130,120 @@ export const shownOnHand = (item: DraftBasis, draft: RowDraft): string => (draft
 export const shownExpected = (item: DraftBasis, draft: RowDraft): string => (draft.expectedTouched ? draft.expected : inDraftUnit(item.expected, item, draft));
 
 const sameNumber = (text: string, baseline: string): boolean => text === baseline || (DECIMAL.test(text) && DECIMAL.test(baseline) && Number(text) === Number(baseline));
+
+// ------------------------------------------------------------------ stock lines
+
+const LINE_KEY = { reorder: 'reorder_at', critical: 'critical_at' } as const;
+const AUTO_KEY = { reorder: 'reorder_at_auto', critical: 'critical_at_auto' } as const;
+const TOUCHED_KEY = { reorder: 'reorderTouched', critical: 'criticalTouched' } as const;
+
+/** A person's own line from the server, in the draft's unit (rounded down). Null when the line is the preset. */
+function savedOverride(item: DraftBasis, draft: RowDraft, field: LineField): number | null {
+  const value = item[LINE_KEY[field]];
+  if (item[AUTO_KEY[field]] !== false || typeof value !== 'number') return null;
+  if (sameCounting(item, draft)) return value;
+  const size = sizeOf(draft.countUnit, draft.perPackage);
+  if (size === null || !(item.units_per_count_unit > 0)) return null;
+  return Math.floor((value * item.units_per_count_unit) / size + 1e-9);
+}
+
+/** A typed line: null when blank (the preset), NaN when it is not a whole number. */
+const typedLine = (text: string): number | null => {
+  const trimmed = text.trim();
+  if (trimmed === '') return null;
+  return WHOLE.test(trimmed) ? Number(trimmed) : Number.NaN;
+};
+
+/** What the Yellow at or Red at box shows: the typed text, the person's saved line, or blank for the preset. */
+export function shownLine(item: DraftBasis, draft: RowDraft, field: LineField): string {
+  if (draft[TOUCHED_KEY[field]]) return draft[field];
+  const saved = savedOverride(item, draft, field);
+  return saved === null ? '' : String(saved);
+}
+
+/** The line a person chose for this row (typed, or saved earlier): null for the preset, NaN when the box is not a number. */
+const chosenLine = (item: DraftBasis, draft: RowDraft, field: LineField): number | null => (
+  draft[TOUCHED_KEY[field]] ? typedLine(draft[field]) : savedOverride(item, draft, field)
+);
+
+/** The expected amount in the draft's unit: null when there is none, NaN when the box is not a number. */
+function draftExpected(item: DraftBasis, draft: RowDraft): number | null {
+  if (!draft.expectedTouched && sameCounting(item, draft)) return item.expected;
+  const size = sizeOf(draft.countUnit, draft.perPackage);
+  if (size === null) return Number.NaN;
+  const base = draft.expectedTouched ? typedBase(draft.expected, size) : savedExpectedBase(item);
+  return base === null ? null : base / size;
+}
+
+/**
+ * The yellow and red lines for the row as it stands. With the unit and expected amount unchanged, an untouched line is
+ * the server's own number, as given; otherwise the presets are worked out again from the expected amount in the boxes.
+ */
+export function draftLines(item: DraftBasis, draft: RowDraft): StockLines | null {
+  const expected = draftExpected(item, draft);
+  if (expected === null || Number.isNaN(expected)) return null;
+  const asGiven = !draft.expectedTouched && sameCounting(item, draft) && item.reorder_at !== undefined;
+  const pick = (field: LineField): number | null => {
+    if (!draft[TOUCHED_KEY[field]] && asGiven) return item[LINE_KEY[field]] ?? null;
+    const chosen = chosenLine(item, draft, field);
+    return chosen === null || Number.isNaN(chosen) ? null : chosen;
+  };
+  return stockLines(expected, pick('reorder'), pick('critical'));
+}
+
+/** The number a blank Yellow at or Red at box stands for (the preset), or null when there is no expected amount yet. */
+export function linePreset(item: DraftBasis, draft: RowDraft, field: LineField): number | null {
+  return draftLines(item, withLine(draft, field, ''))?.[field] ?? null;
+}
+
+/**
+ * The colour for a row in Edit mode. Untouched rows show the server's level; a typed on hand, expected amount or line
+ * recolours the row straight away. A blank on-hand box keeps the saved number.
+ */
+export function liveLevel(item: DraftBasis, draft: RowDraft): StockLevel | null {
+  const untouched = !draft.onHandTouched && !draft.expectedTouched && !draft.reorderTouched && !draft.criticalTouched && sameCounting(item, draft);
+  if (untouched) return item.level !== undefined ? item.level : levelFor(item.on_hand, itemLines(item));
+  const size = sizeOf(draft.countUnit, draft.perPackage);
+  if (size === null) return null;
+  const typed = draft.onHandTouched ? typedBase(draft.onHand, size) : null;
+  if (typed !== null && Number.isNaN(typed)) return null;
+  const base = typed ?? savedOnHandBase(item);
+  if (base === null) return null;
+  return levelFor(base / size, draftLines(item, draft));
+}
+
+function checkLineBoxes(draft: RowDraft, item: DraftBasis, errors: RowErrors, change: Record<string, unknown>): void {
+  for (const field of ['reorder', 'critical'] as const) {
+    if (!draft[TOUCHED_KEY[field]]) continue;
+    const text = draft[field].trim();
+    if (sameNumber(text, shownLine(item, { ...draft, [TOUCHED_KEY[field]]: false }, field))) continue;
+    const typed = typedLine(text);
+    if (typed !== null && Number.isNaN(typed)) errors[field] = LINE_MESSAGE;
+    else change[LINE_KEY[field]] = typed;
+  }
+}
+
+/**
+ * A typed Yellow at never above the expected amount, Red at never above Yellow at, and no line without an expected
+ * amount. Lowering only the expected amount is allowed: a higher saved Yellow at then sits at the expected amount, as
+ * the server does it.
+ */
+function checkLines(draft: RowDraft, item: DraftBasis, errors: RowErrors, change: Record<string, unknown>): void {
+  checkLineBoxes(draft, item, errors, change);
+  if (!(draft.reorderTouched || draft.criticalTouched || draft.expectedTouched) || errors.reorder || errors.critical) return;
+  const expected = draftExpected(item, draft);
+  if (expected !== null && Number.isNaN(expected)) return;
+  const reorder = chosenLine(item, draft, 'reorder');
+  const critical = chosenLine(item, draft, 'critical');
+  if (expected === null || expected < 1) {
+    if (draft.reorderTouched && reorder !== null) errors.reorder = LINE_NEEDS_EXPECTED;
+    if (draft.criticalTouched && critical !== null) errors.critical = LINE_NEEDS_EXPECTED;
+    return;
+  }
+  if (draft.reorderTouched && reorder !== null && reorder > expected) errors.reorder = REORDER_ABOVE_EXPECTED;
+  const yellow = Math.min(Math.floor(expected), reorder ?? presetReorder(expected));
+  if ((draft.reorderTouched || draft.criticalTouched) && critical !== null && critical > yellow) errors.critical = CRITICAL_ABOVE_REORDER;
+}
 
 function checkName(draft: RowDraft, item: DraftBasis, errors: RowErrors, change: Record<string, unknown>): void {
   const name = draft.name.trim();
@@ -154,6 +301,7 @@ export function planRow(item: DraftBasis, draft: RowDraft): { change: BatchChang
   checkShelf(draft, item, errors, change);
   checkCounting(draft, item, errors, change);
   checkNumbers(draft, item, errors, change);
+  checkLines(draft, item, errors, change);
   return { change: Object.keys(change).length > 0 ? { id: item.id, ...change } as BatchChange : null, errors };
 }
 
@@ -229,6 +377,8 @@ const SERVER_FIELDS: Record<string, RowField> = {
   units_per_package: 'perPackage',
   expected: 'expected',
   on_hand: 'onHand',
+  reorder_at: 'reorder',
+  critical_at: 'critical',
 };
 
 /**

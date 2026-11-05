@@ -10,6 +10,7 @@ const normalisedViews = [
   'resources/views/welcome.blade.php',
   'resources/views/daily-roster/show.blade.php',
   'resources/views/daily-roster/_body.blade.php',
+  'resources/views/daily-roster/_days.blade.php',
   'resources/views/daily-roster/_section.blade.php',
   'resources/views/errors/hub.blade.php',
   'resources/views/auth/partials/city-email-style.blade.php',

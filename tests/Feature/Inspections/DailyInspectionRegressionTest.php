@@ -190,6 +190,7 @@ final class DailyInspectionRegressionTest extends TestCase
     /** DEFECT: a member who verified the item as Present is notified, but the link lands on a page with no such issue. */
     public function test_a_member_who_found_the_item_present_can_open_the_issue_their_resolved_notification_links_to(): void
     {
+        config(['captain5.auto_close_on_checkout' => false]); // this test is about the verification path
         $defect = $this->reportedDefect();
         $beta = $this->newMember('Beta Member');
         $this->travel(1)->days();

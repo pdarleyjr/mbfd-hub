@@ -8,21 +8,30 @@ use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Services\DailyCheckoutChecklistResolver;
+use App\Services\Defects\DefectOwnership;
 use App\Services\InspectionPaperFields;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
- * Which equipment issues belong to Captain 5 (docs/captain5-ems-operations-center.md section 4):
- * every Rescue issue, and only the medical portion of Engine/Ladder issues. Classification uses
- * the checklist the finding was recorded against (the inspected unit's template, which matters for
- * vehicle swaps) and stable item keys, never item wording.
+ * Which equipment issues belong to Captain 5 (docs/unified-activity-and-ownership.md section 1, replacing
+ * docs/captain5-ems-operations-center.md section 4's "every Rescue issue"): the medical equipment on any apparatus,
+ * plus standalone stretcher reports. Classification uses the checklist the finding was recorded against (the
+ * inspected unit's template, which matters for vehicle swaps) and stable item keys, never item wording.
+ *
+ * classify() is the rule; inScope() answers "is it in Captain 5's queue", which is the stored owner written by
+ * App\Services\Defects\DefectOwnership (a person's transfer included), or the rule for a row not projected yet.
  */
 final class Captain5IssueScope
 {
+    /** A medical item on a Rescue (counted separately on the workspace). */
     public const KIND_RESCUE = 'rescue';
 
     public const KIND_MEDICAL = 'medical';
+
+    public const KIND_STRETCHER = 'stretcher';
+
+    public const REASON_STRETCHER_REPORT = 'stretcher_report';
 
     public const RESCUE_TYPES = ['rescue'];
 
@@ -46,40 +55,49 @@ final class Captain5IssueScope
 
     public function classify(ApparatusDefect $defect): IssueScopeResult
     {
+        if ((string) $defect->compartment_key === ApparatusDefect::STRETCHER_REPORT_COMPARTMENT) {
+            // A stretcher report is Captain 5's on any apparatus; it never came from a checklist.
+            $type = $this->checklistType((int) $defect->apparatus_id);
+
+            return new IssueScopeResult(true, self::KIND_STRETCHER, $type, $defect->item_key, MedicalScope::MEDICAL, self::REASON_STRETCHER_REPORT);
+        }
         if (in_array((string) $defect->compartment_key, self::NON_EQUIPMENT_COMPARTMENTS, true)) {
             return IssueScopeResult::outOfScope('non_equipment');
         }
 
         $apparatusId = $this->checklistApparatusId($defect);
         $type = $this->checklistType($apparatusId);
-
-        if (in_array($type, self::RESCUE_TYPES, true)) {
-            return new IssueScopeResult(true, self::KIND_RESCUE, $type, $defect->item_key, null);
-        }
         if (! in_array($type, MedicalScope::MEDICAL_ONLY_TYPES, true)) {
             return IssueScopeResult::outOfScope('not_captain5_apparatus', $type);
         }
 
         $itemKey = $defect->item_key ?: $this->itemKeyByName($apparatusId, (string) $defect->compartment, (string) $defect->item);
         $classification = $this->medical->classify($type, $itemKey);
+        $medical = $classification === MedicalScope::MEDICAL;
 
         return new IssueScopeResult(
-            $classification === MedicalScope::MEDICAL,
-            $classification === MedicalScope::MEDICAL ? self::KIND_MEDICAL : null,
+            $medical,
+            $medical ? (in_array($type, self::RESCUE_TYPES, true) ? self::KIND_RESCUE : self::KIND_MEDICAL) : null,
             $type,
             $itemKey,
             $classification,
         );
     }
 
+    /** In Captain 5's queue: the stored owner (a person's transfer included), else the rule. */
     public function inScope(ApparatusDefect $defect): bool
     {
+        $owner = $defect->getAttribute('responsible_owner');
+        if ($owner === ApparatusDefect::OWNER_CAPTAIN5 || $owner === ApparatusDefect::OWNER_LOGISTICS) {
+            return $owner === ApparatusDefect::OWNER_CAPTAIN5;
+        }
+
         return $this->classify($defect)->inScope;
     }
 
     /**
-     * Candidate issues on Captain 5 apparatus families, newest first. Callers still filter
-     * with classify() (medical scope cannot be expressed in SQL).
+     * Candidate issues for Captain 5, newest first: everything stored as Captain 5's, plus rows not projected yet on
+     * Captain 5 apparatus families. Callers still filter with inScope().
      *
      * @return Builder<ApparatusDefect>
      */
@@ -89,12 +107,27 @@ final class Captain5IssueScope
         $ids = $ids === [] ? [0] : $ids;
 
         // Either the physical truck or the unit whose checklist was used (vehicle swaps and reserves:
-        // a Rescue crew's findings on a reserve truck are still Rescue findings).
+        // a Rescue crew's findings on a reserve truck are recorded against the Rescue checklist).
         return ApparatusDefect::query()
-            ->where(fn (Builder $query) => $query->whereIn('apparatus_id', $ids)
-                ->orWhereIn('first_reported_inspection_id', ApparatusInspection::query()->select('id')->whereIn('apparatus_id', $ids))
-                ->orWhereIn('apparatus_inspection_id', ApparatusInspection::query()->select('id')->whereIn('apparatus_id', $ids)))
-            ->where(fn (Builder $query) => $query->whereNull('compartment_key')->orWhereNotIn('compartment_key', self::NON_EQUIPMENT_COMPARTMENTS));
+            ->where(fn (Builder $owned) => $owned->where('responsible_owner', ApparatusDefect::OWNER_CAPTAIN5)
+                ->orWhere(fn (Builder $unprojected) => $unprojected->whereNull('responsible_owner')
+                    ->where(fn (Builder $query) => $query->whereIn('apparatus_id', $ids)
+                        ->orWhereIn('first_reported_inspection_id', ApparatusInspection::query()->select('id')->whereIn('apparatus_id', $ids))
+                        ->orWhereIn('apparatus_inspection_id', ApparatusInspection::query()->select('id')->whereIn('apparatus_id', $ids)))
+                    ->where(fn (Builder $query) => $query->whereNull('compartment_key')->orWhereNotIn('compartment_key', self::NON_EQUIPMENT_COMPARTMENTS))));
+    }
+
+    /**
+     * Open issues a person moved from Captain 5 to Logistics (Captain 5's "sent to Logistics" list, which offers
+     * Bring back). They are no longer in scope, so they are not filtered by inScope().
+     *
+     * @return Builder<ApparatusDefect>
+     */
+    public function sentToLogisticsQuery(): Builder
+    {
+        return ApparatusDefect::query()->where('resolved', false)->whereNotNull('captain5_cleared_at')
+            ->where(fn (Builder $query) => $query->whereNull('responsible_owner')->orWhere('responsible_owner', ApparatusDefect::OWNER_LOGISTICS)
+                ->orWhere(fn (Builder $clear) => DefectOwnership::whereUnadoptedClear($clear)));
     }
 
     /**

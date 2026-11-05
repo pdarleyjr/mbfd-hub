@@ -103,6 +103,7 @@ final class InspectionConcernRecorder
             array_values(array_unique([...$findings->confirmedDefectIds, ...$confirmed])),
             $findings->appearsCorrectedDefectIds,
             $findings->significantNewOrEscalatedDefectIds,
+            $findings->autoClosedDefectIds,
         );
     }
 

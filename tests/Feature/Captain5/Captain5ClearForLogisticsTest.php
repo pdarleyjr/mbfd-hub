@@ -20,15 +20,16 @@ use Tests\Feature\Captain5\Concerns\BuildsCaptain5World;
 use Tests\TestCase;
 
 /**
- * "Clear, this is for Logistics": off the Captain 5 queue and every count on the page, still open and unchanged for
- * everyone else, and always reachable through "Bring back".
+ * "Clear, this is for Logistics" is a real ownership transfer (docs/unified-activity-and-ownership.md): off the
+ * Captain 5 queue and every count, into the Logistics queue, still open with its status and crew untouched, audited
+ * as owner_transferred, and always reachable through "Bring back".
  */
 final class Captain5ClearForLogisticsTest extends TestCase
 {
     use BuildsCaptain5World;
     use RefreshDatabase;
 
-    private const RESCUE_ITEM = 'compartment_c-item-3'; // Bolt Cutters (Rescue: always in scope)
+    private const RESCUE_ITEM = 'patient_compartment-item-5'; // LifePak 15 (Rescue medical: Captain 5's)
 
     private User $captain;
 
@@ -67,21 +68,25 @@ final class Captain5ClearForLogisticsTest extends TestCase
         self::assertSame((string) $before->updated_at, (string) $after->updated_at, 'Logistics sees no change on the issue.');
         self::assertNotNull($after->captain5_cleared_at);
         self::assertSame((int) $this->captain->id, (int) $after->captain5_cleared_by_user_id);
+        self::assertSame(ApparatusDefect::OWNER_LOGISTICS, $after->responsible_owner);
+        self::assertSame('manual', $after->owner_basis);
+        self::assertSame((int) $this->captain->id, (int) $after->owner_set_by_user_id);
 
         Notification::assertNothingSent();
         self::assertSame(0, ApparatusDefectParticipant::query()->where('apparatus_defect_id', $this->defect->id)->where('user_id', $this->captain->id)->count(), 'Clearing does not sign the person up for updates.');
     }
 
-    public function test_a_cleared_issue_stays_in_every_logistics_view(): void
+    public function test_a_cleared_issue_moves_from_the_captain5_queue_into_the_logistics_queue(): void
     {
+        $source = app(IssueSourceRegistry::class)->get('apparatus_defect');
+        $board = new DashboardQuery(OperationalDisplayWindow::forNow('2026-10-20 10:00:00 America/New_York'));
+        $refs = fn (): array => array_map(static fn ($row): string => $row->ref(), $source->rows($this->superAdmin(), $board, 50));
+        self::assertNotContains('apparatus_defect:'.$this->defect->id, $refs(), 'A medical item is Captain 5\'s alone: not in the Logistics queue.');
+
         $this->act('send_to_logistics')->assertOk();
 
         self::assertTrue(ApparatusDefect::query()->unresolved()->whereKey($this->defect->id)->exists());
-
-        $source = app(IssueSourceRegistry::class)->get('apparatus_defect');
-        $board = new DashboardQuery(OperationalDisplayWindow::forNow('2026-10-20 10:00:00 America/New_York'));
-        $refs = array_map(static fn ($row): string => $row->ref(), $source->rows($this->superAdmin(), $board, 50));
-        self::assertContains('apparatus_defect:'.$this->defect->id, $refs, 'The Logistics dashboard still lists it.');
+        self::assertContains('apparatus_defect:'.$this->defect->id, $refs(), 'The Logistics dashboard lists it now.');
     }
 
     public function test_a_cleared_issue_leaves_the_queue_and_every_count_on_the_page(): void
@@ -126,13 +131,15 @@ final class Captain5ClearForLogisticsTest extends TestCase
         self::assertSame(['send_to_logistics'], $detail->json('issue.clearing_actions'));
         self::assertNotContains('send_to_logistics', $detail->json('issue.actions'), 'A page cached before this action existed throws on a name it does not know.');
         self::assertContains('acknowledge', $detail->json('issue.actions'));
-        $events = collect($detail->json('issue.events'));
-        $cleared = $events->firstWhere('type', 'cleared_from_captain5');
+        $transfers = collect($detail->json('issue.events'))->where('type', 'owner_transferred')->values();
+        self::assertCount(2, $transfers);
+        $cleared = $transfers[0];
         self::assertSame('Captain Alpha', $cleared['actor']);
         self::assertSame('Radio mount belongs to support services.', $cleared['internal_note']);
         self::assertNull($cleared['member_message'], 'The crew is never told.');
         self::assertSame($cleared['from'], $cleared['to'], 'No status change happened.');
-        self::assertSame('Captain Alpha', $events->firstWhere('type', 'returned_to_captain5')['actor']);
+        self::assertSame('Captain Alpha', $transfers[1]['actor']);
+        self::assertSame(ApparatusDefect::OWNER_CAPTAIN5, $this->defect->fresh()->responsible_owner);
         self::assertSame(0, \Illuminate\Support\Facades\DB::table('apparatus_issue_messages')->where('apparatus_defect_id', $this->defect->id)->where('body', 'Never sent')->count());
         Notification::assertNothingSent();
     }
@@ -150,7 +157,7 @@ final class Captain5ClearForLogisticsTest extends TestCase
         $this->getJson('/api/captain5/workspace')->assertOk()->assertJsonPath('counts.open', 0)->assertJsonCount(1, 'cleared_issues');
     }
 
-    public function test_when_logistics_closes_it_it_leaves_the_cleared_list_for_history_and_a_captain5_reopen_brings_it_home(): void
+    public function test_when_logistics_closes_it_it_is_logistics_history_and_leaves_the_cleared_list(): void
     {
         $this->act('send_to_logistics')->assertOk();
 
@@ -160,14 +167,7 @@ final class Captain5ClearForLogisticsTest extends TestCase
         $this->actAs($this->captain);
         $this->getJson('/api/captain5/workspace')->assertOk()->assertJsonCount(0, 'cleared_issues')->assertJsonPath('counts.open', 0);
         $closed = $this->getJson('/api/captain5/issues?status=closed')->assertOk();
-        self::assertSame($this->defect->id, $closed->json('issues.0.id'));
-        $this->getJson('/api/captain5/issues/'.$this->defect->id)->assertOk()->assertJsonPath('issue.actions', ['reopen']);
-
-        $this->act('reopen', ['reason' => 'The replacement was the wrong size.'])->assertOk();
-        self::assertNull($this->defect->fresh()->captain5_cleared_at);
-        $this->forgetCaptain5Memo();
-        $this->actAs($this->captain);
-        $this->getJson('/api/captain5/workspace')->assertOk()->assertJsonPath('counts.open', 1)->assertJsonCount(0, 'cleared_issues');
+        self::assertNotContains($this->defect->id, array_column($closed->json('issues'), 'id'), 'Logistics worked and closed it: it is in Logistics history.');
     }
 
     public function test_logistics_reopening_a_cleared_issue_returns_it_to_captain5(): void
@@ -183,13 +183,13 @@ final class Captain5ClearForLogisticsTest extends TestCase
         $this->getJson('/api/captain5/workspace')->assertOk()->assertJsonPath('counts.open', 1)->assertJsonCount(0, 'cleared_issues');
     }
 
-    public function test_clearing_does_not_invalidate_a_screen_logistics_has_open(): void
+    public function test_clearing_is_a_real_change_that_an_open_screen_sees(): void
     {
         $token = DefectCorrectiveActionService::stateToken($this->defect->fresh());
 
         $this->act('send_to_logistics')->assertOk();
 
-        self::assertSame($token, DefectCorrectiveActionService::stateToken($this->defect->fresh()));
+        self::assertNotSame($token, DefectCorrectiveActionService::stateToken($this->defect->fresh()), 'Who works it changed, so a stale screen must refresh before acting.');
     }
 
     public function test_a_closed_issue_cannot_be_cleared(): void
@@ -230,7 +230,7 @@ final class Captain5ClearForLogisticsTest extends TestCase
         $this->forgetCaptain5Memo();
         $this->postJson($url, $body)->assertOk()->assertJsonPath('issue.clearing_actions', ['bring_back_to_captain5']);
 
-        self::assertSame(1, ApparatusDefectEvent::query()->where('apparatus_defect_id', $this->defect->id)->where('event_type', 'cleared_from_captain5')->count());
+        self::assertSame(1, ApparatusDefectEvent::query()->where('apparatus_defect_id', $this->defect->id)->where('event_type', 'owner_transferred')->count());
     }
 
     public function test_a_stale_token_is_refused_with_the_current_issue_and_changes_nothing(): void
@@ -245,7 +245,7 @@ final class Captain5ClearForLogisticsTest extends TestCase
         ])->assertStatus(409)->assertJsonPath('issue.action_status', 'acknowledged');
 
         self::assertNull($this->defect->fresh()->captain5_cleared_at);
-        self::assertSame(0, ApparatusDefectEvent::query()->where('apparatus_defect_id', $this->defect->id)->where('event_type', 'cleared_from_captain5')->count());
+        self::assertSame(0, ApparatusDefectEvent::query()->where('apparatus_defect_id', $this->defect->id)->where('event_type', 'owner_transferred')->count());
     }
 
     private function state(): string

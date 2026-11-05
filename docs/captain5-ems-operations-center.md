@@ -54,10 +54,15 @@ No duty gating (follow-up 2026-10-23): everyone who may open the page may do eve
 
 ## 4. Issue scope (`App\Services\Captain5\Captain5IssueScope`)
 
+> **Superseded November 2026** by `docs/unified-activity-and-ownership.md` section 1: ownership follows the
+> equipment, never the apparatus. A Rescue is no longer "every issue"; its tools, SCBA, rope and water-rescue
+> gear are Logistics'. The stored owner (`apparatus_defects.responsible_owner`) is the queue; the list below is
+> the rule that decides it.
+
 - Physical apparatus checklist type via `DailyCheckoutChecklistResolver::checklistTypeFor()`.
-- `rescue` → every issue, except `compartment_key = scheduled_duties`.
-- `engine`, `engine2`, `ladder1`, `ladder3` → only items classified `medical` (DB decision wins over config). Item key resolution: `item_key`; when null, a unique name match through `InspectionPaperFields::equipmentDefinitions()` (incl. legacy names); otherwise `unclassified`.
-- Everything else (Air Truck, Fire Boat, command vehicles, unmapped) → out of scope.
+- `engine`, `engine2`, `ladder1`, `ladder3`, `rescue`, `fireboat6` → only items classified `medical` (DB decision wins over config). Item key resolution: `item_key`; when null, a unique name match through `InspectionPaperFields::equipmentDefinitions()` (incl. legacy names); otherwise `unclassified`.
+- Standalone stretcher reports (`compartment_key = stretcher_report`) → always Captain 5, on any apparatus.
+- Everything else (Air Truck, command vehicles, unmapped) → Logistics.
 - `unclassified` and config `ambiguous` items are never visible to Captain 5; they appear in the admin Medical Scope review list.
 - Fleet keeps all mechanical/PM/non-medical authority; Captain 5 sees nothing outside the scope.
 

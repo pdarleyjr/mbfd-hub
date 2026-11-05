@@ -50,7 +50,7 @@ final class InspectionWorkspace
     private const OBSERVATION_LABELS = [
         'first_reported' => 'Reported for the first time',
         'confirmed_again' => 'Confirmed again',
-        'appears_corrected' => 'Member reports it appears corrected',
+        'appears_corrected' => 'Checkout reports it present',
     ];
 
     public function __construct(
@@ -609,6 +609,9 @@ final class InspectionWorkspace
     {
         $name = trim((string) (data_get($message, 'author.display_name') ?: data_get($message, 'author.name')));
 
+        if ($message->isFromAssistant()) {
+            return ApparatusIssueMessage::assistantLabel(forStaff: true);
+        }
         if ($message->isFromCaptain5()) {
             return $name !== '' ? 'Captain 5 · '.$name : 'Captain 5';
         }

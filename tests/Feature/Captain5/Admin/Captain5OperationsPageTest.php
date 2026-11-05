@@ -33,7 +33,7 @@ final class Captain5OperationsPageTest extends TestCase
 
     private const TOUGHBOOK_E2 = 'front_cab-item-1';   // Engine 2 Toughbook (reviewed: not medical)
 
-    private const RESCUE_ITEM = 'compartment_c-item-3';
+    private const RESCUE_ITEM = 'patient_compartment-item-5'; // LifePak 15 (Rescue medical: Captain 5's)
 
     protected function setUp(): void
     {

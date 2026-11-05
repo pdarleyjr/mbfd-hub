@@ -8,6 +8,8 @@ use App\Filament\Admin\Pages\EmployeeMessages;
 use App\Filament\Pages\StationOperationsDashboard;
 use App\Filament\Pages\VehicleCheckoutDashboard;
 use App\Models\User;
+use App\Services\Activity\OperationsActivityPreferences;
+use App\Services\Activity\OperationsIssueSort;
 use App\Services\Dashboards\DashboardAccess;
 use App\Services\Dashboards\DashboardFilters;
 use App\Services\Dashboards\DashboardReadModel;
@@ -35,6 +37,9 @@ final class DashboardBoard extends Component
     #[Url(as: 'filter', except: 'all', history: true)]
     public string $filter = DashboardFilters::ALL;
 
+    /** Overview lane order, saved per person (OperationsActivityPreferences). The other dashboards keep their order. */
+    public string $issueSort = OperationsIssueSort::DEFAULT;
+
     private bool $fresh = false;
 
     public function mount(string $dashboard): void
@@ -45,6 +50,20 @@ final class DashboardBoard extends Component
         $this->authorizeView();
         if (! DashboardFilters::isValid($view, $this->filter)) {
             $this->filter = DashboardFilters::ALL;
+        }
+        $user = auth()->user();
+        if ($view === DashboardView::Overview && $user instanceof User) {
+            $this->issueSort = app(OperationsActivityPreferences::class)->issueSort($user);
+        }
+    }
+
+    /** The sort select. Saved only when it differs from the default; the default removes the stored row. */
+    public function updatedIssueSort(): void
+    {
+        $this->issueSort = OperationsIssueSort::normalize($this->issueSort);
+        $user = auth()->user();
+        if ($this->view() === DashboardView::Overview && $user instanceof User) {
+            app(OperationsActivityPreferences::class)->saveIssueSort($user, $this->issueSort);
         }
     }
 
@@ -87,6 +106,7 @@ final class DashboardBoard extends Component
             'snapshot' => $snapshot,
             'chips' => $this->visibleChips($view, $snapshot),
             'links' => $this->links($user),
+            'issueSort' => OperationsIssueSort::normalize($this->issueSort),
         ]);
     }
 

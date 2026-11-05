@@ -1,0 +1,43 @@
+{
+  "repository": "pdarleyjr/mbfd-command",
+  "commit": "58ba8b8b4f8aa34489f7b502f9cd8d09933511d4",
+  "built_at": "2026-11-03T12:12:25.189Z",
+  "base_path": "/training-tools/command-board/",
+  "files": [
+    {
+      "path": "assets/mbfd-official-seal-256-CFwrL00R.png",
+      "sha256": "3353d380ac07e2285afbed5628474fe0153b7cd1af5a50f05a3a31b317d9f6fe",
+      "bytes": 99970
+    },
+    {
+      "path": "assets/plus-jakarta-sans-latin-ext-wght-normal-DmpS2jIq.woff2",
+      "sha256": "38e3b8fd8045048eb311d90170a4429ed2c8f405852dc3d91b5af8452758703f",
+      "bytes": 21728
+    },
+    {
+      "path": "assets/plus-jakarta-sans-latin-wght-normal-eXO_dkmS.woff2",
+      "sha256": "153fc85b70298beeb1d61a5f723331649e7f23bb77302a66e61cb3e2fbdb5e79",
+      "bytes": 27348
+    },
+    {
+      "path": "assets/plus-jakarta-sans-vietnamese-wght-normal-qRpaaN48.woff2",
+      "sha256": "b275d1258601dda240fc6a1d4a6cad56e691d898f5cdf1b0e4fd6ca0022d8e40",
+      "bytes": 8352
+    },
+    {
+      "path": "assets/training-DOSoHgUG.js",
+      "sha256": "2aa00fc3e063a9268cfe17a491ba87f06861d9173ef960a55d969b42fc4308c4",
+      "bytes": 765531
+    },
+    {
+      "path": "assets/training-WOAthqHp.css",
+      "sha256": "6f317bdcd2c9a84d4ffee4448306eb9f695b2a71c1f0e8d5c61f8e57b2c5ac77",
+      "bytes": 71384
+    },
+    {
+      "path": "index.html",
+      "sha256": "21a99616b938cbdba544634995cb00b5fda0a30f41b39ec670b9b5e7641f135b",
+      "bytes": 787
+    }
+  ]
+}

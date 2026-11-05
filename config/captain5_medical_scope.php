@@ -19,7 +19,9 @@
 |  - items that did not exist at review time (for example inventory-correction additions
 |    `inv-c*`) are unclassified: hidden from Captain 5 and queued for admin review.
 |
-| Rescue templates are entirely in scope and are not listed here.
+| Ownership follows the equipment, not the apparatus (docs/unified-activity-and-ownership.md):
+| a Rescue's DeWalt saws, SCBA, TIC, rope and water-rescue gear are Logistics', its patient-care
+| equipment and the stretcher (charging, spare battery, restraints) are Captain 5's.
 */
 
 return [
@@ -140,6 +142,71 @@ return [
             'comp_4-item-13',            // Fluid Absorbent
             'officer_side_panel-item-20', // Stokes Basket
             'rear_cab-item-11',          // Water Cooler
+        ],
+    ],
+
+    'rescue' => [
+        'reviewed_version' => '60b5f4f4b96284e2d17254b517c3c77c961bb1554c3bb733198d413193f9cf01',
+        'medical' => [
+            'patient_compartment-item-9',  // MCI Bag
+            'compartment_b-item-11',       // LUCAS Device W/ Spare Battery
+            'compartment_a-item-1',        // M Cylinders (oxygen)
+            'compartment_a-item-2',        // Backboard / Scoop Stretcher
+            'compartment_a-item-3',        // D-cylinder (oxygen)
+            'compartment_a-item-4',        // Stair Chair (L4)
+            'compartment_d-item-2',        // Stair Chair (R1)
+            'compartment_d-item-3',        // KED
+            'compartment_d-item-5',        // Traction Splint
+            'compartment_d-item-7',        // C-Collars Reg & No Neck
+            'compartment_d-item-9',        // C-Collars Pedi
+            'compartment_d-item-10',       // Cardboard Splints
+            'compartment_d-item-12',       // Pedi Backboard
+            'compartment_a-item-5',        // HANDTEVY
+            'compartment_a-item-6',        // Emergency Yellow Blankets
+            'patient_compartment-item-6',  // Ferno Pedi-Mate
+            'patient_compartment-item-8',  // Cooler (@36-48 Degrees), medication cooler
+            'patient_compartment-item-17', // Pedi Inflatable Splint
+            'patient_compartment-item-19', // OB Kits
+            'patient_compartment-item-22', // Carry Alls (patient movement)
+            'patient_compartment-item-2',  // Airway Bag
+            'patient_compartment-item-3',  // Med Box
+            'patient_compartment-item-4',  // Trauma Bag
+            'patient_compartment-item-5',  // LifePak 15
+            'patient_compartment-item-7',  // LSU Portable Suction
+            'patient_compartment-item-16', // Oral Thermometer
+            'stretcher-item-1',            // Patient FERNO 4 Point Restraint w/ Lap Belt
+            'stretcher-item-2',            // Stretcher Charging
+            'compartment_b-item-12',       // Spare Battery (stretcher compartment: the stretcher's battery)
+            'compartment_c-item-8',        // Yellow Blanket (stretcher)
+            'compartment_c-item-9',        // Spare Sheet (stretcher)
+            'compartment_c-item-10',       // Carry All (stretcher)
+            'compartment_c-item-11',       // O2 Bottle w/ Reg (stretcher)
+        ],
+        'ambiguous' => [
+            'compartment_d-item-14',       // Straps (R1, beside KED and splints: backboard straps or cargo straps?)
+            'patient_compartment-item-11', // PPE Bag
+            'patient_compartment-item-14', // Tyveks
+            'patient_compartment-item-10', // Transport Fee Chart
+            'compartment_d-item-11',       // LP CO MONITOR (LifePak CO-oximetry or a gas detector?)
+            'compartment_d-item-13',       // LP CO Monitor Serial #
+            'compartment_c-item-12',       // Vinegar (jellyfish stings or cleaning?)
+            'compartment_c-item-14',       // SpeedyCleanz (disinfectant)
+        ],
+    ],
+
+    'fireboat6' => [
+        'reviewed_version' => '92930bda64264e1b5af7a18c7b4696d218b70a9edebd135309b69ae70737c0dd',
+        'medical' => [
+            'fb6-medical-airway-bag',      // Airway Bag
+            'fb6-medical-med-box',         // Med Box
+            'fb6-medical-lifepak-15',      // LifePak 15
+            'fb6-medical-spare-o2-bottle', // Spare 02 Bottle
+            'fb6-medical-lsu-suction',     // LSU Suction
+            'fb6-medical-backboards',      // Backboards (2)
+        ],
+        'ambiguous' => [
+            'fb6-medical-gloves',          // Gloves XXL-SM (1BX)
+            'fb6-medical-sleeves',         // Sleeves (1BX)
         ],
     ],
 ];
