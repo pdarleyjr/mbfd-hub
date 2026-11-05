@@ -167,7 +167,7 @@ final class PersonnelRequestSource extends RecentlyClosedSource
         return $record->getAttribute('dashboard_last_event') === self::MEMBER_REPLY_EVENT;
     }
 
-    protected function replySubject(): ?string
+    protected function replySubject(): string
     {
         return ReplySubject::PERSONNEL_REQUEST;
     }

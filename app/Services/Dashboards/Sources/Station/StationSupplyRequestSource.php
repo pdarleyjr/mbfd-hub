@@ -111,7 +111,7 @@ final class StationSupplyRequestSource extends RecentlyClosedSource
         $this->selectAwaitingStaffReply($query);
     }
 
-    protected function replySubject(): ?string
+    protected function replySubject(): string
     {
         return ReplySubject::STATION_SUPPLY_REQUEST;
     }

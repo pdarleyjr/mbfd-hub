@@ -144,7 +144,7 @@ final class MedicalSupplyRequestSource extends RecentlyClosedSource
         return $record->getAttribute('dashboard_last_message_context') === InventoryRequestEvent::CONTEXT_MEMBER;
     }
 
-    protected function replySubject(): ?string
+    protected function replySubject(): string
     {
         return ReplySubject::EMS_INVENTORY_REQUEST;
     }
