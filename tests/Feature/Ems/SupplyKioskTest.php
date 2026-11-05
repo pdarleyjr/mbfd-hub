@@ -156,7 +156,8 @@ final class SupplyKioskTest extends TestCase
     public function test_bootstrap_lists_items_members_units_and_shorthand_without_personal_details(): void
     {
         $this->pairScreen();
-        $this->rescue('E 1');
+        // E1 is already on its truck in the EMS world; a second truck cannot be named E 1.
+        $this->rescue('E 7');
         $this->rescue('R 22');
         $this->rescue('Reserve');
         SupplyItem::query()->where('source_row_key', 'sr.t.02')->update(['controlled_substance' => true]);

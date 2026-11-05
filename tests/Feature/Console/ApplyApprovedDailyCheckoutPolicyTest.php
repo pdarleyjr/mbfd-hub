@@ -182,6 +182,45 @@ final class ApplyApprovedDailyCheckoutPolicyTest extends TestCase
         $this->assertSame(1, Apparatus::query()->count());
     }
 
+    public function test_verify_names_the_record_and_the_fix_when_a_vehicle_number_was_typed_as_a_unit_id(): void
+    {
+        $stations = $this->stations();
+        // The Nov 5 data: truck 53 kept E 1 in its designation and name but its unit ID became the other truck's number.
+        // The model guard refuses this now, so it is written the way an older row would have been.
+        $wrong = Apparatus::withoutEvents(fn (): Apparatus => Apparatus::query()->create([
+            'station_id' => $stations[1]->id, 'unit_id' => '20503', 'designation' => 'E 1', 'name' => 'ENGINE E1',
+            'type' => 'Engine', 'slug' => 'e1', 'vehicle_number' => '002-18', 'status' => 'Out of Service',
+        ]));
+
+        $status = Artisan::call('daily-checkout:apply-approved-policy', ['--verify' => true]);
+        $output = Artisan::output();
+
+        $this->assertSame(Command::FAILURE, $status);
+        $this->assertStringContainsString("E1 collides with an alias on apparatus {$wrong->id}.", $output);
+        $this->assertStringContainsString("record #{$wrong->id} (vehicle 002-18), but that record's unit ID is 20503", $output);
+        $this->assertStringContainsString('use Change unit assignment', $output);
+    }
+
+    public function test_verify_lists_reasons_an_admin_can_act_on(): void
+    {
+        $stations = $this->stations();
+        foreach ([1 => ['E1', 'L1', 'R1', 'R11'], 2 => ['E2', 'R2', 'R22'], 3 => ['E3', 'L3', 'R3'], 4 => ['E4', 'R4', 'R44']] as $number => $units) {
+            foreach ($units as $unitId) {
+                Apparatus::query()->create([
+                    'station_id' => $stations[$number]->id, 'unit_id' => $unitId, 'designation' => $unitId, 'name' => $unitId,
+                    'type' => 'Engine', 'slug' => strtolower($unitId), 'status' => 'In Service',
+                    'daily_checkout_requirement' => 'unknown', 'daily_checkout_template' => 'pending',
+                ]);
+            }
+        }
+
+        Artisan::call('daily-checkout:apply-approved-policy', ['--verify' => true]);
+        $result = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertFalse($result['verified']);
+        $this->assertStringContainsString('14 of the 14 approved units are not set up for Daily Checkout yet', $result['reasons'][0]);
+    }
+
     /** @return array<int, Station> */
     private function stations(): array
     {

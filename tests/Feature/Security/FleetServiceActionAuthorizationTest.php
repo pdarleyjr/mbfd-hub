@@ -130,11 +130,14 @@ final class FleetServiceActionAuthorizationTest extends TestCase
     {
         $manager = $this->fleetManager();
         $this->actingAs($manager);
+        // E2 is a front-line unit: its truck leaves service only through a swap (ApparatusEditPageTest), so this
+        // brings it back from Maintenance instead.
+        $this->apparatus->forceFill(['status' => 'Maintenance'])->save();
 
         Livewire::test(ListApparatuses::class)
             ->call('loadTable')
             ->assertTableActionVisible('updateStatus', $this->apparatus)
-            ->callTableAction('updateStatus', $this->apparatus, data: ['status' => 'Maintenance'])
+            ->callTableAction('updateStatus', $this->apparatus, data: ['status' => 'In Service'])
             ->assertHasNoTableActionErrors()
             ->callTableAction('scheduleService', $this->apparatus, data: $this->scheduleData())
             ->assertHasNoTableActionErrors()
@@ -146,7 +149,7 @@ final class FleetServiceActionAuthorizationTest extends TestCase
             ->callAction('transition_acknowledged', data: ['public_note' => 'Fleet has it.'])
             ->assertHasNoActionErrors();
 
-        self::assertSame('Maintenance', $this->apparatus->fresh()->status);
+        self::assertSame('In Service', $this->apparatus->fresh()->status);
         self::assertNotNull($this->apparatus->fresh()->last_pm_date);
         self::assertSame(3, ApparatusServiceTicket::query()->count());
         self::assertSame('acknowledged', $this->ticket->fresh()->status);

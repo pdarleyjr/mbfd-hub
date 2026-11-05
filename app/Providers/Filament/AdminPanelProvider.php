@@ -148,6 +148,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make()->label('Operations')->icon('heroicon-o-clipboard-document-list')->collapsed(),
                 NavigationGroup::make()->label('Fleet')->icon('heroicon-o-truck')->collapsed(),
                 NavigationGroup::make()->label('EMS')->icon('lucide-briefcase-medical')->collapsed(),
+                NavigationGroup::make()->label('Stations')->icon('heroicon-o-building-office-2')->collapsed(),
                 NavigationGroup::make()->label('Logistics')->icon('heroicon-o-cube')->collapsed(),
                 NavigationGroup::make()->label(\App\Services\AiAutomation\Admin\AdminLabels::NAVIGATION_GROUP)->icon('heroicon-o-chat-bubble-left-ellipsis')->collapsed(),
                 NavigationGroup::make()->label('Personnel')->icon('heroicon-o-user-group')->collapsed(),

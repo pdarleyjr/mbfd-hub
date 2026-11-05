@@ -24,6 +24,9 @@ final class ApparatusChangeoutPlanner
 
     public const MODE_HANDOFF_ONLY = 'handoff_only';
 
+    /** An admin took a front-line unit's truck out of service with no truck to replace it. Nothing moved. */
+    public const MODE_NO_REPLACEMENT = ApparatusChangeout::MODE_NO_REPLACEMENT;
+
     /** How long the crew on a new truck is told what stayed on the old one. */
     private const HANDOFF_NOTICE_DAYS = 14;
 

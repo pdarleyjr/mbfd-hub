@@ -44,7 +44,7 @@ class ApparatusOperationalAlertResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-megaphone';
 
-    protected static ?string $navigationGroup = 'Operations';
+    protected static ?string $navigationGroup = 'Fleet';
 
     protected static ?int $navigationSort = 72;
 

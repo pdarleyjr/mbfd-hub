@@ -32,7 +32,7 @@ final class ApparatusInspectionExceptionResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
-    protected static ?string $navigationGroup = 'Operations';
+    protected static ?string $navigationGroup = 'Fleet';
 
     protected static ?string $navigationLabel = 'Inspection Exceptions';
 

@@ -6,7 +6,9 @@ namespace App\Console\Commands;
 
 use App\Models\Apparatus;
 use App\Models\Station;
+use App\Services\Fleet\FrontlineCoverage;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -77,6 +79,8 @@ final class ApplyApprovedDailyCheckoutPolicy extends Command
             $result['required_count'] = $required->count();
             $result['additional_required'] = $additional->map(fn (Apparatus $apparatus): string => (string) $apparatus->getAttribute('unit_id'))->values()->all();
             $result['replacement_capacity'] = $replacementCapacity;
+            $result['reasons'] = $verified ? [] : $this->verifyReasons($result, $additional, $replacementCapacity);
+            // One JSON line: the deploy log keeps it, and the reasons say what to fix.
             $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
 
             return $verified ? self::SUCCESS : self::FAILURE;
@@ -125,20 +129,21 @@ final class ApplyApprovedDailyCheckoutPolicy extends Command
                     $matches[$id] = $apparatus;
                 }
             }
+            // The same wording the Apparatus page warning uses (FrontlineCoverage), so an admin can act on it.
             if (count($matches) > 1) {
-                throw new RuntimeException("{$unitId} resolves to multiple apparatus records.");
+                throw new RuntimeException("{$unitId} resolves to multiple apparatus records. ".FrontlineCoverage::severalMessage($unitId, array_values($matches)));
             }
 
             /** @var Apparatus|null $target */
             $target = $matches === [] ? null : array_values($matches)[0];
             if ($target !== null && $target->getAttribute('unit_id') !== $unitId) {
-                throw new RuntimeException("{$unitId} collides with an alias on apparatus {$target->id}.");
+                throw new RuntimeException("{$unitId} collides with an alias on apparatus {$target->id}. ".FrontlineCoverage::conflictMessage($unitId, $target));
             }
             if ($target === null && $unitId !== 'FB6') {
-                throw new RuntimeException("Required apparatus {$unitId} was not found by exact identity.");
+                throw new RuntimeException("Required apparatus {$unitId} was not found by exact identity. ".FrontlineCoverage::missingMessage($unitId));
             }
             if ($target !== null && $target->station_id !== $stations[$entry['station']]->id) {
-                throw new RuntimeException("{$unitId} is not assigned to approved Station {$entry['station']}.");
+                throw new RuntimeException("{$unitId} is not assigned to approved Station {$entry['station']}. ".FrontlineCoverage::stationMessage($unitId, (int) $entry['station'], $target));
             }
             $targets[$unitId] = [$entry, $target];
         }
@@ -197,6 +202,33 @@ final class ApplyApprovedDailyCheckoutPolicy extends Command
         )));
 
         return $result;
+    }
+
+    /**
+     * Why --verify failed, in words an admin can act on.
+     *
+     * @param  array<string, mixed>  $result
+     * @param  Collection<int, Apparatus>  $additional
+     * @return list<string>
+     */
+    private function verifyReasons(array $result, Collection $additional, int $replacementCapacity): array
+    {
+        $reasons = [];
+        $pending = (int) $result['updated'] + (int) $result['created'];
+        if ($pending > 0) {
+            $reasons[] = "{$pending} of the 14 approved units are not set up for Daily Checkout yet. Run daily-checkout:apply-approved-policy --confirm=APPLY_APPROVED_FRONTLINE_DAILY_POLICY.";
+        }
+        $notInService = $additional->reject(fn (Apparatus $apparatus): bool => $apparatus->getAttribute('status') === 'In Service');
+        foreach ($notInService as $apparatus) {
+            $reasons[] = 'Record #'.$apparatus->getKey().' ('.($apparatus->getAttribute('unit_id') ?: 'no unit ID').') requires Daily Checkout but is not an approved unit and is not In Service. Set its Daily Checkout policy under More settings.';
+        }
+        if ($additional->count() > $replacementCapacity) {
+            $names = $additional->map(fn (Apparatus $apparatus): string => (string) ($apparatus->getAttribute('unit_id') ?: '#'.$apparatus->getKey()))->implode(', ');
+            $reasons[] = "These records require Daily Checkout but are not approved units: {$names}. Only {$replacementCapacity} approved ".($replacementCapacity === 1 ? 'unit is' : 'units are')
+                .' Out of Service for them to cover. Use Swap truck to move a unit onto a truck instead, or set their Daily Checkout policy under More settings.';
+        }
+
+        return $reasons;
     }
 
     private function normalize(mixed $value): string

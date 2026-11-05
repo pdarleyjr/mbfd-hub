@@ -27,9 +27,11 @@ final class ChangeoutAlertText
 
     public static function oldTruckSentence(ApparatusChangeout $changeout): string
     {
-        return ($changeout->move_audit['mode'] ?? null) === ApparatusChangeoutPlanner::MODE_HANDOFF_ONLY
-            ? 'The unit had already moved, so no truck status changed here.'
-            : ApparatusChangeoutPresenter::oldTruckSentence($changeout);
+        return match ($changeout->move_audit['mode'] ?? null) {
+            ApparatusChangeoutPlanner::MODE_HANDOFF_ONLY => 'The unit had already moved, so no truck status changed here.',
+            ApparatusChangeoutPlanner::MODE_NO_REPLACEMENT => 'No other truck was available, so '.$changeout->unit_designation.' stays on this truck until a truck is swapped onto it.',
+            default => ApparatusChangeoutPresenter::oldTruckSentence($changeout),
+        };
     }
 
     /** "Left behind: Halligan, Axe." or nothing. */
@@ -44,9 +46,12 @@ final class ChangeoutAlertText
     public static function body(ApparatusChangeout $changeout, bool $withName = true): string
     {
         $from = $changeout->from_vehicle_number ?: 'not recorded';
+        $what = $changeout->isWithoutReplacement()
+            ? ($withName ? $changeout->submitted_by_name.' marked ' : 'Marked ')."truck {$from} ".ApparatusChangeout::OLD_TRUCK_STATUS." while it carries {$changeout->unit_designation}, ".self::when($changeout).'.'
+            : ($withName ? $changeout->submitted_by_name.' moved ' : 'Moved ').$changeout->unit_designation." from truck {$from} to truck {$changeout->to_vehicle_number}, ".self::when($changeout).'.';
 
         return implode(' ', array_filter([
-            ($withName ? $changeout->submitted_by_name.' moved ' : 'Moved ').$changeout->unit_designation." from truck {$from} to truck {$changeout->to_vehicle_number}, ".self::when($changeout).'.',
+            $what,
             self::oldTruckSentence($changeout),
             self::leftBehindSentence($changeout),
             filled($changeout->note) && $withName ? 'Crew note: '.$changeout->note : null,
