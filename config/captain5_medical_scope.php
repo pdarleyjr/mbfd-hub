@@ -195,7 +195,7 @@ return [
     ],
 
     'fireboat6' => [
-        'reviewed_version' => 'ee4d035da0f2c49e1f3a6c075b7b59bcd4ccaf3a7759fc5ea1c8fb5fcdf03f6f',
+        'reviewed_version' => '92930bda64264e1b5af7a18c7b4696d218b70a9edebd135309b69ae70737c0dd',
         'medical' => [
             'fb6-medical-airway-bag',      // Airway Bag
             'fb6-medical-med-box',         // Med Box
