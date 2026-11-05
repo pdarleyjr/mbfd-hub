@@ -52,6 +52,9 @@ final class OperationsActivityDefectReader
             ->whereIn('event_type', self::EVENTS)
             ->whereNotIn('event_type', ApparatusDefectEvent::PAGE_ONLY_EVENTS)
             ->where('created_at', '>=', $since)
+            // Medical issues Captain 5 works stay on the Captain 5 workspace, never the admin activity feed.
+            ->whereHas('defect', static fn ($defect) => $defect->where(static fn ($owner) => $owner->whereNull('responsible_owner')
+                ->orWhere('responsible_owner', '<>', self::CAPTAIN5)))
             ->with(['defect', 'defect.firstReporter:id,name,display_name', 'actor:id,name,display_name'])
             ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get();
         $apparatuses = ApparatusLookup::load($rows->map(
@@ -123,6 +126,9 @@ final class OperationsActivityDefectReader
         $messages = ApparatusIssueMessage::query()
             ->where('created_at', '>=', $since)
             ->when(! $manage, static fn ($query) => $query->where('visibility', ApparatusIssueMessage::VISIBILITY_MEMBER))
+            ->where(static fn ($query) => $query->whereNull('apparatus_defect_id')
+                ->orWhereHas('defect', static fn ($defect) => $defect->where(static fn ($owner) => $owner->whereNull('responsible_owner')
+                    ->orWhere('responsible_owner', '<>', self::CAPTAIN5))))
             ->with(['author:id,name,display_name', 'defect', 'inspection:id,apparatus_id,review_status'])
             ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get();
         $answered = $this->lastResponseIds($messages->all());
