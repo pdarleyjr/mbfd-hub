@@ -20,7 +20,7 @@ use Tests\TestCase;
 
 /**
  * Admin -> EMS shows which of the four medical inventory forms a request came from: a Form column and filter on
- * Submitted Inventory Forms, the family on the request page, and a "By form" table on Medical Data / Statistics.
+ * Submitted Inventory Forms, the family on the request page, and a "By form" table on Medical Supply Data → Requests.
  * A request with no family stored (written before the four forms, or by a rolled-back image) is ALS Transport.
  */
 final class FormFamilyAdminTest extends TestCase
@@ -163,7 +163,8 @@ final class FormFamilyAdminTest extends TestCase
         $this->requestOn('als-transport', 3);
         $this->actAsManager();
 
-        $page = Livewire::test(MedicalDataStatistics::class)->assertOk();
+        // The request tables live on the Requests tab of Medical Supply Data.
+        $page = Livewire::test(MedicalDataStatistics::class)->set('tab', 'requests')->assertOk();
         // Livewire wraps each loop pass in marker comments; the rows are read without them.
         $html = (string) preg_replace('~<!--.*?-->~s', '', $page->html());
 
