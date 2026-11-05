@@ -10,8 +10,8 @@ use App\Support\OperationalDisplayWindow;
 
 /**
  * Filter chips per dashboard. Every chip maps onto a DashboardQuery field the sources already
- * honour (tag, severity or stage), or on the Overview onto one lane (apparatus, stations or
- * personnel), and shows the exact count the sources return for its key.
+ * honour (tag, severity or stage), or on the Overview onto one lane (apparatus, stations,
+ * personnel or requests), and shows the exact count the sources return for its key.
  */
 final class DashboardFilters
 {
@@ -32,6 +32,17 @@ final class DashboardFilters
                 self::lane('apparatus', 'Apparatus', 'heroicon-m-truck', DashboardSnapshot::LANE_VEHICLE),
                 self::lane('stations', 'Stations', 'heroicon-m-building-office', DashboardSnapshot::LANE_STATION),
                 self::lane('personnel', 'Personnel', 'heroicon-m-users', DashboardSnapshot::LANE_MESSAGES),
+                self::lane('requests', 'Requests', 'heroicon-m-clipboard-document-list', DashboardSnapshot::LANE_REQUESTS),
+            ],
+            // Medical, narcotics and "member replied" hide at zero: only some request staff see those sources at all.
+            DashboardView::MemberRequests => [
+                $all,
+                self::tag('uniform', 'Uniforms', 'heroicon-m-shopping-bag'),
+                self::tag('ppe', 'PPE / equipment', 'heroicon-m-shield-check'),
+                self::tag('medical', 'Medical supplies', 'heroicon-m-beaker', true),
+                self::tag('narcotics', 'Narcotics checks', 'heroicon-m-lock-closed', true),
+                ['key' => 'awaiting_response', 'label' => 'Needs review', 'countKey' => 'awaiting_response', 'kind' => 'stage', 'optional' => false, 'icon' => 'heroicon-m-clock'],
+                self::tag('member_replied', 'Member replied', 'heroicon-m-chat-bubble-left-ellipsis', true),
             ],
             DashboardView::VehicleCheckout => [
                 $all,

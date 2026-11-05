@@ -35,7 +35,8 @@ final class IssueGroupBoard extends Component
 
     private const LOAD_FAILED = 'Some items could not be loaded just now, so this list may be out of date. It will retry on the next refresh.';
 
-    private const KEY_PATTERN = '/^(apparatus|station|member):[1-9][0-9]{0,18}$/';
+    /** "employee:<id>": a member's requests when the member has no Hub sign-in to key them by (member:<user id>). */
+    private const KEY_PATTERN = '/^(apparatus|station|member|employee):[1-9][0-9]{0,18}$/';
 
     private const SECTION_LABELS = [
         'apparatus_defect' => 'Equipment issues',
@@ -47,6 +48,10 @@ final class IssueGroupBoard extends Component
         'station_inspection' => 'Station inspections',
         'support_message' => 'Messages',
         'hub_support_ticket' => 'Member reports',
+        'station_supply_request' => 'Station supply requests',
+        'personnel_request' => 'Uniform and PPE requests',
+        'medical_supply_request' => 'Medical supply requests',
+        'narcotics_check' => 'Narcotics checks',
     ];
 
     #[Locked]
@@ -381,7 +386,7 @@ final class IssueGroupBoard extends Component
             'imageKind' => $image === null ? null : DashboardImages::kind($lead->imageKey),
             'icon' => match (true) {
                 str_starts_with($this->group, 'station:') => 'heroicon-o-building-office',
-                str_starts_with($this->group, 'member:') => 'heroicon-o-user',
+                str_starts_with($this->group, 'member:'), str_starts_with($this->group, 'employee:') => 'heroicon-o-user',
                 default => 'heroicon-o-truck',
             },
         ];

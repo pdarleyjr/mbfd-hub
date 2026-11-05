@@ -103,6 +103,7 @@ class AdminPanelProvider extends PanelProvider
                 Dashboard::class,
                 \App\Filament\Pages\VehicleCheckoutDashboard::class,
                 \App\Filament\Pages\StationOperationsDashboard::class,
+                \App\Filament\Pages\MemberRequestsDashboard::class,
                 \App\Filament\Pages\IssueGroupPage::class,
                 \App\Filament\Pages\LogisticsBoard::class,
                 Captain5Operations::class,
