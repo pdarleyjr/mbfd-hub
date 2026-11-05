@@ -4,6 +4,7 @@ import { isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../
 import { takeDownDepartmentUpdate } from '../../utils/departmentUpdatesApi';
 import { EmptyState, LoadError, SkeletonRows } from '../ui/StateViews';
 import Tag from '../ui/Tag';
+import MessageBody from '../command-communications/MessageBody';
 import type { UpdatesStatus } from './useDepartmentUpdates';
 import type { PostedUpdate, UpdateOrigin } from './types';
 import { HUB_TIMEZONE } from '../../../../shared/timezone.ts';
@@ -45,17 +46,19 @@ function UpdateRow({ origin, update, onChanged }: { origin: UpdateOrigin; update
   };
 
   return (
-    <li className="rounded-hub-control border border-hub-border bg-hub-well p-3" data-testid="department-update-row">
+    <li className={`rounded-hub-control border border-hub-border border-l-4 bg-hub-well p-3 sm:p-4 ${live ? 'border-l-hub-blue' : 'border-l-hub-n-400'}`} data-testid="department-update-row">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="min-w-0 flex-1 break-words text-sm font-semibold text-hub-ink">{update.title}</p>
+        <h4 className="min-w-0 flex-1 break-words font-heading text-base font-bold text-hub-ink">{update.title}</h4>
         <Tag tone={live ? 'success' : 'neutral'}>{live ? 'Published' : 'Taken down'}</Tag>
       </div>
-      <p className={HINT}>
-        Posted by {update.author}{update.posted_at ? ` · ${when(update.posted_at)}` : ''}
-        {live && update.expires_at ? ` · comes down ${day(update.expires_at)}` : ''}
-        {update.has_image ? ' · picture' : ''}{update.has_attachment ? ' · file' : ''}
-      </p>
-      {update.excerpt && <p className="mt-1 line-clamp-2 break-words text-sm text-hub-ink">{update.excerpt}</p>}
+      <p className={HINT}>Posted by {update.author}{update.posted_at ? ` · ${when(update.posted_at)}` : ''}</p>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {live && update.expires_at && <Tag tone="warning">Comes down {day(update.expires_at)}</Tag>}
+        {live && !update.expires_at && <Tag tone="neutral">No end date</Tag>}
+        {update.has_image && <Tag tone="info">Picture</Tag>}
+        {update.has_attachment && <Tag tone="info">File attached</Tag>}
+      </div>
+      {update.excerpt && <MessageBody text={update.excerpt} className="mt-2" testId="department-update-excerpt" />}
       {live && update.url && (
         <a href={update.url} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-hub-blue underline underline-offset-4">
           View on the home page<span className="sr-only">: {update.title}</span>

@@ -110,6 +110,32 @@ class EmployeeLogisticsThread extends Model
         return $this->reason === EmployeeMessageReason::GENERAL ? null : EmployeeMessageReason::label($this->reason);
     }
 
+    /** The member picked "Bunker gear cleaning request" when starting the conversation. */
+    public function isBunkerGearByReason(): bool
+    {
+        return $this->reason === EmployeeMessageReason::BUNKER_GEAR_CLEANING;
+    }
+
+    /**
+     * A conversation filed under another reason (or none) whose subject or latest preview plainly
+     * asks about cleaning bunker / turnout gear. Deliberately narrow so it does not cry wolf.
+     */
+    public function isBunkerGearByKeyword(): bool
+    {
+        if ($this->isBunkerGearByReason() || ! in_array($this->reason, [null, '', EmployeeMessageReason::GENERAL], true)) {
+            return false;
+        }
+        $text = mb_strtolower(trim((string) $this->subject.' '.(string) $this->last_message_preview));
+
+        return preg_match('/\b(bunker|turn[- ]?out|structural)\s+(gear|pants|coat|jacket|boots?)\b/u', $text) === 1
+            && preg_match('/\b(clean(ing|ed)?|wash(ing|ed)?|launder(ing)?|decon(tamination)?|extract(or|ion)?|contaminat(ed|ion))\b/u', $text) === 1;
+    }
+
+    public function isBunkerGear(): bool
+    {
+        return $this->isBunkerGearByReason() || $this->isBunkerGearByKeyword();
+    }
+
     /** Whether the team still owes the member a reply (unread-ness is separate: see isUnreadForLogistics). */
     public function supportStatus(): string
     {

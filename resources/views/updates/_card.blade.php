@@ -39,10 +39,28 @@
             </a>
         </{{ $headingTag }}>
         @if($compact)
-            <p class="mt-2 text-sm leading-relaxed text-hub-muted">{{ $update->excerpt(165) }}</p>
+            <div class="mt-2 flex items-start gap-3">
+                @if($update->image_path)
+                    <img src="{{ route('updates.image', $update) }}" alt="" loading="lazy" class="hidden h-16 w-16 flex-none rounded-lg object-cover sm:block" data-update-thumb>
+                @endif
+                <p class="min-w-0 text-[15px] leading-relaxed text-hub-ink-secondary">{{ $update->excerpt(165) }}</p>
+            </div>
         @else
-            <div class="prose prose-sm mt-3 max-w-none text-hub-ink-secondary">
+            <div data-update-body class="prose prose-base mt-4 max-w-[70ch] text-base leading-[1.6] text-hub-ink-secondary prose-p:my-3 prose-headings:font-heading prose-a:text-hub-blue prose-a:underline prose-li:my-1 [overflow-wrap:anywhere]">
                 {!! \App\Support\Security\SafeHtml::report($update->body) !!}
+            </div>
+        @endif
+        @if($update->expires_at || $update->attachment_path || $ctaUrl)
+            <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold" data-update-chips>
+                @if($update->expires_at)
+                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-amber-900 ring-1 ring-inset ring-amber-600/30">Stays up until {{ $update->expires_at->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y') }}</span>
+                @endif
+                @if($update->attachment_path)
+                    <span class="inline-flex items-center rounded-full bg-hub-surface-muted px-2.5 py-1 text-hub-ink-secondary ring-1 ring-inset ring-hub-border">File attached</span>
+                @endif
+                @if($ctaUrl)
+                    <span class="inline-flex items-center rounded-full bg-hub-surface-muted px-2.5 py-1 text-hub-ink-secondary ring-1 ring-inset ring-hub-border">Has a link</span>
+                @endif
             </div>
         @endif
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-hub-border-soft pt-3">
