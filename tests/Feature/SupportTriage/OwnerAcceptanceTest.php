@@ -193,14 +193,14 @@ final class OwnerAcceptanceTest extends TestCase
         $this->checkout('engine2', [['Gas Meter']]);
         $this->assertSame(C::MEDIUM, $this->dashboardLevel(ApparatusDefect::query()->sole()));
         $missing = $this->onlyReply();
-        $this->assertStringContainsString('Coordinate a replacement gas meter or detector with Support Services or the appropriate equipment technician', $missing);
-        $this->assertStringContainsString('Call or text first', $missing);
+        $this->assertStringContainsString('Coordinate with the on-duty Air Tech to have the gas meter or detector checked or swapped out', $missing);
+        $this->assertStringContainsString('Notify your officer', $missing);
 
         $this->checkout('engine', [['Dreager Gas Meter', 'Damaged', ['notes' => 'Display is cracked.']]]);
         $levels = ApparatusDefect::query()->orderBy('id')->get()->map(fn (ApparatusDefect $d): string => $this->dashboardLevel($d))->all();
         $this->assertSame([C::MEDIUM, C::MEDIUM], $levels);
         $this->assertSame(2, $this->assistantMessages()->count());
-        $this->assertStringContainsString('Coordinate a replacement', (string) $this->assistantMessages()->last()->body);
+        $this->assertStringContainsString('on-duty Air Tech', (string) $this->assistantMessages()->last()->body);
         $this->assertNoEmailAnywhere();
     }
 
