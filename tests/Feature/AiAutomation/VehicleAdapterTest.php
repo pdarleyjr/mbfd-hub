@@ -120,6 +120,12 @@ final class VehicleAdapterTest extends TestCase
         return ApparatusInspection::query()->findOrFail($this->submit($payload, $apparatus)->assertCreated()->json('id'));
     }
 
+    /** Makes the open issue one a later Present answer cannot close: damaged equipment waits for the owner to verify. */
+    private function needsVerification(): void
+    {
+        ApparatusDefect::query()->whereKey(ApparatusDefect::query()->sole()->id)->update(['issue_type' => 'damaged']);
+    }
+
     /** One plain non-medical item reported Missing on the Engine 2 unit. */
     private function missingOnUnit(array $extra = ['notes' => 'Not in the cab.'], ?int $miles = null, ?float $hours = null): ApparatusInspection
     {
@@ -556,16 +562,17 @@ final class VehicleAdapterTest extends TestCase
 
     // ------------------------------------------------------------ existing behavior
 
-    public function test_present_on_the_next_checkout_is_still_only_an_observation(): void
+    public function test_present_on_the_next_checkout_is_only_an_observation_for_an_issue_that_needs_verification(): void
     {
         $this->switchOn();
         $this->missingOnUnit();
+        $this->needsVerification();
         $this->actAs($this->alpha);
 
         $second = ApparatusInspection::query()->findOrFail($this->submit($this->payload(null, 1040, 402.4))->assertCreated()->json('id'));
 
         $defect = ApparatusDefect::query()->sole();
-        $this->assertFalse((bool) $defect->resolved, 'A Present answer must never close the issue.');
+        $this->assertFalse((bool) $defect->resolved, 'A Present answer never closes damaged equipment: the owner verifies it.');
         $this->assertSame('reported', $defect->action_status);
         $this->assertSame('appears_corrected', ApparatusDefectObservation::query()->where('apparatus_inspection_id', $second->id)->value('observation'));
         // A live follow-up checkout with no new and no confirmed-again finding is a clean checkout: it is owed only the one-line receipt.
@@ -575,12 +582,13 @@ final class VehicleAdapterTest extends TestCase
         $this->assertSame(2, AiIntakeEvent::query()->where('source_type', VehicleAdapter::SOURCE_INSPECTION)->count());
     }
 
-    public function test_found_present_on_a_later_checkout_gets_only_the_clean_receipt_and_leaves_the_official_issue_fields_alone(): void
+    public function test_found_present_on_a_later_checkout_gets_only_the_clean_receipt_and_leaves_an_unverified_issue_alone(): void
     {
         $payload = $this->payload();
         [$ac, $ai] = $this->pick($payload, 'engine2', false);
         $a = $this->checkout([[$ac, $ai, 'Missing', ['notes' => 'Gone.']]]);
         $defect = ApparatusDefect::query()->sole();
+        $this->needsVerification();
         $official = fn (): array => $defect->fresh()->only(['resolved', 'resolved_at', 'action_status', 'status', 'acknowledged_at', 'acknowledged_by_user_id', 'severity']);
         $before = $official();
 
@@ -596,6 +604,21 @@ final class VehicleAdapterTest extends TestCase
 
         // The first checkout is still owed its acknowledgment: the Present answer did not answer or close it.
         $this->assertTrue($this->adapter()->facts($this->inspectionIntake($a))->eligible());
+    }
+
+    public function test_a_routine_item_found_present_is_closed_by_that_checkout_and_the_first_report_is_not_answered_about_it(): void
+    {
+        $this->switchOn();
+        $first = $this->missingOnUnit();
+        $this->actAs($this->alpha);
+
+        $present = ApparatusInspection::query()->findOrFail($this->submit($this->payload(null, 1040, 402.4))->assertCreated()->json('id'));
+
+        $this->assertTrue((bool) ApparatusDefect::query()->sole()->resolved, 'A routine item found Present is resolved by that checkout.');
+        $facts = $this->adapter()->facts($this->inspectionIntake($present));
+        $this->assertTrue($facts->eligible(), 'The Present checkout is owed only the clean receipt.');
+        $this->assertSame([], $facts->findings);
+        $this->assertSame('issue_closed', $this->adapter()->facts($this->inspectionIntake($first))->ineligibleReason);
     }
 
     public function test_a_resolved_or_replaced_issue_is_not_answered_and_a_new_failure_is_a_new_issue(): void
@@ -803,6 +826,7 @@ final class VehicleAdapterTest extends TestCase
     public function test_backlog_returns_only_unattended_open_checkouts_in_keyset_order(): void
     {
         $a = $this->missingOnUnit();
+        $this->needsVerification(); // the clean checkout below must not close it
 
         // Attended: Logistics already wrote to the member.
         $frontPayload = $this->payload($this->frontline, 5020, 901.0);
