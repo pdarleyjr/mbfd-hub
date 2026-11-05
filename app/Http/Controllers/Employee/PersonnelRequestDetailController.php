@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Employee;
 use App\Concerns\ResolvesCanonicalEmployee;
 use App\Http\Controllers\Controller;
 use App\Models\PersonnelRequest;
+use App\Support\PersonnelRequests\PersonnelRequestParticipantAccess;
 use Illuminate\View\View;
 
 class PersonnelRequestDetailController extends Controller
@@ -16,10 +17,13 @@ class PersonnelRequestDetailController extends Controller
     public function __invoke(PersonnelRequest $personnelRequest): View
     {
         $employee = $this->authenticatedEmployee();
-        abort_unless($personnelRequest->beneficiary_employee_id === $employee->id, 403);
+        // The member it is for, or the officer who submitted it for them (docs/member-replies.md section 3).
+        abort_unless(PersonnelRequestParticipantAccess::isParticipant($employee, $personnelRequest), 403);
 
         return view('employee.personnel-request-detail', [
             'request' => $personnelRequest->load(['items', 'updates', 'originatingStation', 'attachments']),
+            'isBeneficiary' => PersonnelRequestParticipantAccess::isBeneficiary($employee, $personnelRequest),
+            'viewerEmployeeId' => (int) $employee->getKey(),
         ]);
     }
 }

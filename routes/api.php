@@ -87,6 +87,12 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('apparatus-issues/{defect}/observations/{observation}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'observationPhoto'])->whereNumber(['defect', 'observation']);
     Route::get('inspection-concerns/{concern}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'concernPhoto'])->whereNumber('concern');
     // Member "it's fixed" and standalone stretcher reports (docs/unified-activity-and-ownership.md). Network only.
+    // The issue's conversation for its participants (docs/member-replies.md section 2.1). Network only.
+    Route::get('apparatus-issues/{defect}/conversation', [\App\Http\Controllers\Api\MemberIssueConversationController::class, 'show'])->whereNumber('defect');
+    Route::post('apparatus-issues/{defect}/conversation', [\App\Http\Controllers\Api\MemberIssueConversationController::class, 'store'])->whereNumber('defect')->middleware(['throttle:20,1,member-issue-replies']);
+    // Replies on station requests, supply requests and service tickets (docs/member-replies.md section 2.3).
+    Route::get('submission-conversations/{type}/{id}', [\App\Http\Controllers\Api\SubmissionConversationController::class, 'show'])->whereIn('type', \App\Support\MemberReplies\ReplySubject::GENERIC_THREADS)->whereNumber('id');
+    Route::post('submission-conversations/{type}/{id}', [\App\Http\Controllers\Api\SubmissionConversationController::class, 'store'])->whereIn('type', \App\Support\MemberReplies\ReplySubject::GENERIC_THREADS)->whereNumber('id')->middleware(['throttle:20,1,submission-replies']);
     Route::post('apparatus-issues/{defect}/member-correction', [\App\Http\Controllers\Api\MemberIssueActionsController::class, 'correction'])->whereNumber('defect')->middleware(['throttle:20,1']);
     Route::post('apparatuses/{apparatus}/stretcher-issues', [\App\Http\Controllers\Api\MemberIssueActionsController::class, 'stretcher'])->whereNumber('apparatus')->middleware(['throttle:20,1']);
     Route::get('stations/{station}/operational-alerts', [\App\Http\Controllers\Api\OperationalAlertController::class, 'station'])->whereNumber('station');

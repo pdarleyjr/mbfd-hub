@@ -34,6 +34,7 @@ import StationShiftAlert from './station/StationShiftAlert';
 import { canMarkResolved } from '../utils/stationRequestResolveApi';
 import { useStationOverview } from './station/useStationOverview';
 import Tag, { StatusTag } from './ui/Tag';
+import SubmissionConversationDisclosure from './conversation/SubmissionConversationDisclosure';
 import { EmptyState, LoadError, SkeletonRows } from './ui/StateViews';
 import { humanize, type Tone } from './ui/status';
 import { formatHubDate, HUB_TIMEZONE } from '../../../shared/timezone.ts';
@@ -442,6 +443,7 @@ export default function StationDetailPage() {
                       {ticket.expected_return_at ? ` · Expected return ${formatDate(ticket.expected_return_at)} at ${formatTime(ticket.expected_return_at)}` : ''}
                     </p>
                     {ticket.updates && ticket.updates.length > 1 && <UpdateHistory summary={`View ${ticket.updates.length} public updates`} updates={ticket.updates} />}
+                    {ticket.member_conversation?.participant === true && <SubmissionConversationDisclosure type="apparatus_service_ticket" id={ticket.id} />}
                   </li>
                 ))}
               </ul>

@@ -31,6 +31,7 @@ class PublicApparatusServiceTicketController extends Controller
                 'id', 'ticket_number', 'apparatus_id', 'station_id', 'unit_designation_snapshot',
                 'origin', 'category', 'service_type', 'title', 'priority', 'status', 'scheduled_for',
                 'scheduled_location', 'expected_return_at', 'current_public_response', 'archived_at', 'created_at', 'updated_at',
+                'requested_by_employee_id',
             ])
             ->with(['updates' => fn ($query) => $query
                 ->select('id', 'apparatus_service_ticket_id', 'status', 'public_note', 'scheduled_for', 'created_at')])

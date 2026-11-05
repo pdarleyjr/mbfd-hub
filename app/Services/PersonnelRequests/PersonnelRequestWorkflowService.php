@@ -11,6 +11,7 @@ use App\Models\PersonnelRequestItem;
 use App\Models\PersonnelRequestUpdate;
 use App\Models\User;
 use App\Support\DecisionReason;
+use App\Support\PersonnelRequests\PersonnelRequestParticipantAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -132,7 +133,7 @@ final class PersonnelRequestWorkflowService
 
     public function employeeRespond(PersonnelRequest $request, Employee $employee, string $message, ?PersonnelRequestItem $item = null, ?string $idempotencyKey = null): PersonnelRequest
     {
-        if ($request->beneficiary_employee_id !== $employee->id) {
+        if (! PersonnelRequestParticipantAccess::isParticipant($employee, $request)) {
             abort(403);
         }
         if (trim($message) === '') {
@@ -141,7 +142,7 @@ final class PersonnelRequestWorkflowService
 
         return DB::transaction(function () use ($request, $employee, $message, $item, $idempotencyKey): PersonnelRequest {
             $locked = PersonnelRequest::query()->lockForUpdate()->findOrFail($request->id);
-            if ($locked->beneficiary_employee_id !== $employee->id) {
+            if (! PersonnelRequestParticipantAccess::isParticipant($employee, $locked)) {
                 abort(403);
             }
             $lockedItem = $item ? $this->lockItem($locked, $item) : null;

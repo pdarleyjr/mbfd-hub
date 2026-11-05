@@ -8,6 +8,7 @@ use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\ApparatusServiceTicketCategory;
 use App\Enums\ApparatusServiceTicketPriority;
 use App\Models\Apparatus;
+use App\Models\ApparatusServiceTicket;
 use App\Models\Station;
 use App\Services\ApparatusServiceTicketWorkflowService;
 use Filament\Forms\Components\Hidden;
@@ -43,6 +44,19 @@ class ApparatusServiceRequestPage extends Page
     protected static ?int $navigationSort = 2;
 
     public ?array $data = [];
+
+    /** @return array<string, mixed> */
+    protected function getViewData(): array
+    {
+        // The member's own tickets only (requested_by_employee_id), newest first; the link opens their conversation.
+        return [
+            'myTickets' => ApparatusServiceTicket::query()
+                ->where('requested_by_employee_id', $this->authenticatedEmployee()->getKey())
+                ->latest('id')
+                ->limit(10)
+                ->get(['id', 'ticket_number', 'unit_designation_snapshot', 'title', 'status', 'current_public_response']),
+        ];
+    }
 
     public bool $stationLocked = false;
 
