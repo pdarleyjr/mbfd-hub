@@ -26,6 +26,7 @@ use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectEventNarrative;
 use App\Support\Fleet\DefectFollowUpState;
 use App\Support\Fleet\DefectNoActionClosure;
+use App\Support\Fleet\DefectResolutionLine;
 use App\Support\Fleet\DefectSeverityCorrection;
 use App\Support\Fleet\InspectionReviewers;
 use App\Support\OperationalDisplayWindow;
@@ -96,12 +97,22 @@ final class ApparatusDefectSource extends VehicleIssueSource
             ->orWhere('apparatus_defects.responsible_owner', '<>', ApparatusDefect::OWNER_CAPTAIN5)
             // Cleared to Logistics by the previous image and not adopted yet: Logistics' work, never in neither queue.
             ->orWhere(fn (Builder $clear) => DefectOwnership::whereUnadoptedClear($clear, 'apparatus_defects')));
+        // Open issues, plus fixed ones for dashboards.resolved_display_hours unless staff cleared them (the resolution line
+        // on the row says how it ended). An issue closed with no action required is not a "resolved" item: it keeps the
+        // operational-day rule, and a clear takes it off early as well.
         $query->where(fn (Builder $board) => $board
             ->where('apparatus_defects.resolved', false)
+            ->orWhere(fn (Builder $fixed) => (new ApparatusDefect)->scopeRecentlyResolved($fixed, $window->now))
             ->orWhere(fn (Builder $closed) => $closed
-                ->whereIn('apparatus_defects.action_status', DefectActionStatus::CLOSED)
+                ->where('apparatus_defects.action_status', DefectActionStatus::DISMISSED)
+                ->whereNull('apparatus_defects.resolution_cleared_at')
                 ->where('apparatus_defects.resolved_at', '>=', $window->databaseStart())
                 ->where('apparatus_defects.resolved_at', '<', $window->databaseEnd())));
+    }
+
+    protected function resolvedTodaySql(OperationalDisplayWindow $window): string
+    {
+        return 'apparatus_defects.resolved_at >= \''.$window->databaseStart()->format('Y-m-d H:i:s').'\' AND apparatus_defects.resolved_at < \''.$window->databaseEnd()->format('Y-m-d H:i:s').'\'';
     }
 
     protected function severitySql(): string
@@ -126,13 +137,19 @@ final class ApparatusDefectSource extends VehicleIssueSource
 
     protected function eagerLoads(): array
     {
-        return ['apparatus:'.implode(',', ApparatusClass::COLUMNS), 'firstReporter:id,name,display_name'];
+        return ['apparatus:'.implode(',', ApparatusClass::COLUMNS), 'firstReporter:id,name,display_name', 'resolvedBy:id,name,display_name'];
     }
 
     protected function rowSelects(): array
     {
-        return ['dashboard_last_event_id' => ApparatusDefectEvent::query()->changingTheIssue()->selectRaw('MAX(id)')
-            ->whereColumn('apparatus_defect_events.apparatus_defect_id', 'apparatus_defects.id')];
+        return [
+            'dashboard_last_event_id' => ApparatusDefectEvent::query()->changingTheIssue()->selectRaw('MAX(id)')
+                ->whereColumn('apparatus_defect_events.apparatus_defect_id', 'apparatus_defects.id'),
+            // How it was closed, for the resolution line on a resolved row.
+            'dashboard_closing_event' => ApparatusDefectEvent::query()->select('event_type')
+                ->whereColumn('apparatus_defect_events.apparatus_defect_id', 'apparatus_defects.id')
+                ->whereIn('event_type', DefectResolutionLine::CLOSING_EVENTS)->orderByDesc('id')->limit(1),
+        ];
     }
 
     protected function toIssue(Model $record, bool $displayMode, array $projection): DashboardIssue
@@ -145,7 +162,11 @@ final class ApparatusDefectSource extends VehicleIssueSource
             type: $this->type(),
             id: (string) $record->getKey(),
             title: trim($problem.': '.$record->item, ': '),
-            summary: implode(' — ', array_filter([trim((string) $record->compartment) ?: null, $notes])) ?: null,
+            summary: implode(' — ', array_filter([
+                DefectResolutionLine::forRow($record, $record->getAttribute('dashboard_closing_event')),
+                trim((string) $record->compartment) ?: null,
+                $notes,
+            ])) ?: null,
             severity: $projection['severity'],
             status: $status,
             statusLabel: DefectActionStatus::label($status),
@@ -191,7 +212,8 @@ final class ApparatusDefectSource extends VehicleIssueSource
             ['label' => 'Reported by', 'value' => (string) $fresh['issue']->actorLabel],
             ['label' => 'Service ticket', 'value' => (string) $defect->serviceTicket?->ticket_number],
             ['label' => 'Assigned to', 'value' => $this->assigneeLabel($details['assigned_to'] ?? null)],
-            ['label' => 'Member reports', 'value' => $this->memberReportLabel($defect)],
+            ['label' => 'Needs verification', 'value' => $this->memberReportLabel($defect)],
+            ['label' => 'How it ended', 'value' => (string) (DefectResolutionLine::forDefects([$defect])[(int) $defect->getKey()]['text'] ?? '')],
             ['label' => 'Handled by', 'value' => DefectOwnership::isCaptain5Owned($defect) ? 'Captain 5' : 'Support Services (Logistics)'],
         ], static fn (array $fact): bool => $fact['value'] !== ''));
 
@@ -227,7 +249,10 @@ final class ApparatusDefectSource extends VehicleIssueSource
             self::textarea('internal_note', 'Internal note, staff only (optional)', max: 4000),
         ];
         if (DefectActionStatus::isClosed($status)) {
-            return [new IssueAction('reopen', 'Reopen', 'secondary', [self::textarea('reason', 'Reason for reopening', true, 5000), ...$messages])];
+            return array_values(array_filter([
+                $defect->resolution_cleared_at === null ? new IssueAction('clear_resolution', 'Clear from list', 'secondary', []) : null,
+                new IssueAction('reopen', 'Reopen', 'secondary', [self::textarea('reason', 'Reason for reopening', true, 5000), ...$messages]),
+            ]));
         }
         if (DefectOwnership::isCaptain5Owned($defect)) {
             if ((string) $defect->compartment_key === ApparatusDefect::STRETCHER_REPORT_COMPARTMENT) {
@@ -283,10 +308,10 @@ final class ApparatusDefectSource extends VehicleIssueSource
         $observation = $defect->latestObservation;
         $reported = $defect->correction_reported_at;
         if ($reported !== null && ($observation === null || $reported->greaterThanOrEqualTo($observation->created_at))) {
-            return 'A member reported it fixed. Verify before closing.';
+            return 'Needs verification: a member reported it fixed. Verify before closing.';
         }
 
-        return $observation?->observation === 'appears_corrected' ? 'The latest checkout says the item is present again' : '';
+        return $observation?->observation === 'appears_corrected' ? 'Needs verification: the latest checkout reported the item present' : '';
     }
 
     /** "Medium (set by equipment priorities)" or "High (changed by Pat Smith)". */
@@ -390,6 +415,7 @@ final class ApparatusDefectSource extends VehicleIssueSource
                     ...$messages,
                 ]), 'Issue resolved.'),
                 'close_no_action' => $this->done($service->dismiss($key, $user, ['reason' => self::text($input, 'reason'), ...$messages]), DefectNoActionClosure::SUCCESS),
+                'clear_resolution' => $this->done($service->clearResolution($key, $user, [], substr(hash('sha256', 'clear:'.$key.':'.$expectedVersion), 0, 32)), 'Cleared from the list. The resolution stays in the history.'),
                 'reopen' => $this->done($service->reopen($key, $user, ['reason' => self::text($input, 'reason'), ...$messages]), 'Issue reopened.'),
                 default => ActionResult::invalid(['action' => 'That action is not available for this issue.'], 'That action is not available for this issue.'),
             };
@@ -417,6 +443,7 @@ final class ApparatusDefectSource extends VehicleIssueSource
             in_array($action, ['resolve', 'verify'], true) && $nothingNew && $status === DefectActionStatus::RESOLVED => 'Already resolved.',
             $action === 'close_no_action' && $nothingNew && $status === DefectActionStatus::DISMISSED => 'Already closed with no action required.',
             $action === 'reopen' && $nothingNew && ! DefectActionStatus::isClosed($status) => 'Already open.',
+            $action === 'clear_resolution' && ($defect->resolution_cleared_at !== null || ! DefectActionStatus::isClosed($status)) => 'Already cleared.',
             default => null,
         };
     }

@@ -107,6 +107,33 @@ whose checklist type has no medical scope is `logistics` / `not_medical`, not `u
   `client_action_id` return the first result. A closed issue returns 409 `ISSUE_CLOSED`.
 - Findings payloads carry `member_correction: { eligible, closes_immediately, pending: {at}|null }`.
 
+### Resolved by a checkout, and how long resolved issues stay in view
+
+- **Auto-close.** A later checkout that marks a previously reported item Present closes the issue in the same
+  transaction when it is routine (`DefectMemberCorrection::closesImmediately`) and `captain5.auto_close_on_checkout`
+  (default on) is set: `action_status = resolved`, `resolved_by_user_id` = the inspector, `resolution_type = item_located`,
+  note "Resolved by {Name} during {Unit} checkout", and one `resolved_by_checkout` event (`details.member_resolution`,
+  `source = checkout`, `inspection_id`, `observation_id`; idempotency key `defect:{id}:resolved_by_checkout:{inspection}`).
+  The observation row is still `appears_corrected`. The defect row is locked and open, so a retried submission closes
+  nothing twice. Significant, out-of-service/blocking, damaged, service-ticketed and stretcher issues keep the old path:
+  `appears_corrected` event, issue stays open, "Needs verification". The apparatus' service status is never changed and
+  no push is sent for an auto-close.
+- **Vocabulary.** Closed by a checkout: "Resolved by {Name} during {Unit} checkout · {time}". Closed by Mark resolved
+  or staff: "Resolved by {Name} · {time}" (`App\Support\Fleet\DefectResolutionLine`). Waiting: "Needs verification
+  — {Name} reported it present/fixed {time}"; safety-critical ones say so. `reported` now reads "New — not yet
+  acknowledged". Captain 5's "Clear, this is for Logistics" is now "Send to Logistics" (action names unchanged).
+- **Retention.** Fixed issues stay on the Captain 5 workspace ("Recently resolved", not open, not counted) and the
+  Admin issue board for `dashboards.resolved_display_hours` (default 72, env `DASHBOARD_RESOLVED_DISPLAY_HOURS`), then
+  drop off; they remain in History and the issue record. Closed-with-no-action rows keep the operational-day rule on the board.
+- **Clear.** Staff can clear a resolved issue early: `apparatus_defects.resolution_cleared_at/_by_user_id` plus a
+  page-only `resolution_cleared` event (in `ApparatusDefectEvent::PAGE_ONLY_EVENTS`: never shown to members, never part of
+  an open-screen state token, not in Latest Activity). Captain 5 uses action `clear_resolution` on
+  `/api/captain5/issues/{id}/actions`; Logistics/admin use the `clear_resolution` action on the board
+  (`ApparatusDefectSource`). Both go through `DefectCorrectiveActionService::clearResolution`: idempotent, no
+  notification, the resolution is untouched; reopening resets it.
+- **Latest Activity** lists `appears_corrected` ("Needs verification", action required) and `resolved_by_checkout`
+  ("Resolved during checkout").
+
 ### Station requests
 
 `POST /api/public/station-requests/{id}/member-resolve`

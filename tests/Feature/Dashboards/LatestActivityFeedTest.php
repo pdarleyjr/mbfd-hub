@@ -210,7 +210,7 @@ final class LatestActivityFeedTest extends TestCase
         $admin = $this->reviewerAdmin();
 
         $events = $this->latest($admin, 'apparatus');
-        $this->assertSame(['Correction reported', 'New issue'], $this->kindsOf($events));
+        $this->assertSame(['Needs verification', 'New issue'], $this->kindsOf($events));
         $this->assertTrue($events[0]->actionRequired);
         $this->assertTrue($events[1]->actionRequired);
 

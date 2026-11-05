@@ -13,7 +13,10 @@ use LogicException;
 final class ApparatusDefectEvent extends Model
 {
     /** Captain 5's own page filter. History shows them, but as far as anyone else's open screen goes nothing changed. */
-    public const PAGE_ONLY_EVENTS = ['cleared_from_captain5', 'returned_to_captain5'];
+    public const PAGE_ONLY_EVENTS = ['cleared_from_captain5', 'returned_to_captain5', self::RESOLUTION_CLEARED];
+
+    /** Staff took a resolved issue off the Captain 5 / Admin lists. Never shown to members and never a change to the issue. */
+    public const RESOLUTION_CLEARED = 'resolution_cleared';
 
     protected $guarded = ['id'];
 

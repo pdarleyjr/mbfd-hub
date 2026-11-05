@@ -28,6 +28,8 @@ use Illuminate\Support\Facades\DB;
  */
 final class DefectContinuityService
 {
+    public const EVENT_RESOLVED_BY_CHECKOUT = 'resolved_by_checkout';
+
     private const ISSUE_STATUSES = ['Missing', 'Damaged'];
 
     /**
@@ -53,7 +55,7 @@ final class DefectContinuityService
         $targets = $this->assignTargets($entries, $open, $definitions);
         $recurrences = $this->recurrenceCandidates((int) $physicalApparatus->id, $targets, $definitions);
 
-        $new = $confirmed = $corrected = $significant = $participation = [];
+        $new = $confirmed = $corrected = $autoClosed = $significant = $participation = [];
         foreach ($targets as $target) {
             $entry = $this->representative($target['entries']);
             $defect = $target['defect'];
@@ -89,12 +91,19 @@ final class DefectContinuityService
                 $participation[(int) $defect->id] = 'confirmed';
             } else {
                 $observation = 'appears_corrected';
-                $corrected[] = (int) $defect->id;
                 $defect->forceFill($this->observedChanges($defect, $inspection, $entry))->save();
-                $this->event($defect, $inspection, 'appears_corrected', ['details' => $this->details($entry)]);
+                // A routine issue the crew now finds present is closed by that checkout (one event: resolved_by_checkout).
+                // Anything that needs a person's judgement keeps waiting for Verify correction.
+                $closesNow = config('captain5.auto_close_on_checkout', true) && DefectMemberCorrection::closesImmediately($defect);
+                $corrected[] = (int) $defect->id;
+                if ($closesNow) {
+                    $autoClosed[] = (int) $defect->id;
+                } else {
+                    $this->event($defect, $inspection, 'appears_corrected', ['details' => $this->details($entry)]);
+                }
                 $participation[(int) $defect->id] = 'verified_corrected';
             }
-            ApparatusDefectObservation::query()->create([
+            $row = ApparatusDefectObservation::query()->create([
                 'apparatus_defect_id' => $defect->id,
                 'apparatus_inspection_id' => $inspection->id,
                 'actor_user_id' => $inspection->actor_user_id,
@@ -103,6 +112,9 @@ final class DefectContinuityService
                 'notes' => $entry['notes'],
                 'photo_path' => $entry['photo_path'],
             ]);
+            if ($observation === 'appears_corrected' && in_array((int) $defect->id, $autoClosed, true)) {
+                $this->closeByCheckout($defect, $inspection, $physicalApparatus, $row, $entry);
+            }
             // A finding is never itself permission to take a unit OOS or
             // return it to service. Its authorized disposition remains a
             // later, explicit administrative decision; an unclassified
@@ -110,7 +122,7 @@ final class DefectContinuityService
         }
         $this->enrollParticipants($inspection, $participation);
 
-        return new FindingsResult($new, $confirmed, $corrected, array_values(array_unique($significant)));
+        return new FindingsResult($new, $confirmed, $corrected, array_values(array_unique($significant)), $autoClosed);
     }
 
     /**
@@ -202,6 +214,9 @@ final class DefectContinuityService
                 'severity' => $defect->severity,
                 'first_reported_at' => $defect->first_reported_at?->toIso8601String(),
                 'latest_member_update' => $updates[$defect->id] ?? null,
+                // What marking it Present will mean: a routine issue closes at once, anything else is verified by its owner.
+                'owner' => $defect->getAttribute('responsible_owner') ?? app(DefectOwnership::class)->ownerOf($defect),
+                'member_correction' => ['closes_immediately' => DefectMemberCorrection::closesImmediately($defect) && config('captain5.auto_close_on_checkout', true)],
             ];
         })->all();
     }
@@ -569,6 +584,53 @@ final class DefectContinuityService
         }
 
         return $changes;
+    }
+
+    /**
+     * The crew's checkout found a routine issue's item present: close it in this transaction (the defect row is locked and
+     * open). The resolver is the inspector and the issue says so; the apparatus' service status is never touched. A second
+     * pass finds the event by its key and does nothing. No push: the owner sees it under "Recently resolved".
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    private function closeByCheckout(ApparatusDefect $defect, ApparatusInspection $inspection, Apparatus $apparatus, ApparatusDefectObservation $observation, array $entry): void
+    {
+        $key = 'defect:'.$defect->id.':resolved_by_checkout:'.$inspection->id;
+        if (ApparatusDefectEvent::query()->where('idempotency_key', $key)->exists() || DefectActionStatus::isClosed($defect->action_status)) {
+            return;
+        }
+        $inspector = $inspection->actor_user_id !== null ? User::query()->find($inspection->actor_user_id, ['id', 'name', 'display_name']) : null;
+        $name = trim((string) ($inspector?->display_name ?: $inspector?->name ?: $inspection->operator_name)) ?: 'a crew member';
+        $unit = trim((string) ($apparatus->designation ?: $apparatus->name)) ?: 'the unit';
+        $notes = 'Resolved by '.$name.' during '.$unit.' checkout';
+        $from = (string) ($defect->action_status ?: DefectActionStatus::REPORTED);
+
+        $defect->forceFill([
+            'action_status' => DefectActionStatus::RESOLVED,
+            'resolved_by_user_id' => $inspector?->getKey(),
+            'resolution_type' => 'item_located',
+            'resolution_notes' => $notes,
+        ])->save();
+        ApparatusDefectEvent::query()->create([
+            'apparatus_defect_id' => $defect->id,
+            'apparatus_inspection_id' => $inspection->id,
+            'actor_user_id' => $inspection->actor_user_id,
+            'event_type' => self::EVENT_RESOLVED_BY_CHECKOUT,
+            'from_status' => $from,
+            'to_status' => DefectActionStatus::RESOLVED,
+            'details' => [
+                'member_resolution' => true,
+                'source' => 'checkout',
+                'inspection_id' => (int) $inspection->id,
+                'observation_id' => (int) $observation->id,
+                'resolution_type' => 'item_located',
+                'resolution_notes' => $notes,
+                'resolved_by' => $name,
+                'unit' => $unit,
+                'reported_status' => $entry['status'],
+            ],
+            'idempotency_key' => $key,
+        ]);
     }
 
     /** @param array<string, mixed> $entry */

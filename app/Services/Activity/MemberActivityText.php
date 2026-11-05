@@ -61,7 +61,7 @@ final class MemberActivityText
             return DefectActionStatus::isClosed($actionStatus) ? DefectActionStatus::label($actionStatus) : 'Resolved';
         }
 
-        return $correctionReported ? 'Correction reported, awaiting verification' : DefectActionStatus::label($actionStatus);
+        return $correctionReported ? 'Needs verification' : DefectActionStatus::label($actionStatus);
     }
 
     public static function ownerLabel(?string $owner): ?string

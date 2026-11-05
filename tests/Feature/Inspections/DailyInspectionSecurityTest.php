@@ -659,6 +659,7 @@ final class DailyInspectionSecurityTest extends TestCase
     /** @return array{flagged: ApparatusInspection, rolledBack: ApparatusInspection, dismissed: ApparatusInspection, betaInspection: ApparatusInspection} */
     private function internalNoteWorld(): array
     {
+        config(['captain5.auto_close_on_checkout' => false]); // this test is about the verification path
         // Inspection 1 (alpha): missing battery AND a member flag, so it is held.
         $this->actAs($this->alpha);
         $one = $this->payload();

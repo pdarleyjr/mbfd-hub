@@ -28,11 +28,12 @@ final class DefectEventSignals
     ];
 
     /** A member saying it is fixed: "You" for the one who did it, "A crew member" for everyone else following it. */
-    private const OWN_EVENTS = ['correction_reported', 'member_resolved'];
+    private const OWN_EVENTS = ['correction_reported', 'member_resolved', 'resolved_by_checkout'];
 
     private const OWN_WORDS = [
         'correction_reported' => 'You reported a correction',
         'member_resolved' => 'You marked this fixed',
+        'resolved_by_checkout' => 'Your checkout found it present, so it was resolved',
     ];
 
     private const COLUMNS = ['id', 'apparatus_defect_id', 'actor_user_id', 'event_type', 'member_message', 'details', 'created_at'];
@@ -89,6 +90,7 @@ final class DefectEventSignals
             $message !== '' => $message,
             $mine && isset(self::OWN_WORDS[$event->event_type]) => self::OWN_WORDS[$event->event_type],
             $byCrew && $event->event_type === 'correction_reported' => 'A crew member reported it fixed; awaiting verification',
+            $byCrew && $event->event_type === 'resolved_by_checkout' => 'Resolved by a crew member during checkout',
             $byCrew => 'Marked fixed by a crew member',
             default => DefectEventNarrative::label((string) $event->event_type),
         };

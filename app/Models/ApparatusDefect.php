@@ -101,6 +101,7 @@ class ApparatusDefect extends Model
         'captain5_cleared_at' => 'datetime',
         'owner_set_at' => 'datetime',
         'correction_reported_at' => 'datetime',
+        'resolution_cleared_at' => 'datetime',
     ];
 
     /** Captain 5's queue. Written only by App\Services\Defects\DefectOwnership. */
@@ -132,6 +133,26 @@ class ApparatusDefect extends Model
     public function scopeFixed(Builder $query): Builder
     {
         return $query->where('action_status', DefectActionStatus::RESOLVED);
+    }
+
+    /** How long a fixed issue stays visible as "resolved" on the Captain 5 workspace and the Admin board. */
+    public static function resolvedDisplayHours(): int
+    {
+        return max(1, (int) config('dashboards.resolved_display_hours', 72));
+    }
+
+    /**
+     * Fixed issues still on display: resolved inside the retention window and not cleared by staff. Hiding them later
+     * never changes the resolution or the history.
+     */
+    public function scopeRecentlyResolved(Builder $query, ?\DateTimeInterface $now = null): Builder
+    {
+        $table = $query->getModel()->getTable();
+        $now = $now !== null ? \Carbon\CarbonImmutable::instance($now)->utc() : \Carbon\CarbonImmutable::now()->utc();
+
+        return $query->where($table.'.action_status', DefectActionStatus::RESOLVED)
+            ->whereNull($table.'.resolution_cleared_at')
+            ->where($table.'.resolved_at', '>=', $now->subHours(self::resolvedDisplayHours()));
     }
 
     public function scopeClosedNoAction(Builder $query): Builder
@@ -204,6 +225,18 @@ class ApparatusDefect extends Model
     public function captain5ClearedBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'captain5_cleared_by_user_id');
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\BelongsTo<User, $this> */
+    public function resolvedBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'resolved_by_user_id');
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\BelongsTo<User, $this> who cleared the resolved issue from the lists */
+    public function resolutionClearedBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'resolution_cleared_by_user_id');
     }
 
     public function firstReportedInspection(): \Illuminate\Database\Eloquent\Relations\BelongsTo
