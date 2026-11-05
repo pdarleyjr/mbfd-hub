@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Enums\DailyCheckoutRequirement;
+use App\Services\Fleet\UnitIdentityGuard;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -85,6 +86,9 @@ class Apparatus extends Model
      */
     protected static function booted(): void
     {
+        // A unit (E1) is not a truck (vehicle 20503). Every write path goes through this, not only the admin form.
+        static::saving(static fn (Apparatus $apparatus) => app(UnitIdentityGuard::class)->check($apparatus));
+
         static::creating(function (Apparatus $apparatus) {
             if (empty($apparatus->slug) && ! empty($apparatus->designation)) {
                 $apparatus->slug = Str::slug($apparatus->designation);

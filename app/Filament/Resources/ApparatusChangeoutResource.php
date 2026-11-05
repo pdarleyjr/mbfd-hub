@@ -43,7 +43,7 @@ class ApparatusChangeoutResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-truck';
 
-    protected static ?string $navigationGroup = 'Operations';
+    protected static ?string $navigationGroup = 'Fleet';
 
     protected static ?int $navigationSort = 73;
 

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ApparatusResource\Pages;
 
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\ApparatusResource\ApparatusWorkflowActions;
+use App\Filament\Resources\ApparatusResource\Widgets\FrontlineCoverageBanner;
 use App\Filament\Resources\ApparatusResource\Widgets\VehicleChangesBanner;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
@@ -37,20 +38,22 @@ class ViewApparatus extends ViewRecord
         return 'Overview';
     }
 
-    /** @return list<class-string> a change involving this truck, on both of its trucks */
+    /** @return list<class-string> a unit without an In Service truck, and a change involving this truck */
     protected function getHeaderWidgets(): array
     {
-        return [VehicleChangesBanner::class];
+        return [FrontlineCoverageBanner::class, VehicleChangesBanner::class];
     }
 
-    /** The unit's everyday work first; reference links and editing after. */
+    /** The truck actions first (swap, out of service, back in service), then everyday work, reference links and editing. */
     protected function getHeaderActions(): array
     {
         return [
+            ...ApparatusWorkflowActions::truckActions(),
             ApparatusWorkflowActions::scheduleService(Actions\Action::make('scheduleService')),
             ApparatusWorkflowActions::logPm(Actions\Action::make('logPmService')),
-            ApparatusWorkflowActions::changeStatus(Actions\Action::make('updateStatus')),
             Actions\ActionGroup::make([
+                ApparatusWorkflowActions::changeStatus(Actions\Action::make('updateStatus')),
+                ApparatusWorkflowActions::changeUnitAssignment(Actions\Action::make('changeUnitAssignment')),
                 ApparatusWorkflowActions::scheduleChangeout(Actions\Action::make('scheduleChangeout')),
                 ApparatusWorkflowActions::addOperationalAlert(Actions\Action::make('addOperationalAlert')),
                 ApparatusWorkflowActions::dailyCheckout(Actions\Action::make('daily_checkout')),

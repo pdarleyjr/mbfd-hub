@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ApparatusResource\Pages;
 
 use App\Enums\DailyCheckoutRequirement;
 use App\Filament\Resources\ApparatusResource;
+use App\Filament\Resources\ApparatusResource\Widgets\FrontlineCoverageBanner;
 use App\Filament\Resources\ApparatusResource\Widgets\VehicleChangesBanner;
 use App\Models\Apparatus;
 use App\Models\ApparatusChangeout;
@@ -39,7 +40,7 @@ class ListApparatuses extends ListRecords
     /** @return list<class-string> */
     protected function getHeaderWidgets(): array
     {
-        return [VehicleChangesBanner::class];
+        return [FrontlineCoverageBanner::class, VehicleChangesBanner::class];
     }
 
     /** Redraws the tab counts after the banner acknowledged a change. */

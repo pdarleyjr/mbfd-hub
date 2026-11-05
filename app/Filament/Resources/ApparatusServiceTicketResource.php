@@ -34,7 +34,7 @@ class ApparatusServiceTicketResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-wrench-screwdriver';
 
-    protected static ?string $navigationGroup = 'Operations';
+    protected static ?string $navigationGroup = 'Fleet';
 
     protected static ?int $navigationSort = 70;
 

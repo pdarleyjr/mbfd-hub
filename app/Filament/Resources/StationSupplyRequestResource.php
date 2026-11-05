@@ -38,8 +38,8 @@ class StationSupplyRequestResource extends Resource
 
     protected static ?string $model = StationSupplyRequest::class;
 
-    // No icon: the Operations navigation group already carries one.
-    protected static ?string $navigationGroup = 'Operations';
+    // No icon: the Stations navigation group already carries one.
+    protected static ?string $navigationGroup = 'Stations';
 
     protected static ?int $navigationSort = 31;
 

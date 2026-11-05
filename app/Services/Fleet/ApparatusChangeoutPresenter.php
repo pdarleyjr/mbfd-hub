@@ -60,6 +60,9 @@ final class ApparatusChangeoutPresenter
         if (($changeout->move_audit['mode'] ?? null) === ApparatusChangeoutPlanner::MODE_HANDOFF_ONLY) {
             return "{$unit} is on truck {$to}. What you took and what you left is recorded.";
         }
+        if ($changeout->isWithoutReplacement()) {
+            return "{$unit} has no truck in service. Truck {$to} is marked ".ApparatusChangeout::OLD_TRUCK_STATUS.'.';
+        }
 
         return "{$unit} is now on truck {$to}. ".self::oldTruckSentence($changeout);
     }
