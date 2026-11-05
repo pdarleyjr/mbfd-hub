@@ -17,7 +17,7 @@ final class DefectEventNarrative
     private const LABELS = [
         'reported' => 'Issue reported',
         'observed_again' => 'Observed again',
-        'appears_corrected' => 'Member reported it appears corrected',
+        'appears_corrected' => 'Needs verification: a checkout reported it present',
         'escalated' => 'Escalated to significant damage',
         'acknowledged' => 'Acknowledged',
         'action_updated' => 'Corrective action updated',
@@ -30,11 +30,13 @@ final class DefectEventNarrative
         'ticket_linked' => 'Service ticket linked',
         'impact_classified' => 'Operational impact classified',
         'severity_corrected' => 'Severity corrected',
-        'cleared_from_captain5' => 'Cleared from Captain 5 (stays open for Logistics)',
+        'cleared_from_captain5' => 'Sent to Logistics (stays open)',
         'returned_to_captain5' => 'Brought back to Captain 5',
         'owner_transferred' => 'Moved to another queue',
-        'correction_reported' => 'Member reported it fixed (awaiting verification)',
+        'correction_reported' => 'Needs verification: a member reported it fixed',
         'member_resolved' => 'Resolved by a member',
+        'resolved_by_checkout' => 'Resolved during checkout',
+        'resolution_cleared' => 'Cleared from the resolved list',
     ];
 
     private const OWNER_NAMES = ['captain5' => 'Captain 5', 'logistics' => 'Support Services (Logistics)'];
@@ -92,6 +94,20 @@ final class DefectEventNarrative
                 if (($reason = $text('reason')) !== null) {
                     $lines[] = 'Reason: '.$reason;
                 }
+                break;
+            case 'resolved_by_checkout':
+                $by = $text('resolved_by');
+                $unit = $text('unit');
+                if ($by !== null) {
+                    $lines[] = 'Resolved by '.$by.($unit !== null ? ' during '.$unit.' checkout' : ' during a checkout').'.';
+                }
+                $lines[] = 'The checkout reported the item present; this was a routine issue, so it closed itself.';
+                break;
+            case 'appears_corrected':
+                $lines[] = 'This issue is open until someone verifies the correction.';
+                break;
+            case 'resolution_cleared':
+                $lines[] = 'Staff cleared it from the list. The resolution is unchanged.';
                 break;
             case 'resolved':
             case 'correction_verified':

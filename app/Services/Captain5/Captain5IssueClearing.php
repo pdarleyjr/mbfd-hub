@@ -27,6 +27,12 @@ final class Captain5IssueClearing
 
     public const ACTIONS = [self::ACTION_CLEAR, self::ACTION_BRING_BACK];
 
+    /** Takes a resolved issue off the "Recently resolved" list. Not an ownership move; the resolution is untouched. */
+    public const ACTION_CLEAR_RESOLUTION = 'clear_resolution';
+
+    /** Actions a page cached before they existed would throw on, so they travel apart from the main action list. */
+    public const LATE_ACTIONS = [...self::ACTIONS, self::ACTION_CLEAR_RESOLUTION];
+
     /** Events written before ownership existed; still rendered in history. */
     public const EVENT_CLEARED = 'cleared_from_captain5';
 

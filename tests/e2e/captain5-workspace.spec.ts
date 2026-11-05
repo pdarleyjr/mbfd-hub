@@ -61,7 +61,7 @@ const apparatusIdOf = (unit: string): number => {
 function makeIssue(id: number, overrides: Partial<IssueDetail> = {}): IssueDetail {
   return {
     id, kind: 'rescue', apparatus_id: apparatusIdOf(overrides.unit ?? 'Rescue 1'), unit: 'Rescue 1', compartment: 'Medical bag', item: 'Pulse oximeter', issue_type: 'Missing',
-    severity: 'routine', action_status: 'reported', action_label: 'Awaiting verification', open: true, details: {},
+    severity: 'routine', action_status: 'reported', action_label: 'New — not yet acknowledged', open: true, details: {},
     expected_delivery: null, overdue: false, awaiting_verification: false, first_reported_at: minutesAgo(180),
     first_reported_by: 'Lt. Reporter', last_observed_at: minutesAgo(60), resolved_at: null, resolution_type: null,
     state_token: `reported:${id}0`, resolution_notes: null,
@@ -582,7 +582,7 @@ test.describe('Issues and the detail sheet', () => {
     await expect(rows.filter({ hasText: 'Epinephrine' })).toContainText('Medical');
     await expect(rows.filter({ hasText: 'Epinephrine' })).toContainText('Engine 1');
     await expect(rows.filter({ hasText: 'Pulse oximeter' })).toContainText('Needs acknowledgement');
-    await expect(rows.filter({ hasText: 'Suction unit' })).toContainText('Awaiting verification');
+    await expect(rows.filter({ hasText: 'Suction unit' })).toContainText('Needs verification');
     // Overdue sorts first and says so in text.
     await expect(rows.first()).toContainText('Overdue');
 
@@ -872,7 +872,7 @@ test.describe('one row per unit', () => {
   });
 });
 
-test.describe('Clear for Logistics', () => {
+test.describe('Send to Logistics', () => {
   const twoOnRescue = (): IssueDetail[] => [
     makeIssue(1),
     makeIssue(2, { item: 'Cervical collar', state_token: 'reported:20' }),
@@ -883,13 +883,13 @@ test.describe('Clear for Logistics', () => {
     const server = newServer({ issues: twoOnRescue() });
     await open(page, server, '/daily/captain-5?tab=issues');
     await unitRow(page, 'Rescue 1').click();
-    const row = page.getByRole('button', { name: 'Clear for Logistics: Rescue 1, Pulse oximeter' });
+    const row = page.getByRole('button', { name: 'Send to Logistics: Rescue 1, Pulse oximeter' });
     const box = await row.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
     await row.click();
 
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(page.getByTestId('captain5-clear-status')).toContainText('Cleared from Captain 5. It stays open with Logistics.');
+    await expect(page.getByTestId('captain5-clear-status')).toContainText('Sent to Logistics. It stays open with Logistics.');
     expect(server.actionBodies).toHaveLength(1);
     expect(lastAction(server)).toMatchObject({ action: 'send_to_logistics', expected_state: 'reported:10' });
     expect(String(lastAction(server).idempotency_key)).toMatch(KEY_PATTERN);
@@ -897,7 +897,7 @@ test.describe('Clear for Logistics', () => {
     expect(lastAction(server)).not.toHaveProperty('member_message');
     await expect(unitRow(page, 'Rescue 1')).toContainText('1 issue');
     await expect(page.getByRole('tab', { name: /^Issues/ })).toContainText('2');
-    await expect(page.getByTestId('captain5-cleared-section')).toContainText('Cleared for Logistics (1)');
+    await expect(page.getByTestId('captain5-cleared-section')).toContainText('Sent to Logistics (1)');
     await expectNoHorizontalOverflow(page);
     await shot(page, `cleared-${page.viewportSize()?.width}`);
 
@@ -913,7 +913,7 @@ test.describe('Clear for Logistics', () => {
     await open(page, server, '/daily/captain-5?tab=issues');
     await expect(page.getByRole('tab', { name: /^Issues/ })).toContainText('1');
     const section = page.getByTestId('captain5-cleared-section');
-    await expect(section).toContainText('Cleared for Logistics (1)');
+    await expect(section).toContainText('Sent to Logistics (1)');
     await expect(page.getByTestId('captain5-cleared-row')).toBeHidden();
     await section.locator('summary').click();
     await expect(page.getByTestId('captain5-cleared-row')).toContainText('by Jordan Lee');
@@ -939,15 +939,15 @@ test.describe('Clear for Logistics', () => {
     };
     await open(page, server, '/daily/captain-5?tab=issues');
     await unitRow(page, 'Rescue 1').click();
-    await page.getByRole('button', { name: 'Clear all 2 for Logistics' }).click();
+    await page.getByRole('button', { name: 'Send all 2 to Logistics' }).click();
 
-    await expect(page.getByTestId('captain5-clear-status')).toHaveText(/Cleared 1 of 2\. 1 changed and was not cleared\./);
+    await expect(page.getByTestId('captain5-clear-status')).toHaveText(/Sent 1 of 2\. 1 changed and was not sent\./);
     // In queue order, newest first: the changed one does not stop the next.
     expect(server.actionBodies.map((body) => body.expected_state)).toEqual(['reported:20', 'reported:10']);
     expect(server.actionBodies[0].idempotency_key).not.toBe(server.actionBodies[1].idempotency_key);
     await expect(unitRow(page, 'Rescue 1')).toContainText('1 issue');
     await expect(page.getByTestId('captain5-issue-row').filter({ hasText: 'Cervical collar' })).toContainText('Acknowledged');
-    await expect(page.getByTestId('captain5-cleared-section')).toContainText('Cleared for Logistics (1)');
+    await expect(page.getByTestId('captain5-cleared-section')).toContainText('Sent to Logistics (1)');
 
     await page.getByRole('tab', { name: 'Today' }).click();
     await expect(page.getByTestId('captain5-count-all')).toContainText('2');
@@ -964,12 +964,12 @@ test.describe('Clear for Logistics', () => {
       return route.abort('connectionreset');
     });
     await unitRow(page, 'Rescue 1').click();
-    await page.getByRole('button', { name: 'Clear for Logistics: Rescue 1, Pulse oximeter' }).click();
-    await expect(page.getByTestId('captain5-clear-status')).toContainText('Cleared 0 of 1. 1 could not be sent. Try again.');
+    await page.getByRole('button', { name: 'Send to Logistics: Rescue 1, Pulse oximeter' }).click();
+    await expect(page.getByTestId('captain5-clear-status')).toContainText('Sent 0 of 1. 1 could not be sent. Try again.');
     const firstKey = server.actionBodies[0].idempotency_key;
 
-    await page.getByRole('button', { name: 'Clear all 2 for Logistics' }).click();
-    await expect(page.getByTestId('captain5-clear-status')).toContainText('Cleared all 2 from Captain 5. They stay open with Logistics.');
+    await page.getByRole('button', { name: 'Send all 2 to Logistics' }).click();
+    await expect(page.getByTestId('captain5-clear-status')).toContainText('Sent all 2 to Logistics. They stay open with Logistics.');
     const sameIssue = server.actionBodies.filter((body) => body.expected_state === 'reported:10');
     expect(sameIssue).toHaveLength(2);
     expect(sameIssue[1]).toMatchObject({ action: 'send_to_logistics', idempotency_key: firstKey });
@@ -978,15 +978,15 @@ test.describe('Clear for Logistics', () => {
   test('the sheet offers the same action with a note and no message to the crew, and the timeline names who did it', async ({ page }) => {
     const server = newServer({ issues: [makeIssue(1, { clearing_actions: ['send_to_logistics'] })] });
     await open(page, server, '/daily/captain-5?tab=issues&issue=1');
-    await page.getByRole('group', { name: 'Issue actions' }).getByRole('button', { name: 'Clear, this is for Logistics' }).click();
+    await page.getByRole('group', { name: 'Issue actions' }).getByRole('button', { name: 'Send to Logistics' }).click();
     const form = actionForm(page);
     await form.getByText('Add a note (optional)').click();
     await expect(form.getByLabel('Message to crew')).toHaveCount(0);
     await form.getByLabel('Internal note').fill('Radio mount belongs to support services.');
-    await form.getByRole('button', { name: 'Clear for Logistics' }).click();
-    await expect(page.getByTestId('captain5-issue-notice')).toHaveText('Cleared from Captain 5. It stays open with Logistics.');
+    await form.getByRole('button', { name: 'Send to Logistics' }).click();
+    await expect(page.getByTestId('captain5-issue-notice')).toHaveText('Sent to Logistics. It stays open with Logistics.');
     expect(lastAction(server)).toMatchObject({ action: 'send_to_logistics', internal_note: 'Radio mount belongs to support services.' });
-    await expect(page.getByTestId('captain5-timeline')).toContainText('Cleared from Captain 5 by Alex Rivera');
+    await expect(page.getByTestId('captain5-timeline')).toContainText('Sent to Logistics by Alex Rivera');
     await expect(page.getByTestId('captain5-issue-summary')).toContainText('It stays open with Logistics.');
     await expect(page.getByRole('group', { name: 'Issue actions' }).getByRole('button')).toHaveText(['Bring back']);
   });

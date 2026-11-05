@@ -64,7 +64,7 @@ export const ACTIONS: Record<IssueActionName, ActionMeta> = {
   },
   verify: {
     label: 'Verify correction', confirm: 'Verify correction', done: 'Correction verified.',
-    intro: 'A crew member reported this as corrected. Confirm you checked it.', fields: ['resolution_notes'], required: [],
+    intro: 'A crew member said this is fixed or present. Confirm you checked it before it is closed.', fields: ['resolution_notes'], required: [],
   },
   dismiss: {
     label: NO_ACTION_LABEL, confirm: 'Close issue', done: 'Issue closed. No action required.',
@@ -75,9 +75,13 @@ export const ACTIONS: Record<IssueActionName, ActionMeta> = {
     intro: 'Puts a closed issue back in the queue.', fields: ['reason'], required: ['reason'],
   },
   send_to_logistics: {
-    label: 'Clear, this is for Logistics', confirm: 'Clear for Logistics', done: 'Cleared from Captain 5. It stays open with Logistics.',
-    intro: 'For a support services or logistics issue. It leaves your page and counts, stays open for Logistics, and the crew is not told. Bring it back any time from Cleared for Logistics.',
+    label: 'Send to Logistics', confirm: 'Send to Logistics', done: 'Sent to Logistics. It stays open with Logistics.',
+    intro: 'For a support services or logistics issue. It leaves your page and counts, stays open for Logistics, and the crew is not told. Bring it back any time from Sent to Logistics.',
     fields: [], required: [],
+  },
+  clear_resolution: {
+    label: 'Clear from list', confirm: 'Clear', done: 'Cleared from the resolved list.',
+    intro: 'Takes this off Recently resolved. The resolution stays in History and the crew is not told.', fields: [], required: [],
   },
   bring_back_to_captain5: {
     label: 'Bring back', confirm: 'Bring back', done: 'Brought back to the Captain 5 queue.',
@@ -87,7 +91,7 @@ export const ACTIONS: Record<IssueActionName, ActionMeta> = {
 };
 
 /** These two stay between Captain 5 and Logistics, so their forms offer a note and no message to the crew. */
-export const NOTE_ONLY_ACTIONS: IssueActionName[] = ['send_to_logistics', 'bring_back_to_captain5'];
+export const NOTE_ONLY_ACTIONS: IssueActionName[] = ['send_to_logistics', 'bring_back_to_captain5', 'clear_resolution'];
 
 export const REQUIRED_MESSAGES: Partial<Record<FieldKey, string>> = {
   resolution_notes: 'Describe what was replaced or repaired.',

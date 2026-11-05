@@ -373,7 +373,8 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         $this->assertDatabaseCount('apparatus_defects', 1);
         $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
         $this->assertSame('In Service', $this->apparatus->fresh()->status);
-        $this->assertFalse($defect->fresh()->resolved);
+        // A routine (missing) item the next checkout finds present closes itself; damage waits for verification.
+        $this->assertSame($status === 'Missing', $defect->fresh()->resolved);
         $this->assertSame(
             ['first_reported', 'confirmed_again', 'appears_corrected'],
             ApparatusDefectObservation::query()->where('apparatus_defect_id', $defect->id)->orderBy('id')->pluck('observation')->all(),

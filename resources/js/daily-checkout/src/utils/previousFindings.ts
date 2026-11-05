@@ -56,9 +56,17 @@ export function formatReportedDate(value: string | null | undefined): string | n
 
 /** Current status line: the corrective action wording when the server has one, else the verification wait. */
 export function previousIssueStatusLine(finding: OpenFinding): string {
-  const status = finding.action_label?.trim() ? finding.action_label.trim() : 'Awaiting verification';
+  const status = finding.action_label?.trim() ? finding.action_label.trim() : 'New — not yet acknowledged';
   const reported = formatReportedDate(finding.first_reported_at);
   return reported ? `${status} · First reported ${reported}` : status;
+}
+
+/** What marking a previously reported item Present means, in one sentence the member reads before they submit. */
+export function markedPresentNote(findings: Array<Pick<OpenFinding, 'owner' | 'member_correction'>>): string {
+  const waiting = findings.find(finding => finding.member_correction?.closes_immediately !== true);
+  if (!waiting) return 'Marked present. This closes the issue.';
+  const owner = waiting.owner === 'captain5' ? 'Captain 5' : 'Support Services';
+  return `Marked present. ${owner} will verify it before it is closed.`;
 }
 
 /** What the member's current observation says about a previously reported item, for Review & Sign. */

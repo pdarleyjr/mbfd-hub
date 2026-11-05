@@ -20,9 +20,9 @@ export function IssueTags({ issue, showKind = true }: { issue: IssueSummary; sho
       <Tag tone={status.tone}>{status.label}</Tag>
       {issue.overdue && <Tag tone="danger">Overdue</Tag>}
       {issue.severity === 'significant' && <Tag tone="danger">Significant damage</Tag>}
-      {issue.awaiting_verification && <Tag tone="warning">Awaiting verification</Tag>}
+      {issue.awaiting_verification && <Tag tone={issue.verification?.safety_critical ? 'danger' : 'warning'}>Needs verification</Tag>}
       {showKind && <Tag>{kindLabel(issue.kind)}</Tag>}
-      {issue.open && issue.captain5_cleared_at && <Tag>Cleared for Logistics</Tag>}
+      {issue.open && issue.captain5_cleared_at && <Tag>Sent to Logistics</Tag>}
     </span>
   );
 }

@@ -54,6 +54,8 @@ final class Captain5Workspace
             'rescue_dailies' => $this->rescueDailies(),
             'issues' => $summaries,
             'issues_truncated' => $this->truncated,
+            'resolved_display_hours' => ApparatusDefect::resolvedDisplayHours(),
+            'recently_resolved' => $this->presenter->summaries($this->recentlyResolvedIssues()),
             'cleared_issues' => $this->presenter->summaries($this->clearedIssues()),
             ...$this->trucks->payload(),
             'handoff' => $this->handoff($dutyDate, $viewer),
@@ -84,6 +86,17 @@ final class Captain5Workspace
             ->orderByDesc('id')->limit(self::OPEN_LIMIT)->get();
 
         return $this->scope->attachApparatus($issues);
+    }
+
+    /**
+     * @return Collection<int, ApparatusDefect> fixed in-scope issues still on display: resolved within
+     *                                          dashboards.resolved_display_hours and not cleared by staff. Not open, not counted.
+     */
+    public function recentlyResolvedIssues(): Collection
+    {
+        $query = $this->scope->candidateQuery()->recentlyResolved()->with(['firstReporter', 'resolvedBy'])->orderByDesc('resolved_at')->orderByDesc('id');
+
+        return $this->scope->attachApparatus($this->scope->collect($query, self::HISTORY_LIMIT)[0]);
     }
 
     /** @return Collection<int, ApparatusDefect> closed in-scope issues within the history window */

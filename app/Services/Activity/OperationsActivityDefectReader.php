@@ -31,7 +31,7 @@ final class OperationsActivityDefectReader
 {
     private const EVENTS = [
         'reported', 'acknowledged', 'action_updated', 'resolved', 'dismissed', 'reopened', 'correction_verified',
-        'owner_transferred', 'correction_reported', 'member_resolved',
+        'owner_transferred', 'correction_reported', 'member_resolved', 'appears_corrected', 'resolved_by_checkout',
     ];
 
     private const CAPTAIN5 = 'captain5';
@@ -104,7 +104,7 @@ final class OperationsActivityDefectReader
             at: CarbonImmutable::instance($event->created_at),
             statusLabel: DefectActionStatus::label($status),
             actionRequired: ! $captain5 && ! DefectActionStatus::isClosed($status) && (
-                ($type === 'reported' && $status === DefectActionStatus::REPORTED) || $type === 'correction_reported'
+                ($type === 'reported' && $status === DefectActionStatus::REPORTED) || $type === 'correction_reported' || $type === 'appears_corrected'
             ),
             internal: $internal,
             automated: false,
@@ -244,6 +244,9 @@ final class OperationsActivityDefectReader
     /** @param array<string, mixed> $details */
     private static function kindOf(string $type, array $details, bool $memberResolved): string
     {
+        if ($type === 'resolved_by_checkout') {
+            return 'Resolved during checkout';
+        }
         if ($memberResolved) {
             return 'Resolved by member';
         }
@@ -258,7 +261,7 @@ final class OperationsActivityDefectReader
             'dismissed' => 'Closed, no action',
             'reopened' => 'Reopened',
             'correction_verified' => 'Correction verified',
-            'correction_reported' => 'Correction reported',
+            'correction_reported', 'appears_corrected' => 'Needs verification',
             default => 'Status update',
         };
     }

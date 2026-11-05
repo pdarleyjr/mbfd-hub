@@ -35,6 +35,10 @@ return [
     // Workspace history window (closed issues and events) in days.
     'history_days' => 90,
 
+    // A later checkout that finds a routine reported item present closes the issue (event resolved_by_checkout).
+    // Anything significant, blocking, damaged, ticketed or a stretcher report still waits for Verify correction.
+    'auto_close_on_checkout' => (bool) env('CAPTAIN5_AUTO_CLOSE_ON_CHECKOUT', true),
+
     // Kill switch for the Captain 5 communications channel (rollback aid).
     'communications_enabled' => (bool) env('CAPTAIN5_COMMUNICATIONS_ENABLED', true),
 ];
