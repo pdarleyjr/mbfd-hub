@@ -8,10 +8,18 @@ errors go to stderr with a non-zero exit code. The PIN values are never logged.
 """
 
 import json
+import os
 import re
 import sys
 
-import fitz  # PyMuPDF
+# Only the JSON rows may reach stdout. PyMuPDF (and MuPDF underneath it) can print notices and warnings to
+# stdout, which would corrupt the result, so keep a private copy of the real stdout for the JSON and send
+# everything else written to fd 1 (Python or C level) to stderr from here on.
+_RESULT = os.fdopen(os.dup(1), "w", encoding="utf-8")
+os.dup2(2, 1)
+sys.stdout = sys.stderr
+
+import fitz  # PyMuPDF  # noqa: E402 - imported after stdout is redirected on purpose
 
 # Column boundaries (PDF points, left edge of each word).
 COLUMNS = (
@@ -76,7 +84,8 @@ def main(argv):
     with document:
         for index, page in enumerate(document, start=1):
             rows.extend(page_rows(page, index))
-    json.dump(rows, sys.stdout)
+    json.dump(rows, _RESULT)
+    _RESULT.flush()
     return 0
 
 
