@@ -96,6 +96,9 @@ existing `title` or `name` key, whichever the template uses; unique, ≤120) and
   published until it has an item or is deleted. Removing an item removes it from the next issued
   checklist; open defects stay open (the preview counts them).
 - Names are unique case-insensitively (compartments across the checklist, items within a compartment).
+- Inside a compartment, two items may not be the same equipment to the system (names equal once spacing and
+  punctuation are ignored, or one was renamed from the other), and an item may not take another item's former
+  name (old issues are matched by compartment and name). Both are refused on save and on publish.
 - Import may change only `compartments`; every other top-level key must equal the live checklist. An
   imported item without an id keeps its positional id only when that id still names the same item;
   an id that belonged to removed equipment is refused. Restore copies a version's compartments and
@@ -147,9 +150,15 @@ diff also reports `items_reordered` (order changes inside a compartment), which 
 ## 8. Commands
 
 - `php artisan checklist-templates:status` — source, versions, drafts, drift per type.
-- `php artisan checklist-templates:export {type} [--write]` — prints the live baseline JSON; with
-  `--write` replaces `storage/checklists/{type}_checklist.json` so a developer can commit the
-  published version back into the repository.
+- `php artisan checklist-templates:export {type} [--write]` — prints the live baseline JSON. To commit a
+  published version back into the repository, run it on the server, save the output as
+  `storage/checklists/{type}_checklist.json` in a checkout and commit it (the published version and the file
+  then match, so no drift is shown). `--write` writes the local checkout's file and is refused in production.
+  For Engine/Ladder/Rescue/Fire Boat 6 a changed file needs a Captain 5 medical-scope re-review
+  (`config/captain5_medical_scope.php` `reviewed_version`); the command warns when it does.
+- Rollback note: redeploying an image without this feature while a version is published puts every unit on
+  that type back on the repository file at once, without grace revisions. Revert to the repository file in
+  the editor first.
 
 ## 9. Verification
 

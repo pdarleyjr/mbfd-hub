@@ -14,9 +14,10 @@ use JsonException;
  * the published editor version of the type when there is one, otherwise the repository file,
  * read exactly as the resolver always read it.
  *
- * Bound `scoped`: the published row is memoized per request / queued job, so one checkout resolves
- * every apparatus against one consistent baseline and a publish is picked up by the next request.
- * The editor flushes it around a publish. File reads are never memoized (the file is the
+ * Bound `scoped`: outside a transaction the published row is memoized per request / queued job, so one
+ * page resolves every apparatus against one baseline and a publish is picked up by the next request.
+ * Inside a transaction it is read fresh (lock-then-resolve callers must see a publish that committed while
+ * they waited). The editor flushes it around a publish. File reads are never memoized (the file is the
  * deploy-managed source and tests rewrite it between resolves).
  */
 final class ChecklistTemplateRepository

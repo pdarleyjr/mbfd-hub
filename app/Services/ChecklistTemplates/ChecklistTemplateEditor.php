@@ -208,7 +208,8 @@ final class ChecklistTemplateEditor
             'checklist' => $baseline['checklist'],
             'hash' => $this->resolver->versionOf($baseline['checklist']),
             'source' => $baseline['source'],
-            'version' => $baseline['source'] === 'published' ? $this->repository()->published($type) : null,
+            // The very row baseline() read (a second read could see a different one inside a transaction).
+            'version' => $baseline['source'] === 'published' && $baseline['version_id'] !== null ? Version::query()->find($baseline['version_id']) : null,
         ];
     }
 
@@ -1160,6 +1161,18 @@ final class ChecklistTemplateEditor
             }
         }
 
+        // The same ambiguity rules publishing enforces, reported on the row now rather than at publish.
+        if ($errors === []) {
+            foreach ($built as $compartment) {
+                $label = InventoryOverlay::compartmentName($compartment['data']);
+                $aliased = $this->withAliases(['compartments' => [[...$compartment['data'], 'items' => $compartment['items']]]], $this->baseOf($draft));
+                foreach (self::ambiguities($aliased['compartments'][0]['items'], $label) as $problem) {
+                    $item = $compartment['items'][$problem['item_index']] ?? [];
+                    $errors[($formKeys[(string) ($item['id'] ?? '')] ?? 'checklist').'.name'] ??= $problem['message'];
+                }
+            }
+        }
+
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
@@ -1485,41 +1498,8 @@ final class ChecklistTemplateEditor
             }
 
             $itemNames = [];
-            // Equipment identity and former names must stay unambiguous inside a compartment: inventory
-            // changes match on the identity, and old issues are matched to items by compartment and name.
-            $identities = [];
-            $formerNames = [];
-            foreach ($items as $item) {
-                if (! is_array($item)) {
-                    continue;
-                }
-                $identity = EquipmentIdentity::forItem($item);
-                $identities[$identity][] = self::text($item['name'] ?? null);
-                foreach ((array) ($item['legacyItemNames'] ?? []) as $former) {
-                    if (is_string($former) && trim($former) !== '') {
-                        $formerNames[mb_strtolower(trim($former))][] = self::text($item['name'] ?? null);
-                    }
-                }
-            }
-            foreach ($identities as $names) {
-                if (count($names) > 1) {
-                    $errors[] = sprintf(
-                        '%s: "%s" are the same equipment to the system (one was renamed from the other\'s name). Remove the old item or give the new one a different name.',
-                        $label,
-                        implode('" and "', $names),
-                    );
-                }
-            }
-            foreach ($items as $item) {
-                if (! is_array($item)) {
-                    continue;
-                }
-                $name = self::text($item['name'] ?? null);
-                foreach ($formerNames[mb_strtolower($name)] ?? [] as $renamed) {
-                    if ($renamed !== $name) {
-                        $errors[] = "{$label}: \"{$name}\" is the former name of \"{$renamed}\", so old issues could not tell them apart. Remove the old item or give the new one a different name.";
-                    }
-                }
+            foreach (self::ambiguities($items, $label) as $problem) {
+                $errors[] = $problem['message'];
             }
 
             foreach ($items as $ii => $item) {
@@ -1567,6 +1547,60 @@ final class ChecklistTemplateEditor
         return array_values(array_unique($errors));
     }
 
+    /**
+     * Equipment identity and former names must stay unambiguous inside a compartment: inventory changes
+     * match items on the identity, and old issues are matched to items by compartment and name.
+     *
+     * @param  array<int, mixed>  $items  one compartment's items
+     * @return list<array{item_index: int, message: string}> the index is the later item of each clash
+     */
+    private static function ambiguities(array $items, string $label): array
+    {
+        $problems = [];
+        $identities = [];
+        $formerNames = [];
+        foreach ($items as $ii => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $name = self::text($item['name'] ?? null);
+            $identities[EquipmentIdentity::forItem($item)][] = [$ii, $name];
+            foreach ((array) ($item['legacyItemNames'] ?? []) as $former) {
+                if (is_string($former) && trim($former) !== '') {
+                    $formerNames[mb_strtolower(trim($former))][] = $name;
+                }
+            }
+        }
+        foreach ($identities as $members) {
+            if (count($members) > 1) {
+                $problems[] = [
+                    'item_index' => (int) end($members)[0],
+                    'message' => sprintf(
+                        '%s: "%s" are the same equipment to the system (their names match once spacing and punctuation are ignored, or one was renamed from the other). Remove one of them or give one a clearly different name.',
+                        $label,
+                        implode('" and "', array_column($members, 1)),
+                    ),
+                ];
+            }
+        }
+        foreach ($items as $ii => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $name = self::text($item['name'] ?? null);
+            foreach ($formerNames[mb_strtolower($name)] ?? [] as $renamed) {
+                if ($renamed !== $name) {
+                    $problems[] = [
+                        'item_index' => (int) $ii,
+                        'message' => "{$label}: \"{$name}\" is the former name of \"{$renamed}\", so old issues could not tell them apart. Give the new item a distinguishing name (for example \"{$name} (new)\") or remove the old one.",
+                    ];
+                }
+            }
+        }
+
+        return $problems;
+    }
+
     // ------------------------------------------------------------------ ids
 
     /**
@@ -1584,7 +1618,8 @@ final class ChecklistTemplateEditor
         if (is_array($file['checklist'])) {
             $checklists[] = $file['checklist'];
         }
-        foreach (Version::query()->where('checklist_type', $type)->get(['checklist', 'base_checklist']) as $version) {
+        // Discarded drafts were never issued: nothing (defects, inventory changes, decisions) is keyed to their ids.
+        foreach (Version::query()->where('checklist_type', $type)->where('status', '!=', Version::STATUS_DISCARDED)->get(['checklist', 'base_checklist']) as $version) {
             $checklists[] = is_array($version->checklist) ? $version->checklist : [];
             $checklists[] = is_array($version->base_checklist) ? $version->base_checklist : [];
         }

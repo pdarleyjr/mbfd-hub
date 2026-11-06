@@ -12,9 +12,10 @@ use Illuminate\Console\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Prints the live baseline of a Daily Checkout checklist template as JSON. With --write it replaces
- * storage/checklists/{type}_checklist.json, so a developer can commit a published version back into
- * the repository (docs/checklist-template-editor.md section 8). Nothing in the database changes.
+ * Prints the live baseline of a Daily Checkout checklist template as JSON, so the published version can be
+ * committed back into the repository (docs/checklist-template-editor.md section 8). With --write (refused in
+ * production) it replaces storage/checklists/{type}_checklist.json of the local checkout. Nothing in the
+ * database changes.
  */
 final class ChecklistTemplatesExport extends Command
 {
@@ -51,7 +52,8 @@ final class ChecklistTemplatesExport extends Command
         // The repository file is deploy-managed: rewriting it on a running server would be lost on the next
         // deploy and would silently move Captain 5's reviewed medical baseline. Commit it from a checkout.
         if (app()->environment('production')) {
-            $this->error('--write is refused in production. Run it in a development checkout and commit the file.');
+            $this->error("--write is refused in production. Run `php artisan checklist-templates:export {$type}` here (it only prints), "
+                ."save the output as storage/checklists/{$type}_checklist.json in a repository checkout and commit it.");
 
             return self::FAILURE;
         }

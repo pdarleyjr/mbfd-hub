@@ -110,7 +110,7 @@ final class ChecklistTemplateEditorTest extends TestCase
 
     public function test_a_publish_committed_while_a_caller_waits_for_locks_is_seen_inside_its_transaction(): void
     {
-        $fileVersion = $this->resolved('E1')['checklist_version']; // memoizes "no published version"
+        $fileVersion = $this->resolved('E1')['checklist_version']; // the memo itself is covered by ChecklistTemplateRepositoryTest
 
         // Another administrator's publish commits (written directly: the memo is not flushed).
         $draft = $this->editor()->startDraft('engine', $this->manager);
@@ -159,11 +159,56 @@ final class ChecklistTemplateEditorTest extends TestCase
             'id' => '', 'name' => 'Passports', 'expectedQuantity' => null, 'manufacturer' => null, 'model' => null,
             'description' => null, 'note' => null, 'compartment_id' => $form['compartments'][$ci]['id'],
         ];
-        $draft = $this->editor()->saveDraft($draft, $form, $this->manager, $draft->lock_version);
+        $newRow = count($form['compartments'][$ci]['items']) - 1;
 
-        $preview = $this->editor()->preview($draft);
-        $this->assertFalse($preview['publishable']);
-        $this->assertStringContainsString('same equipment', implode(' ', $preview['errors']));
+        // Refused when saving, on the new item's row, not first at publish.
+        try {
+            $this->editor()->saveDraft($draft, $form, $this->manager, $draft->lock_version);
+            $this->fail('The ambiguous pair must be refused on save.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey("compartments.{$ci}.items.{$newRow}.name", $exception->errors());
+            $this->assertStringContainsString('same equipment', $exception->errors()["compartments.{$ci}.items.{$newRow}.name"][0]);
+        }
+
+        // Publishing enforces it too (a draft imported or stored in that state is refused).
+        $checklist = $draft->fresh()->checklist;
+        foreach ($checklist['compartments'] as $c => $compartment) {
+            foreach ($compartment['items'] as $i => $item) {
+                if ($item['name'] === 'Passports') {
+                    $checklist['compartments'][$c]['items'][$i]['name'] = 'Passports (old)';
+                    $checklist['compartments'][$c]['items'][$i]['equipmentKey'] = 'name:passports';
+                    $checklist['compartments'][$c]['items'][] = ['id' => 'probe-new-passports', 'name' => 'Passports', 'inputType' => 'checkbox'];
+                    break 2;
+                }
+            }
+        }
+        $this->assertStringContainsString('same equipment', implode(' ', $this->editor()->validationErrors($checklist)));
+    }
+
+    public function test_a_new_item_may_not_take_another_items_former_name_in_its_compartment(): void
+    {
+        $draft = $this->editor()->startDraft('engine', $this->manager);
+        $form = $this->editor()->toForm($draft->checklist);
+        foreach ($draft->checklist['compartments'] as $ci => $compartment) {
+            foreach ($compartment['items'] as $item) {
+                foreach ($item['legacyItemNames'] ?? [] as $former) {
+                    if ($former !== $item['name']) {
+                        $form['compartments'][$ci]['items'][] = [
+                            'id' => '', 'name' => $former, 'expectedQuantity' => null, 'manufacturer' => null, 'model' => null,
+                            'description' => null, 'note' => null, 'compartment_id' => $compartment['id'],
+                        ];
+                        $this->assertThrows(
+                            fn () => $this->editor()->saveDraft($draft, $form, $this->manager, $draft->lock_version),
+                            ValidationException::class,
+                            'is the former name of',
+                        );
+
+                        return;
+                    }
+                }
+            }
+        }
+        $this->markTestSkipped('No item with a former name in the engine template.');
     }
 
     public function test_export_write_is_refused_in_production_and_a_committed_export_is_not_drift(): void
