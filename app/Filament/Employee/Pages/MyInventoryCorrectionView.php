@@ -38,9 +38,16 @@ class MyInventoryCorrectionView extends Page implements HasNavigationParent
 
     public string $reply = '';
 
+    /** Optional reason the member gives when withdrawing. */
+    public string $withdrawNote = '';
+
     /** Server-issued idempotency key for the reply being sent; the browser cannot change it. */
     #[Locked]
     public ?string $replyKey = null;
+
+    /** Server-issued idempotency key for a withdrawal; the browser cannot change it. */
+    #[Locked]
+    public ?string $withdrawKey = null;
 
     public function mount(int|string $correction): void
     {
@@ -68,6 +75,28 @@ class MyInventoryCorrectionView extends Page implements HasNavigationParent
         $this->reply = '';
         $this->replyKey = null;
         Notification::make()->success()->title('Reply sent to Logistics')->send();
+    }
+
+    /** Withdraws the member's own open request (asked to confirm first in the page). */
+    public function withdraw(): void
+    {
+        $user = auth('web')->user();
+        abort_unless($user instanceof User, 403);
+        $this->authorizedCorrection($this->correctionId);
+        $this->validate(['withdrawNote' => ['nullable', 'string', 'max:'.InventoryCorrectionService::MAX_MESSAGE]], [], ['withdrawNote' => 'reason']);
+        // One key per page visit: a double tap or a retry withdraws once.
+        $this->withdrawKey ??= (string) Str::uuid();
+        try {
+            app(InventoryCorrectionService::class)->withdraw($this->correctionId, $user, trim($this->withdrawNote) !== '' ? $this->withdrawNote : null, $this->withdrawKey);
+        } catch (AuthorizationException) {
+            abort(403);
+        } catch (ValidationException $exception) {
+            Notification::make()->warning()->title('Not withdrawn')->body((string) collect($exception->errors())->flatten()->first())->send();
+
+            return;
+        }
+        $this->withdrawNote = '';
+        Notification::make()->success()->title('Request withdrawn')->body('Logistics will not review it. The checklist was not changed.')->send();
     }
 
     public function getTitle(): string

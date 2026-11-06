@@ -33,6 +33,7 @@ final class InventoryCorrectionActivitySource implements MemberActivitySource
         Event::REJECTED => 'Rejected',
         Event::REVERSED => 'The change was reversed',
         Event::LOGISTICS_REPLIED => 'Support Services replied',
+        Event::CLOSED => 'Closed: no checklist change was needed',
     ];
 
     public function __construct(private readonly InventoryCorrectionProjection $corrections) {}

@@ -18,6 +18,8 @@ export interface PendingSubmission {
   retryCount: number;
   lastError?: string;
   lastErrorCode?: string;
+  /** When the current send started (ms since epoch); lets a later pass recover a send the app never finished. */
+  processingSince?: number;
   ownerUserId?: number;
   ownerSecurityVersion?: number;
   ownershipState?: 'owned' | 'legacy_unclaimed' | 'identity_mismatch' | 'security_mismatch';

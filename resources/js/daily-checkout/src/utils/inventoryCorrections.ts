@@ -1,6 +1,7 @@
 import type { PendingInventoryCorrection } from '../types';
 import { db } from '../lib/db';
-import { submitOrQueueWithResponse, type SubmissionOutcome } from '../lib/sync';
+import { SERVER_REFUSED_CODE, submitOrQueueWithResponse, type SubmissionOutcome } from '../lib/sync';
+import { announceSubmissionQueuesChanged } from './dailyCheckoutSubmissionQueue';
 
 export type ItemCorrectionReason = 'no_longer_carried' | 'moved' | 'replaced' | 'wrong_quantity' | 'wrong_description' | 'other';
 export type CorrectionReason = ItemCorrectionReason | 'new_item';
@@ -24,7 +25,11 @@ export const PHOTO_MAX_BYTES = 5_000_000;
 export const SENT_TEXT = 'Sent to Logistics for review';
 /** Another member already reported this change: the server added this member to that request instead of filing a second one. */
 export const JOINED_TEXT = 'Another member already reported this. You were added to that request and will get its updates.';
-export const QUEUED_TEXT = 'Saved on this device. It will be sent when you\'re back online.';
+export const QUEUED_TEXT = 'Saved on this device because Logistics could not be reached. It will be sent automatically when the app reconnects or is opened again.';
+/** Image types the server stores; anything else (HEIC, TIFF, SVG...) is refused there. */
+export const PHOTO_TYPES: ReadonlyArray<string> = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MARKUP = /[<>]/;
+const MARKUP_MESSAGE = 'Remove the < and > characters.';
 
 /** Everything the member has typed for one report, kept in the workspace so closing the panel never loses it. */
 export interface CorrectionForm {
@@ -45,6 +50,8 @@ export interface CorrectionForm {
   sending: boolean;
   error: string | null;
   result: SubmissionOutcome | 'joined' | null;
+  /** The request the report became (or joined), once the server confirmed it: "IC-000123". */
+  sentReference?: { id: number; reference: string };
   /** The id of the last send of this exact payload; a retry of the same payload reuses it so the server can ignore a duplicate. */
   attempt?: { id: string; fingerprint: string };
 }
@@ -52,21 +59,29 @@ export interface CorrectionForm {
 export function emptyCorrectionForm(expectedQuantity?: number): CorrectionForm {
   return {
     open: false, reason: '', toCompartmentId: '', toLocationText: '', name: '', manufacturer: '', model: '', description: '',
-    quantity: expectedQuantity === undefined ? '' : String(expectedQuantity), note: '', photo: undefined, photoKey: 0, showErrors: false, sending: false, error: null, result: null, attempt: undefined,
+    quantity: expectedQuantity === undefined ? '' : String(expectedQuantity), note: '', photo: undefined, photoKey: 0, showErrors: false, sending: false, error: null, result: null, sentReference: undefined, attempt: undefined,
   };
 }
 
-export type CorrectionErrors = Partial<Record<'reason' | 'toCompartmentId' | 'toLocationText' | 'name' | 'quantity' | 'note', string>>;
+export type CorrectionErrors = Partial<Record<'reason' | 'toCompartmentId' | 'toLocationText' | 'name' | 'manufacturer' | 'model' | 'description' | 'quantity' | 'note', string>>;
 
 const validQuantity = (value: string): boolean => /^\d{1,3}$/.test(value.trim()) && Number(value) >= 1 && Number(value) <= QUANTITY_MAX;
 
-export function validateCorrection(mode: CorrectionMode, form: CorrectionForm): CorrectionErrors {
+/** The server refuses < and > in these fields; say so before sending instead of after (or silently, from the offline queue). */
+function markupErrors(form: CorrectionForm, errors: CorrectionErrors): CorrectionErrors {
+  for (const key of ['name', 'manufacturer', 'model', 'description', 'toLocationText'] as const) {
+    if (errors[key] === undefined && MARKUP.test(form[key])) errors[key] = MARKUP_MESSAGE;
+  }
+  return errors;
+}
+
+export function validateCorrection(mode: CorrectionMode, form: CorrectionForm, expectedQuantity?: number): CorrectionErrors {
   const errors: CorrectionErrors = {};
   const quantityMessage = `Enter a whole number from 1 to ${QUANTITY_MAX}.`;
   if (mode === 'new_item') {
     if (form.name.trim() === '') errors.name = 'Enter the name of the item.';
     if (form.quantity.trim() !== '' && !validQuantity(form.quantity)) errors.quantity = quantityMessage;
-    return errors;
+    return markupErrors(form, errors);
   }
   if (form.reason === '') {
     errors.reason = 'Choose what is wrong.';
@@ -77,11 +92,14 @@ export function validateCorrection(mode: CorrectionMode, form: CorrectionForm): 
     else if (form.toCompartmentId === ELSEWHERE && form.toLocationText.trim() === '') errors.toLocationText = 'Say where it is carried now.';
   }
   if (form.reason === 'wrong_quantity' && !validQuantity(form.quantity)) errors.quantity = quantityMessage;
+  else if (form.reason === 'wrong_quantity' && expectedQuantity !== undefined && Number(form.quantity) === expectedQuantity) {
+    errors.quantity = `The checklist already says ${expectedQuantity}. Enter the quantity actually carried.`;
+  }
   if (form.reason === 'wrong_description' && form.name.trim() === '' && form.description.trim() === '' && form.note.trim() === '') {
     errors.name = 'Enter the correct name or description.';
   }
   if (form.reason === 'other' && form.note.trim() === '') errors.note = 'Tell Logistics what is wrong.';
-  return errors;
+  return markupErrors(form, errors);
 }
 
 export interface CorrectionBodyArgs {
@@ -127,10 +145,13 @@ export const correctionQueueType = (apparatusId: number): string => `apparatuses
  * Sends the report, or saves it in the owner-bound offline queue when the device is offline or the server is
  * unavailable. A 4xx throws (the server will never accept this payload); nothing the member typed is touched.
  */
-export async function sendInventoryCorrection(apparatusId: number, payload: Record<string, unknown>): Promise<SubmissionOutcome | 'joined'> {
+export async function sendInventoryCorrection(apparatusId: number, payload: Record<string, unknown>): Promise<{ outcome: SubmissionOutcome | 'joined'; sentReference?: { id: number; reference: string } }> {
   const { outcome, response } = await submitOrQueueWithResponse(correctionQueueType(apparatusId), payload, '/api/public');
-  const joined = outcome === 'submitted' && typeof response === 'object' && response !== null && (response as { joined_existing?: unknown }).joined_existing === true;
-  return joined ? 'joined' : outcome;
+  const body = typeof response === 'object' && response !== null ? response as { joined_existing?: unknown; id?: unknown; reference?: unknown } : {};
+  const joined = outcome === 'submitted' && body.joined_existing === true;
+  const sentReference = outcome === 'submitted' && typeof body.id === 'number' && typeof body.reference === 'string'
+    ? { id: body.id, reference: body.reference } : undefined;
+  return { outcome: joined ? 'joined' : outcome, sentReference };
 }
 
 /** Plain-language message for a failed send; the queue reports server rejections as "HTTP 422: detail". */
@@ -141,9 +162,15 @@ export function correctionErrorMessage(error: unknown): string {
   const status = Number(match[1]);
   const detail = match[2].trim();
   if (status === 401 || status === 419) return 'Your sign-in expired. What you typed is still here. Sign in again, then send it.';
+  if (status === 409 && /checklist changed/i.test(detail)) {
+    // Resending cannot work: the report points at a checklist that was replaced. Only a reload gets the current one.
+    return 'The checklist for this apparatus changed while you had it open, so this report was not sent. Copy anything you need from this form, then reload the page and report it again on the current checklist.';
+  }
   const reason = detail !== '' && !/^(unprocessable|bad request|conflict|forbidden|not found)/i.test(detail) ? ` ${detail.replace(/\.?$/, '.')}` : '';
   // A refused send is not a decision: Logistics never saw it, so say so instead of sounding like a rejection.
-  return `Your report was not sent.${reason} Nothing was rejected: Logistics has not seen it. What you typed is still here, so you can change it and try again.`;
+  // A limit is not fixed by editing the report: do not suggest it.
+  const retry = /limit|already have \d+ corrections/i.test(detail) ? '' : ' What you typed is still here, so you can change it and try again.';
+  return `Your report was not sent.${reason} Nothing was rejected: Logistics has not seen it.${retry}`;
 }
 
 /** A report that is waiting on Logistics, for the marker on its item or compartment. */
@@ -151,9 +178,13 @@ export interface CorrectionMarker {
   compartmentId: string | null;
   /** Null for an unlisted item. */
   itemId: string | null;
-  kind: 'pending' | 'question';
+  /** `unsent`: saved on this device, then refused by the server when it was sent later. */
+  kind: 'pending' | 'question' | 'unsent';
   /** The server's id, when known, so a question can link straight to its conversation. */
   correctionId?: number;
+  /** For a report saved on this device: its queue row (to discard it when `unsent`); `error` says why it was refused. */
+  queueId?: number;
+  error?: string;
 }
 
 /** What CompartmentStep needs to file a report and show markers. */
@@ -163,6 +194,8 @@ export interface InventoryCorrectionContext {
   draftId: string | null;
   markers: CorrectionMarker[];
   onRecorded: (marker: CorrectionMarker) => void;
+  /** Deletes a refused report saved on this device; resolves false when it could not be removed. */
+  onDiscardUnsent?: (queueId: number) => Promise<boolean>;
 }
 
 export function serverMarkers(pending: PendingInventoryCorrection[] | undefined): CorrectionMarker[] {
@@ -179,17 +212,35 @@ export async function readQueuedCorrectionMarkers(apparatusId: number, ownerUser
   try {
     const rows = await db.pendingSubmissions.where('type').equals(correctionQueueType(apparatusId)).toArray();
     return rows
-      .filter(row => row.ownerUserId === ownerUserId && (row.status === 'pending' || row.status === 'processing'))
+      .filter(row => row.ownerUserId === ownerUserId && (row.status === 'pending' || row.status === 'processing'
+        || (row.status === 'requires_attention' && row.lastErrorCode === SERVER_REFUSED_CODE)))
       .map(row => ({
         compartmentId: typeof row.data.compartment_id === 'string' ? row.data.compartment_id : null,
         itemId: typeof row.data.item_id === 'string' ? row.data.item_id : null,
-        kind: 'pending' as const,
+        queueId: row.id,
+        ...(row.status === 'requires_attention'
+          ? { kind: 'unsent' as const, error: (row.lastError ?? '').replace(/^HTTP \d{3}:\s*/, '') }
+          : { kind: 'pending' as const }),
       }));
   } catch {
     // Markers are a convenience; the queue itself is untouched.
     return [];
   }
 }
+
+/** Deletes a refused report saved on this device, after the member chose to discard it. Only their own rows. */
+export async function discardUnsentCorrection(apparatusId: number, ownerUserId: number, queueId: number): Promise<boolean> {
+  const row = await db.pendingSubmissions.get(queueId);
+  if (!row || row.type !== correctionQueueType(apparatusId) || row.ownerUserId !== ownerUserId || row.status !== 'requires_attention') return false;
+  await db.pendingSubmissions.delete(queueId);
+  announceSubmissionQueuesChanged();
+  return true;
+}
+
+/** The refused report saved on this device for one item (or the first for unlisted items in a compartment). */
+export const unsentFor = (markers: CorrectionMarker[], compartmentId: string, itemId: string | null): CorrectionMarker | undefined => (
+  markers.find(marker => marker.compartmentId === compartmentId && marker.itemId === itemId && marker.kind === 'unsent')
+);
 
 /** Where a member answers Logistics: the correction's own page when known, else the list of their corrections. */
 export const correctionLink = (marker?: CorrectionMarker): string => (marker?.correctionId !== undefined
@@ -204,11 +255,13 @@ export const questionFor = (markers: CorrectionMarker[], compartmentId: string, 
 /** The marker for one checklist item; a question outranks a plain pending report. */
 export function markerForItem(markers: CorrectionMarker[], compartmentId: string, itemId: string): CorrectionMarker['kind'] | null {
   const own = markers.filter(marker => marker.compartmentId === compartmentId && marker.itemId === itemId);
-  return own.some(marker => marker.kind === 'question') ? 'question' : own.length > 0 ? 'pending' : null;
+  if (own.some(marker => marker.kind === 'question')) return 'question';
+  if (own.some(marker => marker.kind === 'unsent')) return 'unsent';
+  return own.length > 0 ? 'pending' : null;
 }
 
 /** Pending reports about unlisted items in one compartment. */
 export function unlistedMarkers(markers: CorrectionMarker[], compartmentId: string): { pending: number; question: boolean } {
   const own = markers.filter(marker => marker.compartmentId === compartmentId && marker.itemId === null);
-  return { pending: own.length, question: own.some(marker => marker.kind === 'question') };
+  return { pending: own.filter(marker => marker.kind !== 'unsent').length, question: own.some(marker => marker.kind === 'question') };
 }

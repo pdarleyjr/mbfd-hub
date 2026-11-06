@@ -130,6 +130,8 @@ final class InventoryCorrectionProjection
         $applied = $events->last(static fn (Event $event): bool => $event->event_type === Event::APPLIED);
         $mine = static fn (?int $actorId): bool => $viewer === null || $actorId === null || $actorId === (int) $viewer->getKey();
         $duplicateOf = $correction->duplicate_of_correction_id !== null ? ApparatusInventoryCorrection::query()->find($correction->duplicate_of_correction_id) : null;
+        $withdrawable = $viewer !== null && $correction->isOpen();
+        $withdrawRefusal = $withdrawable ? app(InventoryCorrectionService::class)->withdrawRefusal($correction, $viewer) : null;
 
         return [
             ...$this->summary($correction),
@@ -155,7 +157,11 @@ final class InventoryCorrectionProjection
                     'at' => $event->created_at,
                 ];
             })->values()->all(),
-            'can_reply' => $correction->status !== ApparatusInventoryCorrection::STATUS_MERGED,
+            // Members write while Logistics is still deciding; a decided request is in no queue (report it again instead).
+            'can_reply' => $correction->isOpen(),
+            // Withdrawal is offered only while open; the refusal explains why a member who cannot withdraw cannot.
+            'can_withdraw' => $withdrawable && $withdrawRefusal === null,
+            'withdraw_refusal' => $withdrawable ? $withdrawRefusal : null,
         ];
     }
 

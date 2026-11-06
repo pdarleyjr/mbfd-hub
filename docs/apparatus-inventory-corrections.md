@@ -46,8 +46,9 @@ template JSON --(resolver)--> baseline --(InventoryOverlay: active changes by id
 | `apparatus_inventory_changes` | the overlay: one operation on one apparatus; `active`/`superseded`/`reversed` |
 | `apparatus_checklist_revisions` | snapshots of effective checklists retired by a change (grace for in-flight work) |
 
-Correction status: `submitted` -> (`clarification_requested` <-> `submitted`) -> `applied` | `rejected`;
-`applied` -> `reversed`. `lock_version` increments on every state change (optimistic concurrency).
+Correction status: `submitted` -> (`clarification_requested` <-> `submitted`) -> `applied` | `rejected` |
+`closed` | `withdrawn` | `merged`; `applied` -> `reversed`. Every open request has a button that ends it
+(section 8). `lock_version` increments on every state change (optimistic concurrency).
 
 ### 2.2 Item identity
 
@@ -145,7 +146,7 @@ by its successor). The reversal is refused if it would introduce a new overlay c
 
 ## 3. Member API
 
-`POST /api/public/apparatuses/{id}/inventory-corrections` (auth:sanctum, canonical member, throttle 30/min)
+`POST /api/public/apparatuses/{id}/inventory-corrections` (auth:sanctum, canonical member, throttle 60/min)
 
 ```json
 {
@@ -240,3 +241,51 @@ record and one set of tables. Nothing new is stored and no migration is involved
   message to the member is optional (a bare rejection still notifies "The checklist was not changed"). Both require the
   `lock_version` the reviewer saw, are idempotent per key, and a second administrator is told it was already decided.
 - **Notifications** reuse `inventory_correction_submitted` (reviewers) and `inventory_correction_update` (member).
+
+## 8. Every request and every approved change has an end (2026-11-06)
+
+Audit result: before this section, three paths had no button to finish them. A request that another approval had
+already made moot could only be **rejected** (the member was told "rejected"); a member who reported by mistake could
+not take it back; and an approved change that stopped applying after a template change stayed "in effect" with only a
+log line to show for it. Each now has an explicit, audited end. No migration: statuses are plain strings.
+
+| Where it ends | Who | Status / effect | Member is told |
+|---|---|---|---|
+| Review and approve | reviewer | `applied` (then `reversed` by Reverse change) | approved; when Logistics changed the proposal, what was approved, plus Logistics' note |
+| Reject | reviewer | `rejected` | rejected, checklist not changed |
+| **Close, no change needed** | reviewer | `closed` (`InventoryCorrectionService::closeNoChange`) | closed, *not a rejection*: nothing needed changing |
+| **Withdraw this request** | the member who filed it, while open and while no other member has joined | `withdrawn` (`withdraw`) | (their own action) reviewers already in the thread are notified |
+| Combined | the system or the consolidation command | `merged` | combined with IC-…, decided there |
+| **Retire this change** | reviewer, per change | change `retired` (`retireChange`); the correction stays `applied` | nothing (internal event `change_retired`) |
+
+- **Close, no change needed.** Offered on the request page, in the Logistics dashboard panel (`close_no_change`) and
+  highlighted when the member's proposal cannot be applied to the reporting apparatus (`no_change`,
+  `item_not_found`, …): the page explains why and pre-fills the member message.
+- **Withdraw.** On the member's correction page (`/employee/my-inventory-corrections/{id}`), behind a disclosure with
+  an optional reason. Refused once another member joined: the request is theirs too and stays with Logistics.
+- **Replies.** Members write while a request is open. A decided request is in no review queue, so its page says
+  "report it again from a Daily Checkout" instead of offering a reply box (`postMessage` refuses it too).
+- **Approved changes that do not apply.** `InventoryOverlayHealth` lists active changes the resolver skips
+  (`overlay_conflicts`). The queue shows a banner with each one, the request page marks the change "Not applying" with
+  the reason, and the apparatus profile no longer counts it as in effect. **Retire** sets the change `retired` only if
+  it is still in conflict and the unit's `checklist_version` is unchanged afterwards (it never changes the truck's
+  checklist). The overlay logs each conflict at most once an hour.
+- **Blocked reversal.** "A later approved change builds on this one" now names the request (IC-…) and the page's
+  notice links straight to it; reverse that one first.
+- **Queue.** Tabs: Needs a decision (default), Waiting on the member, Approved, Closed (rejected, closed, withdrawn,
+  combined, reversed), All. Open rows say how long they have waited.
+
+### Daily Checkout (member) side
+
+- A report saved offline that the server later refuses (for example the checklist changed first) used to vanish while
+  the connection indicator kept counting it as saved. The queue now marks a refusal `requires_attention`
+  (`OFFLINE_QUEUE_SERVER_REFUSED`); the item shows **Report not sent** with the server's reason and a confirmed
+  **Discard**. A send interrupted by closing the app is retried (payloads with a `client_submission_id` only, which
+  the server de-duplicates); such sends also time out after 60 s and are queued instead of spinning forever.
+- The form checks what the server refuses before sending: `<` and `>` in text, photo type (JPEG, PNG, WebP or GIF),
+  and a "quantity is wrong" report that repeats the listed quantity. A "checklist changed" refusal tells the member to
+  reload rather than retry, and a limit refusal no longer suggests editing the report.
+- After a send the status line links to the request (`View IC-…`). The panel has Cancel and closes on Escape; fields
+  are disabled while sending; Remove photo keeps keyboard focus on the picker; the status line stays in the
+  accessibility tree so the result is announced. An unlisted item reported once is counted once.
+

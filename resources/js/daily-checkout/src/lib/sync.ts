@@ -5,6 +5,13 @@ import { announceSubmissionQueuesChanged } from '../utils/dailyCheckoutSubmissio
 
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 1000;
+/** A send that has not answered in this long is treated as a lost connection (idempotent payloads only). */
+const IDEMPOTENT_SEND_TIMEOUT_MS = 60_000;
+/** A row left "processing" longer than this was interrupted (app closed mid-send). */
+const STALE_PROCESSING_MS = 5 * 60_000;
+
+/** The server refused a saved submission when it was replayed; it needs the member, not another retry. */
+export const SERVER_REFUSED_CODE = 'OFFLINE_QUEUE_SERVER_REFUSED';
 
 export type SubmissionOutcome = 'submitted' | 'queued';
 
@@ -42,20 +49,32 @@ function getBackoffDelay(retryCount: number): number {
   return Math.min(BASE_DELAY_MS * Math.pow(2, retryCount), 30000);
 }
 
+/** The server de-duplicates a payload that carries its own client_submission_id, so resending it is safe. */
+const isIdempotent = (data: Record<string, unknown>): boolean => typeof data.client_submission_id === 'string' && data.client_submission_id !== '';
+
 async function processSubmission(
   submission: PendingSubmission,
   apiBaseUrl: string,
 ): Promise<unknown> {
-  const response = await fetch(`${apiBaseUrl}/${submission.type}`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      ...(xsrfToken() ? { 'X-XSRF-TOKEN': xsrfToken() as string } : {}),
-    },
-    body: JSON.stringify(submission.data),
-  });
+  // Only a payload the server can de-duplicate gets a deadline: a timed-out send may still have arrived.
+  const controller = isIdempotent(submission.data) ? new AbortController() : null;
+  const deadline = controller ? setTimeout(() => controller.abort(), IDEMPOTENT_SEND_TIMEOUT_MS) : undefined;
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}/${submission.type}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        ...(xsrfToken() ? { 'X-XSRF-TOKEN': xsrfToken() as string } : {}),
+      },
+      body: JSON.stringify(submission.data),
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+  } finally {
+    if (deadline !== undefined) clearTimeout(deadline);
+  }
 
   if (!response.ok) {
     let detail = response.statusText;
@@ -192,6 +211,15 @@ async function runPendingSubmissionPass(
       && submission.lastErrorCode === 'OFFLINE_QUEUE_OWNER_MISMATCH'
       && submission.ownerSecurityVersion === identity.securityVersion)
     .modify({ status: 'pending', ownershipState: 'owned', lastError: undefined, lastErrorCode: undefined });
+  // A send interrupted by closing the app leaves its row "processing" forever. Passes run one at a time, so
+  // an old processing row is not in flight here; only payloads the server de-duplicates are put back.
+  const staleBefore = Date.now() - STALE_PROCESSING_MS;
+  await db.pendingSubmissions
+    .where('status')
+    .equals('processing')
+    .filter((submission) => isIdempotent(submission.data)
+      && (submission.processingSince === undefined || submission.processingSince < staleBefore))
+    .modify({ status: 'pending', processingSince: undefined });
   const pending = await db.pendingSubmissions
     .where('status')
     .anyOf('pending', 'failed')
@@ -235,6 +263,7 @@ async function runPendingSubmissionPass(
     try {
       await db.pendingSubmissions.update(submission.id!, {
         status: 'processing',
+        processingSince: Date.now(),
       });
 
       await processSubmission(submission, apiBaseUrl);
@@ -245,9 +274,12 @@ async function runPendingSubmissionPass(
       const isPermanent = error instanceof PermanentSubmissionError;
       const newRetryCount = isPermanent ? MAX_RETRIES : submission.retryCount + 1;
       await db.pendingSubmissions.update(submission.id!, {
-        status: newRetryCount >= MAX_RETRIES ? 'failed' : 'pending',
+        // A refusal is shown to the member (it will never be accepted as saved); retries that ran out stay failed.
+        status: isPermanent ? 'requires_attention' : (newRetryCount >= MAX_RETRIES ? 'failed' : 'pending'),
         retryCount: newRetryCount,
+        processingSince: undefined,
         lastError: error instanceof Error ? error.message : String(error),
+        ...(isPermanent ? { lastErrorCode: SERVER_REFUSED_CODE } : {}),
       });
       failed++;
     }

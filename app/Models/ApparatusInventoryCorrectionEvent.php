@@ -37,6 +37,15 @@ final class ApparatusInventoryCorrectionEvent extends Model
 
     public const REVERSED = 'reversed';
 
+    /** Logistics closed the request with no checklist change (already done, no longer applies). */
+    public const CLOSED = 'closed';
+
+    /** The member who filed the request withdrew it before a decision. */
+    public const WITHDRAWN = 'withdrawn';
+
+    /** Logistics retired one approved change that no longer applies to its unit's checklist (internal). */
+    public const CHANGE_RETIRED = 'change_retired';
+
     public const LINKED_TO_INSPECTION = 'linked_to_inspection';
 
     /** Another member reported the same change and was added to this request. */
