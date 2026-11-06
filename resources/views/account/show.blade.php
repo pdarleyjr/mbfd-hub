@@ -11,42 +11,48 @@
     <x-hub-header back-label="Hub home" max-width="max-w-5xl" />
     <main id="main" class="hub-page__main mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <x-hub.page-header title="My account" description="Manage your Hub identity, security, and application access." />
+        @php($chevron = 'm8.25 4.5 7.5 7.5-7.5 7.5')
         <section class="overflow-hidden hub-panel" aria-labelledby="identity-heading">
-            <div class="border-b border-hub-border px-5 py-4"><h2 id="identity-heading" class="text-lg font-bold">Identity & security</h2><p class="mt-1 text-sm text-hub-muted">Your department identity and current security readiness.</p></div>
-            <dl class="grid gap-px bg-hub-border sm:grid-cols-2">
-                <div class="bg-hub-surface p-5"><dt class="text-xs font-bold uppercase tracking-wide text-hub-muted">Name</dt><dd class="mt-1 font-semibold">{{ $user->name }}</dd></div>
-                <div class="bg-hub-surface p-5"><dt class="text-xs font-bold uppercase tracking-wide text-hub-muted">Employee ID</dt><dd class="mt-1 font-mono font-semibold">{{ $user->employee_id ?: 'Not linked' }}</dd></div>
-                <div class="bg-hub-surface p-5"><dt class="text-xs font-bold uppercase tracking-wide text-hub-muted">Password</dt><dd class="mt-1 font-semibold">{{ $localCredentials ? 'Hub local credential' : 'MBFD Identity credential' }}</dd></div>
-                <div class="bg-hub-surface p-5"><dt class="text-xs font-bold uppercase tracking-wide text-hub-muted">Recovery readiness</dt><dd class="mt-1 font-semibold">{{ $maskedRecoveryEmail ? 'Ready · '.$maskedRecoveryEmail : 'Needs administrator review' }}</dd></div>
-                <div class="bg-hub-surface p-5"><dt class="text-xs font-bold uppercase tracking-wide text-hub-muted">Active Hub sessions</dt><dd class="mt-1 font-semibold">{{ $activeSessionCount }}</dd></div>
-                <div class="bg-hub-surface p-5"><dt class="text-xs font-bold uppercase tracking-wide text-hub-muted">Account status</dt><dd class="mt-1 font-semibold">{{ ucfirst(str_replace('_', ' ', $user->getRawOriginal('account_status'))) }}</dd></div>
+            <div class="hub-panel__header-block px-4 py-3 sm:px-5"><h2 id="identity-heading" class="text-lg font-bold">Identity & security</h2><p class="mt-1 text-sm text-hub-ink-secondary">Your department identity and current security readiness.</p></div>
+            {{-- Label and value share one row, settings-list style; two columns from tablet width. --}}
+            <dl class="hub-facts">
+                <div><dt>Name</dt><dd>{{ $user->name }}</dd></div>
+                <div><dt>Employee ID</dt><dd class="tabular-nums">{{ $user->employee_id ?: 'Not linked' }}</dd></div>
+                <div><dt>Password</dt><dd>{{ $localCredentials ? 'Hub local credential' : 'MBFD Identity credential' }}</dd></div>
+                <div><dt>Recovery readiness</dt><dd>{{ $maskedRecoveryEmail ? 'Ready · '.$maskedRecoveryEmail : 'Needs administrator review' }}</dd></div>
+                <div><dt>Active Hub sessions</dt><dd class="tabular-nums">{{ $activeSessionCount }}</dd></div>
+                <div><dt>Account status</dt><dd>{{ ucfirst(str_replace('_', ' ', $user->getRawOriginal('account_status'))) }}</dd></div>
             </dl>
-            <div class="flex flex-wrap gap-3 border-t border-hub-border px-5 py-4">
-                <a href="{{ $changePasswordUrl }}" class="inline-flex min-h-11 items-center rounded-lg bg-hub-blue px-4 py-2 text-sm font-bold text-white hover:bg-hub-blue-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">Change password</a>
-                <a href="{{ route('city-email.show') }}" class="inline-flex min-h-11 items-center rounded-lg border border-hub-border-strong px-4 py-2 text-sm font-bold hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">City email & recovery</a>
-                @if($notificationSettingsUrl)
-                    <a href="{{ $notificationSettingsUrl }}" class="inline-flex min-h-11 items-center rounded-lg border border-hub-border-strong px-4 py-2 text-sm font-bold hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">Notification settings</a>
-                @endif
-                <a href="/employee" class="inline-flex min-h-11 items-center rounded-lg border border-hub-border-strong px-4 py-2 text-sm font-bold hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">Employee Portal</a>
-                @if($user->hasCurrentAdminPanelEntitlement())
-                    <a href="/admin" class="inline-flex min-h-11 items-center rounded-lg border border-hub-border-strong px-4 py-2 text-sm font-bold hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">Admin Panel</a>
-                @endif
-                @if($enrollmentUrls)
-                    <a href="{{ $enrollmentUrls['passkey'] }}" class="inline-flex min-h-11 items-center rounded-lg border border-hub-border-strong px-4 py-2 text-sm font-bold hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">Add a passkey</a>
-                    <a href="{{ $enrollmentUrls['totp'] }}" class="inline-flex min-h-11 items-center rounded-lg border border-hub-border-strong px-4 py-2 text-sm font-bold hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">Add authenticator app</a>
-                @endif
-                <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="inline-flex min-h-11 items-center rounded-lg border border-hub-border-strong px-4 py-2 text-sm font-bold hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">Sign out</button></form>
-            </div>
         </section>
 
-        <section class="hub-panel" aria-labelledby="access-heading">
-            <div class="border-b border-hub-border px-5 py-4"><h2 id="access-heading" class="text-lg font-bold">Application access</h2><p class="mt-1 text-sm text-hub-muted">Availability reflects your Hub account and each application's access requirements.</p></div>
-            <ul class="divide-y divide-hub-border-soft">
+        <section class="overflow-hidden hub-panel" aria-labelledby="account-actions-heading">
+            <h2 id="account-actions-heading" class="hub-panel__header-block px-4 py-3 text-lg font-bold sm:px-5">Settings</h2>
+            <ul class="hub-rowlist">
+                <li><a href="{{ $changePasswordUrl }}" class="hub-rowlist__item"><x-heroicon-o-key class="hub-rowlist__icon" aria-hidden="true" /><span class="hub-rowlist__label">Change password</span><svg class="hub-rowlist__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $chevron }}"/></svg></a></li>
+                <li><a href="{{ route('city-email.show') }}" class="hub-rowlist__item"><x-heroicon-o-envelope class="hub-rowlist__icon" aria-hidden="true" /><span class="hub-rowlist__label">City email & recovery</span><svg class="hub-rowlist__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $chevron }}"/></svg></a></li>
+                @if($notificationSettingsUrl)
+                    <li><a href="{{ $notificationSettingsUrl }}" class="hub-rowlist__item"><x-heroicon-o-bell class="hub-rowlist__icon" aria-hidden="true" /><span class="hub-rowlist__label">Notification settings</span><svg class="hub-rowlist__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $chevron }}"/></svg></a></li>
+                @endif
+                @if($enrollmentUrls)
+                    <li><a href="{{ $enrollmentUrls['passkey'] }}" class="hub-rowlist__item"><x-heroicon-o-finger-print class="hub-rowlist__icon" aria-hidden="true" /><span class="hub-rowlist__label">Add a passkey</span><svg class="hub-rowlist__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $chevron }}"/></svg></a></li>
+                    <li><a href="{{ $enrollmentUrls['totp'] }}" class="hub-rowlist__item"><x-heroicon-o-device-phone-mobile class="hub-rowlist__icon" aria-hidden="true" /><span class="hub-rowlist__label">Add authenticator app</span><svg class="hub-rowlist__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $chevron }}"/></svg></a></li>
+                @endif
+                <li><a href="/employee" class="hub-rowlist__item"><x-heroicon-o-user-circle class="hub-rowlist__icon" aria-hidden="true" /><span class="hub-rowlist__label">Employee Portal</span><svg class="hub-rowlist__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $chevron }}"/></svg></a></li>
+                @if($user->hasCurrentAdminPanelEntitlement())
+                    <li><a href="/admin" class="hub-rowlist__item"><x-heroicon-o-squares-2x2 class="hub-rowlist__icon" aria-hidden="true" /><span class="hub-rowlist__label">Admin Panel</span><svg class="hub-rowlist__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $chevron }}"/></svg></a></li>
+                @endif
+                <li><form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="hub-rowlist__item hub-rowlist__item--danger"><x-heroicon-o-arrow-right-on-rectangle class="hub-rowlist__icon" aria-hidden="true" /><span class="hub-rowlist__label">Sign out</span></button></form></li>
+            </ul>
+        </section>
+
+        <section class="overflow-hidden hub-panel" aria-labelledby="access-heading">
+            <div class="hub-panel__header-block px-4 py-3 sm:px-5"><h2 id="access-heading" class="text-lg font-bold">Application access</h2><p class="mt-1 text-sm text-hub-ink-secondary">Availability reflects your Hub account and each application's access requirements.</p></div>
+            <ul class="hub-rowlist">
                 @foreach($applications as $key => $application)
                     @php($state = $applicationStates[$key])
-                    <li class="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div><h3 class="font-semibold">{{ $application['label'] }}</h3><p class="text-sm text-hub-muted">{{ $state['status'] }}</p></div>
-                        <span class="hub-tag w-fit {{ $state['allowed'] ? 'hub-tag--success' : '' }}">{{ $state['allowed'] ? 'Available' : 'Unavailable' }}</span>
+                    <li class="hub-rowlist__item hub-rowlist__item--static">
+                        <div class="min-w-0 flex-1"><h3 class="font-semibold">{{ $application['label'] }}</h3><p class="text-sm text-hub-ink-secondary">{{ $state['status'] }}</p></div>
+                        <span class="hub-tag shrink-0 {{ $state['allowed'] ? 'hub-tag--success' : '' }}">{{ $state['allowed'] ? 'Available' : 'Unavailable' }}</span>
                     </li>
                 @endforeach
             </ul>
