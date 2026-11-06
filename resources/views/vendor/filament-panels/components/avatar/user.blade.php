@@ -18,11 +18,17 @@
     />
 @else
     @php
-        $initials = str(filament()->getNameForDefaultAvatar($user))
-            ->trim()
+        // First and last initial only ("PC"), like the dashboard avatars: every-word initials
+        // joined with spaces ("P U T C") wrapped onto two lines in the 32px circle.
+        $nameParts = str(filament()->getNameForDefaultAvatar($user))
+            ->squish()
             ->explode(' ')
-            ->map(fn (string $segment): string => filled($segment) ? mb_substr($segment, 0, 1) : '')
-            ->join(' ');
+            ->filter(fn (string $segment): bool => filled($segment))
+            ->values();
+        $initials = mb_strtoupper(
+            mb_substr((string) $nameParts->first(), 0, 1)
+            .($nameParts->count() > 1 ? mb_substr((string) $nameParts->last(), 0, 1) : '')
+        );
         $size = $avatarAttributes->get('size', 'md');
         $circular = $avatarAttributes->get('circular', true);
     @endphp
@@ -34,7 +40,7 @@
             $avatarAttributes
                 ->except(['size', 'circular'])
                 ->class([
-                    'fi-avatar object-cover object-center inline-flex items-center justify-center bg-gray-950 text-white text-xs font-medium',
+                    'fi-avatar object-cover object-center inline-flex flex-none items-center justify-center whitespace-nowrap leading-none bg-gray-950 text-white text-xs font-medium',
                     'rounded-md' => ! $circular,
                     'fi-circular rounded-full' => $circular,
                     match ($size) {

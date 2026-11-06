@@ -1068,7 +1068,8 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
 
     body.mbfd-dash-fit .fi-main { padding-bottom: calc(var(--hub-status-bar-height) + .5rem); }
 
-    body.mbfd-dash-fit .mbfd-dash-pager { flex: none; justify-content: center; }
+    /* The floating "Report an Issue" button sits at the right end of this row: keep the next step clear of it. */
+    body.mbfd-dash-fit .mbfd-dash-pager { flex: none; justify-content: center; padding-inline-end: 10rem; }
 
     /* The shared "Report an Issue" footer floats beside the pager instead of taking a 108px band. */
     body.mbfd-dash-fit .hub-issue-widget--inline {
@@ -1086,6 +1087,7 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
         grid-template-rows: repeat(2, minmax(0, 1fr));
     }
 }
+
 
 /* Short desktop windows (1366x768 and similar): tighten vertical rhythm. */
 @media (min-width: 1024px) and (min-height: 600px) and (max-height: 820px) {
@@ -1172,6 +1174,18 @@ a.mbfd-dash-activity__link:focus-visible { outline: 2px solid rgb(var(--hub-blue
 /* Phones and tablets: every control is a 44px touch target. */
 @media (max-width: 1023.98px) {
     .mbfd-dash-activity__kind-button { min-height: 2.75rem; }
+}
+
+/*
+ * Narrow screens: one header row squeezed the title to nothing and stacked the filter chips in a
+ * thin column. The title keeps the first line beside its icon; filters and "View all activity"
+ * share the line below.
+ */
+@media (max-width: 767.98px) {
+    .mbfd-dash-activity > .mbfd-dash-card__head { flex-wrap: wrap; row-gap: .5rem; }
+    .mbfd-dash-activity > .mbfd-dash-card__head > .mbfd-dash-card__titles { flex: 1 1 calc(100% - 3rem); }
+    .mbfd-dash-activity__kinds { order: 3; flex: 1 1 auto; }
+    .mbfd-dash-activity > .mbfd-dash-card__head > .mbfd-dash-card__link { order: 4; margin-inline-start: auto; }
 }
 
 /* Short desktop windows: three one-line events, so the lanes keep their room. */

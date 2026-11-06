@@ -1,3 +1,4 @@
+import { protectedUiOrigin } from '../support/test-environment';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext, type Request } from '@playwright/test';
 import { createHash } from 'node:crypto';
@@ -5,7 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { guardUiRendering, waitForUiRendering } from '../support/ui-readonly';
 
-const origin = 'http://127.0.0.1:8127';
+const origin = protectedUiOrigin;
 const widths = [390, 1024, 1440];
 const artifactDir = resolve(process.env.UI_AUDIT_ARTIFACT_DIR ?? 'test-results/ui-audit-artifacts', 'modules');
 
