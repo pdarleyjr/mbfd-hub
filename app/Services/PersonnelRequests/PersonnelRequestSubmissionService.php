@@ -9,6 +9,8 @@ use App\Enums\PersonnelRequestType;
 use App\Models\Employee;
 use App\Models\PersonnelRequest;
 use App\Models\Station;
+use App\Support\PersonnelRequests\PersonnelRequestParticipantAccess;
+use App\Support\PersonnelRequests\UniformOrderAmendment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -31,12 +33,7 @@ final class PersonnelRequestSubmissionService
         }
 
         $normalized = $this->validateUniformItems($items);
-        $note = $metadata['member_note'] ?? null;
-        $noteMax = (int) config('uniform_orders.note_max', 4000);
-        if ($note !== null && (! is_string($note) || mb_strlen($note) > $noteMax)) {
-            throw ValidationException::withMessages(['member_note' => 'Notes must be text of no more than '.number_format($noteMax).' characters.']);
-        }
-        $note = filled($note) ? trim($note) : null;
+        $note = $this->validatedNote($metadata['member_note'] ?? null);
         $justification = $this->validatedJustification($metadata['allowance_justification'] ?? null);
         $context = $this->entitlements->forEmployee($employee);
         $summary = $this->entitlements->summarize($context, $normalized);
@@ -49,6 +46,141 @@ final class PersonnelRequestSubmissionService
         } catch (\Illuminate\Database\UniqueConstraintViolationException $exception) {
             return $this->existingSubmission($idempotencyKey, $employee, PersonnelRequestType::Uniform) ?? throw $exception;
         }
+    }
+
+    /**
+     * The member changes their own uniform order before anything is ordered, received or issued.
+     * The same checks as a new order run again, counting this order's current lines out of the
+     * annual allowance and jacket limit. Status is left alone. The lines before and after, and on
+     * the first change the original submission, are kept in the history.
+     *
+     * @param  array<string, mixed>  $metadata  member_note and allowance_justification, as on submit
+     */
+    public function amendUniform(Employee $employee, PersonnelRequest $request, array $items, string $amendKey, array $metadata = []): PersonnelRequest
+    {
+        $this->assertActionKey($amendKey);
+        $normalized = $this->validateUniformItems($items);
+        if (collect($normalized)->pluck('item_code')->duplicates()->isNotEmpty()) {
+            throw ValidationException::withMessages(['items' => 'List each item once, with the total quantity you need.']);
+        }
+        $note = $this->validatedNote($metadata['member_note'] ?? null);
+        $justification = $this->validatedJustification($metadata['allowance_justification'] ?? null);
+        $fingerprint = hash('sha256', json_encode([$employee->id, $request->id, $normalized, $note, $justification], JSON_THROW_ON_ERROR));
+
+        return DB::transaction(function () use ($employee, $request, $normalized, $note, $justification, $amendKey, $fingerprint): PersonnelRequest {
+            Employee::query()->whereKey($employee->id)->lockForUpdate()->firstOrFail();
+            $locked = PersonnelRequest::query()->lockForUpdate()->find($request->id)
+                ?? throw ValidationException::withMessages(['items' => 'This order is no longer available to edit.']);
+            abort_unless(PersonnelRequestParticipantAccess::isParticipant($employee, $locked), 403);
+            $previous = $locked->updates()->where('metadata->idempotency_key', $amendKey)->first();
+            if ($previous !== null) {
+                if ($previous->event !== UniformOrderAmendment::EVENT || data_get($previous->metadata, 'fingerprint') !== $fingerprint) {
+                    throw ValidationException::withMessages(['idempotency_key' => 'This change was already saved with different details. Reload the page and try again.']);
+                }
+
+                return $locked->load('items', 'updates');
+            }
+            $current = $locked->items()->orderBy('id')->lockForUpdate()->get();
+            if ($reason = UniformOrderAmendment::blockReason($employee, $locked, $current)) {
+                throw ValidationException::withMessages(['items' => $reason]);
+            }
+            if (collect($normalized)->contains('item_code', 'jacket')) {
+                $eligibility = $this->entitlements->jacketEligibility($employee, $locked->id);
+                if (! $eligibility['can_order']) {
+                    throw ValidationException::withMessages(['items.jacket.quantity' => $eligibility['reason']]);
+                }
+            }
+            $context = $this->entitlements->forEmployee($employee);
+            $summary = $this->entitlements->summarize($context, $normalized);
+            $allowance = $this->allowanceAttributes($employee, $context, $normalized, $justification, $locked->id);
+
+            $before = UniformOrderAmendment::snapshot($current);
+            $after = UniformOrderAmendment::snapshot($normalized);
+            $noteBefore = data_get($locked->metadata, 'member_note');
+            $changes = UniformOrderAmendment::describeChanges($before, $after, $noteBefore, $note);
+            if ($changes === []) {
+                throw ValidationException::withMessages(['items' => 'Nothing was changed. Change an item, size or quantity, then save.']);
+            }
+
+            $this->replaceItems($locked, $current, $normalized);
+            $locked->forceFill([
+                'metadata' => $this->amendedMetadata($locked, $before, $note, $summary, $allowance),
+                'over_allowance' => $allowance['over_allowance'],
+                'allowance_justification' => $allowance['allowance_justification'],
+            ])->save();
+            $locked->updates()->create([
+                'event' => UniformOrderAmendment::EVENT,
+                'status' => $locked->status,
+                'employee_visible_note' => UniformOrderAmendment::MEMBER_NOTE,
+                'changed_by_employee_id' => $employee->id,
+                'metadata' => [
+                    'idempotency_key' => $amendKey,
+                    'fingerprint' => $fingerprint,
+                    'changes' => $changes,
+                    'before' => ['items' => $before, 'member_note' => $noteBefore],
+                    'after' => ['items' => $after, 'member_note' => $note],
+                ],
+            ]);
+            DB::afterCommit(fn () => $this->notifier->memberAmended($locked, $changes));
+
+            return $locked->fresh(['items', 'updates']);
+        });
+    }
+
+    /**
+     * Keep each line's row (and its item history) when the same product stays on the order;
+     * add new products and remove the ones the member took off.
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\PersonnelRequestItem>  $current
+     * @param  list<array<string, mixed>>  $normalized
+     */
+    private function replaceItems(PersonnelRequest $request, \Illuminate\Support\Collection $current, array $normalized): void
+    {
+        $existing = $current->keyBy('item_code');
+        foreach ($normalized as $line) {
+            $row = $existing->pull($line['item_code']);
+            if ($row === null) {
+                $request->items()->create($line);
+
+                continue;
+            }
+            $row->fill($line);
+            if ($row->isDirty()) {
+                $row->save();
+            }
+        }
+        foreach ($existing as $removed) {
+            $removed->delete();
+        }
+    }
+
+    /**
+     * The bid-assignment snapshot stays as submitted. The original lines and notes are copied once,
+     * on the first change; the current note, advisories and allowance flags follow the new lines.
+     *
+     * @param  list<array<string, mixed>>  $before
+     * @param  array<string, mixed>  $summary
+     * @param  array{over_allowance: bool, allowance_justification: string|null, metadata: array<string, mixed>}  $allowance
+     * @return array<string, mixed>
+     */
+    private function amendedMetadata(PersonnelRequest $request, array $before, ?string $note, array $summary, array $allowance): array
+    {
+        $metadata = $request->metadata ?? [];
+        $metadata['original_submission'] ??= [
+            'items' => $before,
+            'member_note' => $metadata['member_note'] ?? null,
+            'warnings_at_submission' => $metadata['warnings_at_submission'] ?? null,
+            'calculated_swap_credits' => $metadata['calculated_swap_credits'] ?? null,
+            'over_allowance' => (bool) $request->over_allowance,
+            'allowance_justification' => $request->allowance_justification,
+            'allowance_at_submission' => $metadata['allowance_at_submission'] ?? null,
+        ];
+        $metadata['member_note'] = $note;
+        $metadata['warnings_at_submission'] = $summary['warnings'];
+        $metadata['calculated_swap_credits'] = $summary['swaps'];
+        unset($metadata['allowance_at_submission']);
+
+        return array_merge($metadata, $allowance['metadata']);
     }
 
     public function submitEquipment(
@@ -100,9 +232,7 @@ final class PersonnelRequestSubmissionService
         array $metadata = [],
         ?\Closure $guard = null,
     ): PersonnelRequest {
-        if (! preg_match('/^[A-Za-z0-9._:-]{8,100}$/', $idempotencyKey)) {
-            throw ValidationException::withMessages(['idempotency_key' => 'A valid submission key is required.']);
-        }
+        $this->assertActionKey($idempotencyKey);
 
         $request = DB::transaction(function () use ($type, $beneficiary, $requester, $station, $items, $idempotencyKey, $signature, $metadata, $guard): PersonnelRequest {
             $extra = [];
@@ -163,6 +293,23 @@ final class PersonnelRequestSubmissionService
         return $request->load('items', 'updates');
     }
 
+    private function assertActionKey(string $key): void
+    {
+        if (! preg_match('/^[A-Za-z0-9._:-]{8,100}$/', $key)) {
+            throw ValidationException::withMessages(['idempotency_key' => 'A valid submission key is required.']);
+        }
+    }
+
+    private function validatedNote(mixed $note): ?string
+    {
+        $noteMax = (int) config('uniform_orders.note_max', 4000);
+        if ($note !== null && (! is_string($note) || mb_strlen($note) > $noteMax)) {
+            throw ValidationException::withMessages(['member_note' => 'Notes must be text of no more than '.number_format($noteMax).' characters.']);
+        }
+
+        return filled($note) ? trim($note) : null;
+    }
+
     private function validatedJustification(mixed $value): ?string
     {
         $max = (int) config('uniform_orders.allowance_justification_max', 1000);
@@ -181,9 +328,9 @@ final class PersonnelRequestSubmissionService
      * @param  list<array<string, mixed>>  $items
      * @return array{over_allowance: bool, allowance_justification: string|null, metadata: array<string, mixed>}
      */
-    private function allowanceAttributes(Employee $employee, array $context, array $items, ?string $justification): array
+    private function allowanceAttributes(Employee $employee, array $context, array $items, ?string $justification, ?int $excludeRequestId = null): array
     {
-        $assessment = $this->allowances->assess($context, $this->allowances->usedByGroup($employee), $items);
+        $assessment = $this->allowances->assess($context, $this->allowances->usedByGroup($employee, null, $excludeRequestId), $items);
         if (! $assessment['is_over']) {
             return ['over_allowance' => false, 'allowance_justification' => null, 'metadata' => []];
         }
