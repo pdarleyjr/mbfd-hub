@@ -120,7 +120,10 @@ table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden] > * { min
   border-radius: var(--hub-radius-control);
   background-color: rgb(var(--hub-well));
   color: rgb(var(--hub-n-900));
-  padding-inline: 0.75rem;
+  /* The forms plugin draws the chevron in the right padding: keep text clear of it. */
+  padding-inline: 0.75rem 2.5rem;
+  flex: 1 1 10rem;
+  min-width: 10rem;
 }
 
 /* ---- Cards (phones and any container narrower than the essential columns) ---- */
