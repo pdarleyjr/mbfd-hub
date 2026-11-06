@@ -23,6 +23,12 @@ class AnalyzeProjectPriorities extends Command
 
     public function handle()
     {
+        if (! (bool) config('cloudflare.ai.project_priorities.enabled', true)) {
+            $this->info('Project priority analysis is turned off (PROJECT_PRIORITY_AI_ENABLED=false). Skipping.');
+
+            return Command::SUCCESS;
+        }
+
         // Use cache lock to prevent concurrent runs (5 min lock)
         $lock = Cache::lock('projects:analyze-priorities', 300);
 
@@ -51,9 +57,13 @@ class AnalyzeProjectPriorities extends Command
             // Check if we have required AI service configuration
             $aiService = app(CloudflareAIService::class);
 
-            if (! $aiService->canMakeRequest()) {
-                $this->warn('Cloudflare AI service not configured. Skipping AI analysis.');
-                Log::warning('Scheduled task projects:analyze-priorities skipped - AI service not configured');
+            // isEnabled() is the gateway's bounded readiness probe (3 s connect,
+            // 5 s total, cached for a minute) or, for the direct Cloudflare
+            // driver, a configuration check. Without it an unreachable gateway
+            // cost two 10 s connect timeouts before the run gave up.
+            if (! $aiService->isEnabled() || ! $aiService->canMakeRequest()) {
+                $this->info('AI service is not configured or not reachable. Skipping; existing project priorities were kept.');
+                Log::info('Scheduled task projects:analyze-priorities skipped - AI service not available');
 
                 return Command::SUCCESS;
             }
