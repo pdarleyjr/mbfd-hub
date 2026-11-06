@@ -13,10 +13,9 @@
     <main id="main" class="hub-page__main mx-auto max-w-3xl break-words px-4 py-6 sm:px-6 sm:py-8">
         @if(session('status')) <p class="mb-4 rounded-lg border border-hub-success/30 bg-hub-success/10 px-4 py-3 text-sm font-semibold text-hub-success" role="status">{{ session('status') }}</p> @endif
         <h1 class="hub-h1">{{ $report->generated_title }}</h1>
-        <p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-hub-ink-secondary">
-            <span class="hub-tag">{{ $report->status->memberLabel() }}</span>
-            <span class="tabular-nums">Reference: {{ $report->ticket_number }}</span>
-        </p>
+        {{-- The status stays its own paragraph directly under main (personnel-requests.spec.ts reads it there). --}}
+        <p class="hub-tag mt-2 w-fit">{{ $report->status->memberLabel() }}</p>
+        <p class="mt-1 text-xs tabular-nums text-hub-ink-secondary">Reference: {{ $report->ticket_number }}</p>
         @if($report->isArchived())
             <p class="hub-callout mt-4 px-4 py-3 text-sm">This report is archived. Its history is available here; support must restore it before the conversation continues.</p>
         @endif
