@@ -215,7 +215,9 @@ class ViewUnitMasterVehicle extends ViewRecord
                             ->hiddenLabel()
                             ->view('filament.fleet.vehicle-inspection-history')
                             ->viewData(fn (UnitMasterVehicle $record): array => [
-                                'inspections' => $record->takeHomeInspections()->limit(100)->get(),
+                                // As corrected by the member, when they edited it.
+                                'inspections' => $record->takeHomeInspections()->with('latestRevision')->limit(100)->get()
+                                    ->map(fn (TakeHomeVehicleInspection $inspection): TakeHomeVehicleInspection => $inspection->effective()),
                             ]),
                     ])
                     ->collapsible(),
@@ -322,7 +324,7 @@ class ViewUnitMasterVehicle extends ViewRecord
 
     private function lastInspection(UnitMasterVehicle $record): ?TakeHomeVehicleInspection
     {
-        return $record->takeHomeInspections()->first();
+        return $record->takeHomeInspections()->with('latestRevision')->first()?->effective();
     }
 
     /** @return Collection<int, UnitMasterVehicleChange> */
