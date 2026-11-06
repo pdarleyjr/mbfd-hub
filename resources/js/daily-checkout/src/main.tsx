@@ -9,6 +9,7 @@ import { startPushSync } from '../../pwa/push-sync'
 import { startUpdateRegistrar } from '../../pwa/update-registrar'
 import { startForegroundAlerts } from '../../pwa/foreground-alerts'
 import { startDocumentViewer } from '../../pwa/document-viewer'
+import { startBottomBarPin } from '../../pwa/bottom-bar-pin'
 import { startSiblingLinks } from '../../pwa/sibling-links'
 
 startHubIssueDiagnosticsCollector()
@@ -45,6 +46,7 @@ startForegroundAlerts()
 // Links marked data-hub-viewer (attachment images) open in a dialog on this page instead of a new tab, so an
 // installed app never leaves for the browser and a half-typed reply is kept. Images only: no pdf.js here.
 startDocumentViewer()
+startBottomBarPin()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

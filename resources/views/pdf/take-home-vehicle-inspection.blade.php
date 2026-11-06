@@ -41,6 +41,7 @@
         .signature img { max-height: 70px; max-width: 260px; border-bottom: 1px solid #94a3b8; }
         .avoid-break { page-break-inside: avoid; }
         .pre { white-space: pre-wrap; }
+        .edited { border: 1px solid #93c5fd; background: #eff6ff; color: #1e3a8a; padding: 6px 8px; margin: 8px 0; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -71,6 +72,11 @@
 
 <h1>Take Home Vehicle Inspection</h1>
 <div class="muted">Submitted {{ $inspection->submittedAtLocal() }}@if($inspection->started_at) · Started {{ $inspection->started_at->clone()->timezone(\App\Support\HubTimezone::NAME)->format('g:i A T') }}@endif</div>
+
+@if(($revisions ?? collect())->isNotEmpty())
+    @php($latestRevision = $revisions->last())
+    <div class="edited">Edited by {{ $latestRevision->revised_by_name }} on {{ $latestRevision->createdAtLocal() }}. This report shows the corrected answers; every change is listed under "Changes after submission".</div>
+@endif
 
 @if($inspection->acceptable_for_use === null)
     <div class="callout">Acceptability for use was not answered.</div>
@@ -140,6 +146,46 @@
     <div><strong>{{ $inspection->inspector_name }}</strong> · Signed {{ $inspection->acknowledged_at->clone()->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}</div>
     <div class="muted">Signature SHA-256 {{ $inspection->signature_sha256 }}</div>
 </div>
+
+@if(($revisions ?? collect())->isNotEmpty())
+    <h2>Changes after submission</h2>
+    <p class="muted">The signature above was given for the original answers. Each edit shows what the report said before and the correction.</p>
+    <table class="grid">
+        <thead><tr><th style="width: 30%">Edit</th><th style="width: 30%">Answer</th><th style="width: 20%">Before</th><th>After</th></tr></thead>
+        <tbody>
+        @foreach($revisions as $revision)
+            @foreach($revision->changeLines() as $index => $line)
+                <tr class="avoid-break">
+                    <td>@if($index === 0)<strong>Edit {{ $revision->revision_number }}</strong> · {{ $revision->revised_by_name }}<br><span class="muted">{{ $revision->createdAtLocal() }}</span>@if(filled($revision->reason))<div class="pre">Reason: {{ $revision->reason }}</div>@endif @endif</td>
+                    <td>{{ $line['label'] }}</td>
+                    <td class="pre">{{ $line['from'] }}</td>
+                    <td class="pre"><strong>{{ $line['to'] }}</strong></td>
+                </tr>
+            @endforeach
+        @endforeach
+        </tbody>
+    </table>
+@endif
+
+@if(($revisions ?? collect())->isNotEmpty())
+    <h2>Changes after submission</h2>
+    <p class="muted">The signature above was given for the original answers. Each edit shows what the report said before and the correction.</p>
+    <table class="grid">
+        <thead><tr><th style="width: 30%">Edit</th><th style="width: 30%">Answer</th><th style="width: 20%">Before</th><th>After</th></tr></thead>
+        <tbody>
+        @foreach($revisions as $revision)
+            @foreach($revision->changeLines() as $index => $line)
+                <tr class="avoid-break">
+                    <td>@if($index === 0)<strong>Edit {{ $revision->revision_number }}</strong> · {{ $revision->revised_by_name }}<br><span class="muted">{{ $revision->createdAtLocal() }}</span>@if(filled($revision->reason))<div class="pre">Reason: {{ $revision->reason }}</div>@endif @endif</td>
+                    <td>{{ $line['label'] }}</td>
+                    <td class="pre">{{ $line['from'] }}</td>
+                    <td class="pre"><strong>{{ $line['to'] }}</strong></td>
+                </tr>
+            @endforeach
+        @endforeach
+        </tbody>
+    </table>
+@endif
 
 <div style="page-break-before: always;"></div>
 <h2>Standard photos</h2>

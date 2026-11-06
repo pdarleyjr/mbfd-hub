@@ -22,7 +22,10 @@ final class TakeHomeInspectionPdfRenderer
 
     public function render(TakeHomeVehicleInspection $inspection): \Barryvdh\DomPDF\PDF
     {
-        $inspection->loadMissing(['photos', 'vehicle']);
+        $inspection->loadMissing(['photos', 'vehicle', 'revisions', 'latestRevision']);
+        $revisions = $inspection->revisions;
+        // The PDF reads as corrected, with every correction (before and after) listed.
+        $inspection = $inspection->effective();
         $disk = Storage::disk(TakeHomeInspectionPhotoStore::disk());
 
         $standard = [];
@@ -46,6 +49,7 @@ final class TakeHomeInspectionPdfRenderer
             'standardPhotos' => $standard,
             'issuePhotos' => $issues,
             'signature' => $signature,
+            'revisions' => $revisions,
             'logo' => $this->logo(),
             'generatedAt' => now(\App\Support\HubTimezone::NAME),
         ]);

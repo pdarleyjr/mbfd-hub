@@ -243,6 +243,18 @@ class InventoryRequest extends Model
         return $this->hasMany(InventoryRequestEvent::class, 'request_id')->orderBy('id');
     }
 
+    /**
+     * The newest "closed" event: who cleared the form and why. The list eager-loads it, so a page of archived forms
+     * costs one query for it.
+     *
+     * @return HasOne<InventoryRequestEvent, $this>
+     */
+    public function latestClose(): HasOne
+    {
+        return $this->hasOne(InventoryRequestEvent::class, 'request_id')
+            ->ofMany(['id' => 'max'], static fn ($query) => $query->where('action', 'closed'));
+    }
+
     /** @return HasMany<InventoryRequestMessage, $this> */
     public function messages(): HasMany
     {

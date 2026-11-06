@@ -69,6 +69,8 @@ final class Captain5InspectionView
             'acceptance' => (string) ($inspection->processing_status ?? $inspection->review_status ?? ''),
             'scope_note' => $kind === Captain5IssueScope::KIND_MEDICAL ? 'Medical equipment only. Fleet manages the rest of this checklist.' : null,
             'compartments' => $compartments,
+            // A Rescue checkout Captain 5 cleared from his list (Captain5InspectionClearing); null fields when not cleared.
+            ...app(Captain5InspectionClearing::class)->clearFields($inspection),
         ];
     }
 }

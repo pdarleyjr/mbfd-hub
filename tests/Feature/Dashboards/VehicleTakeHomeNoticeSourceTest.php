@@ -145,14 +145,15 @@ final class VehicleTakeHomeNoticeSourceTest extends TestCase
         $this->assertSame([], $this->source->rows($viewer, $this->boardQuery('2026-11-05 10:30:00', stage: 'awaiting_response'), 50));
     }
 
-    public function test_the_detail_is_read_only_with_a_link_and_nothing_can_be_done_to_it(): void
+    public function test_the_detail_links_the_record_and_clear_is_the_only_thing_that_can_be_done_to_it(): void
     {
         $inspection = $this->inspection(['acceptable_for_use' => false, 'comments' => 'Rear tire looks soft.']);
         $viewer = $this->fleetViewer();
 
         $detail = $this->source->detail($viewer, (string) $inspection->id);
         $this->assertNotNull($detail);
-        $this->assertSame([], $detail->actions);
+        // Clearing (archiving, restorable) is covered in Tests\Feature\Fleet\TakeHomeInspectionEditAndClearTest.
+        $this->assertSame([TakeHomeInspectionNoticeSource::ACTION_CLEAR], array_map(static fn ($action): string => $action->key, $detail->actions));
         $this->assertSame([], $detail->timeline);
         $this->assertStringContainsString('approved automatically', (string) $detail->readOnlyReason);
         $this->assertSame('Rear tire looks soft.', $detail->body);

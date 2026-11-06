@@ -26,7 +26,7 @@ use Carbon\CarbonImmutable;
  */
 final class OperationsActivityPersonnelReader
 {
-    private const EVENTS = ['submitted', 'status_changed', 'employee_responded', 'note_added', 'item_acknowledged', 'item_arrived', 'item_fulfilled', 'items_fulfilled'];
+    private const EVENTS = ['submitted', 'status_changed', 'employee_responded', 'member_amended', 'note_added', 'item_acknowledged', 'item_arrived', 'item_fulfilled', 'items_fulfilled'];
 
     public static function canReadRequests(User $user): bool
     {
@@ -89,6 +89,7 @@ final class OperationsActivityPersonnelReader
             kind: match (true) {
                 $event === 'submitted' => 'New request',
                 $event === 'employee_responded' => 'Member message',
+                $event === 'member_amended' => 'Order edited',
                 $event === 'note_added' => 'Note added',
                 $event === 'status_changed' => match ($update->status) {
                     PersonnelRequestStatus::Completed => 'Completed',

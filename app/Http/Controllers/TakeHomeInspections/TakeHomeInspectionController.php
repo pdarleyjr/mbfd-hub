@@ -6,12 +6,16 @@ namespace App\Http\Controllers\TakeHomeInspections;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTakeHomeInspectionRequest;
+use App\Http\Requests\UpdateTakeHomeInspectionRequest;
 use App\Models\TakeHomeVehicleInspection;
 use App\Models\User;
+use App\Services\Fleet\TakeHomeInspectionReviser;
 use App\Services\Fleet\TakeHomeInspectionSubmitter;
 use App\Support\Fleet\TakeHomeInspectionAccess;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 final class TakeHomeInspectionController extends Controller
@@ -21,9 +25,11 @@ final class TakeHomeInspectionController extends Controller
         /** @var User $user */
         $user = $request->user();
         $inspections = TakeHomeVehicleInspection::query()
+            ->with('latestRevision')
             ->where('inspector_user_id', $user->getKey())
             ->latest('submitted_at')
-            ->paginate(20);
+            ->paginate(20)
+            ->through(fn (TakeHomeVehicleInspection $inspection): TakeHomeVehicleInspection => $inspection->effective());
 
         $receipt = null;
         $submittedReference = $request->session()->get('take_home_submitted');
@@ -92,12 +98,51 @@ final class TakeHomeInspectionController extends Controller
         /** @var User $user */
         $user = $request->user();
         abort_unless(TakeHomeInspectionAccess::canView($user, $inspection), 404);
-        $inspection->load(['photos', 'vehicleChanges']);
+        $inspection->load(['photos', 'vehicleChanges', 'revisions', 'latestRevision', 'archivedBy:id,name,display_name']);
 
         return view('take-home-inspections.show', [
-            'inspection' => $inspection,
+            // The report reads as corrected; the signed original stays available below it.
+            'inspection' => $inspection->effective(),
+            'original' => $inspection,
             'isOwn' => (int) $inspection->inspector_user_id === (int) $user->getKey(),
             'canViewAll' => TakeHomeInspectionAccess::canViewAll($user),
+            'canEdit' => TakeHomeInspectionAccess::canEdit($user, $inspection),
+            'revisedNumber' => $request->session()->get('take_home_revised'),
+            'unchanged' => $request->session()->get('take_home_unchanged') === $inspection->reference,
         ]);
+    }
+
+    public function edit(Request $request, TakeHomeVehicleInspection $inspection): View
+    {
+        $this->authorizeEdit($request, $inspection);
+        $inspection->load('latestRevision');
+
+        return view('take-home-inspections.edit', [
+            'inspection' => $inspection->effective(),
+            // One id per opened form: a double tap or a resubmit records one revision.
+            'clientRevisionId' => (string) Str::uuid(),
+        ]);
+    }
+
+    public function update(UpdateTakeHomeInspectionRequest $request, TakeHomeVehicleInspection $inspection, TakeHomeInspectionReviser $reviser): RedirectResponse
+    {
+        $this->authorizeEdit($request, $inspection);
+        /** @var User $user */
+        $user = $request->user();
+        $revision = $reviser->revise($user, $inspection, $request->validated());
+
+        return redirect()
+            ->route('take-home-inspections.show', $inspection)
+            ->with($revision === null ? 'take_home_unchanged' : 'take_home_revised', $revision === null ? $inspection->reference : $revision->revision_number);
+    }
+
+    /** Hidden from anyone who cannot see it (404); visible but not theirs to change, or cleared (403). */
+    private function authorizeEdit(Request $request, TakeHomeVehicleInspection $inspection): void
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User && TakeHomeInspectionAccess::canView($user, $inspection), 404);
+        abort_unless(TakeHomeInspectionAccess::canEdit($user, $inspection), 403, $inspection->isArchived()
+            ? 'Fleet has cleared this inspection, so it can no longer be changed.'
+            : 'Only the member who submitted this inspection can change it.');
     }
 }
