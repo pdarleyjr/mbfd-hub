@@ -41,6 +41,19 @@
     font-weight: 600;
 }
 
+/* A degraded feed or roster is a warning, so it reads as one: tinted, bordered, named in words. */
+.us-main .us-status-line {
+    display: block;
+    margin: 4px 0 8px;
+    padding: 6px 10px;
+    border: 1px solid rgb(var(--hub-warning-border));
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-warning-bg));
+    color: rgb(var(--hub-warning-strong));
+    font-size: 13px;
+    line-height: 18px;
+}
+
 .us-main .us-foot { margin-top: 10px; }
 
 .us-main .us-advisory,
@@ -72,56 +85,76 @@
 
 /* Shift totals */
 
+/* One instrument strip, four readouts divided by hairlines: a glance, not four cards. */
 .us-main .us-totals {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
     margin: 0 0 12px;
-}
-
-@media (min-width: 720px) {
-    .us-main .us-totals { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    overflow: hidden;
+    border: 1px solid rgb(var(--hub-border));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-border));
+    box-shadow: var(--hub-shadow-card);
 }
 
 .us-main .us-total {
     min-width: 0;
-    padding: 12px;
-    border: 1px solid rgb(var(--hub-border));
-    border-radius: var(--hub-radius-card);
+    padding: 8px 10px;
     background: rgb(var(--hub-surface));
-    box-shadow: var(--hub-shadow-card);
 }
 
 .us-main .us-total__label {
-    margin: 0 0 4px;
-    color: rgb(var(--hub-muted));
-    font-size: 11px;
+    margin: 0;
+    color: rgb(var(--hub-ink-secondary));
+    font-size: 12px;
     line-height: 16px;
-    font-weight: 700;
-    letter-spacing: .05em;
-    text-transform: uppercase;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .us-main .us-total__figure {
     margin: 0;
     color: rgb(var(--hub-header));
-    font-size: 28px;
-    line-height: 34px;
+    font-size: 22px;
+    line-height: 28px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
 
-.us-main .us-total__figure--text { font-size: 20px; line-height: 34px; overflow-wrap: anywhere; }
+.us-main .us-total__figure--text { font-size: 16px; line-height: 28px; overflow-wrap: anywhere; }
 
 .us-main .us-total__sub,
 .us-main .us-total__empty {
     margin: 0;
-    color: rgb(var(--hub-muted));
+    color: rgb(var(--hub-ink-secondary));
     font-size: 12px;
     line-height: 16px;
 }
 
-.us-main .us-total__empty { color: rgb(var(--hub-ink-secondary)); font-size: 13px; line-height: 34px; }
+.us-main .us-total__empty { font-size: 13px; line-height: 20px; }
+
+/* Phone: the busiest unit is one line under the three counts. */
+.us-main .us-total:last-child {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 10px;
+    grid-column: 1 / -1;
+}
+
+.us-main .us-total:last-child .us-total__figure--text { line-height: 24px; }
+
+@media (min-width: 720px) {
+    .us-main .us-totals { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.35fr); }
+    .us-main .us-total:last-child { display: block; grid-column: auto; }
+    .us-main .us-total { padding: 10px 16px; }
+    .us-main .us-total__label { font-size: 13px; }
+    .us-main .us-total__figure { font-size: 26px; line-height: 32px; }
+    .us-main .us-total__figure--text { font-size: 18px; line-height: 32px; }
+}
 
 /* Stations and rows. Phone: unit | status, the incident under the status. */
 
@@ -160,9 +193,8 @@
     min-height: 52px;
     padding: 6px 16px;
     border: 0;
-    background-color: transparent;
-    background-image: linear-gradient(90deg, rgb(var(--us-tone, 148 163 184) / .22), rgb(var(--us-tone, 148 163 184) / .1) 55%, rgb(var(--us-tone, 148 163 184) / .05));
-    box-shadow: inset 4px 0 0 rgb(var(--us-tone, 148 163 184));
+    /* The whole row carries its status as one even tint (owner's v1.2 board); the chip names it, so colour is never alone. */
+    background-color: rgb(var(--us-tone, 148 163 184) / .13);
     color: rgb(var(--hub-ink));
     font: inherit;
     text-align: left;
@@ -170,7 +202,7 @@
     transition: background-color 120ms ease;
 }
 
-.us-main .us-row:hover { background-color: rgb(var(--us-tone, 148 163 184) / .1); }
+.us-main .us-row:hover { background-color: rgb(var(--us-tone, 148 163 184) / .22); }
 
 .us-main .us-row:focus-visible {
     outline: 2px solid rgb(var(--hub-focus));
@@ -337,7 +369,7 @@
     .us-main { padding-block: 6px; }
     .us-main .us-title { font-size: 24px; line-height: 30px; }
     .us-main .us-total { padding: 6px 12px; }
-    .us-main .us-total__label { font-size: 10px; line-height: 14px; }
+    .us-main .us-total__label { font-size: 12px; line-height: 14px; }
     .us-main .us-total__figure,
     .us-main .us-total__figure--text,
     .us-main .us-total__empty { font-size: 20px; line-height: 24px; }

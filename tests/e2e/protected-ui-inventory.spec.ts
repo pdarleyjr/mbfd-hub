@@ -1,3 +1,4 @@
+import { protectedUiOrigin } from './support/test-environment';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext } from '@playwright/test';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -9,7 +10,7 @@ import { fixtureSessionRenewal } from './support/fixture-session-renewal';
 type Entry = { route: string; name: string; panel: string | null; scope: string; parent: string; route_name: string | null };
 const catalog = JSON.parse(readFileSync(resolve('tests/e2e/support/protected-ui-inventory.json'), 'utf8')) as { pages: Entry[] };
 const widths = [320, 390, 820, 1024, 1280, 1440, 1920];
-const origin = 'http://127.0.0.1:8127';
+const origin = protectedUiOrigin;
 const serviceWorkers = process.env.PROTECTED_UI_INVENTORY_ALLOW_SW === '1' ? 'allow' as const : 'block' as const;
 const ownedContexts: BrowserContext[] = [];
 

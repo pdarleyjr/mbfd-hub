@@ -91,12 +91,12 @@ final class MaintainMemberPhotoUploadsTest extends TestCase
     public function test_a_converted_rows_leftover_original_goes_and_its_photo_stays(): void
     {
         $upload = $this->dailyUpload(InspectionPhotoUpload::STATUS_STORED, now()->subMinutes(30));
-        Storage::disk('public')->put($upload->path, 'converted jpeg');
+        Storage::disk('local')->put($upload->path, 'converted jpeg');
 
         $this->artisan('photos:maintain')->assertSuccessful();
 
         Storage::disk('local')->assertMissing((string) $upload->source_path);
-        Storage::disk('public')->assertExists($upload->path);
+        Storage::disk('local')->assertExists($upload->path);
         $this->assertNull($upload->fresh()?->source_path);
         $this->assertSame(InspectionPhotoUpload::STATUS_STORED, $upload->fresh()?->status);
     }
@@ -166,7 +166,7 @@ final class MaintainMemberPhotoUploadsTest extends TestCase
             'uuid' => $uuid,
             'user_id' => $this->member->id,
             'status' => $status,
-            'disk' => InspectionPhotoUploads::DISK,
+            'disk' => InspectionPhotoUploads::disk(),
             'path' => InspectionPhotoUploads::pathFor($uuid),
             'source_path' => $source,
             'bytes' => 8,

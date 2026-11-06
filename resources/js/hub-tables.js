@@ -88,12 +88,13 @@ function headSignature(table) {
 function reset(table) {
   delete table.dataset.hubMode;
   table.style.removeProperty('--hub-rt-cols');
-  table.querySelectorAll('[data-hub-hidden],[data-hub-label],[data-hub-lead],[data-hub-kind],[data-hub-span],[data-hub-rt-row]').forEach(el => {
+  table.querySelectorAll('[data-hub-hidden],[data-hub-label],[data-hub-lead],[data-hub-title],[data-hub-kind],[data-hub-span],[data-hub-rt-row]').forEach(el => {
     el.removeAttribute('data-hub-rt-row');
     el.removeAttribute('data-hub-span');
     el.removeAttribute('data-hub-hidden');
     el.removeAttribute('data-hub-label');
     el.removeAttribute('data-hub-lead');
+    el.removeAttribute('data-hub-title');
     el.removeAttribute('data-hub-kind');
   });
   table.querySelectorAll('[data-hub-role]').forEach(el => {
@@ -288,6 +289,8 @@ function commit(table, info, plan, { onlyNew = false } = {}) {
       if (label && th.getAttribute('data-hub-kind') === 'data') cell.setAttribute('data-hub-label', label);
       if (hidden.has(index)) cell.setAttribute('data-hub-hidden', '');
     });
+    // A card reads like a list row: its first visible field is the row's title (styling only).
+    if (plan.mode === 'cards' && firstVisible) cells[firstVisible.index].setAttribute('data-hub-title', '');
     if (hiddenColumns.length && firstVisible) {
       const lead = cells[firstVisible.index];
       lead.setAttribute('data-hub-lead', '');

@@ -13,6 +13,7 @@
 @import './pages/trt-and-employee-record.css';
 @import './pages/personnel-uniforms.css';
 @import '../workgroup-pages.css';
+@import '../training-pages.css';
 @import '../employee-messages.css';
 @import '../email-center.css';
 @import '../push-enrollment.css';
@@ -233,21 +234,35 @@
     color: rgb(var(--hub-border));
 }
 
-/* Global search input */
+/* Global search: one translucent pill on the bar. The wrapper owns the fill and edge; the input inside it is
+   transparent (two stacked fills read as a split box with a second border). */
 .fi-topbar > nav .fi-global-search-field input {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: transparent;
     color: rgb(var(--hub-surface));
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 0;
+    box-shadow: none;
 }
 
 .fi-topbar > nav .fi-global-search-field input::placeholder {
     color: rgb(var(--hub-muted-soft));
 }
 
-/* Search icon and label text */
-.fi-topbar > nav .fi-global-search-field .fi-input-wrp {
-    background-color: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
+/* .fi-body outranks the panels' grey input-ring rule (hub-admin-v2.css), which is for inputs on light surfaces. */
+.fi-body .fi-topbar > nav .fi-global-search-field .fi-input-wrp {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 9999px;
+    --tw-ring-color: rgba(255, 255, 255, 0.24);
+}
+
+.fi-body .fi-topbar > nav .fi-global-search-field .fi-input-wrp:focus-within {
+    background-color: rgba(255, 255, 255, 0.16);
+    --tw-ring-color: rgb(var(--hub-surface));
+}
+
+.fi-topbar > nav .fi-global-search-field .fi-input-wrp-prefix,
+.fi-topbar > nav .fi-global-search-field .fi-input-wrp-suffix {
+    background: transparent;
+    border: 0;
 }
 
 .fi-topbar > nav .fi-global-search-field svg {
@@ -656,15 +671,15 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 }
 
 /* ===== ALERT UTILITIES ===== */
-.alert-critical { background-color: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-.alert-warning { background-color: #fefce8; color: #a16207; border-color: #fef08a; }
-.alert-success { background-color: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
-.alert-info { background-color: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.alert-critical { background-color: rgb(var(--hub-danger-bg)); color: rgb(var(--hub-danger)); border-color: rgb(var(--hub-danger-border)); }
+.alert-warning { background-color: rgb(var(--hub-warning-bg)); color: rgb(var(--hub-warning)); border-color: rgb(var(--hub-warning-border)); }
+.alert-success { background-color: rgb(var(--hub-success-bg)); color: rgb(var(--hub-success)); border-color: rgb(var(--hub-success-border)); }
+.alert-info { background-color: rgb(var(--hub-info-bg)); color: rgb(var(--hub-info)); border-color: rgb(var(--hub-info-border)); }
 
 /* ===== STOCK INDICATORS ===== */
-.stock-critical { color: #dc2626; font-weight: 600; }
-.stock-low { color: #ca8a04; font-weight: 500; }
-.stock-good { color: #16a34a; }
+.stock-critical { color: rgb(var(--hub-danger)); font-weight: 600; }
+.stock-low { color: rgb(var(--hub-warning)); font-weight: 500; }
+.stock-good { color: rgb(var(--hub-success)); }
 
 /* ===== FORM FOCUS ENHANCEMENT ===== */
 .fi-wi-stats-overview-stat-description.fi-color-success { color: rgb(var(--hub-success)); }
@@ -747,11 +762,11 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     gap: 0.25rem;
     font-size: 0.6875rem;
     font-weight: 600;
-    color: #B91C1C;
-    background-color: #fef2f2;
+    color: rgb(var(--hub-danger));
+    background-color: rgb(var(--hub-danger-bg));
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
-    border: 1px solid #fecaca;
+    border: 1px solid rgb(var(--hub-danger-border));
 }
 
 .command-center-badge-warn {
@@ -760,11 +775,11 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     gap: 0.25rem;
     font-size: 0.6875rem;
     font-weight: 600;
-    color: #92400E;
-    background-color: #fffbeb;
+    color: rgb(var(--hub-warning));
+    background-color: rgb(var(--hub-warning-bg));
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
-    border: 1px solid #fde68a;
+    border: 1px solid rgb(var(--hub-warning-border));
 }
 
 .command-center-badge-info {
@@ -773,11 +788,11 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     gap: 0.25rem;
     font-size: 0.6875rem;
     font-weight: 600;
-    color: #1E40AF;
-    background-color: #eff6ff;
+    color: rgb(var(--hub-info));
+    background-color: rgb(var(--hub-info-bg));
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
-    border: 1px solid #bfdbfe;
+    border: 1px solid rgb(var(--hub-info-border));
 }
 
 .command-center-badge-ok {
@@ -786,11 +801,11 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     gap: 0.25rem;
     font-size: 0.6875rem;
     font-weight: 600;
-    color: #166534;
-    background-color: #f0fdf4;
+    color: rgb(var(--hub-success));
+    background-color: rgb(var(--hub-success-bg));
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
-    border: 1px solid #bbf7d0;
+    border: 1px solid rgb(var(--hub-success-border));
 }
 
 .command-center-divider {
@@ -847,14 +862,14 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 }
 
 .wg-session-pill--overall {
-    background-color: #292524;
+    background-color: rgb(var(--hub-header));
     color: #ffffff;
-    border-color: #1C1917;
+    border-color: rgb(var(--hub-header-deep));
     font-weight: 600;
 }
 
 .wg-session-pill--overall:hover {
-    background-color: #1C1917;
+    background-color: rgb(var(--hub-header-deep));
     color: #ffffff;
 }
 
@@ -866,11 +881,11 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 }
 
 .wg-status-dot--active {
-    background-color: #22C55E;
+    background-color: rgb(var(--hub-success));
 }
 
 .wg-status-dot--completed {
-    background-color: #3B82F6;
+    background-color: rgb(var(--hub-blue));
 }
 
 /* Section Layout — flat, no nested cards */
@@ -1237,11 +1252,12 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 }
 
 /* Feedback Quotes */
+/* A quoted comment is a white well inside the section's glass, edged evenly (no side stripe). */
 .wg-feedback-quote {
     padding: 0.875rem 1rem;
-    border-left: 3px solid rgb(var(--hub-border-strong));
-    background-color: rgb(var(--hub-surface-muted));
-    border-radius: 0 0.5rem 0.5rem 0;
+    border: 1px solid rgb(var(--hub-border));
+    background-color: rgb(var(--hub-well));
+    border-radius: var(--hub-radius-control);
     margin-bottom: 0.75rem;
 }
 
@@ -1316,7 +1332,7 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 
 /* Overall Project banner */
 .wg-overall-banner {
-    background-color: #292524;
+    background-color: rgb(var(--hub-header));
     color: #ffffff;
     padding: 0.625rem 1.25rem;
     border-radius: 0.75rem 0.75rem 0 0;
@@ -1392,9 +1408,9 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     border-radius: 9999px;
     font-size: 0.6875rem;
     font-weight: 600;
-    background-color: #ECFDF5;
-    color: #065F46;
-    border: 1px solid #BBF7D0;
+    background-color: rgb(var(--hub-success-bg));
+    color: rgb(var(--hub-success));
+    border: 1px solid rgb(var(--hub-success-border));
 }
 
 /* ===== REDUCED MOTION ===== */

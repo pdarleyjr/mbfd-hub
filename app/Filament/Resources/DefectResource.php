@@ -8,6 +8,7 @@ use App\Filament\Resources\DefectResource\Pages;
 use App\Filament\Support\DefectCorrectiveActions;
 use App\Filament\Support\DefectServiceTicketActions;
 use App\Filament\Support\InspectionWorkspace;
+use App\Filament\Support\MemberMediaFields;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
@@ -15,6 +16,7 @@ use App\Services\SupportTriage\TriageSql;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
 use App\Support\Fleet\DefectNoActionClosure;
+use App\Support\Media\MemberMedia;
 use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -88,10 +90,8 @@ class DefectResource extends Resource
                     ->columnSpanFull()
                     ->rows(3),
 
-                Forms\Components\FileUpload::make('photo_path')
+                MemberMediaFields::photoUpload('photo_path', 'defects')
                     ->label('Photo')
-                    ->disk('public')
-                    ->directory('defects')
                     ->image()
                     ->imageEditor()
                     // Shrunk in the browser before upload, like the member apps (long edge 2048 px).
@@ -152,8 +152,7 @@ class DefectResource extends Resource
 
                 Tables\Columns\ImageColumn::make('photo_path')->visibleFrom('md')
                     ->label('Photo')
-                    ->getStateUsing(fn (ApparatusDefect $record): ?string => $record->availablePhotoPath())
-                    ->disk('public')
+                    ->getStateUsing(fn (ApparatusDefect $record): ?string => MemberMedia::url($record->availablePhotoPath()))
                     ->width(60)
                     ->height(60),
 

@@ -22,6 +22,7 @@ class LegacyStationRequestBackfillTest extends TestCase
     public function test_backfill_is_idempotent_and_preserves_legacy_payloads_and_statuses(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         $png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
         $station = Station::query()->create([
             'station_number' => 1,
@@ -116,8 +117,8 @@ class LegacyStationRequestBackfillTest extends TestCase
         );
         $this->assertStringStartsWith('station-requests/legacy/photos/', $replacement->items->sole()->photo_path);
         $this->assertStringStartsWith('station-requests/legacy/signatures/', $replacement->metadata['signatures']['member']);
-        Storage::disk('public')->assertExists($replacement->items->sole()->photo_path);
-        Storage::disk('public')->assertExists($replacement->metadata['signatures']['member']);
+        Storage::disk('local')->assertExists($replacement->items->sole()->photo_path);
+        Storage::disk('local')->assertExists($replacement->metadata['signatures']['member']);
         $this->assertArrayNotHasKey('photo', $replacement->metadata['legacy']['form_data']['items'][0]);
         $this->assertArrayNotHasKey('signature', $replacement->metadata['legacy']);
         $this->assertStringNotContainsString('data:image', json_encode($replacement->metadata, JSON_THROW_ON_ERROR));

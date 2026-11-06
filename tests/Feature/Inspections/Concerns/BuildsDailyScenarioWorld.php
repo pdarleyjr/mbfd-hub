@@ -43,6 +43,7 @@ trait BuildsDailyScenarioWorld
     {
         $this->withoutVite();
         Storage::fake('public', ['root' => storage_path('framework/testing/disks/dic-f-'.getmypid())]);
+        Storage::fake('local', ['root' => storage_path('framework/testing/disks/dic-f-local-'.getmypid())]);
         config()->set('google_sheets.apparatus_sync_enabled', false);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 

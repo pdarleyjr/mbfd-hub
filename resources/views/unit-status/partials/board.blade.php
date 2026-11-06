@@ -53,7 +53,8 @@
         @if($live)
             <p class="us-subtitle">24-Hour Live Availability</p>
         @else
-            <p class="us-status-line" data-us-status-line>{{ implode('. ', $statusParts) }}</p>
+            {{-- Each part may already end in a full stop; join them as sentences without doubling it. --}}
+            <p class="us-status-line" data-us-status-line>{{ implode('. ', array_map(static fn (string $part): string => rtrim($part, ". \t"), $statusParts)) }}.</p>
         @endif
         <p class="us-meta">
             @if(! empty($board['dutyWindow']['label']))<span>Duty window: {{ $board['dutyWindow']['label'] }}</span>@endif

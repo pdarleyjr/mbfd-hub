@@ -11,7 +11,7 @@
     <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub-header :back-href="route('take-home-inspections.index')" back-label="Take Home Inspections" />
     <main id="main" class="hub-page__main thvi-main mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
-        <x-hub.page-header title="Take Home Vehicle Inspection" eyebrow="New inspection">
+        <x-hub.page-header title="Take Home Vehicle Inspection">
             <span class="thvi-type">Inspection type: Take Home Vehicle Inspection</span>
         </x-hub.page-header>
 

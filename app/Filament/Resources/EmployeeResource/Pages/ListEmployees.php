@@ -48,10 +48,24 @@ class ListEmployees extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            // One primary action; the rest are secondary, and the two onboarding tools share one menu.
             Actions\CreateAction::make(),
             Actions\Action::make('accountExceptions')->label(fn (): string => 'Account exceptions ('.\App\Models\User::query()->whereNull('employee_profile_id')->count().')')
+                ->color('gray')
                 ->visible(fn (): bool => \App\Filament\Resources\AccountProfileResource::canViewAny())
                 ->url(\App\Filament\Resources\AccountProfileResource::getUrl()),
+            Actions\ActionGroup::make($this->onboardingActions())
+                ->label('Onboarding')
+                ->icon('heroicon-o-envelope')
+                ->button()
+                ->color('gray'),
+        ];
+    }
+
+    /** @return list<Actions\Action> */
+    private function onboardingActions(): array
+    {
+        return [
             Actions\Action::make('onboardingStatus')
                 ->label('Onboarding status')
                 ->visible(fn (): bool => $this->canIssueInvitations())

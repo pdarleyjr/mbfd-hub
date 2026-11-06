@@ -64,11 +64,14 @@ final class ProcessInspectionPhotoUpload implements ShouldQueue
             return;
         }
 
-        if (! Storage::disk($upload->disk)->put($upload->path, $jpeg['bytes'])) {
+        // Always the private member image disk, also for a row recorded before photos went private.
+        $disk = InspectionPhotoUploads::disk();
+        if (! Storage::disk($disk)->put($upload->path, $jpeg['bytes'], ['visibility' => 'private'])) {
             throw new \RuntimeException('The converted Daily Checkout photo could not be written.');
         }
         $upload->forceFill([
             'status' => InspectionPhotoUpload::STATUS_STORED,
+            'disk' => $disk,
             'source_path' => null,
             'bytes' => strlen($jpeg['bytes']),
             'width' => $jpeg['width'],

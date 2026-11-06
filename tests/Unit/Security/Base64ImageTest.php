@@ -15,12 +15,13 @@ final class Base64ImageTest extends TestCase
         parent::setUp();
 
         Storage::fake('public');
+        Storage::fake('local');
     }
 
     public function test_rejects_payload_without_image_magic_bytes(): void
     {
         $fakeText = base64_encode('this is not an image at all');
-        $payload = 'data:image/jpeg;base64,' . $fakeText;
+        $payload = 'data:image/jpeg;base64,'.$fakeText;
 
         self::assertNull(Base64Image::store($payload, 'defects', 'defect'));
     }
@@ -28,36 +29,36 @@ final class Base64ImageTest extends TestCase
     public function test_rejects_html_disguised_as_jpeg(): void
     {
         $html = base64_encode('<html><script>alert(1)</script></html>');
-        $payload = 'data:image/jpeg;base64,' . $html;
+        $payload = 'data:image/jpeg;base64,'.$html;
 
         self::assertNull(Base64Image::store($payload, 'defects', 'defect'));
     }
 
     public function test_rejects_payload_with_mismatched_declared_subtype(): void
     {
-        $jpegBytes = "\xFF\xD8\xFF\xE0" . str_repeat("\x00", 32);
-        $payload = 'data:image/png;base64,' . base64_encode($jpegBytes);
+        $jpegBytes = "\xFF\xD8\xFF\xE0".str_repeat("\x00", 32);
+        $payload = 'data:image/png;base64,'.base64_encode($jpegBytes);
 
         self::assertNull(Base64Image::store($payload, 'defects', 'defect'));
     }
 
     public function test_accepts_valid_jpeg_magic_bytes(): void
     {
-        $jpegBytes = "\xFF\xD8\xFF\xE0" . str_repeat("\x00", 32);
-        $payload = 'data:image/jpeg;base64,' . base64_encode($jpegBytes);
+        $jpegBytes = "\xFF\xD8\xFF\xE0".str_repeat("\x00", 32);
+        $payload = 'data:image/jpeg;base64,'.base64_encode($jpegBytes);
 
         $path = Base64Image::store($payload, 'defects', 'defect');
 
         self::assertNotNull($path);
         self::assertStringStartsWith('defects/defect_', $path);
         self::assertStringEndsWith('.jpg', $path);
-        Storage::disk('public')->assertExists($path);
+        Storage::disk('local')->assertExists($path);
     }
 
     public function test_accepts_valid_png_magic_bytes(): void
     {
-        $pngBytes = "\x89PNG\r\n\x1A\n" . str_repeat("\x00", 32);
-        $payload = 'data:image/png;base64,' . base64_encode($pngBytes);
+        $pngBytes = "\x89PNG\r\n\x1A\n".str_repeat("\x00", 32);
+        $payload = 'data:image/png;base64,'.base64_encode($pngBytes);
 
         $path = Base64Image::store($payload, 'signatures', 'signature');
 
@@ -67,15 +68,15 @@ final class Base64ImageTest extends TestCase
 
     public function test_rejects_payload_exceeding_maxbytes(): void
     {
-        $jpegBytes = "\xFF\xD8\xFF\xE0" . str_repeat("\x00", 100_000);
-        $payload = 'data:image/jpeg;base64,' . base64_encode($jpegBytes);
+        $jpegBytes = "\xFF\xD8\xFF\xE0".str_repeat("\x00", 100_000);
+        $payload = 'data:image/jpeg;base64,'.base64_encode($jpegBytes);
 
         self::assertNull(Base64Image::store($payload, 'defects', 'defect', maxBytes: 10_000));
     }
 
     public function test_rejects_data_uri_with_non_image_mime(): void
     {
-        $payload = 'data:text/html;base64,' . base64_encode('<script>alert(1)</script>');
+        $payload = 'data:text/html;base64,'.base64_encode('<script>alert(1)</script>');
 
         self::assertNull(Base64Image::store($payload, 'defects', 'defect'));
     }

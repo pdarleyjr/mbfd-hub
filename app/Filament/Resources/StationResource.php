@@ -228,7 +228,9 @@ class StationResource extends Resource
                 Tables\Columns\TextColumn::make('address')->visibleFrom('md')
                     ->searchable()
                     ->limit(30),
-                Tables\Columns\TextColumn::make('captain_in_charge')->visibleFrom('md')
+                // Phone cards: station, address and phone, then captain and active status.
+                Tables\Columns\TextColumn::make('captain_in_charge')
+                    ->extraHeaderAttributes(['data-hub-priority' => 1])
                     ->searchable()
                     ->label('Captain'),
                 Tables\Columns\TextColumn::make('phone')->visibleFrom('md')
@@ -245,7 +247,8 @@ class StationResource extends Resource
                 Tables\Columns\TextColumn::make('rooms_count')->visibleFrom('md')
                     ->counts('rooms')
                     ->label('Rooms'),
-                Tables\Columns\IconColumn::make('is_active')->visibleFrom('md')
+                Tables\Columns\IconColumn::make('is_active')
+                    ->extraHeaderAttributes(['data-hub-priority' => 2])
                     ->label('Active')
                     ->boolean()
                     ->sortable(),

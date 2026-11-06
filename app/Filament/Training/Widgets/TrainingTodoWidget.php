@@ -82,16 +82,8 @@ class TrainingTodoWidget extends BaseWidget implements ExportableTable
                     ->url(fn (TrainingTodo $record): string => route('filament.training.resources.training-todos.view', ['record' => $record]))
                     ->openUrlInNewTab(false),
             ])
+            // The page header carries "New Training Todo" (same permission), so the table does not repeat it.
             ->heading('Recent & Pending Training Todos')
-            ->description('Quick view of active training todo items')
-            ->headerActions([
-                Tables\Actions\Action::make('create')
-                    ->label('New Training Todo')
-                    ->icon('heroicon-o-plus')
-                    ->color('primary')
-                    ->url(route('filament.training.resources.training-todos.create'))
-                    ->visible(fn (): bool => auth()->user()?->can('create', TrainingTodo::class) ?? false),
-            ])
             ->emptyStateHeading('No pending training todos')
             ->emptyStateDescription('All training todos are completed or no todos exist.')
             ->emptyStateIcon('heroicon-o-check-circle'));

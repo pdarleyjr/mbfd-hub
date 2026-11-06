@@ -7,6 +7,7 @@ namespace App\Services\Inspections;
 use App\Jobs\Photos\ProcessInspectionPhotoUpload;
 use App\Models\InspectionPhotoUpload;
 use App\Services\Photos\PhotoNormalizer;
+use App\Support\Media\MemberMedia;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -23,15 +24,14 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
  * photo will be: the issue, observation and concern rows show it as soon as the
  * phone delivers it, and nothing is ever blocked waiting for a photo.
  *
- * Photos stay on the disk and in the directory every Daily Checkout viewer reads
- * (public disk, defects/). A clean JPEG from the app is written once, as received;
- * anything else is held on the private disk and converted by a queued job.
+ * Photos are stored on the private disk under defects/ and read only through
+ * MemberMedia (authorized routes; private disk first, then the public disk for
+ * files photos:make-private has not moved yet). A clean JPEG from the app is
+ * written once, as received; anything else is held under the incoming directory
+ * and converted by a queued job.
  */
 final class InspectionPhotoUploads
 {
-    /** Where every Daily Checkout photo viewer reads from today. */
-    public const DISK = 'public';
-
     /** An original the phone could not shrink (HEIC from a desktop browser, for example). */
     public const MAX_UPLOAD_KB = 25600;
 
@@ -80,7 +80,7 @@ final class InspectionPhotoUploads
         $fast = $this->photos->isFastPath($bytes, $type);
         $source = $fast ? null : self::INCOMING_DIRECTORY.'/'.$uuid.'.'.PhotoNormalizer::EXTENSIONS[$type];
         $written = $fast
-            ? Storage::disk(self::DISK)->put($path, $bytes)
+            ? Storage::disk(self::disk())->put($path, $bytes, ['visibility' => 'private'])
             : Storage::disk(self::privateDisk())->put((string) $source, $bytes, ['visibility' => 'private']);
         if (! $written) {
             throw $this->fail('The photo could not be saved. It stays on this device and will be sent again.');
@@ -89,7 +89,7 @@ final class InspectionPhotoUploads
         $now = now();
         $attributes = [
             'status' => $fast ? InspectionPhotoUpload::STATUS_STORED : InspectionPhotoUpload::STATUS_PROCESSING,
-            'disk' => self::DISK,
+            'disk' => self::disk(),
             'path' => $path,
             'source_path' => $source,
             'bytes' => strlen($bytes),
@@ -218,7 +218,7 @@ final class InspectionPhotoUploads
                 'user_id' => $userId,
                 'apparatus_inspection_id' => $inspectionId,
                 'status' => InspectionPhotoUpload::STATUS_AWAITING_UPLOAD,
-                'disk' => self::DISK,
+                'disk' => self::disk(),
                 'path' => $path,
                 'attached_at' => $now,
                 'created_at' => $now,
@@ -230,6 +230,12 @@ final class InspectionPhotoUploads
                 ->whereNull('apparatus_inspection_id')
                 ->update(['apparatus_inspection_id' => $inspectionId, 'attached_at' => $now, 'updated_at' => $now]);
         }
+    }
+
+    /** Where a stored Daily Checkout photo is written (the member image disk, never public). */
+    public static function disk(): string
+    {
+        return MemberMedia::disk();
     }
 
     public static function privateDisk(): string

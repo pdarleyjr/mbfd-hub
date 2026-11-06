@@ -1,17 +1,15 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="workgroups">
-    <div class="space-y-6">
-        <x-filament::section>
-            <x-slot name="heading">Profile Information</x-slot>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <p class="text-sm text-gray-500">Name</p>
-                    <p class="font-medium">{{ auth()->user()->name }}</p>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500">Email</p>
-                    <p class="font-medium">{{ auth()->user()->email }}</p>
-                </div>
+    <x-filament::section>
+        <x-slot name="heading">Profile Information</x-slot>
+        <dl class="wg-context">
+            <div class="wg-context__item">
+                <dt>Name</dt>
+                <dd><span class="wg-context__value">{{ auth()->user()->name }}</span></dd>
             </div>
-        </x-filament::section>
-    </div>
+            <div class="wg-context__item">
+                <dt>Email</dt>
+                <dd><span class="wg-context__value">{{ auth()->user()->email }}</span></dd>
+            </div>
+        </dl>
+    </x-filament::section>
 </x-filament-panels::page>

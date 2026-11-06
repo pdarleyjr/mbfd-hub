@@ -1,7 +1,8 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
     <section class="rl" aria-labelledby="my-activity-all-heading">
-        <div class="rl-intro">
-            <h2 id="my-activity-all-heading" class="rl-title">Everything you sent or follow</h2>
+        <div class="rl-intro hub-portal-intro">
+            {{-- The page title already says "My activity"; this heading stays for screen readers only. --}}
+            <h2 id="my-activity-all-heading" class="sr-only">Everything you sent or follow</h2>
             <p>The last 180 days of your inspections, equipment issues, requests and messages. Open one to see the whole record.</p>
         </div>
 
@@ -40,9 +41,9 @@
         </p>
 
         @if($items === [])
-            <div class="rl-empty">
-                <p class="rl-empty__title">{{ $isFiltered ? 'Nothing matches that search' : 'Nothing yet' }}</p>
-                <p>{{ $isFiltered ? 'Try fewer words, or clear the search.' : 'Inspections, requests and messages you send show up here.' }}</p>
+            <div class="hub-panel hub-empty">
+                <x-heroicon-o-clock class="hub-empty__icon" aria-hidden="true" /><p class="hub-empty__title">{{ $isFiltered ? 'Nothing matches that search' : 'Nothing yet' }}</p>
+                <p class="hub-empty__body">{{ $isFiltered ? 'Try fewer words, or clear the search.' : 'Inspections, requests and messages you send show up here.' }}</p>
             </div>
         @else
             <div class="ep-panel act-card">

@@ -1,6 +1,7 @@
+import { protectedUiOrigin } from '../support/test-environment';
 import { expect, type Browser } from '@playwright/test';
 
-const origin = 'http://127.0.0.1:8127';
+const origin = protectedUiOrigin;
 
 /**
  * Signs a disposable fixture persona in through the supported /login form and

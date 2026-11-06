@@ -9,8 +9,8 @@
 <body data-hub-ui="2" class="hub-page min-h-screen bg-hub-canvas text-hub-ink antialiased">
     <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub-header back-label="Hub home" />
-    <main id="main" class="hub-page__main thvi-main mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-        <x-hub.page-header title="Take Home Vehicle Inspections" eyebrow="Fleet" description="Inspect a take-home vehicle in four short steps. Your completed inspections are listed here.">
+    <main id="main" class="hub-page__main thvi-main mx-auto max-w-5xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
+        <x-hub.page-header title="Take Home Vehicle Inspections" class="!mb-0">
             <a href="{{ route('take-home-inspections.create') }}" class="hub-btn hub-btn--primary hub-btn--field">New inspection</a>
         </x-hub.page-header>
 
@@ -30,7 +30,7 @@
 
         <section class="hub-panel" aria-labelledby="history-heading">
             <div class="hub-panel__header">
-                <h2 id="history-heading" class="text-lg font-bold">My inspections</h2>
+                <h2 id="history-heading" class="hub-h3">My inspections</h2>
                 @if($canViewAll)
                     <a class="hub-link text-sm" href="{{ url('/admin/take-home-vehicle-inspections') }}">All inspections (Fleet)</a>
                 @endif
@@ -39,7 +39,7 @@
                 @if($inspections->isEmpty())
                     <div class="py-6 text-center">
                         <p class="font-semibold">You have not submitted a take-home inspection yet.</p>
-                        <p class="mt-1 text-sm text-hub-muted">Start one with New inspection. Only the vehicle and your signature are required.</p>
+                        <p class="mt-1 text-sm text-hub-ink-secondary">Start one with New inspection. Only the vehicle and your signature are required.</p>
                     </div>
                 @else
                     <ul class="thvi-history">
