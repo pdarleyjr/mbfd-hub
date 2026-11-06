@@ -145,19 +145,24 @@ class CapitalProjectResource extends Resource
                 Tables\Columns\TextColumn::make('project_number')
                     ->searchable()
                     ->sortable(),
+                // Phone cards summarise number, name, status and priority.
                 Tables\Columns\TextColumn::make('name')
+                    ->extraHeaderAttributes(['data-hub-priority' => 1])
                     ->searchable()
                     ->sortable()
                     ->limit(50),
                 Tables\Columns\TextColumn::make('station.name')
+                    ->extraHeaderAttributes(['data-hub-priority' => 5])
                     ->label('Station')
                     ->searchable()
                     ->sortable()
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('budget_amount')
+                    ->extraHeaderAttributes(['data-hub-priority' => 4])
                     ->money('USD')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
+                    ->extraHeaderAttributes(['data-hub-priority' => 2])
                     ->badge()
                     ->color(fn ($state): string => match ($state?->value ?? $state) {
                         'pending' => 'warning',
@@ -167,6 +172,7 @@ class CapitalProjectResource extends Resource
                         default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('priority')
+                    ->extraHeaderAttributes(['data-hub-priority' => 3])
                     ->badge()
                     ->color(fn ($state): string => match ($state?->value ?? $state) {
                         'low' => 'gray',

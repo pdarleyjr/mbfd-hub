@@ -80,17 +80,22 @@ class InventoryItemResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
+                // Phone cards summarise name, category, whether the item is active, and par.
                 Tables\Columns\TextColumn::make('category.name')
+                    ->extraHeaderAttributes(['data-hub-priority' => 1])
                     ->sortable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('par_quantity')
+                    ->extraHeaderAttributes(['data-hub-priority' => 3])
                     ->label('Par')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('low_threshold')
+                    ->extraHeaderAttributes(['data-hub-priority' => 4])
                     ->label('Low Threshold')
                     ->placeholder('Default (50%)')
                     ->sortable(),
                 Tables\Columns\IconColumn::make('active')
+                    ->extraHeaderAttributes(['data-hub-priority' => 2])
                     ->boolean()
                     ->sortable(),
             ])
