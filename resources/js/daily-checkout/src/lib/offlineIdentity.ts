@@ -96,6 +96,14 @@ export async function refreshOfflineIdentity({ redirectOnExpiry = true }: Refres
   return identity;
 }
 
+/** The last verified member on this device, without a network request (null when there is none). */
+export async function cachedOfflineIdentity(): Promise<OfflineIdentity | null> {
+  const cached = await db.cachedData.get(CACHE_KEY);
+  const identity = cached?.data as Partial<OfflineIdentity> | undefined;
+
+  return Number.isInteger(identity?.userId) && Number.isInteger(identity?.securityVersion) ? identity as OfflineIdentity : null;
+}
+
 export async function identityForQueueCapture(options: RefreshOfflineIdentityOptions = {}): Promise<OfflineIdentity> {
   if (typeof navigator === 'undefined' || navigator.onLine) {
     try {

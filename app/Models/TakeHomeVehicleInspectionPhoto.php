@@ -22,6 +22,7 @@ class TakeHomeVehicleInspectionPhoto extends Model
         'angle',
         'check_key',
         'path',
+        'source_path',
         'width',
         'height',
         'bytes',
@@ -44,6 +45,12 @@ class TakeHomeVehicleInspectionPhoto extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by_user_id');
+    }
+
+    /** True while the original waits for the queued conversion (the JPEG is not written yet). */
+    public function isPendingConversion(): bool
+    {
+        return is_string($this->source_path) && $this->source_path !== '';
     }
 
     public function label(): string

@@ -25,6 +25,7 @@ use App\Services\Fleet\VehicleIdentificationPlanner;
 use App\Services\Fleet\VehicleIdentificationService;
 use App\Services\Fleet\VehicleIdentificationSubmission;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
+use App\Services\Inspections\InspectionPhotoUploads;
 use App\Services\Inspections\InspectionSubmissionSignals;
 use App\Services\Inventory\ChecklistRevisionStore;
 use App\Services\Inventory\InventoryCorrectionProjection;
@@ -389,12 +390,15 @@ class ApparatusController extends Controller
             'compartments.*.items.*.notes' => ['nullable', 'string', 'max:2000'],
             'compartments.*.items.*.significant' => ['sometimes', 'boolean'],
             'compartments.*.items.*.photo' => ['nullable', 'string', 'max:7000000'],
+            // A photo uploaded on its own request (api.inspection-photos.store), named by the phone's id for it.
+            'compartments.*.items.*.photo_id' => ['nullable', 'uuid'],
             'defects' => ['nullable', 'array', 'max:100'],
             'defects.*.compartment' => ['required', 'string', 'max:255'],
             'defects.*.item' => ['required', 'string', 'max:255'],
             'defects.*.status' => ['required', 'string', 'in:Missing,Damaged'],
             'defects.*.notes' => ['nullable', 'string', 'max:2000'],
             'defects.*.photo' => ['nullable', 'string', 'max:7000000'],
+            'defects.*.photo_id' => ['nullable', 'uuid'],
             'defects.*.compartment_id' => ['nullable', 'string', 'max:255'],
             'defects.*.item_id' => ['nullable', 'string', 'max:255'],
             'defects.*.significant' => ['sometimes', 'boolean'],
@@ -418,6 +422,7 @@ class ApparatusController extends Controller
             'concerns.*.description' => ['required', 'string', 'max:2000', 'regex:/\S/'],
             'concerns.*.location' => ['nullable', 'string', 'max:255'],
             'concerns.*.photo' => ['nullable', 'string', 'max:7000000'],
+            'concerns.*.photo_id' => ['nullable', 'uuid'],
             'concerns.*.existing_issue_id' => ['nullable', 'integer', 'min:1'],
             // The SCBA and radio numbers the app showed the member, so only what they changed is applied. Sent, even empty, by an app that shows them.
             'equipment_numbers_seen' => ['sometimes', 'array', 'max:200', 'prohibited_unless:processing_version,1'],
@@ -558,9 +563,10 @@ class ApparatusController extends Controller
         $this->validateCompleteChecklist($validated, $checklist, $checklistResolver, $inspectionSession);
 
         $storedPaths = [];
+        $photoRefs = [];
         try {
-            $prepared = $this->prepareImages($validated, $storedPaths);
-            $result = DB::transaction(function () use ($id, $clientSubmissionId, $prepared, $checklistResolver, $inspectionSessionService, $request, $submissionPayloadHash, $hasInspectionSessionCredentials, $actor): array {
+            $prepared = $this->prepareImages($validated, $storedPaths, $actor->userId(), $photoRefs);
+            $result = DB::transaction(function () use ($id, $clientSubmissionId, $prepared, $photoRefs, $checklistResolver, $inspectionSessionService, $request, $submissionPayloadHash, $hasInspectionSessionCredentials, $actor): array {
                 $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId, true);
                 if ($existing !== null) {
                     return ['inspection' => $existing, 'created' => false];
@@ -715,6 +721,8 @@ class ApparatusController extends Controller
 
                 $inspectionRef = "INS-{$designationTag}-{$today}-".str_pad((string) $inspection->id, 6, '0', STR_PAD_LEFT);
                 $inspection->update(['inspection_reference' => $inspectionRef]);
+                // Link the photos this checkout names; one still on its way gets its row (and fixed path) now.
+                app(InspectionPhotoUploads::class)->attach($photoRefs, $actor->userId(), (int) $inspection->id);
                 if ($lockedInspectionSession !== null) {
                     $lockedInspectionSession->update(['submitted_inspection_id' => $inspection->id]);
                 }
@@ -1226,12 +1234,22 @@ class ApparatusController extends Controller
     }
 
     /**
+     * Photos named by id (uploaded on their own request) resolve to their fixed stored path; a photo
+     * still on its way from the phone resolves too and appears once it arrives. Photos still carried
+     * inline (queued by an older app) are stored here as before. A finding without its own photo
+     * takes the photo of the checklist item it describes, so the app sends each photo once.
+     *
      * @param  array<string, mixed>  $data
-     * @param  list<string>  $storedPaths
+     * @param  list<string>  $storedPaths  inline photos written by this request (deleted again on failure)
+     * @param  array<string, string|null>  $photoRefs  photo ids this checkout uses => stored path (null: not this member's)
      * @return array<string, mixed>
      */
-    private function prepareImages(array $data, array &$storedPaths): array
+    private function prepareImages(array $data, array &$storedPaths, int $actorUserId, array &$photoRefs): array
     {
+        $photoRefs = app(InspectionPhotoUploads::class)->resolve($this->referencedPhotoIds($data), $actorUserId);
+        $refs = $photoRefs;
+        $uploaded = static fn (mixed $id): ?string => is_string($id) && $id !== '' ? ($refs[strtolower($id)] ?? null) : null;
+
         if (filled($data['officer_signature'] ?? null)) {
             $data['officer_signature_path'] = $this->storeImageOrFail(
                 (string) $data['officer_signature'],
@@ -1245,7 +1263,9 @@ class ApparatusController extends Controller
 
         $data['defects'] ??= [];
         foreach ($data['defects'] as $index => &$defect) {
-            if (filled($defect['photo'] ?? null)) {
+            if (($path = $uploaded($defect['photo_id'] ?? null)) !== null) {
+                $defect['photo_path'] = $path;
+            } elseif (filled($defect['photo'] ?? null)) {
                 $defect['photo_path'] = $this->storeImageOrFail(
                     (string) $defect['photo'],
                     'defects',
@@ -1254,14 +1274,16 @@ class ApparatusController extends Controller
                 );
                 $storedPaths[] = $defect['photo_path'];
             }
-            unset($defect['photo']);
+            unset($defect['photo'], $defect['photo_id']);
         }
         unset($defect);
 
         // Concern photos are stored like defect photos, so a failed submission deletes them with the rest. An optional
         // photo the server cannot read costs the photo, never the concern or the checkout.
         foreach ($data['concerns'] ?? [] as $index => $concern) {
-            if (filled($concern['photo'] ?? null)) {
+            if (($path = $uploaded($concern['photo_id'] ?? null)) !== null) {
+                $concern['photo_path'] = $path;
+            } elseif (filled($concern['photo'] ?? null)) {
                 $path = Base64Image::store((string) $concern['photo'], 'defects', 'concern');
                 if ($path === null) {
                     Log::warning('A concern photo could not be read and was left out of the checkout.', ['client_id' => $concern['client_id'] ?? null]);
@@ -1270,13 +1292,15 @@ class ApparatusController extends Controller
                     $storedPaths[] = $path;
                 }
             }
-            unset($concern['photo']);
+            unset($concern['photo'], $concern['photo_id']);
             $data['concerns'][$index] = $concern;
         }
 
         foreach ($data['compartments'] as $compartmentIndex => &$compartment) {
             foreach ($compartment['items'] as $itemIndex => &$item) {
-                if (filled($item['photo'] ?? null)) {
+                if (($path = $uploaded($item['photo_id'] ?? null)) !== null) {
+                    $item['photo_path'] = $path;
+                } elseif (filled($item['photo'] ?? null)) {
                     $matching = collect($data['defects'])->first(fn (array $finding): bool => $finding['compartment'] === $compartment['name'] && $finding['item'] === $item['name']);
                     $existingPath = $matching['photo_path'] ?? null;
                     $photoPath = is_string($existingPath) ? $existingPath : $this->storeImageOrFail(
@@ -1285,13 +1309,53 @@ class ApparatusController extends Controller
                     $item['photo_path'] = $photoPath;
                     $storedPaths[] = $photoPath;
                 }
-                unset($item['photo']);
+                unset($item['photo'], $item['photo_id']);
             }
             unset($item);
         }
         unset($compartment);
 
+        // A finding sent without its own photo shows the photo taken for its checklist item (one copy, one file).
+        foreach ($data['defects'] as &$defect) {
+            if (isset($defect['photo_path'])) {
+                continue;
+            }
+            foreach ($data['compartments'] as $compartment) {
+                if ($compartment['name'] !== $defect['compartment']) {
+                    continue;
+                }
+                foreach ($compartment['items'] as $item) {
+                    if ($item['name'] === $defect['item'] && is_string($item['photo_path'] ?? null)) {
+                        $defect['photo_path'] = $item['photo_path'];
+                        break 2;
+                    }
+                }
+            }
+        }
+        unset($defect);
+
         return $data;
+    }
+
+    /**
+     * Every photo id the checkout names (items, findings and concerns).
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<string>
+     */
+    private function referencedPhotoIds(array $data): array
+    {
+        $ids = [];
+        foreach ($data['compartments'] ?? [] as $compartment) {
+            foreach ($compartment['items'] ?? [] as $item) {
+                $ids[] = $item['photo_id'] ?? null;
+            }
+        }
+        foreach ([...($data['defects'] ?? []), ...($data['concerns'] ?? [])] as $entry) {
+            $ids[] = $entry['photo_id'] ?? null;
+        }
+
+        return array_values(array_filter($ids, static fn (mixed $id): bool => is_string($id) && $id !== ''));
     }
 
     private function storeImageOrFail(string $payload, string $directory, string $prefix, string $field): string

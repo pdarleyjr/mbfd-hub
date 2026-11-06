@@ -53,12 +53,34 @@ export interface DailyCheckoutQueuedSubmission {
   ownershipState?: 'owned' | 'legacy_unclaimed' | 'identity_mismatch' | 'security_mismatch';
 }
 
+/**
+ * One Daily Checkout photo waiting on (or already sent from) this device. Photos travel
+ * on their own requests (utils/photoUploadQueue.ts); the checkout only names them by id.
+ */
+export interface QueuedPhoto {
+  /** The photo id the server keys on (idempotency key for every attempt). */
+  id: string;
+  ownerUserId: number;
+  /** The shrunken JPEG (or the original when the phone could not convert it). */
+  blob: Blob;
+  filename: string;
+  bytes: number;
+  status: 'pending' | 'sent' | 'rejected';
+  attempts: number;
+  /** Epoch ms before which no automatic attempt is made. */
+  nextAttemptAt?: number;
+  lastError?: string;
+  createdAt: number;
+  sentAt?: number;
+}
+
 class MBFDDatabase extends Dexie {
   pendingSubmissions!: Table<PendingSubmission, number>;
   cachedData!: Table<CachedData, string>;
   trtCatalog!: Table<TrtCatalogItem, number>;
   dailyCheckoutSubmissions!: Table<DailyCheckoutQueuedSubmission, string>;
   dailyCheckoutDrafts!: Table<DailyCheckoutDraft, string>;
+  photoUploads!: Table<QueuedPhoto, string>;
 
   constructor() {
     super('mbfd-daily-checkout');
@@ -139,6 +161,11 @@ class MBFDDatabase extends Dexie {
     // checkout ever collides with a legacy one.
     this.version(7).stores({
       dailyCheckoutSubmissions: '&id, &[apparatusId+checklistVersion+ownerUserId], [apparatusId+checklistVersion], apparatusId, checklistVersion, status, createdAt, updatedAt, retentionExpiresAt, ownerUserId, ownershipState',
+    });
+
+    // Photos are queued and uploaded one at a time, apart from the checkout that names them.
+    this.version(8).stores({
+      photoUploads: '&id, status, ownerUserId, createdAt',
     });
   }
 }

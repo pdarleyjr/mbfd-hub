@@ -68,6 +68,10 @@
                         @if($issuePhotos->isNotEmpty())
                             <div class="thvi-thumbs mt-2">
                                 @foreach($issuePhotos as $photo)
+                                    @if($photo->isPendingConversion())
+                                        <p class="hub-well p-3 text-sm">Photo still being processed.</p>
+                                        @continue
+                                    @endif
                                     <a class="thvi-thumb" href="{{ route('take-home-inspections.photo', $photo) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="{{ $photo->label() }}"><img src="{{ route('take-home-inspections.photo', $photo) }}" alt="{{ $photo->label() }}" loading="lazy"></a>
                                 @endforeach
                             </div>
@@ -83,7 +87,9 @@
                 @foreach(Inspection::PHOTO_ANGLES as $angle => $label)
                     @php($photo = $inspection->photos->firstWhere('angle', $angle))
                     <figure>
-                        @if($photo)
+                        @if($photo?->isPendingConversion())
+                            <p class="hub-well p-6 text-center text-sm">Photo received, still being processed. Refresh in a minute.</p>
+                        @elseif($photo)
                             <a href="{{ route('take-home-inspections.photo', $photo) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="{{ $label }}"><img src="{{ route('take-home-inspections.photo', $photo) }}" alt="{{ $label }}" loading="lazy"></a>
                         @else
                             <p class="hub-well p-6 text-center text-sm">Not provided</p>

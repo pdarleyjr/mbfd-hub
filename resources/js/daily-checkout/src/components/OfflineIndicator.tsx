@@ -9,6 +9,7 @@ import {
   type DailyCheckoutAttentionRecord,
 } from '../utils/dailyCheckoutSubmissionQueue';
 import { db } from '../lib/db';
+import { onPhotoUploadsChanged, pendingPhotoCount } from '../utils/photoUploadQueue';
 import { identityForQueueCapture } from '../lib/offlineIdentity';
 import { redirectToLoginAfterSessionExpiry } from '../utils/api';
 import { HUB_TIMEZONE } from '../../../shared/timezone.ts';
@@ -169,6 +170,19 @@ export default function OfflineIndicator() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [refreshRevision, setRefreshRevision] = useState(0);
   const [signInRequired, setSignInRequired] = useState(false);
+  const [photoCount, setPhotoCount] = useState(0);
+
+  // Photos waiting to reach the Hub (they travel apart from the checkouts that name them).
+  useEffect(() => {
+    let mounted = true;
+    const updatePhotos = () => {
+      pendingPhotoCount().then((count) => { if (mounted) setPhotoCount(count); }).catch(() => undefined);
+    };
+    updatePhotos();
+    const unsubscribe = onPhotoUploadsChanged(updatePhotos);
+
+    return () => { mounted = false; unsubscribe(); };
+  }, []);
 
   useEffect(() => {
     const onSignInRequired = (event: Event) => setSignInRequired((event as CustomEvent<boolean>).detail === true);
@@ -247,7 +261,10 @@ export default function OfflineIndicator() {
     <>
       <div className="hub-connection-bar" data-state={state} role="status" aria-live="polite">
         <span className="hub-connection-state">{label}</span>
-        <span className="hub-connection-detail">{queueCount > 0 ? `${queueCount} saved on this device` : isOffline ? 'Work stays on this device' : 'No submissions waiting to sync'}</span>
+        <span className="hub-connection-detail">{[
+          queueCount > 0 ? `${queueCount} saved on this device` : null,
+          photoCount > 0 ? `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} ${isOffline ? 'will send when back online' : 'sending'}` : null,
+        ].filter(Boolean).join(' · ') || (isOffline ? 'Work stays on this device' : 'No submissions waiting to sync')}</span>
       </div>
       {signInRequired && !isOffline && (
         <div className="hub-sync-notice" role="status" data-testid="sign-in-required-notice">
