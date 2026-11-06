@@ -902,6 +902,14 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
     .fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav .hub-page-nav__label { display: none; }
 }
 
+/* Other Admin pages keep their own layout under the control; only Filament's 32px section padding and gaps
+   tighten to the page rhythm tokens so the title does not float a band below the navigation. */
+.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page, [class*="fi-resource-"], [data-hub-page-frame="bleed"]):has(> .hub-page-nav) > .hub-page-nav { margin-block: var(--hub-page-pad-top) 0; }
+.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page, [class*="fi-resource-"], [data-hub-page-frame="bleed"]):has(> .hub-page-nav) > section {
+    padding-block: var(--hub-page-gap) var(--hub-page-pad-bottom);
+    row-gap: var(--hub-page-gap);
+}
+
 .fi-panel-admin .fi-page[class*="fi-resource-"]:not([data-hub-page-frame="bleed"]) {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -913,15 +921,16 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
 .fi-panel-admin .fi-page[class*="fi-resource-"]:not([data-hub-page-frame="bleed"]) > section { display: contents; }
 .fi-panel-admin .fi-page[class*="fi-resource-"]:not([data-hub-page-frame="bleed"]) > :not(section, .hub-page-nav) { grid-column: 1 / -1; min-width: 0; }
 
+/* Top-aligned, so a tall header (breadcrumbs, title, a wrapped row of actions) does not float the control. */
 .fi-panel-admin .fi-page[class*="fi-resource-"]:not([data-hub-page-frame="bleed"]) > .hub-page-nav {
     grid-area: 1 / 1;
-    align-self: center;
+    align-self: start;
     margin: 0;
 }
 
 .fi-panel-admin .fi-page[class*="fi-resource-"]:not([data-hub-page-frame="bleed"]) > section > .fi-header {
     grid-area: 1 / 1 / 2 / -1;
-    align-self: center;
+    align-self: start;
     min-width: 0;
     flex-direction: row;
     flex-wrap: wrap;
@@ -933,7 +942,7 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
 .fi-panel-admin .fi-page[class*="fi-resource-"]:not([data-hub-page-frame="bleed"]):has(> .hub-page-nav) > section > .fi-header { grid-column: 2; }
 
 /* The title keeps a readable width; header actions that do not fit beside it wrap onto their own line. */
-.fi-panel-admin .fi-page[class*="fi-resource-"]:not([data-hub-page-frame="bleed"]) > section > .fi-header > div:first-child { flex: 1 1 16rem; min-width: min(100%, 14rem); }
+.fi-panel-admin .fi-page[class*="fi-resource-"]:not([data-hub-page-frame="bleed"]) > section > .fi-header > div:first-child { flex: 1 1 auto; min-width: min(100%, 12rem); }
 
 /* The breadcrumb trail sits tight over the title; the actions centre on the title row instead of a 28px drop. */
 .fi-panel-admin .fi-page[class*="fi-resource-"] > section > .fi-header .fi-breadcrumbs { margin-bottom: .125rem; }
@@ -1233,7 +1242,7 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
        structured values (lists, tables, images, rich text, repeaters) keep the label above. */
     .fi-panel-admin .fi-in-entry-wrp:not(:has(.fi-in-repeatable, .fi-in-key-value, .fi-in-image, table, .prose, ul, ol)) > .grid:has(> :first-child + *),
     .fi-panel-admin .fi-page .fi-fo-field-wrp:has(.fi-fo-placeholder):not(:has(.fi-fo-placeholder :is(div, p, ul, ol, table))) > .grid:has(> :first-child + *) {
-        grid-template-columns: minmax(6.5rem, 38%) minmax(0, 1fr);
+        grid-template-columns: minmax(7.5rem, 45%) minmax(0, 1fr);
         align-items: baseline;
         column-gap: .75rem;
     }
