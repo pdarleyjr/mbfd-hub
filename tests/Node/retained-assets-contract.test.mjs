@@ -14,6 +14,8 @@ const read = (path) => readFileSync(resolve(root, path), "utf8").replace(/\r\n/g
 const RETAIN_STEP = "Retain the running release's hashed assets";
 const SWITCH_STEP = "Migrate and activate prebuilt Hub image";
 const HOST_DIR = "/var/lib/mbfd-hub/retained-assets";
+// Escapes every RegExp metacharacter, backslash included, so a path is matched literally.
+const escapeRegExp = (value) => value.replace(/[\\^$.*+?()[\]{}|/-]/g, '\\$&');
 
 function step(workflow, name) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -37,7 +39,7 @@ test("deploy retains the running release's hashed assets before the image switch
   assert.match(retain, /HUB_APP_CONTAINER=mbfd-hub-laravel/);
   assert.match(retain, /docker cp "\$HUB_APP_CONTAINER:\/var\/www\/html\/public\/\$AREA\/assets\/\." /);
   assert.match(retain, /for AREA in build daily; do/);
-  assert.match(retain, new RegExp(`RETAINED_ASSETS_DIR=${HOST_DIR.replace(/\//g, "\\/")}\\n`));
+  assert.match(retain, new RegExp(`RETAINED_ASSETS_DIR=${escapeRegExp(HOST_DIR)}\\n`));
 
   // Same hashed name means same bytes: an existing retained file is never replaced.
   assert.match(retain, /if \[ -e "\$DST\/\$NAME" \]; then\n\s+cmp -s/);
@@ -93,7 +95,7 @@ test("compose mounts the retained assets read-only into the app container", () =
   const service = compose.split(/^  laravel\.test:\n/m)[1]?.split(/^networks:/m)[0] ?? "";
   const volumes = service.split(/^    volumes:\n/m)[1]?.split(/^    [a-z_]+:/m)[0] ?? "";
 
-  assert.match(volumes, new RegExp(`^      - "${HOST_DIR.replace(/\//g, "\\/")}:\\/var\\/www\\/retained:ro"$`, "m"));
+  assert.match(volumes, new RegExp(`^      - "${escapeRegExp(HOST_DIR)}:\\/var\\/www\\/retained:ro"$`, "m"));
   assert.doesNotMatch(compose, /\/var\/www\/retained(?!:ro")/);
 });
 
@@ -124,7 +126,7 @@ test("the runbook documents the bounds, verification and how to turn it off", ()
   const path = "docs/ops/retained-assets.md";
   assert.ok(existsSync(resolve(root, path)), `${path} must exist`);
   const runbook = read(path);
-  assert.match(runbook, new RegExp(HOST_DIR.replace(/\//g, "\\/")));
+  assert.match(runbook, new RegExp(escapeRegExp(HOST_DIR)));
   assert.match(runbook, /72 hours/);
   assert.match(runbook, /500 MB/);
   assert.match(runbook, /curl -sI https:\/\/www\.mbfdhub\.com\/build\/assets\//);
