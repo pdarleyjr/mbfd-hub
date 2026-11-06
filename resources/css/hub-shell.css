@@ -331,6 +331,20 @@
     body:has(.hub-member-nav) { padding-bottom: calc(var(--hub-member-nav-height) + 16px + env(safe-area-inset-bottom, 0px)); }
 }
 
+/* Filament panels: the bar shows the brand only while the sidebar (which carries it) is a drawer,
+   and only the seal on phones, where the bar also holds the switcher, menu and account controls. */
+.hub-panel-shell__brand { display: none; }
+@media (max-width: 1023.98px) {
+    .hub-panel-shell__brand { display: inline-flex; flex: none; }
+}
+@media (max-width: 639.98px) {
+    .hub-panel-shell__brand .hub-shell-brand__word { display: none; }
+}
+/* Admin's bar also holds global search: on narrow phones the search field keeps that room. */
+@media (max-width: 479.98px) {
+    .fi-panel-admin .hub-panel-shell__brand { display: none; }
+}
+
 /* Up to 419px the brand, a long module name ("Workgroups") and two controls overflow the bar and push
    the account menu off screen. The switcher keeps its accessible name and becomes icon-only. */
 @media (max-width: 419.98px) {

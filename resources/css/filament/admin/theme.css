@@ -13,6 +13,7 @@
 @import './pages/trt-and-employee-record.css';
 @import './pages/personnel-uniforms.css';
 @import '../workgroup-pages.css';
+@import '../training-pages.css';
 @import '../employee-messages.css';
 @import '../email-center.css';
 @import '../push-enrollment.css';
@@ -233,21 +234,35 @@
     color: rgb(var(--hub-border));
 }
 
-/* Global search input */
+/* Global search: one translucent pill on the bar. The wrapper owns the fill and edge; the input inside it is
+   transparent (two stacked fills read as a split box with a second border). */
 .fi-topbar > nav .fi-global-search-field input {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: transparent;
     color: rgb(var(--hub-surface));
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 0;
+    box-shadow: none;
 }
 
 .fi-topbar > nav .fi-global-search-field input::placeholder {
     color: rgb(var(--hub-muted-soft));
 }
 
-/* Search icon and label text */
-.fi-topbar > nav .fi-global-search-field .fi-input-wrp {
-    background-color: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
+/* .fi-body outranks the panels' grey input-ring rule (hub-admin-v2.css), which is for inputs on light surfaces. */
+.fi-body .fi-topbar > nav .fi-global-search-field .fi-input-wrp {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 9999px;
+    --tw-ring-color: rgba(255, 255, 255, 0.24);
+}
+
+.fi-body .fi-topbar > nav .fi-global-search-field .fi-input-wrp:focus-within {
+    background-color: rgba(255, 255, 255, 0.16);
+    --tw-ring-color: rgb(var(--hub-surface));
+}
+
+.fi-topbar > nav .fi-global-search-field .fi-input-wrp-prefix,
+.fi-topbar > nav .fi-global-search-field .fi-input-wrp-suffix {
+    background: transparent;
+    border: 0;
 }
 
 .fi-topbar > nav .fi-global-search-field svg {
@@ -1237,11 +1252,12 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 }
 
 /* Feedback Quotes */
+/* A quoted comment is a white well inside the section's glass, edged evenly (no side stripe). */
 .wg-feedback-quote {
     padding: 0.875rem 1rem;
-    border-left: 3px solid rgb(var(--hub-border-strong));
-    background-color: rgb(var(--hub-surface-muted));
-    border-radius: 0 0.5rem 0.5rem 0;
+    border: 1px solid rgb(var(--hub-border));
+    background-color: rgb(var(--hub-well));
+    border-radius: var(--hub-radius-control);
     margin-bottom: 0.75rem;
 }
 

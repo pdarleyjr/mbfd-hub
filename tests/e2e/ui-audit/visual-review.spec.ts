@@ -14,12 +14,14 @@ const outDir = resolve('test-results/visual-review', label);
 const viewports = [{ width: 390, height: 844 }, { width: 1440, height: 900 }];
 const personas = JSON.parse(readFileSync('test-results/protected-ui-auth/personas.json', 'utf8')) as Record<string, string>;
 
-const screens: Record<string, string[]> = {
+// VISUAL_SCREENS='{"super-admin":["/admin/x"],"member":["/y"]}' replaces the default screen list.
+const defaultScreens: Record<string, string[]> = {
   'super-admin': ['/', '/admin', '/admin/apparatuses', '/admin/employees', '/admin/inventory-items', '/updates', '/support/issues', '/account', '/no-such-page'],
   member: ['/', '/employee/dashboard', '/daily/stations', '/updates', '/account'],
   'training-admin': ['/training'],
   'workgroup-member': ['/workgroups'],
 };
+const screens: Record<string, string[]> = process.env.VISUAL_SCREENS ? JSON.parse(process.env.VISUAL_SCREENS) : defaultScreens;
 
 const slug = (path: string) => (path === '/' ? 'home' : path.replace(/^\//, '').replace(/[^a-z0-9]+/gi, '-'));
 

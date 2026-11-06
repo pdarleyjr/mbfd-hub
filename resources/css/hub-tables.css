@@ -191,6 +191,112 @@ table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-h
   table[data-hub-mode="cards"] > tbody > tr:has(> td[data-hub-kind="select"]) > td[data-hub-lead] { padding-inline-start: 3rem; }
 }
 
+/*
+ * App-style list rows. The first visible field is the row's title: no "Label" column, the value in
+ * semibold ink, its Filament description muted underneath. Other summary fields stay label : value.
+ */
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-title]:not([data-hub-hidden]) {
+  display: block;
+  padding-block: 0.625rem 0.25rem;
+  color: rgb(var(--hub-n-900));
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-title]:not([data-hub-hidden])::before { content: none; }
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-title] :is(.fi-ta-text-description, .fi-ta-text-item-description) {
+  color: rgb(var(--hub-n-600));
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+/* One label column width on every table, so values start at the same x on every card and page;
+   a label only wraps when it is longer than the column ("Account activation" fits). */
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden]):not([data-hub-title]) {
+  grid-template-columns: 8.25rem minmax(0, 1fr);
+  justify-items: start;
+  padding-block: 0;
+  text-align: start;
+}
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden]):not([data-hub-title])::before { font-weight: 500; }
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden]):not([data-hub-title]) > * { justify-self: start; text-align: start; }
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"] :is(.fi-ta-text, .fi-ta-icon, .fi-ta-col-wrp) { justify-content: flex-start; align-items: flex-start; text-align: start; }
+
+/*
+ * Row actions: a single "Actions" menu is a 44px icon button (its label stays for screen readers)
+ * at every width, so the data, not eleven identical outlined buttons, carries the table.
+ */
+@supports selector(:has(*)) {
+  .fi-ta-cell .fi-ta-actions > .fi-dropdown:only-child .fi-btn:has(.fi-btn-icon) {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding-inline: 0;
+    justify-content: center;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+  .fi-ta-cell .fi-ta-actions > .fi-dropdown:only-child .fi-btn:has(.fi-btn-icon):hover { background: rgb(var(--hub-n-50)); }
+  .fi-ta-cell .fi-ta-actions > .fi-dropdown:only-child .fi-btn:has(.fi-btn-icon) .fi-btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+/*
+ * One "Actions" menu per row moves into the row header as a 44px icon button beside the details
+ * chevron, so the card has no separate footer band. Its text label stays for screen readers. Rows
+ * with several separate actions keep the footer, where each button keeps its visible label.
+ */
+@supports selector(:has(*)) {
+  table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="actions"]:has(.fi-ta-actions > .fi-dropdown:only-child) {
+    position: absolute;
+    inset-block-start: 0.25rem;
+    inset-inline-end: 0.25rem;
+    z-index: 1;
+    min-height: 0;
+    padding: 0;
+    border-top: 0;
+  }
+  table[data-hub-mode="cards"] > tbody > tr:has(.hub-rt-toggle) > td[data-hub-kind="actions"]:has(.fi-ta-actions > .fi-dropdown:only-child) { inset-inline-end: 3rem; }
+  table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="actions"]:has(.fi-ta-actions > .fi-dropdown:only-child) .fi-btn:has(.fi-btn-icon) {
+    width: 2.75rem;
+    padding-inline: 0;
+    border-color: transparent;
+    box-shadow: none;
+    background: transparent;
+  }
+  table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="actions"]:has(.fi-ta-actions > .fi-dropdown:only-child) .fi-btn:has(.fi-btn-icon) .fi-btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  table[data-hub-mode="cards"] > tbody > tr:has(> td[data-hub-kind="select"]) > td[data-hub-title] { padding-inline-start: 3rem; }
+  /* The title keeps clear of the header controls: actions only, or actions plus the chevron. */
+  table[data-hub-mode="cards"] > tbody > tr:has(> td[data-hub-kind="actions"] .fi-ta-actions > .fi-dropdown:only-child) > td[data-hub-title] { padding-inline-end: 3.5rem; }
+  table[data-hub-mode="cards"] > tbody > tr:has(.hub-rt-toggle):has(> td[data-hub-kind="actions"] .fi-ta-actions > .fi-dropdown:only-child) > td[data-hub-title] { padding-inline-end: 6.25rem; }
+}
+
+/* Select all: a labelled, compact control row instead of an empty band with a lone checkbox. */
+table[data-hub-mode="cards"] > thead > tr { padding: 0.25rem 0.75rem; background: transparent; }
+table[data-hub-mode="cards"] > thead > tr > th[data-hub-kind="select"]:not([data-hub-hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+}
+table[data-hub-mode="cards"] > thead > tr > th[data-hub-kind="select"]:not([data-hub-hidden])::after {
+  content: "Select all";
+  color: rgb(var(--hub-n-600));
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
 /* Inputs inside narrow cells fill the cell instead of keeping their own minimum */
 table[data-hub-mode] .fi-ta-text-input,
 table[data-hub-mode] .fi-ta-select { width: 100%; min-width: 0; padding: 0.25rem 0; }

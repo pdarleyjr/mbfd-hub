@@ -13,7 +13,7 @@
                     <p>{{ $request->items->pluck('item_name')->join(', ') }}</p>
                     <small>Submitted by {{ $request->requester_rank }} {{ $request->requester_name }} · {{ $request->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y') }}</small>
                 </div>
-                <div class="mr-arrow" aria-hidden="true">→</div>
+                <x-heroicon-m-chevron-right class="mr-arrow" aria-hidden="true" />
             </a>
         @empty
             <div class="mr-empty hub-empty"><x-heroicon-o-inbox class="hub-empty__icon" aria-hidden="true" /><p class="hub-empty__title">No personnel requests yet</p><p class="hub-empty__body">Your structured uniform and officer-submitted equipment requests will appear here.</p></div>

@@ -2,10 +2,11 @@
 <section class="ep-panel act-card" aria-labelledby="my-activity-heading" data-my-activity>
     <div class="ep-panel-header">
         <h2 id="my-activity-heading" class="ep-panel-title">My activity</h2>
-        <a href="{{ \App\Filament\Employee\Pages\MyActivity::getUrl(panel: 'employee') }}" class="ep-panel-link">View all activity →</a>
+        <a href="{{ \App\Filament\Employee\Pages\MyActivity::getUrl(panel: 'employee') }}" class="ep-panel-link">View all activity<x-heroicon-m-chevron-right class="ep-link-chevron" aria-hidden="true" /></a>
     </div>
     @if($items === [])
-        <div class="ep-empty">
+        <div class="ep-empty ep-empty--row">
+            <x-heroicon-o-clock class="ep-empty-icon" aria-hidden="true" />
             <p>Nothing yet. Inspections, requests and messages you send show up here.</p>
         </div>
     @else

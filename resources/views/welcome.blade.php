@@ -192,7 +192,7 @@
                             <svg class="hub-tag__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
                         </a>
                     </div>
-                    <div class="hub-list">
+                    <div class="hub-panel home-updates"><div class="hub-list">
                         @forelse($departmentUpdates as $update)
                             @php
                                 [$priorityTone, $priorityIcon] = match ($update->priority) {
@@ -231,7 +231,7 @@
                                 <p class="hub-empty__body">Published notices will appear here.</p>
                             </div>
                         @endforelse
-                    </div>
+                    </div></div>
                 </section>
 
             </div>

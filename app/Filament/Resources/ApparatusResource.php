@@ -284,7 +284,9 @@ class ApparatusResource extends Resource
                     ->sortable()
                     ->weight('bold')
                     ->placeholder('—'),
+                // Phone cards summarise unit, status, open work and PM; the rest opens in the row's details.
                 Tables\Columns\TextColumn::make('vehicle_number')->visibleFrom('md')
+                    ->extraHeaderAttributes(['data-hub-priority' => 4])
                     ->label('Vehicle')
                     ->description(fn (Apparatus $record): string => self::vehicleSummary($record))
                     ->color(fn (Apparatus $record): ?string => $record->master_link_status === Apparatus::MASTER_LINK_NEEDS_REVIEW ? 'warning' : null)
@@ -292,13 +294,15 @@ class ApparatusResource extends Resource
                     ->sortable()
                     ->toggleable()
                     ->placeholder('Not recorded'),
-                Tables\Columns\TextColumn::make('status')->visibleFrom('md')
+                Tables\Columns\TextColumn::make('status')
+                    ->extraHeaderAttributes(['data-hub-priority' => 1])
                     ->badge()
                     ->alignment(Alignment::Center)
                     ->color(fn (?string $state): string => self::statusColor($state))
                     ->sortable()
                     ->placeholder('Not set'),
-                Tables\Columns\TextColumn::make('open_work')->visibleFrom('md')
+                Tables\Columns\TextColumn::make('open_work')
+                    ->extraHeaderAttributes(['data-hub-priority' => 2])
                     ->label('Open work')
                     ->badge()
                     ->alignment(Alignment::Center)
@@ -306,7 +310,8 @@ class ApparatusResource extends Resource
                     ->color(fn (Apparatus $record): string => (int) $record->getAttribute('open_defects_count') > 0
                         ? 'danger'
                         : ((int) $record->getAttribute('open_tickets_count') > 0 ? 'warning' : 'success')),
-                Tables\Columns\TextColumn::make('pm_health_status')->visibleFrom('md')
+                Tables\Columns\TextColumn::make('pm_health_status')
+                    ->extraHeaderAttributes(['data-hub-priority' => 3])
                     ->label('PM')
                     ->badge()
                     ->alignment(Alignment::Center)
@@ -334,6 +339,7 @@ class ApparatusResource extends Resource
                         return "{$health['hours_since_pm']} of {$health['interval_hours']} engine hours since PM | {$miles} mi | Last PM: {$lastPm}";
                     }),
                 Tables\Columns\TextColumn::make('location_display')->visibleFrom('md')
+                    ->extraHeaderAttributes(['data-hub-priority' => 5])
                     ->label('Location')
                     ->getStateUsing(fn (Apparatus $record): string => self::locationLabel($record))
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(fn (Builder $q): Builder => $q

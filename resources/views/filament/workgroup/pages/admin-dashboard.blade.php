@@ -1,64 +1,38 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="workgroups">
-    {{-- Admin Stats Overview --}}
+    {{-- One readout strip: label, figure, note. Tokens only, no tinted icon tiles. --}}
     @if(!empty($stats))
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.875rem; margin-bottom: 1.5rem;">
+    <dl class="wg-overview-stats wg-overview-stats--counts" aria-label="Workgroup administration summary">
         @foreach($stats as $stat)
-        @php
-            $iconColors = [
-                'primary' => 'background-color: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-action-primary)); border-color: rgb(var(--hub-border));',
-                'success' => 'background-color: #ECFDF5; color: #065F46; border-color: #BBF7D0;',
-                'warning' => 'background-color: #FEF9C3; color: #854D0E; border-color: #FDE68A;',
-                'info'    => 'background-color: #EFF6FF; color: #1E40AF; border-color: #BFDBFE;',
-                'gray'    => 'background-color: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-ink-secondary)); border-color: rgb(var(--hub-border));',
-            ];
-            $style = $iconColors[$stat['color']] ?? $iconColors['gray'];
-        @endphp
-        <div class="wg-stat-card" style="text-align: left; padding: 1rem 1.25rem;">
-            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.625rem;">
-                <div style="width: 2rem; height: 2rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; border: 1px solid; {{ $style }}">
-                    <x-dynamic-component :component="$stat['icon']" style="width: 1rem; height: 1rem;"/>
-                </div>
-                <p class="wg-stat-label" style="text-transform: none; letter-spacing: normal;">{{ $stat['label'] }}</p>
-            </div>
-            <p class="wg-stat-value" style="font-size: 1.5rem;">{{ $stat['value'] }}</p>
-            <p style="font-size: 0.6875rem; color: rgb(var(--hub-ink-secondary)); margin-top: 0.25rem;">{{ $stat['desc'] }}</p>
+        <div class="wg-overview-stat">
+            <dt class="wg-overview-stat__label">{{ $stat['label'] }}</dt>
+            <dd @class([
+                'wg-overview-stat__value',
+                'wg-overview-stat__value--warning' => ($stat['color'] ?? null) === 'warning',
+            ])>{{ $stat['value'] }}</dd>
+            @if(filled($stat['desc'] ?? null))<dd class="wg-overview-stat__note">{{ $stat['desc'] }}</dd>@endif
         </div>
         @endforeach
-    </div>
+    </dl>
     @endif
 
-    {{-- Session Progress --}}
     @if($progress)
-    <div class="wg-section">
+    <section class="wg-section wg-admin-progress" aria-labelledby="wg-admin-progress-title">
         <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: rgb(var(--hub-action-primary));">
-                <x-heroicon-o-chart-bar class="w-5 h-5"/>
-            </div>
-            <h3 class="wg-section-title">Active Session Progress{{ $activeSession ? ': ' . $activeSession->name : '' }}</h3>
+            <h3 id="wg-admin-progress-title" class="wg-section-title">Active Session Progress{{ $activeSession ? ': ' . $activeSession->name : '' }}</h3>
         </div>
         <div class="wg-section-body">
-            <div class="wg-stats-row" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));">
-                @php
-                    $progressItems = [
-                        ['label' => 'Products', 'val' => $progress['total_products']],
-                        ['label' => 'Evaluators', 'val' => $progress['total_members']],
-                        ['label' => 'Submitted', 'val' => $progress['submitted_submissions']],
-                        ['label' => 'Completion', 'val' => $progress['completion_percentage'] . '%'],
-                    ];
-                @endphp
-                @foreach($progressItems as $pi)
-                <div style="text-align: center; padding: 0.75rem; background-color: rgb(var(--hub-surface-muted)); border-radius: 0.5rem; border: 1px solid rgb(var(--hub-border));">
-                    <p class="wg-stat-label">{{ $pi['label'] }}</p>
-                    <p class="wg-stat-value">{{ $pi['val'] }}</p>
-                </div>
-                @endforeach
-            </div>
+            <dl class="wg-progress-figures">
+                <div><dt>Products</dt><dd>{{ $progress['total_products'] }}</dd></div>
+                <div><dt>Evaluators</dt><dd>{{ $progress['total_members'] }}</dd></div>
+                <div><dt>Submitted</dt><dd>{{ $progress['submitted_submissions'] }}</dd></div>
+                <div><dt>Completion</dt><dd>{{ $progress['completion_percentage'] }}%</dd></div>
+            </dl>
             @if($progress['completion_percentage'] > 0)
-            <div class="wg-progress-track">
+            <div class="wg-progress-track" role="progressbar" aria-label="Session completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ min(100, $progress['completion_percentage']) }}">
                 <div class="wg-progress-fill" style="width: {{ min(100, $progress['completion_percentage']) }}%"></div>
             </div>
             @endif
         </div>
-    </div>
+    </section>
     @endif
 </x-filament-panels::page>

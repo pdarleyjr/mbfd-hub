@@ -18,9 +18,9 @@
     <style>
         .hub-error { min-height: 100vh; padding: 24px; display: grid; place-items: center; font-family: var(--hub-font-sans); }
         .hub-error__card { width: min(100%, 38rem); padding: clamp(20px, 5vw, 32px); }
-        .hub-error__identity { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; color: rgb(var(--hub-header)); font-weight: 700; }
+        .hub-error__identity { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; color: rgb(var(--hub-header)); font-weight: 700; }
         .hub-error__identity img { width: 48px; height: 48px; }
-        .hub-error__code { margin: 0 0 8px; color: rgb(var(--hub-n-600)); font-size: 14px; font-weight: 700; letter-spacing: .08em; }
+        .hub-error__code { color: rgb(var(--hub-n-800)); font-weight: 600; font-variant-numeric: tabular-nums; }
         .hub-error h1 { margin: 0; color: rgb(var(--hub-header)); font-size: clamp(28px, 6vw, 40px); line-height: 1.2; letter-spacing: -.025em; }
         .hub-error__message { margin: 20px 0 28px; color: rgb(var(--hub-n-600)); line-height: 1.6; }
         .hub-error__note { margin: -12px 0 24px; padding: 14px 16px; color: rgb(var(--hub-n-900)); line-height: 1.5; }
@@ -31,7 +31,6 @@
 <body class="hub-error">
     <main class="hub-panel hub-error__card">
         <div class="hub-error__identity"><img src="/images/mbfd-official-seal-256.png" alt="" width="48" height="48">MBFD Hub</div>
-        <p class="hub-error__code">{{ $eyebrow ?? 'ERROR '.$code }}</p>
         <h1>{{ $title }}</h1>
         <p class="hub-error__message">{{ $message }}</p>
         @isset($note)
@@ -54,7 +53,8 @@
                 @endunless
             </div>
         @endunless
-        <div class="hub-error__footer">Miami Beach Fire Department · Support Services Division</div>
+        {{-- The status code is reference detail for support, so it sits in the footer rather than as a label above the heading. --}}
+        <div class="hub-error__footer"><span class="hub-error__code">{{ $eyebrow ?? 'ERROR '.$code }}</span> · Miami Beach Fire Department · Support Services Division</div>
     </main>
 </body>
 </html>

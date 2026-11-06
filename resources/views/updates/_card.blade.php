@@ -25,11 +25,16 @@
                 </span>
             @endif
         </div>
-        <{{ $headingTag }} class="mt-3 font-heading text-base font-bold leading-snug text-hub-ink sm:text-lg">
-            <a href="{{ route('updates.show', $update) }}" class="rounded-sm hover:text-hub-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">
-                {{ $update->title }}
-            </a>
-        </{{ $headingTag }}>
+        @if($compact)
+            <{{ $headingTag }} class="mt-2 font-heading text-base font-bold leading-snug text-hub-ink sm:text-lg">
+                <a href="{{ route('updates.show', $update) }}" class="rounded-sm hover:text-hub-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">
+                    {{ $update->title }}
+                </a>
+            </{{ $headingTag }}>
+        @else
+            {{-- The detail page's title is its page heading, not a link back to itself. --}}
+            <{{ $headingTag }} class="hub-h1 mt-3">{{ $update->title }}</{{ $headingTag }}>
+        @endif
         @if($compact)
             <div class="mt-2 flex items-start gap-3">
                 @if($update->image_path)
@@ -62,19 +67,21 @@
                     <span aria-hidden="true"> · </span>Posted by {{ $update->attribution() }}
                 @endif
             </p>
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="ml-auto flex flex-wrap items-center gap-2">
                 @if($update->attachment_path)
-                    <a href="{{ route('updates.attachment', $update) }}" class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-semibold text-hub-ink-secondary hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">
+                    <a href="{{ route('updates.attachment', $update) }}" class="hub-btn hub-btn--secondary">
+                        <x-heroicon-o-arrow-down-tray class="hub-btn__icon" aria-hidden="true" />
                         Download attachment
                     </a>
                 @endif
                 @if($ctaUrl)
-                    <a href="{{ $ctaUrl }}" @if($update->hasExternalCta()) target="_blank" rel="noopener noreferrer" @endif class="inline-flex min-h-11 items-center rounded-lg bg-hub-blue px-4 py-2 text-sm font-semibold text-white hover:bg-hub-blue-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">
+                    <a href="{{ $ctaUrl }}" @if($update->hasExternalCta()) target="_blank" rel="noopener noreferrer" @endif class="hub-btn hub-btn--primary">
                         {{ $update->cta_label ?: 'Open' }}
                     </a>
                 @elseif($compact)
-                    <a href="{{ route('updates.show', $update) }}" class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-semibold text-hub-blue hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">
-                        Read update
+                    <a href="{{ route('updates.show', $update) }}" class="hub-btn hub-btn--tertiary">
+                        Read update<span class="sr-only">: {{ $update->title }}</span>
+                        <x-heroicon-o-chevron-right class="hub-btn__icon" aria-hidden="true" />
                     </a>
                 @endif
             </div>
