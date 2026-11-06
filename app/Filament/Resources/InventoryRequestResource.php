@@ -11,6 +11,7 @@ use App\Filament\Support\EmsLabels;
 use App\Filament\Support\EmsPanelAccess;
 use App\Models\Ems\InventoryRequest;
 use App\Models\Ems\InventoryRequestMessage;
+use App\Services\Ems\FormFamilies;
 use Carbon\CarbonImmutable;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Grid;
@@ -148,6 +149,8 @@ class InventoryRequestResource extends Resource
             ->emptyStateDescription('Change or clear the filters to see more requests. Members send requests from the Employee Portal.')
             ->columns([
                 Tables\Columns\TextColumn::make('number')->label('Request')->searchable()->sortable()->weight('bold'),
+                Tables\Columns\TextColumn::make('form_family')->label('Form')
+                    ->state(fn (InventoryRequest $record): string => FormFamilies::resolve($record->form_family)['title']),
                 Tables\Columns\TextColumn::make('submitted_at')->label('Submitted')
                     ->dateTime('M j, Y g:i A', EmsLabels::TIMEZONE)->sortable(),
                 Tables\Columns\TextColumn::make('submitter_name')->label('Member')->searchable()
@@ -177,6 +180,9 @@ class InventoryRequestResource extends Resource
             ->filters([
                 SelectFilter::make('status')->label('Status')->multiple()
                     ->options(EmsLabels::STATUS)->default(InventoryRequest::ACTIVE_STATUSES),
+                SelectFilter::make('form_family')->label('Form')
+                    ->options(fn (): array => array_column(FormFamilies::all(), 'title', 'key'))
+                    ->query(fn (Builder $query, array $data): Builder => static::filterByFamily($query, $data['value'] ?? null)),
                 SelectFilter::make('apparatus_id')->label('Unit')
                     ->options(fn (): array => static::unitOptions()),
                 SelectFilter::make('target_kind')->label('Kind of request')->options(EmsLabels::TARGET_KIND),
@@ -214,6 +220,22 @@ class InventoryRequestResource extends Resource
                 Tables\Actions\ViewAction::make()->label('Open'),
             ])
             ->bulkActions([]));
+    }
+
+    /**
+     * Keeps one form family. A row with no family stored (written before the four forms, or by a rolled-back image)
+     * is ALS Transport, and so is a value this release does not know, the same way FormFamilies::resolve reads it.
+     *
+     * @param  Builder<InventoryRequest>  $query
+     * @return Builder<InventoryRequest>
+     */
+    public static function filterByFamily(Builder $query, ?string $family): Builder
+    {
+        if (blank($family)) {
+            return $query;
+        }
+
+        return $query->inFamily((string) $family);
     }
 
     /**

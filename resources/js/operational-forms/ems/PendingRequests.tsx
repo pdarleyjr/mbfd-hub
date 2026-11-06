@@ -22,7 +22,7 @@ export function PendingRequests({ outbox, openRequest, editEntry }: {
         </MessageBar>)}
         {outbox.entries.map((entry) => entry.state === 'rejected'
             ? <MessageBar key={entry.clientSubmissionId} intent="error">
-                <MessageBarBody><MessageBarTitle>A request for {entry.unitLabel} was not accepted</MessageBarTitle>{entry.message} Nothing was lost. You can fix it and send it again.</MessageBarBody>
+                <MessageBarBody><MessageBarTitle>A request{entry.familyShort ? ` on ${entry.familyShort}` : ''} for {entry.unitLabel} was not accepted</MessageBarTitle>{entry.message} Nothing was lost. You can fix it and send it again.</MessageBarBody>
                 <MessageBarActions>
                     <Button size="small" onClick={() => editEntry(entry)}>Edit and resend</Button>
                     <Button size="small" appearance="subtle" onClick={() => void outbox.discard(entry.clientSubmissionId)}>Discard</Button>
@@ -30,7 +30,7 @@ export function PendingRequests({ outbox, openRequest, editEntry }: {
             </MessageBar>
             : <MessageBar key={entry.clientSubmissionId} intent="warning">
                 <MessageBarBody>
-                    <MessageBarTitle>{entry.revision ? `Waiting to send the corrected form: ${entry.unitLabel}, ${itemsLabel(entry.itemCount)}` : `Waiting to send: ${entry.unitLabel}, ${itemsLabel(entry.itemCount)}`}</MessageBarTitle>
+                    <MessageBarTitle>{entry.revision ? `Waiting to send the corrected form: ${entry.familyShort ? `${entry.familyShort}, ` : ''}${entry.unitLabel}, ${itemsLabel(entry.itemCount)}` : `Waiting to send: ${entry.familyShort ? `${entry.familyShort}, ` : ''}${entry.unitLabel}, ${itemsLabel(entry.itemCount)}`}</MessageBarTitle>
                     Saved on this device. We&apos;ll send it when you&apos;re back online.{entry.revision?.number ? ` It will replace ${entry.revision.number}.` : ''}
                 </MessageBarBody>
                 <MessageBarActions>

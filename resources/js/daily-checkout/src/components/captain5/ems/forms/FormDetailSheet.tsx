@@ -10,7 +10,7 @@ import { BTN_SECONDARY, HINT, LiveNote } from '../shared';
 import { fetchForm } from './api';
 import FormActionButtons from './FormActionButtons';
 import {
-  ackText, archiveText, formEventSentence, formStatusLabel, FORM_STATUS_TONE, isCleared, isOlderRecord, isReturned, isWorkingStatus, returnedText, revisionTag,
+  ackText, archiveText, familyTitle, formEventSentence, formStatusLabel, FORM_STATUS_TONE, isCleared, isOlderRecord, isReturned, isWorkingStatus, returnedText, revisionTag,
 } from './logic';
 import RejectSheet, { type RejectTarget } from './RejectSheet';
 import RestoreButton from './RestoreButton';
@@ -128,7 +128,7 @@ export default function FormDetailSheet({ uuid, canAct, tick, onOpenForm, onClos
         onClose={onClose}
         testId="ems-form-sheet"
         title={form ? `${form.number}: ${targetText(form)}` : 'Submitted inventory form'}
-        description={form ? `${memberText(form)} · ${etDateTime(form.submitted_at)}` : undefined}
+        description={form ? `${familyTitle(form)} · ${memberText(form)} · ${etDateTime(form.submitted_at)}` : undefined}
       >
         {loading && !form && <div role="status" aria-label="Loading form" className="space-y-3"><span className="hub-skeleton block !h-8 w-2/3" /><span className="hub-skeleton block !h-32 w-full" /></div>}
         {unavailable && (
@@ -177,6 +177,7 @@ export default function FormDetailSheet({ uuid, canAct, tick, onOpenForm, onClos
             )}
 
             <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2" data-testid="ems-form-summary">
+              <Fact label="Form"><span data-testid="ems-form-family-title">{familyTitle(form)}</span></Fact>
               <Fact label="Unit">{targetText(form)}</Fact>
               <Fact label="Member">{memberText(form)}</Fact>
               <Fact label="Submitted">{etDateTime(form.submitted_at)}</Fact>

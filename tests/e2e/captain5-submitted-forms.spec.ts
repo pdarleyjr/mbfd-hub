@@ -126,7 +126,7 @@ function buildPreview(server: Server, ids: string[]): FormsPreview {
   return {
     last_movement_id: server.movement,
     blocked: forms.some((form) => !form.can_reconcile),
-    forms: forms.map((form) => ({ id: form.id, number: form.number, target_label: form.target_label, submitter_name: form.submitter_name, submitted_at: form.submitted_at, eligible: form.can_reconcile, ineligible_reason: form.can_reconcile ? null : 'It has not been acknowledged.' })),
+    forms: forms.map((form) => ({ id: form.id, number: form.number, target_label: form.target_label, submitter_name: form.submitter_name, submitted_at: form.submitted_at, eligible: form.can_reconcile, ineligible_reason: form.can_reconcile ? null : 'It has not been acknowledged.', form_family_short: form.form_family_short ?? null })),
     lines,
     totals,
   };
@@ -179,7 +179,9 @@ async function handleEms(route: Route, server: Server, url: URL): Promise<void> 
     const state = url.searchParams.get('state');
     const legacy = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
     const q = (url.searchParams.get('q') ?? '').toLowerCase();
+    const family = url.searchParams.get('family');
     const rows = server.forms.filter((form) => (state === 'active' ? ACTIVE.includes(form.status) : state === 'archived' ? !ACTIVE.includes(form.status) : legacy.length === 0 || legacy.includes(form.status))
+      && (!family || (form.form_family ?? 'als-transport') === family)
       && (!q || `${form.number} ${form.submitter_name} ${form.target_label}`.toLowerCase().includes(q)));
     const perPage = Number(url.searchParams.get('per_page') ?? 25);
     return ok(route, rows.slice(0, perPage).map(summaryOf), { page: 1, per_page: perPage, total: rows.length, last_page: Math.max(1, Math.ceil(rows.length / perPage)) });
@@ -263,6 +265,65 @@ async function openReconcile(page: Page): Promise<Locator> {
 const gaugeInput = (sheet: Locator, line: number) => sheet.locator(`[data-testid="ems-reconcile-line"][data-line-id="${line}"] input`);
 
 // ---------------------------------------------------------------------------- the list
+
+test.describe('form families', () => {
+  const boatForm = (forms: FormDetail[]): FormDetail[] => forms.map((form) => (form.id === BOAT
+    ? { ...form, form_family: 'fire-boat-6', form_family_title: 'Fire Boat 6 Medical Inventory Form', form_family_short: 'Fire Boat 6' }
+    : form));
+
+  test('each card names its form, and a form with no family stored reads as ALS Transport', async ({ page }) => {
+    await open(page, newServer({ forms: boatForm(startingForms()) }));
+    await expect(card(page, 'Engine 1').getByTestId('ems-form-family')).toHaveText('ALS Transport');
+    await expect(card(page, 'Fireboat 1').getByTestId('ems-form-family')).toHaveText('Fire Boat 6');
+  });
+
+  test('the Form filter narrows Active and Archived, falls back to the four known forms, and All brings everything back', async ({ page }) => {
+    const server = newServer({ forms: boatForm(startingForms()) });
+    await open(page, server);
+    const filter = page.getByTestId('ems-forms-family');
+    // /meta in this mock lists no families, so the four known ones are offered.
+    await expect(filter.locator('option')).toHaveText(['All forms', 'ALS Transport', 'ALS Non Transport', 'Fire Boat 6', 'BLS Detail']);
+
+    await filter.selectOption('fire-boat-6');
+    await expect(page.getByTestId('ems-form-card')).toHaveCount(1);
+    await expect(card(page, 'Fireboat 1')).toBeVisible();
+    expect(server.reads.some((read) => read.path === '/requests' && read.search.includes('state=active') && read.search.includes('family=fire-boat-6'))).toBe(true);
+
+    await filter.selectOption('bls-detail');
+    await expect(page.getByText('No BLS Detail forms waiting')).toBeVisible();
+
+    // The family choice stays when the view changes; the archived list has none of this family.
+    await filter.selectOption('fire-boat-6');
+    await page.getByRole('button', { name: 'Archived', exact: true }).click();
+    await expect(page.getByText('No archived Fire Boat 6 forms yet')).toBeVisible();
+
+    await filter.selectOption('als-transport');
+    await expect(card(page, 'Rescue 3')).toBeVisible();
+    await expect(card(page, 'Engine 2')).toBeVisible();
+    await page.getByRole('button', { name: 'Active', exact: true }).click();
+    await filter.selectOption('all');
+    await expect(page.getByTestId('ems-form-card')).toHaveCount(4);
+  });
+
+  test('the form sheet names the form', async ({ page }) => {
+    await open(page, newServer({ forms: boatForm(startingForms()) }));
+    await card(page, 'Fireboat 1').getByTestId('ems-form-open').click();
+    await expect(page.getByTestId('ems-form-sheet')).toContainText('Fire Boat 6 Medical Inventory Form');
+    await expect(page.getByTestId('ems-form-family-title')).toHaveText('Fire Boat 6 Medical Inventory Form');
+  });
+
+  test('a mixed-family selection still reconciles together, and the sheet says which form each one is', async ({ page }) => {
+    const server = newServer({ forms: boatForm(startingForms()) });
+    await open(page, server);
+
+    // Ladder 1 (ALS Transport, nothing stored) and Fireboat 1 (Fire Boat 6) go in one reconcile.
+    const sheet = await openReconcile(page);
+    await expect(sheet.getByTestId('ems-reconcile-form-family')).toHaveText([/ALS Transport/, /Fire Boat 6/]);
+    await sheet.getByTestId('ems-reconcile-confirm').click();
+    await expect.poll(() => reconcileWrites(server).length).toBe(1);
+    expect(reconcileWrites(server)[0].body.request_ids).toEqual([LADDER, BOAT]);
+  });
+});
 
 test.describe('active forms', () => {
   test('lists engine, ladder and fireboat forms as well as rescue, each with member, time, items and acknowledgment', async ({ page }) => {

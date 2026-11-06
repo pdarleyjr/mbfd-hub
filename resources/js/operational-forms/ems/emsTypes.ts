@@ -12,6 +12,16 @@ export interface EmsFlags {
     /** The transport vehicle sheet's "Fill if <" level, as printed. min_text is its AMOUNT (par). */
     fill_if_text?: string;
     fill_if_qty?: number | null;
+    /** Where the item is kept, as printed ("In Handtevy", "Placed in BVM bag"). */
+    location_text?: string;
+    /** A printed condition ("Detail Airway Bags Only"). */
+    qualifier_text?: string;
+    /** The printed color or age group ("Grey", "Yellow (2 years)"). */
+    color_band?: string;
+    /** `monthly_first_tuesday` is the only cadence. */
+    cadence?: string;
+    /** Extra search words. Search only, never identity. */
+    search_terms?: string[];
 }
 
 export interface EmsFormItem {
@@ -25,12 +35,20 @@ export interface EmsFormItem {
     response_type: EmsResponseType;
     flags: EmsFlags;
     aliases?: string[];
+    /** The label exactly as printed (misspellings included); `label` may be a cleaned display name. */
+    source_label?: string | null;
+    /** Extra search words, when the server sends them next to the flags. */
+    search_terms?: string[];
 }
 
 export interface EmsFormSection {
     key: string;
     label: string;
     parent_key: string | null;
+    /** A printed note shown under the section heading. */
+    note?: string | null;
+    /** `monthly_first_tuesday` is the only cadence. */
+    cadence?: string | null;
     items: EmsFormItem[];
 }
 
@@ -51,7 +69,26 @@ export interface EmsUnit {
     group: string;
 }
 
+/** The four forms. GET /form?family=<key> answers for one; `families` lists them all. */
+export interface EmsFamilySummary {
+    key: string;
+    title: string;
+    short_title: string;
+    /** The deep-link `form=` value. */
+    form_key: string;
+    description: string;
+}
+
+export interface EmsFamily extends EmsFamilySummary {
+    bag_keys: string[];
+    /** `detail`, `unit:<id>` or null: the unit the form preselects. The member can change it. */
+    default_target: string | null;
+}
+
 export interface EmsFormDefinition {
+    /** Absent on a server from before the four forms: that is ALS Transport. */
+    family?: EmsFamily;
+    families?: EmsFamilySummary[];
     forms: EmsForm[];
     units: EmsUnit[];
     limits: { max_quantity: number; note_max: number; event_assignment_max: number };
@@ -61,6 +98,8 @@ export interface EmsFormDefinition {
 /** The unsent request as the member builds it. Quantities and answers are keyed by `lineKey()`. */
 export interface EmsDraft {
     clientSubmissionId: string;
+    /** The form this request is for. A draft without one is ALS Transport. */
+    family?: string;
     /** '' (not chosen), 'detail', or `unit:<apparatus id>` */
     targetChoice: string;
     eventAssignment: string;
@@ -88,6 +127,8 @@ export interface EmsRetired {
 export interface StoredDraft {
     v: 1;
     clientSubmissionId: string;
+    /** Optional and additive (the stored version stays 1): a row without one is ALS Transport. */
+    family?: string;
     targetChoice: string;
     quantities: Record<string, number>;
     answers: Record<string, boolean>;
@@ -110,6 +151,8 @@ export interface EmsSubmitLine {
 
 export interface EmsSubmitPayload {
     client_submission_id: string;
+    /** The form this request is for. A queued send without one is ALS Transport. */
+    family?: string;
     /** The returned request this one corrects (the member's own, status returned). The server supersedes it. */
     revises?: string;
     target: { kind: EmsTargetKind; apparatus_id?: number; event_assignment?: string; label_seen?: string };
@@ -128,6 +171,8 @@ export interface EmsOutboxEntry {
     itemCount: number;
     /** Present when this is a correction: which returned request it replaces, for the waiting notice and for editing it again. */
     revision?: { number: string; reason: string };
+    /** The form's short title, to name it in the waiting notice. Display only; the payload's family is what is sent. */
+    familyShort?: string;
 }
 
 export type EmsStatus =
@@ -147,6 +192,10 @@ export interface EmsRequestSummary {
     /** Present when the server reports it; the list shows "n of m issued" only when it is. */
     issued_line_count?: number;
     has_note: boolean;
+    /** The form the request was made on. Absent or null means ALS Transport. */
+    form_family?: string | null;
+    form_family_title?: string | null;
+    form_family_short?: string | null;
     last_activity_at: string | null;
     closed_at: string | null;
     /** True when Captain 5 sent it back and the member can fix and resend it. */
@@ -241,12 +290,14 @@ export interface EmsEndpoints {
 }
 
 export type EmsView =
-    /** `revises`: the returned request being fixed, so a refresh or a shared link comes back to the correction. */
-    | { name: 'form'; revises?: string }
+    /** `family`: which of the four forms (ALS Transport when absent). `revises`: the returned request being fixed, so a refresh or a shared link comes back to the correction; its own family wins. */
+    | { name: 'form'; family?: string; revises?: string }
     | { name: 'mine' }
     | { name: 'detail'; id: string };
 
 export interface EmsDeepLink {
     view: 'form' | 'mine' | 'detail' | null;
     request: string | null;
+    /** A family key or its form key; absent means ALS Transport. */
+    family?: string | null;
 }

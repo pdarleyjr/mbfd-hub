@@ -90,7 +90,38 @@ final class SourceImporterTest extends TestCase
         $result = app(\App\Services\Ems\Import\SourceImporter::class)->import($this->realPath());
 
         $this->assertSame($counts, [SourceForm::query()->count(), SourceFormItem::query()->count(), SupplyItem::query()->count(), CatalogItem::query()->count()]);
-        $this->assertSame(['forms.airway-bag.unchanged', 'forms.als-med-bag.unchanged', 'forms.als-transport-vehicle.unchanged', 'supply_source.unchanged'], array_keys($result['counts']));
+        $this->assertSame([
+            'forms.airway-bag.unchanged', 'forms.als-med-bag.unchanged', 'forms.als-non-transport.unchanged', 'forms.als-transport-vehicle.unchanged',
+            'forms.bls-detail-bag.unchanged', 'forms.fire-boat-6-als.unchanged', 'forms.handtevy.unchanged', 'supply_source.unchanged',
+        ], array_keys($result['counts']));
+    }
+
+    /** The release order (docs/ems/four-inventory-forms.md section 8): the three lists already in production stay unchanged, the four new ones arrive. */
+    public function test_the_four_new_lists_arrive_without_touching_the_three_already_imported(): void
+    {
+        $importer = app(\App\Services\Ems\Import\SourceImporter::class);
+        $older = ['airway-bag', 'als-med-bag', 'als-transport-vehicle'];
+        $newer = ['handtevy', 'als-non-transport', 'fire-boat-6-als', 'bls-detail-bag'];
+        // What production holds today: the three older lists (and the supply room).
+        $tmp = $this->copyOfSources();
+        File::copy($this->realPath().DIRECTORY_SEPARATOR.'als_transport_vehicle_inventory.json', $tmp.DIRECTORY_SEPARATOR.'als_transport_vehicle_inventory.json');
+        $importer->import($tmp);
+        $rows = fn (): array => SourceFormItem::query()->whereIn('source_form_id', SourceForm::query()->whereIn('key', $older)->pluck('id'))->orderBy('id')->get()->map->getAttributes()->all();
+        $before = $rows();
+
+        $dry = $importer->import($this->realPath(), true); // the report the release runs first
+
+        foreach ($older as $key) {
+            $this->assertSame(1, $dry['counts']["forms.{$key}.unchanged"] ?? 0, $key);
+        }
+        foreach ($newer as $key) {
+            $this->assertSame(1, $dry['counts']["forms.{$key}.new_version"] ?? 0, $key);
+        }
+        $this->assertSame(0, SourceForm::query()->whereIn('key', $newer)->count(), 'A dry run saves nothing.');
+
+        $importer->import($this->realPath());
+        $this->assertSame($before, $rows(), 'No row of the three older lists changes.');
+        $this->assertSame(7, SourceForm::query()->where('active', true)->whereIn('key', [...$older, ...$newer])->count());
     }
 
     public function test_dry_run_saves_nothing(): void

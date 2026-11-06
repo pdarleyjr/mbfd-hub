@@ -6,6 +6,7 @@ use App\Concerns\ResolvesCanonicalEmployee;
 use App\Models\AccidentReport;
 use App\Models\User;
 use App\Services\Accidents\AccidentReportService;
+use App\Services\Ems\FormFamilies;
 use App\Services\Narcotics\NarcoticsCheckAccess;
 use App\Services\OperationalForms\FrocImportLimits;
 use App\Support\Ems\EmsLinks;
@@ -79,7 +80,7 @@ class OperationalForms extends Page
     }
 
     /**
-     * The Medical Inventory Request JSON API (routes/ems.php). The three per-request URLs carry the
+     * The medical inventory forms' JSON API (routes/ems.php). The three per-request URLs carry the
      * placeholder __UUID__, which the app replaces with the request id.
      *
      * @return array{form: string, requests: string, request: string, messages: string, cancel: string, placeholder: string}
@@ -217,23 +218,26 @@ class OperationalForms extends Page
     }
 
     /**
-     * Which Medical Inventory Request view the page opens first, from the query string:
-     * ?form=medical-inventory-request (new request), &view=mine (own list), ?ems_request=<uuid> (one request).
+     * Which medical inventory view the page opens first, from the query string: ?form=<a family's form_key> (a new request on
+     * that form; the old ?form=medical-inventory-request opens ALS Transport), &view=mine (own list), ?ems_request=<uuid>
+     * (one request, which opens in its own form so `family` is null). `family` is the FormFamilies key of the form asked for.
      * Anything else is ignored, so a mistyped link just opens the Forms library.
      *
-     * @return array{view: string|null, request: string|null}
+     * @return array{view: string|null, request: string|null, family: string|null}
      */
     private function emsDeepLink(): array
     {
         $request = Str::lower(trim((string) request()->query('ems_request', '')));
         if (Str::isUuid($request)) {
-            return ['view' => 'detail', 'request' => $request];
+            return ['view' => 'detail', 'request' => $request, 'family' => null];
         }
-        if (request()->query('form') === EmsLinks::MEMBER_FORM_KEY) {
-            return ['view' => request()->query('view') === 'mine' ? 'mine' : 'form', 'request' => null];
+        $form = request()->query('form');
+        $family = is_string($form) ? FormFamilies::fromFormKey($form) : null;
+        if ($family !== null) {
+            return ['view' => request()->query('view') === 'mine' ? 'mine' : 'form', 'request' => null, 'family' => $family['key']];
         }
 
-        return ['view' => null, 'request' => null];
+        return ['view' => null, 'request' => null, 'family' => null];
     }
 
     /**
@@ -285,16 +289,19 @@ class OperationalForms extends Page
             ],
         ];
 
+        // One card per medical inventory form, in the families' order: the card's key is the form's deep-link key.
+        $inventoryForms = array_map(static fn (array $family): array => [
+            'key' => $family['form_key'],
+            'title' => $family['title'],
+            'description' => $family['description'],
+            'href' => url(EmsLinks::memberForm($family['key'])),
+            'action_label' => 'Open form',
+            'in_app' => true,
+            'secondary' => ['label' => 'My medical forms', 'href' => url(EmsLinks::memberRequests())],
+        ], FormFamilies::all());
+
         return [
-            [
-                'key' => EmsLinks::MEMBER_FORM_KEY,
-                'title' => 'Medical Inventory Request',
-                'description' => 'Tell Captain 5 what your Airway Bag, ALS Med Bag or Box, and ALS Transport Vehicle need. Fill in only what you need and send it when you are ready.',
-                'href' => url(EmsLinks::memberForm()),
-                'action_label' => 'Start a request',
-                'in_app' => true,
-                'secondary' => ['label' => 'My medical requests', 'href' => url(EmsLinks::memberRequests())],
-            ],
+            ...$inventoryForms,
             [
                 'key' => 'take-home-vehicle-inspection',
                 'title' => 'Take Home Vehicle Inspection',

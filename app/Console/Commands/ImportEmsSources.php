@@ -12,7 +12,7 @@ use Throwable;
 final class ImportEmsSources extends Command
 {
     protected $signature = 'ems:import-sources
-        {--path=database/data/ems : Directory holding the three source JSON files}
+        {--path=database/data/ems : Directory holding the source JSON files}
         {--dry-run : Show what would change and roll everything back}';
 
     protected $description = 'Import the EMS bag inventory forms and the supply room catalogue (idempotent, never deletes history)';

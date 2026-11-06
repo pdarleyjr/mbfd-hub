@@ -22,24 +22,30 @@ async function openHome(page: Page): Promise<void> {
 test.describe('member', () => {
   test.use({ storageState: join(authDir, 'member.json') });
 
-  test('Rescue Forms expands with the keyboard to exactly three links and there is no Command Board', async ({ page }, testInfo) => {
+  test('Rescue Forms expands with the keyboard to the four inventory forms and two checks, and there is no Command Board', async ({ page }, testInfo) => {
     await openHome(page);
     const card = page.locator('details[data-rescue-forms]');
     await expect(card).toBeVisible();
     await expect(card).not.toHaveAttribute('open', '');
     const summary = card.locator('summary');
     await expect(summary).toContainText('Rescue Forms');
-    await expect(card.locator('a[data-rescue-form-link]')).toHaveCount(3);
-    await expect(card.getByRole('link', { name: 'Medical Inventory Forms' })).toBeHidden();
+    await expect(card.locator('a[data-rescue-form-link]')).toHaveCount(6);
+    await expect(card.getByRole('link', { name: 'ALS Transport Inventory Form' })).toBeHidden();
 
     await summary.focus();
     await page.keyboard.press('Enter');
     await expect(card).toHaveAttribute('open', '');
     const links = card.getByRole('link');
-    await expect(links).toHaveText([/Medical Inventory Forms/, /Narcotics Check/, /Vehicle Inspection/]);
-    await expect(links.nth(0)).toHaveAttribute('href', /\/employee\/forms\?form=medical-inventory-request$/);
-    await expect(links.nth(1)).toHaveAttribute('href', /\/employee\/forms\?form=narcotics-check$/);
-    await expect(links.nth(2)).toHaveAttribute('href', /\/daily\/vehicle-inspections$/);
+    await expect(links).toHaveText([
+      /ALS Transport Inventory Form/, /ALS Non Transport Inventory Form/, /Fire Boat 6 Medical Inventory Form/,
+      /BLS Detail Medical Inventory Form/, /Narcotics Check/, /Vehicle Inspection/,
+    ]);
+    await expect(links.nth(0)).toHaveAttribute('href', /\/employee\/forms\?form=als-transport-inventory$/);
+    await expect(links.nth(1)).toHaveAttribute('href', /\/employee\/forms\?form=als-non-transport-inventory$/);
+    await expect(links.nth(2)).toHaveAttribute('href', /\/employee\/forms\?form=fire-boat-6-medical-inventory$/);
+    await expect(links.nth(3)).toHaveAttribute('href', /\/employee\/forms\?form=bls-detail-medical-inventory$/);
+    await expect(links.nth(4)).toHaveAttribute('href', /\/employee\/forms\?form=narcotics-check$/);
+    await expect(links.nth(5)).toHaveAttribute('href', /\/daily\/vehicle-inspections$/);
     for (const box of await links.evaluateAll(items => items.map(item => item.getBoundingClientRect().height))) expect(box).toBeGreaterThanOrEqual(44);
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
@@ -51,8 +57,8 @@ test.describe('member', () => {
   test('a link opens the real destination', async ({ page }) => {
     await openHome(page);
     await page.locator('details[data-rescue-forms] summary').click();
-    await page.locator('details[data-rescue-forms]').getByRole('link', { name: 'Medical Inventory Forms' }).click();
-    await expect(page).toHaveURL(/\/employee\/forms\?form=medical-inventory-request/);
+    await page.locator('details[data-rescue-forms]').getByRole('link', { name: 'Fire Boat 6 Medical Inventory Form' }).click();
+    await expect(page).toHaveURL(/\/employee\/forms\?form=fire-boat-6-medical-inventory/);
   });
 });
 

@@ -36,7 +36,15 @@ export interface FormSummary extends Omit<RequestSummary, 'status'> {
   revision_number: number;
   items_preview: PreviewItem[];
   quantity_total: number;
+  /** Which of the four forms this came from. Absent or null means ALS Transport (docs/ems/four-inventory-forms.md section 1). */
+  form_family?: string | null;
+  form_family_title?: string | null;
+  form_family_short?: string | null;
 }
+
+/** One entry of the family filter: `all` or a family key. */
+export type FamilyFilter = string;
+export interface FamilyOption { key: string; title: string; short_title: string }
 
 export interface RevisionLink {
   id: string;
@@ -65,6 +73,7 @@ export interface PreviewForm {
   submitted_at: string | null;
   eligible: boolean;
   ineligible_reason: string | null;
+  form_family_short?: string | null;
 }
 
 export interface PreviewItemRef { id: number; name: string; location_code: string | null; count_unit: string }
@@ -83,6 +92,7 @@ export interface PreviewLine {
   state: PreviewLineState;
   message: string | null;
   item: PreviewItemRef | null;
+  form_family_short?: string | null;
 }
 
 export interface PreviewTotal {

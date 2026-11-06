@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, MessageBar, MessageBarBody, Spinner } from '@fluentui/react-components';
 import { ArrowLeft, ListChecks } from 'lucide-react';
 import { EmsApiError, type EmsApi } from './emsApi';
-import { CANNOT_REVISE_SHORT, needsCorrection, reviseFromStored, reviseStart, reviseStoreKey } from './emsLogic.js';
+import { CANNOT_REVISE_SHORT, DEFAULT_FAMILY, isFamilyKey, needsCorrection, reviseFromStored, reviseStart, reviseStoreKey } from './emsLogic.js';
 import { emsDrafts } from './emsStore';
 import type { EmsDraft, EmsFormDefinition, EmsOutboxEntry, EmsRequestDetail } from './emsTypes';
 import { MedicalRequestForm } from './MedicalRequestForm';
@@ -11,7 +11,7 @@ import type { EmsOutbox } from './useEmsOutbox';
 
 type Phase =
     | { kind: 'loading' }
-    | { kind: 'ready'; draft: EmsDraft; resumed: boolean }
+    | { kind: 'ready'; draft: EmsDraft; definition: EmsFormDefinition; resumed: boolean }
     | { kind: 'waiting'; number: string }
     | { kind: 'blocked'; request: EmsRequestDetail | null }
     | { kind: 'error'; message: string };
@@ -19,11 +19,12 @@ type Phase =
 export interface FixAndResendProps {
     api: EmsApi;
     owner: string;
-    definition: EmsFormDefinition;
+    /** Loads one form's lists. A correction opens in the form the returned request was made on, so it asks for that one. */
+    loadDefinition: (family: string) => Promise<EmsFormDefinition>;
     /** The returned request being corrected. */
     requestId: string;
     outbox: EmsOutbox;
-    goForm: () => void;
+    goForm: (family?: string) => void;
     goForms: () => void;
     goMine: () => void;
     goDetail: (id: string) => void;
@@ -38,7 +39,7 @@ export interface FixAndResendProps {
  *  - otherwise the request as it was sent, loaded from the server (it must still be waiting for a correction).
  * Offline, a stored correction can still be resumed without loading the request.
  */
-export function FixAndResend({ api, owner, definition, requestId, outbox, goForm, goForms, goMine, goDetail, editEntry, onSubmitted }: FixAndResendProps) {
+export function FixAndResend({ api, owner, loadDefinition, requestId, outbox, goForm, goForms, goMine, goDetail, editEntry, onSubmitted }: FixAndResendProps) {
     const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
     const [attempt, setAttempt] = useState(0);
     // The queue is read once when the view opens; later changes (a send that just went through) must not restart it.
@@ -57,20 +58,30 @@ export function FixAndResend({ api, owner, definition, requestId, outbox, goForm
                 const request = await api.show(requestId);
                 if (!active) return;
                 if (!needsCorrection(request)) { setPhase({ kind: 'blocked', request }); return; }
+                // The returned request's own form: its lists are the ones its lines come from.
+                const definition = await loadDefinition(request.form_family ?? DEFAULT_FAMILY);
+                if (!active) return;
                 const start = reviseStart(request, stored, definition);
-                setPhase({ kind: 'ready', draft: start.draft, resumed: start.resumed });
+                setPhase({ kind: 'ready', draft: start.draft, definition, resumed: start.resumed });
             } catch (caught) {
                 if (!active) return;
-                if (caught instanceof EmsApiError && caught.status === 404) { setPhase({ kind: 'blocked', request: null }); return; }
-                // No connection: a correction already started on this device can still be picked up.
-                const offline = caught instanceof EmsApiError && caught.network ? reviseFromStored(stored, definition, requestId) : null;
-                if (offline) { setPhase({ kind: 'ready', draft: offline, resumed: true }); return; }
+                if (caught instanceof EmsApiError && caught.status === 404 && caught.code !== 'unknown_family') { setPhase({ kind: 'blocked', request: null }); return; }
+                // No connection: a correction already started on this device can still be picked up, in the form it was started in.
+                const offline = caught instanceof EmsApiError && caught.network ? await resumeStored(stored) : null;
+                if (!active) return;
+                if (offline) { setPhase({ kind: 'ready', draft: offline.draft, definition: offline.definition, resumed: true }); return; }
                 setPhase({ kind: 'error', message: caught instanceof EmsApiError ? caught.message : 'This form could not be opened for correction.' });
             }
         };
+        const resumeStored = async (stored: Awaited<ReturnType<typeof emsDrafts.get>>) => {
+            const family = isFamilyKey(stored?.family) ? (stored?.family as string) : DEFAULT_FAMILY;
+            const definition = await loadDefinition(family).catch(() => null);
+            const draft = definition ? reviseFromStored(stored, definition, requestId) : null;
+            return definition && draft ? { definition, draft } : null;
+        };
         void resolve();
         return () => { active = false; };
-    }, [outbox.loaded, requestId, api, owner, definition, attempt]);
+    }, [outbox.loaded, requestId, api, owner, loadDefinition, attempt]);
 
     const topline = <div className="ems-topline">
         <Button appearance="subtle" icon={<ArrowLeft size={17} />} onClick={goForms}>Forms library</Button>
@@ -79,7 +90,7 @@ export function FixAndResend({ api, owner, definition, requestId, outbox, goForm
 
     if (phase.kind === 'ready') {
         return <MedicalRequestForm
-            key={requestId} api={api} owner={owner} definition={definition} outbox={outbox} startFrom={phase.draft} resumed={phase.resumed} onStartConsumed={() => undefined}
+            key={requestId} api={api} owner={owner} definition={phase.definition} outbox={outbox} startFrom={phase.draft} resumed={phase.resumed} onStartConsumed={() => undefined}
             goForm={goForm} goForms={goForms} goMine={goMine} goDetail={goDetail} editEntry={editEntry} onSubmitted={onSubmitted}
         />;
     }

@@ -27,7 +27,9 @@ use Throwable;
  *  - at least one requested item OR a note is required, so an empty submission is refused;
  *  - quantities are whole numbers 1..999; blank (or 0) is dropped, never stored as 0;
  *  - identity and time are set by the server, never taken from the form;
- *  - the same client_submission_id returns the same request (a double tap or a retry never duplicates).
+ *  - the same client_submission_id returns the same request (a double tap or a retry never duplicates);
+ *  - the request belongs to one form family (docs/ems/four-inventory-forms.md): none sent means ALS Transport (an older page, a
+ *    queued request), a correction keeps the family of the form it corrects, and every line must come from that family's lists.
  */
 final class RequestSubmissionService
 {
@@ -46,6 +48,7 @@ final class RequestSubmissionService
         $data = EmsValidator::validate($input, [
             'client_submission_id' => ['required', 'uuid'],
             'revises' => ['nullable', 'uuid'],
+            'family' => ['nullable', 'string', 'max:40'],
             'target' => ['required', 'array'],
             'target.kind' => ['required', 'in:'.implode(',', InventoryRequest::TARGET_KINDS)],
             'target.apparatus_id' => ['nullable', 'integer'],
@@ -54,7 +57,7 @@ final class RequestSubmissionService
             'member_note' => ['nullable', 'string', 'max:'.RequestFormDefinition::NOTE_MAX],
             'lines' => ['nullable', 'array', 'max:'.RequestFormDefinition::MAX_LINES],
             'lines.*' => ['array'],
-            'lines.*.form' => ['required', 'in:'.implode(',', RequestFormDefinition::BAGS)],
+            'lines.*.form' => ['required', 'in:'.implode(',', FormFamilies::allBagKeys())],
             'lines.*.item_key' => ['required', 'string', 'max:160'],
             'lines.*.quantity' => ['nullable', function (string $attribute, mixed $value, \Closure $fail): void {
                 if (! is_scalar($value)) {
@@ -78,8 +81,9 @@ final class RequestSubmissionService
             return $this->replay($existing, $user);
         }
 
+        $family = $this->resolveFamily($user, $data);
         $target = $this->resolveTarget((array) $data['target']);
-        $forms = $this->forms->activeForms();
+        $forms = $this->forms->activeForms($family['key']);
         if ($forms === []) {
             throw new EmsException('The medical inventory forms are not available yet. Contact the EMS office.', 'forms_unavailable', 503);
         }
@@ -90,7 +94,7 @@ final class RequestSubmissionService
         }
 
         try {
-            $request = DB::transaction(fn (): InventoryRequest => $this->create($user, $employee, $data, $target, $lines, $forms, $note));
+            $request = DB::transaction(fn (): InventoryRequest => $this->create($user, $employee, $data, $family, $target, $lines, $forms, $note));
         } catch (UniqueConstraintViolationException $exception) {
             // A parallel retry of the same submission won the race; return what it saved.
             $winner = InventoryRequest::query()->where('client_submission_id', $data['client_submission_id'])->first();
@@ -110,6 +114,37 @@ final class RequestSubmissionService
         }
 
         return ['request' => $request, 'replayed' => false];
+    }
+
+    /**
+     * The form this request is for. A correction keeps the family of the form it corrects (only its own sender's, so another
+     * member's request is never confirmed or described here); a different family named alongside it is refused.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{key: string, title: string, short_title: string, form_key: string, description: string, bag_keys: list<string>}
+     */
+    private function resolveFamily(User $user, array $data): array
+    {
+        $named = isset($data['family']) && trim((string) $data['family']) !== '' ? $this->forms->family((string) $data['family']) : null;
+        if (! isset($data['revises'])) {
+            return $named ?? FormFamilies::resolve(null);
+        }
+
+        $original = InventoryRequest::query()->where('uuid', $data['revises'])->where('submitted_by_user_id', $user->getKey())->first();
+        if ($original === null) {
+            return $named ?? FormFamilies::resolve(null); // lockRevisable() refuses it as it always has
+        }
+        $family = $original->family();
+        if ($named !== null && $named['key'] !== $family['key']) {
+            throw new EmsException(
+                "This correction is for the {$family['title']}. Open that form to correct it.",
+                'family_mismatch',
+                422,
+                ['family' => ["This correction is for the {$family['title']}."]],
+            );
+        }
+
+        return $family;
     }
 
     /** @return array{request: InventoryRequest, replayed: bool} */
@@ -233,14 +268,18 @@ final class RequestSubmissionService
 
     /**
      * @param  array<string, mixed>  $data
+     * @param  array{key: string, title: string, short_title: string, form_key: string, description: string, bag_keys: list<string>}  $family
      * @param  array{kind: string, apparatus_id: int|null, label: string, event_assignment: string|null}  $target
      * @param  list<array{bag: string, item: SourceFormItem, qty: int|null, flag: bool|null}>  $lines
      * @param  array<string, SourceForm>  $forms
      */
-    private function create(User $user, Employee $employee, array $data, array $target, array $lines, array $forms, string $note): InventoryRequest
+    private function create(User $user, Employee $employee, array $data, array $family, array $target, array $lines, array $forms, string $note): InventoryRequest
     {
         $now = now();
         $original = isset($data['revises']) ? $this->lockRevisable((string) $data['revises'], $user) : null;
+        if ($original !== null && $original->family()['key'] !== $family['key']) {
+            throw new EmsException("This correction is for the {$original->family()['title']}. Open that form to correct it.", 'family_mismatch', 422);
+        }
         $number = $original !== null ? $this->revisionNumber($original) : $this->nextNumber();
         $actor = EmsActor::member($user);
         $versions = [];
@@ -252,6 +291,8 @@ final class RequestSubmissionService
         $snapshot = [
             'schema' => 'mbfd.ems.mir_snapshot.v1',
             'number' => $number,
+            'form_family' => $family['key'],
+            'form_family_title' => $family['title'],
             'submitted_at' => $now->copy()->utc()->toIso8601String(),
             'submitter' => ['user_id' => $user->getKey(), 'employee_id' => $employee->getKey(), 'name' => $actor->name, 'rank' => $actor->rank],
             'target' => ['kind' => $target['kind'], 'apparatus_id' => $target['apparatus_id'], 'label' => $target['label'], 'event_assignment' => $target['event_assignment']],
@@ -277,6 +318,7 @@ final class RequestSubmissionService
             'event_assignment' => $target['event_assignment'],
             'member_note' => $note !== '' ? $note : null,
             'client_submission_id' => $data['client_submission_id'],
+            'form_family' => $family['key'],
             'source_form_versions' => $versions,
             'snapshot' => $snapshot,
             'snapshot_sha256' => hash('sha256', $encoded),
