@@ -13,11 +13,11 @@ use App\Models\User;
 use App\Services\Defects\MemberIssueHistory;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Services\Inspections\IssueMessageService;
+use App\Support\Media\MemberMedia;
 use ErrorException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use TypeError;
 use UnexpectedValueException;
@@ -99,15 +99,9 @@ final class ApparatusIssueHistoryController extends Controller
         return $user;
     }
 
-    /** Streams from the disk photos are stored on. A path is never accepted from the request. */
+    /** Streams the record's own photo from the private disk (or a public copy not moved yet). A path is never accepted from the request. */
     private function stream(mixed $path): StreamedResponse
     {
-        $disk = Storage::disk('public');
-        abort_unless(is_string($path) && trim($path) !== '' && ! str_contains($path, '..') && $disk->exists($path), 404);
-
-        return $disk->response($path, null, [
-            'Cache-Control' => 'private, max-age=300',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return MemberMedia::response($path);
     }
 }

@@ -12,7 +12,11 @@ $uri = urldecode(
     parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? ''
 );
 
-if ($uri !== '/' && is_file($publicPath.$uri)) {
+// Member photos and signatures are private (App\Support\Media\MemberMedia): a copy still on
+// the public disk is never served as a file; Laravel answers these paths with 404.
+$isMemberMedia = preg_match('#^/+storage/+(?:defects|signatures|station-requests|station-inspections|trt-inventory)(?:/|$)#', $uri) === 1;
+
+if ($uri !== '/' && ! $isMemberMedia && is_file($publicPath.$uri)) {
     // Content-hashed Vite output never changes under its name. The built-in
     // server sends no Cache-Control for files it serves itself, so the edge
     // fell back to a four-hour TTL; serve these with a long immutable lifetime.

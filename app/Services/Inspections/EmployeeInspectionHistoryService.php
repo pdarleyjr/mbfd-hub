@@ -14,6 +14,7 @@ use App\Models\Station;
 use App\Models\User;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectNoActionClosure;
+use App\Support\Media\MemberMedia;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,7 @@ final class EmployeeInspectionHistoryService
 {
     public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
-    /** Directories under the public disk this feature may ever serve. */
+    /** Member image directories (MemberMedia, private disk first) this feature may ever serve. */
     private const IMAGE_DIRECTORIES = ['signatures/', 'defects/'];
 
     private const FINDING_STATUSES = ['Missing', 'Damaged'];
@@ -394,11 +395,16 @@ final class EmployeeInspectionHistoryService
         if ($path === null) {
             return null;
         }
-        $disk = Storage::disk('public');
-        if (! $disk->exists($path) || $disk->size($path) > $maxBytes) {
+        // Private disk first, then a public copy photos:make-private has not moved yet.
+        $found = MemberMedia::locate($path);
+        if ($found === null) {
             return null;
         }
-        $bytes = $disk->get($path);
+        $disk = Storage::disk($found['disk']);
+        if ($disk->size($found['path']) > $maxBytes) {
+            return null;
+        }
+        $bytes = $disk->get($found['path']);
         $mime = $bytes === null ? null : (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
         if (! in_array($mime, ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], true)) {
             return null;

@@ -74,7 +74,7 @@ final class InspectionPhotoUploadTest extends TestCase
         $row = InspectionPhotoUpload::query()->sole();
         $this->assertSame(InspectionPhotoUploads::pathFor($id), $row->path);
         $this->assertStringStartsWith('defects/uploads/', $row->path);
-        $this->assertSame($sent, Storage::disk('public')->get($row->path));
+        $this->assertSame($sent, Storage::disk('local')->get($row->path));
         $this->assertSame(hash('sha256', $sent), $row->sha256);
         $this->assertNull($row->apparatus_inspection_id);
         Queue::assertNothingPushed();
@@ -88,7 +88,7 @@ final class InspectionPhotoUploadTest extends TestCase
         $this->upload($id)->assertOk()->assertJsonPath('photo_id', $id);
 
         $this->assertDatabaseCount('inspection_photo_uploads', 1);
-        $this->assertCount(1, Storage::disk('public')->allFiles('defects'));
+        $this->assertCount(1, Storage::disk('local')->allFiles('defects'));
     }
 
     public function test_another_member_cannot_reuse_a_photo_id(): void
@@ -127,7 +127,7 @@ final class InspectionPhotoUploadTest extends TestCase
         $row = InspectionPhotoUpload::query()->sole();
         $this->assertStringEndsWith('.heic', (string) $row->source_path);
         Storage::disk('local')->assertExists((string) $row->source_path);
-        Storage::disk('public')->assertMissing($row->path);
+        Storage::disk('local')->assertMissing($row->path);
         Queue::assertPushed(ProcessInspectionPhotoUpload::class, fn (ProcessInspectionPhotoUpload $job): bool => $job->uuid === $id);
     }
 
@@ -143,7 +143,7 @@ final class InspectionPhotoUploadTest extends TestCase
         $this->assertSame(InspectionPhotoUpload::STATUS_STORED, $row->status);
         $this->assertNull($row->source_path);
         $this->assertSame([2048, 1365], [$row->width, $row->height]);
-        $bytes = (string) Storage::disk('public')->get($row->path);
+        $bytes = (string) Storage::disk('local')->get($row->path);
         $this->assertStringStartsWith("\xFF\xD8\xFF", $bytes);
         $this->assertSame(hash('sha256', $bytes), $row->sha256);
         $this->assertSame([], Storage::disk('local')->allFiles('inspection-photo-uploads'));
@@ -170,7 +170,7 @@ final class InspectionPhotoUploadTest extends TestCase
         $this->assertSame($path, ApparatusDefectObservation::query()->sole()->photo_path);
         $this->assertSame(InspectionPhotoUploads::pathFor($concernPhoto), ApparatusInspectionConcern::query()->sole()->photo_path);
         $this->assertSame(2, InspectionPhotoUpload::query()->where('apparatus_inspection_id', $inspection->id)->whereNotNull('attached_at')->count());
-        $this->assertCount(2, Storage::disk('public')->allFiles('defects'));
+        $this->assertCount(2, Storage::disk('local')->allFiles('defects'));
         $this->get('/api/public/inspection-concerns/'.ApparatusInspectionConcern::query()->sole()->id.'/photo')->assertOk();
     }
 
@@ -278,8 +278,8 @@ final class InspectionPhotoUploadTest extends TestCase
         InspectionPhotoUpload::query()->where('uuid', $second)->update(['created_at' => now()->subDays(InspectionPhotoUploads::UNATTACHED_RETENTION_DAYS + 1)]);
         $this->artisan('photos:maintain')->assertSuccessful();
         $this->assertDatabaseMissing('inspection_photo_uploads', ['uuid' => $second]);
-        Storage::disk('public')->assertMissing(InspectionPhotoUploads::pathFor($second));
-        Storage::disk('public')->assertExists(InspectionPhotoUploads::pathFor($first));
+        Storage::disk('local')->assertMissing(InspectionPhotoUploads::pathFor($second));
+        Storage::disk('local')->assertExists(InspectionPhotoUploads::pathFor($first));
     }
 
     public function test_another_members_photo_id_costs_the_photo_never_the_checkout(): void
@@ -310,7 +310,7 @@ final class InspectionPhotoUploadTest extends TestCase
 
         $this->assertDatabaseCount('apparatus_inspections', 1);
         $this->assertDatabaseCount('inspection_photo_uploads', 1);
-        $this->assertCount(1, Storage::disk('public')->allFiles('defects'));
+        $this->assertCount(1, Storage::disk('local')->allFiles('defects'));
     }
 
     public function test_an_older_queued_checkout_with_inline_photos_still_stores_them_once(): void
@@ -323,7 +323,7 @@ final class InspectionPhotoUploadTest extends TestCase
 
         $itemPath = ApparatusInspection::query()->sole()->results[0]['items'][0]['photo_path'];
         $this->assertSame($itemPath, ApparatusDefect::query()->sole()->photo_path);
-        $this->assertCount(1, Storage::disk('public')->allFiles('defects'));
+        $this->assertCount(1, Storage::disk('local')->allFiles('defects'));
     }
 
     public function test_maintenance_requeues_stalled_conversions_and_keeps_attached_photos(): void

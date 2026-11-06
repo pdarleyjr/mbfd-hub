@@ -12,11 +12,11 @@ use App\Models\User;
 use App\Services\Exports\ExportDataset;
 use App\Services\OperationalEvidenceArchiveService;
 use App\Support\HubTimezone;
+use App\Support\Media\MemberMedia;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Storage;
 
 class TrtTrailerInventory extends Page
 {
@@ -200,7 +200,7 @@ class TrtTrailerInventory extends Page
                 $isPresent = $group->contains('present', true);
                 $imagePaths = $group->pluck('image_path')->filter()->values();
                 $images = $imagePaths
-                    ->filter(fn (string $path): bool => Storage::disk('public')->exists($path))
+                    ->filter(fn (string $path): bool => MemberMedia::exists($path))
                     ->values()
                     ->all();
                 $missingImages = $imagePaths->count() - count($images);
@@ -236,7 +236,7 @@ class TrtTrailerInventory extends Page
                         $imagePath = $entry->image_path;
                         $imageExists = is_string($imagePath)
                             && $imagePath !== ''
-                            && Storage::disk('public')->exists($imagePath);
+                            && MemberMedia::exists($imagePath);
 
                         return [
                             'user' => $entry->user?->name ?? 'Anonymous',

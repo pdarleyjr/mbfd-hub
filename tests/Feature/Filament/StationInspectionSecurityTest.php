@@ -78,7 +78,9 @@ final class StationInspectionSecurityTest extends TestCase
 
         $this->get("/admin/station-inspections/{$inspection->id}")
             ->assertOk()
-            ->assertSee('/storage/station-inspections/valid.png', false)
+            // A fail photo not moved off the public disk yet is shown through a signed member-media address, never /storage.
+            ->assertSee('/member-media/station-inspections/valid.png?', false)
+            ->assertDontSee('/storage/station-inspections/valid.png', false)
             ->assertSee('src="'.$signature.'"', false);
     }
 
