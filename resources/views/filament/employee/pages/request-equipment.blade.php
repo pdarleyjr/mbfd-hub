@@ -58,6 +58,13 @@
             </div>
         @endif
 
+        @if($editingRequestId)
+            <div class="hub-callout mb-4 flex flex-wrap items-center justify-between gap-3 p-4" role="status" data-order-editing="{{ $editingRequestNumber }}">
+                <p class="text-sm leading-6"><strong>Editing order {{ $editingRequestNumber }}.</strong> Change items, sizes or quantities, then save. Support Services will see what you changed.</p>
+                <a class="hub-btn hub-btn--secondary hub-btn--field" href="/employee/my-requests/{{ $editingRequestId }}">Keep order as is</a>
+            </div>
+        @endif
+
         <section class="uo-assignment" aria-labelledby="uo-assignment-title" data-entitlement-profile="{{ $context['profile'] }}" data-marine="{{ $context['marine'] ? 'true' : 'false' }}">
             <div class="uo-assignment-identity">
                 <p class="uo-eyebrow">{{ $context['term_label'] ? $context['term_label'].' Assignment' : 'Your assignment' }}</p>
@@ -296,7 +303,15 @@
                     </div>
                     <footer class="uo-checkout">
                         <p class="uo-cart-total"><span>Total items</span><strong data-cart-total x-text="itemCount">{{ $summary['selected_total'] }}</strong></p>
-                        <button type="submit" class="uo-submit" aria-label="Submit Uniform Request" wire:loading.attr="disabled" wire:target="submit"><span wire:loading.remove wire:target="submit">Submit order</span><span wire:loading wire:target="submit">Submitting…</span><x-heroicon-o-arrow-right aria-hidden="true" /></button>
+                        @if($editingRequestId)
+                            <button type="submit" class="uo-submit" aria-label="Save changes to uniform order" wire:loading.attr="disabled" wire:target="submit"><span wire:loading.remove wire:target="submit">Save changes</span><span wire:loading wire:target="submit">Saving…</span><x-heroicon-o-arrow-right aria-hidden="true" /></button>
+                        @else
+                            @if($editingRequestId)
+                            <button type="submit" class="uo-submit" aria-label="Save changes to uniform order" wire:loading.attr="disabled" wire:target="submit"><span wire:loading.remove wire:target="submit">Save changes</span><span wire:loading wire:target="submit">Saving…</span><x-heroicon-o-arrow-right aria-hidden="true" /></button>
+                        @else
+                            <button type="submit" class="uo-submit" aria-label="Submit Uniform Request" wire:loading.attr="disabled" wire:target="submit"><span wire:loading.remove wire:target="submit">Submit order</span><span wire:loading wire:target="submit">Submitting…</span><x-heroicon-o-arrow-right aria-hidden="true" /></button>
+                        @endif
+                        @endif
                     </footer>
                 </section>
                 <details class="uo-recent" wire:ignore.self>

@@ -11,7 +11,9 @@ use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRequestR
 use App\Filament\Concerns\HasExportActions;
 use App\Models\PersonnelRequest;
 use App\Models\PersonnelRequestItem;
+use App\Models\PersonnelRequestUpdate;
 use App\Services\PersonnelRequests\UniformOrderCatalog;
+use App\Support\PersonnelRequests\UniformOrderAmendment;
 use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\Section;
@@ -159,8 +161,23 @@ class PersonnelRequestResource extends Resource
                     TextEntry::make('metadata.item_id')->label('Applies to')->formatStateUsing(fn ($state, $livewire): string => $livewire->getRecord()->items->firstWhere('id', $state)->item_name ?? 'Request item')->placeholder('Whole request'),
                     TextEntry::make('employee_visible_note')->label('Employee-visible note')->placeholder('—'),
                     TextEntry::make('internal_note')->label('Internal note')->placeholder('—'),
+                    TextEntry::make('metadata.changes')->label('Member changes')->listWithLineBreaks()->columnSpanFull()
+                        ->visible(fn (PersonnelRequestUpdate $record): bool => $record->event === UniformOrderAmendment::EVENT),
+                    TextEntry::make('amended_before')->label('Before')->state(fn (PersonnelRequestUpdate $record): array => self::orderLines(data_get($record->metadata, 'before.items', [])))
+                        ->listWithLineBreaks()->columnSpan(2)->visible(fn (PersonnelRequestUpdate $record): bool => $record->event === UniformOrderAmendment::EVENT),
+                    TextEntry::make('amended_after')->label('After')->state(fn (PersonnelRequestUpdate $record): array => self::orderLines(data_get($record->metadata, 'after.items', [])))
+                        ->listWithLineBreaks()->columnSpan(3)->visible(fn (PersonnelRequestUpdate $record): bool => $record->event === UniformOrderAmendment::EVENT),
                 ])->columns(5),
             ]),
+            Section::make('Original order, before member edits')
+                ->description('The member changed this order after submitting it. This is what they first submitted.')
+                ->schema([
+                    TextEntry::make('original_items')->hiddenLabel()->state(fn (PersonnelRequest $record): array => self::orderLines(data_get($record->metadata, 'original_submission.items', [])))
+                        ->listWithLineBreaks()->columnSpanFull(),
+                    TextEntry::make('metadata.original_submission.member_note')->label('Original notes for Support Services')->placeholder('No note')->columnSpanFull(),
+                ])
+                ->collapsible()->collapsed()
+                ->visible(fn (PersonnelRequest $record): bool => filled(data_get($record->metadata, 'original_submission.items'))),
             Section::make('Private attachments')->schema([
                 RepeatableEntry::make('attachments')->hiddenLabel()->schema([
                     TextEntry::make('original_filename')->label('File')->url(fn ($record) => route('admin.personnel-request-attachments.download', $record)),
@@ -170,6 +187,26 @@ class PersonnelRequestResource extends Resource
                 ])->columns(4),
             ])->collapsible(),
         ]);
+    }
+
+    /**
+     * Readable order lines from a stored snapshot (member edit history).
+     *
+     * @return list<string>
+     */
+    private static function orderLines(mixed $lines): array
+    {
+        $catalog = app(UniformOrderCatalog::class);
+
+        return collect(is_array($lines) ? $lines : [])->filter(fn ($line): bool => is_array($line))
+            ->map(function (array $line) use ($catalog): string {
+                $details = $catalog->orderingDetails((string) ($line['item_code'] ?? ''), is_array($line['metadata'] ?? null) ? $line['metadata'] : []);
+                $text = ($line['item_name'] ?? 'Item').' × '.(int) ($line['quantity'] ?? 0);
+                $extra = $details !== [] ? implode(', ', array_map(fn (string $value, string $label): string => "{$label}: {$value}", $details, array_keys($details)))
+                    : (filled($line['size'] ?? null) ? 'Size '.$line['size'] : '');
+
+                return $extra !== '' ? "{$text} ({$extra})" : $text;
+            })->values()->all();
     }
 
     public static function getPages(): array

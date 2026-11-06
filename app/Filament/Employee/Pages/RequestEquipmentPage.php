@@ -10,6 +10,8 @@ use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
 use App\Services\PersonnelRequests\UniformAllowanceService;
 use App\Services\PersonnelRequests\UniformEntitlementService;
 use App\Services\PersonnelRequests\UniformOrderCatalog;
+use App\Support\PersonnelRequests\PersonnelRequestParticipantAccess;
+use App\Support\PersonnelRequests\UniformOrderAmendment;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Collection;
@@ -46,6 +48,11 @@ class RequestEquipmentPage extends Page
 
     public ?string $submittedRequestId = null;
 
+    /** Public id of the member's own order being edited; checked again on the server when saving. */
+    public ?string $editingRequestId = null;
+
+    public ?string $editingRequestNumber = null;
+
     private ?array $entitlementContext = null;
 
     private function entitlementContext(): array
@@ -55,14 +62,52 @@ class RequestEquipmentPage extends Page
 
     private function orderingProducts(): array
     {
-        return array_diff_key(app(UniformOrderCatalog::class)->products(), array_flip([
-            'uniform_shirt', 'work_boots', 'class_a_coat',
-        ]));
+        return app(UniformOrderCatalog::class)->selfServiceProducts();
     }
 
     public function mount(): void
     {
         $this->resetOrder();
+        $edit = request()->query('edit');
+        if (is_string($edit) && $edit !== '') {
+            $this->startEditing($edit);
+        }
+    }
+
+    public function getTitle(): string
+    {
+        return $this->editingRequestId !== null ? 'Edit Uniform Order' : (string) static::$title;
+    }
+
+    /** Opens the member's own order in the builder with its current lines filled in. */
+    private function startEditing(string $publicId): void
+    {
+        $request = PersonnelRequest::query()->where('public_id', $publicId)->first();
+        $employee = $this->authenticatedEmployee();
+        abort_if($request === null || ! PersonnelRequestParticipantAccess::isParticipant($employee, $request), 404);
+        if ($reason = UniformOrderAmendment::blockReason($employee, $request)) {
+            session()->flash('status', $reason);
+            $this->redirect('/employee/my-requests/'.$request->public_id);
+
+            return;
+        }
+        $this->editingRequestId = $request->public_id;
+        $this->editingRequestNumber = $request->request_number;
+        foreach ($request->items as $item) {
+            $this->data['items'][$item->item_code]['quantity'] = (int) $item->quantity;
+            $this->data['items'][$item->item_code]['metadata'] = array_replace(
+                $this->data['items'][$item->item_code]['metadata'] ?? [],
+                is_array($item->metadata) ? $item->metadata : [],
+            );
+        }
+        $this->data['member_note'] = (string) data_get($request->metadata, 'member_note', '');
+        $this->data['allowance_justification'] = (string) ($request->allowance_justification ?? '');
+    }
+
+    private function editingRequest(): ?PersonnelRequest
+    {
+        return $this->editingRequestId === null ? null
+            : PersonnelRequest::query()->where('public_id', $this->editingRequestId)->first();
     }
 
     private function resetOrder(): void
@@ -129,16 +174,17 @@ class RequestEquipmentPage extends Page
                 'data.items' => 'Some selected items cannot be ordered here. Remove them or contact Support Services.',
             ]);
         }
+        $details = [
+            'member_note' => $this->data['member_note'] ?? '',
+            'allowance_justification' => $this->data['allowance_justification'] ?? null,
+        ];
         try {
-            $request = $submissions->submitUniform(
-                $this->authenticatedEmployee(),
-                $items,
-                $this->data['idempotency_key'],
-                [
-                    'member_note' => $this->data['member_note'] ?? '',
-                    'allowance_justification' => $this->data['allowance_justification'] ?? null,
-                ],
-            );
+            if ($this->editingRequestId !== null) {
+                $this->saveChanges($submissions, $items, $details);
+
+                return;
+            }
+            $request = $submissions->submitUniform($this->authenticatedEmployee(), $items, $this->data['idempotency_key'], $details);
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages(collect($exception->errors())
                 ->mapWithKeys(fn (array $messages, string $key): array => ['data.'.$key => $messages])->all());
@@ -156,6 +202,19 @@ class RequestEquipmentPage extends Page
                 \Filament\Notifications\Actions\Action::make('view')->url('/employee/my-requests/'.$request->public_id),
             ])
             ->send();
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $items
+     * @param  array<string, mixed>  $details
+     */
+    private function saveChanges(PersonnelRequestSubmissionService $submissions, array $items, array $details): void
+    {
+        $request = $this->editingRequest();
+        abort_if($request === null, 404);
+        $submissions->amendUniform($this->authenticatedEmployee(), $request, $items, $this->data['idempotency_key'], $details);
+        session()->flash('status', 'Your order was updated. Support Services can see what you changed.');
+        $this->redirect('/employee/my-requests/'.$request->public_id);
     }
 
     public function getViewData(): array
@@ -195,7 +254,7 @@ class RequestEquipmentPage extends Page
     #[Computed(persist: true, seconds: 300)]
     public function jacketEligibility(): array
     {
-        return app(UniformEntitlementService::class)->jacketEligibility($this->authenticatedEmployee());
+        return app(UniformEntitlementService::class)->jacketEligibility($this->authenticatedEmployee(), $this->editingRequest()?->id);
     }
 
     /**
@@ -207,7 +266,7 @@ class RequestEquipmentPage extends Page
     #[Computed(persist: true, seconds: 300)]
     public function allowanceUsage(): array
     {
-        return app(UniformAllowanceService::class)->usedByGroup($this->authenticatedEmployee());
+        return app(UniformAllowanceService::class)->usedByGroup($this->authenticatedEmployee(), null, $this->editingRequest()?->id);
     }
 
     /** @return Collection<int, PersonnelRequest> */
