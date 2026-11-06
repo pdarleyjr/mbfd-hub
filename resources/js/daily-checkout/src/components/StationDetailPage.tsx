@@ -31,6 +31,7 @@ import StationOverviewPanel from './station/StationOverviewPanel';
 import StationRosterPanel from './station/StationRosterPanel';
 import StationRequestResolveSheet from './station/StationRequestResolveSheet';
 import StationShiftAlert from './station/StationShiftAlert';
+import StationCleaningCard from './station/StationCleaningCard';
 import { canMarkResolved } from '../utils/stationRequestResolveApi';
 import { useStationOverview } from './station/useStationOverview';
 import Tag, { StatusTag } from './ui/Tag';
@@ -505,6 +506,8 @@ export default function StationDetailPage() {
       />
 
       <StationShiftAlert overview={stationOverview.overview} stationId={station.id} />
+
+      <StationCleaningCard cleaning={stationOverview.overview?.cleaning} />
 
       <UnitAlertsBanner stationId={station.id} />
       {/* One-time vehicle questions for units without a Daily Checkout or Captain 5 page */}

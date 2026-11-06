@@ -92,7 +92,10 @@ function RosterRow({ row }: { row: StationRosterRow }) {
   return (
     <div className={`min-w-0 ${row.is_first_in_seat ? '' : 'ml-3 border-l-2 border-hub-glass-border pl-3'}`}>
       <div className="flex items-start justify-between gap-3">
-        <p className={`min-w-0 font-semibold ${row.is_vacant ? 'text-hub-n-600' : 'text-hub-ink'}`}>{row.name}</p>
+        <p className={`min-w-0 font-semibold ${row.is_vacant ? 'text-hub-n-600' : 'text-hub-ink'}`}>
+          {/* Outside Daily, so a plain link; the server sends it only to viewers who may open profiles. */}
+          {row.profile_url && !row.is_vacant ? <a href={row.profile_url} className="text-inherit hover:underline">{row.name}</a> : row.name}
+        </p>
         {/* A code the Hub does not know prints as TeleStaff sent it, so the pill must be able to wrap. */}
         <span className={`hub-tag roster-pill roster-pill--${row.status.tone} max-w-[55%] flex-none !whitespace-normal [overflow-wrap:anywhere]`} title={row.status.title}>{row.status.label}</span>
         {row.status.screen_reader_text && <span className="sr-only">{row.status.screen_reader_text}</span>}

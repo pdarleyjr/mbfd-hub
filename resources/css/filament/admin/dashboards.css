@@ -722,6 +722,12 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
 .mbfd-dash-row[data-notice-row] .mbfd-dash-row__button:not(:hover) { background: rgb(var(--hub-info-bg) / .35); }
 .mbfd-dash-row[data-notice-row] .mbfd-dash-row__cta { border-color: rgb(var(--hub-border)); color: rgb(var(--hub-ink-secondary)); }
 
+/* Accident reports: the one red alert on the Personnel card. Red is reserved for this; the row keeps its tint
+   until the accident is resolved (acknowledging alone does not clear it). */
+.mbfd-dash-row[data-accident-row][data-accident-open="1"] .mbfd-dash-row__button { box-shadow: inset 4px 0 0 rgb(var(--hub-danger-border, 220 38 38)); background: rgb(var(--hub-danger-bg, 254 242 242) / .7); }
+.mbfd-dash-row[data-accident-row][data-accident-open="1"] .mbfd-dash-row__button:hover { background: rgb(var(--hub-danger-bg, 254 242 242)); }
+.mbfd-dash-row[data-accident-row][data-accident-open="1"] .mbfd-dash-row__title { color: rgb(var(--hub-danger, 185 28 28)); font-weight: 700; letter-spacing: .01em; }
+.mbfd-dash-thumb--accident { background: rgb(var(--hub-danger-bg, 254 242 242)); color: rgb(var(--hub-danger, 185 28 28)); border-color: rgb(var(--hub-danger-border, 220 38 38)); }
 /* ---------- Action panel (drawer / sheet) ---------- */
 
 .mbfd-dash-panel-backdrop {

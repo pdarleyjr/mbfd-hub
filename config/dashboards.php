@@ -32,6 +32,7 @@ return [
         App\Services\Dashboards\Sources\Station\StationInspectionSource::class,
         App\Services\Dashboards\Sources\Station\HubSupportTicketSource::class,
         App\Services\Dashboards\Sources\Station\SupportMessageSource::class,
+        App\Services\Dashboards\Sources\Station\AccidentReportSource::class,
         App\Services\Dashboards\Sources\Station\StationSupplyRequestSource::class,
     ],
 

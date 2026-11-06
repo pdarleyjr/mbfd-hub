@@ -45,9 +45,15 @@ final class MasterPersonnelDirectory extends Page implements HasTable
 
     protected static ?string $navigationGroup = 'Personnel';
 
-    protected static ?string $title = 'Master Personnel Directory';
+    /** The one personnel list. The class name and /admin/master-personnel-directory stay for saved links. */
+    protected static ?string $title = 'Personnel Directory';
 
-    protected static ?int $navigationSort = 11;
+    protected static ?string $navigationLabel = 'Personnel Directory';
+
+    protected static ?int $navigationSort = 10;
+
+    /** Login and invitation columns: shown only to people who may open Employees & Access profiles. */
+    private const ACCOUNT_COLUMNS = ['login', 'invitation'];
 
     protected static string $view = 'filament.pages.master-personnel-directory';
 
@@ -115,8 +121,14 @@ final class MasterPersonnelDirectory extends Page implements HasTable
             ->deferLoading(false)
             ->searchable()
             ->query(fn (): Builder => app(PersonnelTableService::class)->members($this->actor(), $this->personnelTable()))
-            ->columns([...$columns, ...$this->trackingColumns($definition)])
+            // Login and invitation summaries come from two eager loads per page, never one query per row.
+            ->modifyQueryUsing(fn (Builder $query): Builder => $this->canAccessEmployeeProfiles()
+                ? $query->with('user.memberOnboardingInvitation') : $query)
+            ->columns([...$columns, ...$this->accountColumns(), ...$this->trackingColumns($definition)])
             ->recordClasses(fn (Employee $record): string => $this->trackingRecordClasses($record))
+            // A row opens the member's profile for people who may open profiles; everyone else keeps Details.
+            ->recordUrl(fn (Employee $record): ?string => $this->profileUrl($record))
+            ->recordAction(fn (Employee $record): ?string => $this->profileUrl($record) === null ? 'details' : null)
             ->defaultSort(fn (Builder $query): Builder => $this->applyPersonnelSort($query))
             ->filters([
                 ...array_map(fn (string $key): Tables\Filters\SelectFilter => Tables\Filters\SelectFilter::make($key)
@@ -135,6 +147,13 @@ final class MasterPersonnelDirectory extends Page implements HasTable
                     ->query(function (Builder $query, array $data): Builder {
                         return blank($data['value'] ?? null) ? $query : $query->whereIn('employees.id', array_keys(array_filter($this->statuses(), fn ($status): bool => $status === $data['value'])));
                     }),
+                Tables\Filters\SelectFilter::make('login_status')->label('Login status')
+                    ->visible(fn (): bool => $this->canAccessEmployeeProfiles())
+                    ->options([
+                        'awaiting_account' => 'Awaiting account', 'pending_activation' => 'Awaiting activation',
+                        'active' => 'Active logins', 'disabled' => 'Disabled logins',
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => $this->filterLoginStatus($query, $data['value'] ?? null)),
                 ...$this->trackingFilters($definition),
             ])
             ->actions([
@@ -143,7 +162,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
                     ->modalContent(fn (Employee $record) => view('filament.pages.partials.personnel-table-member-details', [
                         'fields' => $source->fields(), 'record' => $record, 'source' => $source,
                         'emailStatus' => $this->statuses()[$record->getKey()] ?? '',
-                        'trackingColumns' => $this->personnelTable()->columns ?? [],
+                        'trackingColumns' => $this->visibleTrackingColumns($this->personnelTable()),
                         'trackingValues' => $this->trackingEntry($record)->values ?? [],
                     ]))->modalSubmitAction(false)->modalCancelActionLabel('Close'),
                 // Edit actions sit behind one menu so the actions column stays narrow and sticky.
@@ -207,6 +226,15 @@ final class MasterPersonnelDirectory extends Page implements HasTable
 
         return [
             $actions['addPersonnel'], $actions['export'], $actions['configureColumns'],
+            ActionGroup::make([
+                Action::make('accountsOnboarding')->label('Accounts & Onboarding')->icon('heroicon-o-envelope')
+                    ->visible(fn (): bool => $this->canAccessEmployeeProfiles())
+                    ->url(fn (): string => EmployeeResource::getUrl('index')),
+                Action::make('accountExceptions')->label('Account exceptions')->icon('heroicon-o-exclamation-triangle')
+                    ->visible(fn (): bool => \App\Filament\Resources\AccountProfileResource::canViewAny())
+                    ->url(fn (): string => \App\Filament\Resources\AccountProfileResource::getUrl()),
+            ])->label('Accounts')->icon('heroicon-o-key')->button()->color('gray')
+                ->visible(fn (): bool => $this->canAccessEmployeeProfiles() || \App\Filament\Resources\AccountProfileResource::canViewAny()),
             ActionGroup::make([$actions['saveView'], $actions['applyView'], $actions['deleteView']])->label('Views')->button()->color('gray'),
             ActionGroup::make([$actions['multiSort'], $actions['history'], $actions['restoreColumn'], $actions['reconcile']])->label('More')->button()->color('gray'),
         ];
@@ -344,7 +372,8 @@ final class MasterPersonnelDirectory extends Page implements HasTable
 
     private function exportColumns(): array
     {
-        $shown = array_keys(array_filter($this->getTable()->getColumns(), fn (Tables\Columns\Column $column): bool => ! $column->isToggledHidden() && ! $column->isHidden()));
+        $shown = array_keys(array_filter($this->getTable()->getColumns(), fn (Tables\Columns\Column $column): bool => ! $column->isToggledHidden() && ! $column->isHidden()
+            && ! in_array($column->getName(), self::ACCOUNT_COLUMNS, true)));
         // A value printed beneath another column is exported in its own column, so nothing the page shows is lost.
         $columns = [];
         foreach ($shown as $key) {
@@ -409,5 +438,87 @@ final class MasterPersonnelDirectory extends Page implements HasTable
     private function canAccessEmployeeProfiles(): bool
     {
         return $this->employeeProfilesAccessible ??= EmployeeResource::canViewAny();
+    }
+
+    public function canOpenProfiles(): bool
+    {
+        return $this->canAccessEmployeeProfiles();
+    }
+
+    /** The member's profile, or null when this viewer keeps the Details view instead. */
+    private function profileUrl(Employee $record): ?string
+    {
+        return $this->canAccessEmployeeProfiles() && EmployeeResource::canEdit($record)
+            ? EmployeeResource::getUrl('edit', ['record' => $record]) : null;
+    }
+
+    /**
+     * Login and invitation status from Accounts & Onboarding, hidden until turned on. Never exported: the
+     * directory export carries personnel and tracking columns only.
+     *
+     * @return list<Tables\Columns\Column>
+     */
+    private function accountColumns(): array
+    {
+        return [
+            Tables\Columns\TextColumn::make('login')->label('Login')->badge()
+                ->state(fn (Employee $record): string => self::loginLabel($record->user?->getRawOriginal('account_status')))
+                ->color(fn (string $state): string => match ($state) {
+                    'Active' => 'success', 'Disabled' => 'danger', 'Awaiting activation' => 'warning', default => 'gray',
+                })
+                ->visible(fn (): bool => $this->canAccessEmployeeProfiles())
+                ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('invitation')->label('Invitation')->badge()->color('gray')
+                ->state(fn (Employee $record): string => self::invitationLabel($record))
+                ->description(fn (Employee $record): ?string => $record->user?->memberOnboardingInvitation?->emailDeliveryLabel())
+                ->visible(fn (): bool => $this->canAccessEmployeeProfiles())
+                ->toggleable(isToggledHiddenByDefault: true),
+        ];
+    }
+
+    private static function loginLabel(?string $status): string
+    {
+        return match ($status) {
+            null => 'Awaiting account',
+            'pending_activation' => 'Awaiting activation',
+            default => ucfirst(str_replace('_', ' ', $status)),
+        };
+    }
+
+    /** The same activation wording Accounts & Onboarding shows. */
+    private static function invitationLabel(Employee $record): string
+    {
+        $status = $record->user?->getRawOriginal('account_status');
+        if ($status === 'active') {
+            return 'Account activated';
+        }
+        if ($status !== 'pending_activation') {
+            return 'Not applicable';
+        }
+        $invitation = $record->user->memberOnboardingInvitation;
+        if ($invitation === null) {
+            return 'Invitation not sent';
+        }
+        if (in_array($invitation->delivery_status, ['pending', 'queued', 'redeemed'], true)
+            && $invitation->expires_at?->lessThanOrEqualTo(now()) === true) {
+            return 'Expired, ready to resend';
+        }
+
+        return $invitation->redeemed_at !== null || $invitation->delivery_status === 'redeemed'
+            ? 'Opened / redeemed' : 'Awaiting activation';
+    }
+
+    /** The Accounts & Onboarding tabs as one filter. */
+    private function filterLoginStatus(Builder $query, mixed $value): Builder
+    {
+        if (! $this->canAccessEmployeeProfiles() || ! is_string($value) || $value === '') {
+            return $query;
+        }
+
+        return match ($value) {
+            'awaiting_account' => $query->whereDoesntHave('user'),
+            'pending_activation', 'active', 'disabled' => $query->whereHas('user', fn (Builder $users) => $users->where('account_status', $value)),
+            default => $query,
+        };
     }
 }

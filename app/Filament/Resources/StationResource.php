@@ -6,6 +6,7 @@ use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\StationResource\Pages;
 use App\Filament\Resources\StationResource\RelationManagers;
+use App\Filament\Resources\StationResource\StationCleaningSection;
 use App\Filament\Resources\StationResource\StationOperationsSection;
 use App\Models\Station;
 use App\Services\StationStaffingService;
@@ -112,6 +113,7 @@ class StationResource extends Resource
         return $infolist
             ->schema([
                 StationOperationsSection::make(),
+                StationCleaningSection::make(),
                 Infolists\Components\Section::make('Station Photo')
                     ->schema([
                         Infolists\Components\ImageEntry::make('photo')
@@ -306,6 +308,7 @@ class StationResource extends Resource
             'create' => Pages\CreateStation::route('/create'),
             'view' => Pages\ViewStation::route('/{record}'),
             'edit' => Pages\EditStation::route('/{record}/edit'),
+            'cleaning' => Pages\ManageStationCleaning::route('/{record}/cleaning'),
         ];
     }
 }

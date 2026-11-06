@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
- * @phpstan-type PersonnelTrackingColumn array{id: string, label: string, type: string, options: list<string>, hidden: bool, color: string|null, highlight_when?: string, highlight_value?: string|null}
+ * @phpstan-type PersonnelTrackingColumn array{id: string, label: string, type: string, options: list<string>, hidden: bool, color: string|null, highlight_when?: string, highlight_value?: string|null, profile_section?: string|null, profile_order?: int|null, required?: bool, view_access?: string}
  *
  * @property array<string, mixed> $criteria
  * @property list<string> $source_columns

@@ -1,0 +1,15 @@
+{
+  "form_key": "supervisors-report-of-accident",
+  "display_name": "Supervisor's Report of Accident",
+  "template_sha256": "8e2c32ec4e2bf3599a5ae9018204e0100ea3aa7382987c2d8144833ff650b77c",
+  "layout_sha256": "508524e172769285375bc20ee76b9b303ec0ba96b68acf4d3c5eac5ee01f7944",
+  "expected_page_count": 1,
+  "expected_page_sizes": [
+    [
+      612,
+      792
+    ]
+  ],
+  "renderer_contract_version": "1.0",
+  "template_source": "Official City/MBFD PDF supplied 2026-11-05; unusable AcroForm widgets removed, page content unchanged."
+}

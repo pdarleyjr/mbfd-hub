@@ -10,6 +10,8 @@ use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Models\StationRequest;
+use App\Services\Stations\StationCleaningSchedule;
+use App\Support\HubTimezone;
 use App\Support\StationShiftWindow;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -31,7 +33,10 @@ final class StationOverviewService
 
     private const CHECKOUT_COLUMNS = ['id', 'apparatus_id', 'operator_name', 'rank', 'shift', 'vehicle_number', 'designation_at_time', 'review_status', 'processing_status', 'completed_at'];
 
-    public function __construct(private readonly DailyCheckoutComplianceService $compliance) {}
+    public function __construct(
+        private readonly DailyCheckoutComplianceService $compliance,
+        private readonly StationCleaningSchedule $cleaning,
+    ) {}
 
     /** @return array<string, mixed> */
     public function forStation(Station $station, Request $request, ?CarbonImmutable $now = null): array
@@ -61,6 +66,8 @@ final class StationOverviewService
                 'active' => $window->alertIsDue($now) && $missing !== [],
                 'units' => $window->alertIsDue($now) ? $missing : [],
             ],
+            // Today's cleaning follows the Eastern calendar date, not the 7-to-7 shift window.
+            'cleaning' => $this->cleaning->forStation($station, CarbonImmutable::parse($now->setTimezone(HubTimezone::NAME)->toDateString(), 'UTC')),
         ];
     }
 

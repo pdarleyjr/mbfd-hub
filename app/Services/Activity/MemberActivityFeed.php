@@ -7,6 +7,7 @@ namespace App\Services\Activity;
 use App\Models\Employee;
 use App\Models\MemberActivityRead;
 use App\Models\User;
+use App\Services\Activity\Sources\AccidentReportActivitySource;
 use App\Services\Activity\Sources\DefectActivitySource;
 use App\Services\Activity\Sources\InspectionActivitySource;
 use App\Services\Activity\Sources\InventoryCorrectionActivitySource;
@@ -35,6 +36,7 @@ final class MemberActivityFeed
         InspectionActivitySource::class,
         DefectActivitySource::class,
         StretcherReportActivitySource::class,
+        AccidentReportActivitySource::class,
         StationRequestActivitySource::class,
         PersonnelRequestActivitySource::class,
         InventoryCorrectionActivitySource::class,

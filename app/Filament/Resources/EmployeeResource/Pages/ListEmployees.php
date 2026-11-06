@@ -34,6 +34,17 @@ class ListEmployees extends ListRecords
     #[Locked]
     public ?array $selectedInvitationCohort = null;
 
+    protected static ?string $title = 'Accounts & Onboarding';
+
+    /** @return array<string, string> */
+    public function getBreadcrumbs(): array
+    {
+        return [
+            \App\Filament\Pages\MasterPersonnelDirectory::getUrl() => 'Personnel Directory',
+            'Accounts & Onboarding',
+        ];
+    }
+
     protected function getHeaderActions(): array
     {
         return [

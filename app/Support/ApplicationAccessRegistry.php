@@ -97,6 +97,14 @@ final class ApplicationAccessRegistry
         $options['personnel.tables.export'] = 'Custom personnel tables — export';
         $options['personnel.tables.archive'] = 'Custom personnel tables — archive / restore';
         $options['personnel.promotions.manage'] = 'Promotional lists - manage';
+        $options['personnel.documents.view'] = 'Personnel documents - view employee files';
+        $options['personnel.documents.manage'] = 'Personnel documents - upload, share with the member';
+        $options['personnel.accidents.view'] = 'Accident reports - view (every Hub administrator already can; grant to non-admin accounts)';
+        $options['personnel.accidents.manage'] = 'Accident reports - acknowledge, follow up, correct, resolve';
+        $options['personnel.accidents.supervise'] = 'Accident reports - complete supervisor parts (non-officer supervisors)';
+        $options['personnel.fuel_ids.view'] = 'Fuel ID Numbers - view (PINs masked; each Show is recorded)';
+        $options['personnel.fuel_ids.manage'] = 'Fuel ID Numbers - import and resolve exceptions';
+        $options['stations.cleaning.manage'] = 'Station cleaning schedule - edit';
 
         return $options;
     }

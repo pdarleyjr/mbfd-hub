@@ -16,6 +16,17 @@ class CreateEmployee extends CreateRecord
 {
     protected static string $resource = EmployeeResource::class;
 
+    /** @return array<string, string> */
+    public function getBreadcrumbs(): array
+    {
+        return [\App\Filament\Pages\MasterPersonnelDirectory::getUrl() => 'Personnel Directory', 'Add personnel'];
+    }
+
+    protected function getCancelFormAction(): \Filament\Actions\Action
+    {
+        return parent::getCancelFormAction()->url($this->previousUrl ?? \App\Filament\Pages\MasterPersonnelDirectory::getUrl());
+    }
+
     /** @param array<string, mixed> $data */
     protected function handleRecordCreation(array $data): Model
     {

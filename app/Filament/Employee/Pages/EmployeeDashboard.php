@@ -8,6 +8,7 @@ use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\PersonnelRequestStatus;
 use App\Models\AssignedEquipment;
 use App\Models\Employee;
+use App\Services\Personnel\FuelPinDirectory;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
 
@@ -78,9 +79,12 @@ class EmployeeDashboard extends Page
             ? app(\App\Services\Activity\MemberActivityFeed::class)->forCard($authUser, $employee)
             : [];
 
+        // The member's own Fuel PIN only, as a string (leading zeros kept). Never cached or serialized.
+        $fuelPin = app(FuelPinDirectory::class)->currentFor($employee)?->pin;
+
         // For blade compatibility — use $user variable name but it's an Employee
         $user = $employee;
 
-        return compact('user', 'bidAssignment', 'equipmentCount', 'pendingRequests', 'recentEquipment', 'recentRequests', 'messageUnread', 'canMessageLogistics', 'activity');
+        return compact('user', 'bidAssignment', 'fuelPin', 'equipmentCount', 'pendingRequests', 'recentEquipment', 'recentRequests', 'messageUnread', 'canMessageLogistics', 'activity');
     }
 }

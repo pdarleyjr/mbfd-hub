@@ -45,6 +45,10 @@
             @else
                 <div class="emsg-bubble__body">{{ $message->body }}</div>
             @endif
+            @if ($message->personnel_document_id)
+                {{-- A memorandum sent from the Hub: its PDF opens through the conversation's own access check. --}}
+                <p class="emsg-bubble__attachment"><a href="{{ route('employee-messages.attachment', ['message' => $message->id]) }}" target="_blank" rel="noopener" data-hub-viewer="pdf" data-hub-viewer-title="Memorandum" data-hub-viewer-download="{{ route('employee-messages.attachment', ['message' => $message->id, 'download' => 1]) }}">Open memorandum (PDF)</a></p>
+            @endif
         </li>
     @empty
         <li class="emsg-thread__empty">{{ $emptyText }}</li>

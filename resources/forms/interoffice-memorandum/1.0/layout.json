@@ -1,0 +1,61 @@
+{
+ "schema": "mbfd-overlay-layout",
+ "schema_version": "1.0",
+ "coordinate_origin": "top-left points",
+ "min_size": 6.5,
+ "fields": [
+  {
+   "key": "to",
+   "label": "To",
+   "page": 1,
+   "type": "text",
+   "x": 97,
+   "baseline": 129,
+   "width": 249,
+   "size": 11
+  },
+  {
+   "key": "date",
+   "label": "Date",
+   "page": 1,
+   "type": "text",
+   "x": 388,
+   "baseline": 129,
+   "width": 147,
+   "size": 11
+  },
+  {
+   "key": "from",
+   "label": "From",
+   "page": 1,
+   "type": "text",
+   "x": 109,
+   "baseline": 156,
+   "width": 237,
+   "size": 11
+  },
+  {
+   "key": "subject",
+   "label": "Subject",
+   "page": 1,
+   "type": "text",
+   "x": 126,
+   "baseline": 180,
+   "width": 408,
+   "size": 11
+  },
+  {
+   "key": "body",
+   "label": "Memorandum",
+   "page": 1,
+   "type": "box",
+   "x": 76,
+   "top": 200,
+   "width": 459,
+   "height": 484,
+   "size": 11,
+   "leading": 14.5,
+   "min_size": 11
+  }
+ ]
+}

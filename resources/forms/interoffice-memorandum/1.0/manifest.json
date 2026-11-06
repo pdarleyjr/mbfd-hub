@@ -1,0 +1,15 @@
+{
+  "form_key": "interoffice-memorandum",
+  "display_name": "Miami Beach Fire Department Interoffice Memorandum",
+  "template_sha256": "bee533c01be7ec26009660898a211902dcedafbaeaa6bd5970966c6b005e3aee",
+  "layout_sha256": "c386424686231f8109e828d0b26a778efd6fb0d25d57b49cc44fe191d9df92ef",
+  "expected_page_count": 1,
+  "expected_page_sizes": [
+    [
+      612,
+      792
+    ]
+  ],
+  "renderer_contract_version": "1.0",
+  "template_source": "Official City/MBFD PDF supplied 2026-11-05; unusable AcroForm widgets removed, page content unchanged."
+}

@@ -10,7 +10,10 @@
             </td>
             <td role="cell" class="roster-cell roster-cell--id">{{ $row['employeeId'] }}</td>
             <td role="cell" class="roster-cell roster-cell--member">
-                @if(! $row['isVacant'] && $row['employeeId'] !== '')
+                @if(! $row['isVacant'] && $row['employeeId'] !== '' && ($profileUrl = app(\App\Services\DailyRoster\RosterProfileLinks::class)->url($row['employeeId'])) !== null)
+                    {{-- Same look as the card button. A click opens the profile; Shift-click opens the roster card. --}}
+                    <a href="{{ $profileUrl }}" class="roster-member__name roster-member__name--link" style="width: fit-content" data-roster-member="{{ $row['employeeId'] }}" data-roster-profile title="Open profile. Shift-click for the roster card.">{{ $row['name'] }}</a>
+                @elseif(! $row['isVacant'] && $row['employeeId'] !== '')
                     <button type="button" class="roster-member__name roster-member__name--link" data-roster-member="{{ $row['employeeId'] }}" aria-haspopup="dialog">{{ $row['name'] }}</button>
                 @else
                     <span class="roster-member__name">{{ $row['name'] }}</span>

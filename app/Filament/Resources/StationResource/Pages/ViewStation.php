@@ -5,6 +5,7 @@ namespace App\Filament\Resources\StationResource\Pages;
 use App\Filament\Resources\StationResource;
 use App\Models\Station;
 use App\Services\StationStaffingService;
+use App\Support\Stations\StationCleaningAccess;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,12 @@ class ViewStation extends ViewRecord
     {
         return [
             Actions\EditAction::make(),
+            Actions\Action::make('editCleaningSchedule')
+                ->label('Edit cleaning schedule')
+                ->icon('heroicon-o-sparkles')
+                ->color('gray')
+                ->url(fn (): string => StationResource::getUrl('cleaning', ['record' => $this->getRecord()]))
+                ->visible(fn (): bool => StationCleaningAccess::canManage(auth()->user())),
         ];
     }
 

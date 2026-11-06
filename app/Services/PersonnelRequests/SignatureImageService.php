@@ -13,7 +13,7 @@ final class SignatureImageService
     /** @return array{disk: string, path: string, mime: string, sha256: string} */
     public function store(string $dataUrl, string $namespace = 'personnel-requests'): array
     {
-        if (! in_array($namespace, ['personnel-requests', 'training-rosters', 'take-home-inspections'], true)) {
+        if (! in_array($namespace, ['personnel-requests', 'training-rosters', 'take-home-inspections', 'accident-reports'], true)) {
             throw new \InvalidArgumentException('Unknown signature namespace.');
         }
         if (strlen($dataUrl) > 1_400_000) {

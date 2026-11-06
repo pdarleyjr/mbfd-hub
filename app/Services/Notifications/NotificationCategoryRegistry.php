@@ -72,6 +72,10 @@ final class NotificationCategoryRegistry
 
     public const EMS_SUPPLY_WITHDRAWALS = 'ems_supply_withdrawals';
 
+    public const ACCIDENT_REPORTS = 'accident_reports';
+
+    public const ACCIDENT_SUPERVISOR_REQUESTS = 'accident_supervisor_requests';
+
     /** @var array<string, NotificationCategory>|null */
     private ?array $categories = null;
 
@@ -410,6 +414,30 @@ final class NotificationCategoryRegistry
                 eligibility: static fn (EligibilityContext $c): ?string => app(EmployeeLogisticsMessagingAccess::class)->canViewLogisticsInbox($c->user)
                     ? 'support_services_inbox' : null,
                 candidates: $audience(['super_admin', EmployeeLogisticsMessagingAccess::LOGISTICS_ROLE], [EmployeeLogisticsMessagingAccess::PERMISSION_VIEW, EmployeeLogisticsMessagingAccess::PERMISSION_REPLY]),
+            ),
+            new NotificationCategory(
+                key: self::ACCIDENT_REPORTS,
+                label: 'Accident reports',
+                description: 'A vehicle accident report or a supervisor\'s report of accident was submitted. Alerts give the report type and reference only; details stay in the Hub. In-app alerts for these are always on.',
+                group: self::GROUP_ADMIN,
+                channels: $all,
+                locked: [$db],
+                significance: 'critical',
+                eligibility: static fn (EligibilityContext $c): ?string => \App\Support\Personnel\PersonnelAccess::canViewAccidents($c->user)
+                    ? 'accident_reports_access' : null,
+                candidates: $audience(['super_admin'], ['admin.access', 'personnel.accidents.view', 'personnel.accidents.manage']),
+            ),
+            new NotificationCategory(
+                key: self::ACCIDENT_SUPERVISOR_REQUESTS,
+                label: 'Accident reports to complete',
+                description: 'A driver chose you to complete the supervisor\'s part of a vehicle accident report.',
+                group: self::GROUP_OWN,
+                channels: $all,
+                locked: [$db],
+                significance: 'critical',
+                eligibility: static fn (EligibilityContext $c): ?string => \App\Support\Personnel\PersonnelAccess::canSupervise($c->user)
+                    ? 'accident_supervisor' : null,
+                candidates: null,
             ),
             new NotificationCategory(
                 key: self::EQUIPMENT_EXPIRATIONS,

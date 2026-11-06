@@ -28,6 +28,7 @@ class OperationalFormDocument extends Model
         ];
     }
 
+    /** @return BelongsTo<OperationalFormRecord, $this> */
     public function record(): BelongsTo
     {
         return $this->belongsTo(OperationalFormRecord::class, 'form_record_id');

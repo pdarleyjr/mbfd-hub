@@ -9,6 +9,8 @@ use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Filament\Support\EmployeeAccessSchema;
 use App\Jobs\IssueMemberOnboardingInvitation;
+use App\Livewire\Personnel\EmployeeProfileFieldsPanel;
+use App\Livewire\Personnel\EmployeeRecordsPanel;
 use App\Models\Employee;
 use App\Models\User;
 use Filament\Forms;
@@ -35,6 +37,15 @@ class EmployeeResource extends Resource
     protected static ?string $pluralModelLabel = 'Employees & Access';
 
     protected static ?int $navigationSort = 10;
+
+    /**
+     * The Personnel Directory is the one personnel list in navigation. Every page here keeps its URL: profiles open
+     * from the directory, and the onboarding list sits under the directory's Accounts menu.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public static function form(Form $form): Form
     {
@@ -79,6 +90,20 @@ class EmployeeResource extends Resource
                         ])
                         ->columns(2),
                     ...EmployeeAccessSchema::tabs(),
+                    // Loaded only when opened: nothing below runs while another tab is showing.
+                    Forms\Components\Tabs\Tab::make('Documents & records')
+                        ->visible(fn (?Employee $record): bool => $record instanceof Employee && $record->exists)
+                        ->schema([
+                            Forms\Components\Livewire::make(EmployeeRecordsPanel::class)->lazy()
+                                ->key(fn (?Employee $record): string => 'employee-records-'.($record?->getKey() ?? 'new')),
+                        ]),
+                    Forms\Components\Tabs\Tab::make('Additional details')
+                        ->visible(fn (?Employee $record): bool => $record instanceof Employee && $record->exists
+                            && EmployeeProfileFieldsPanel::hasFieldsFor(auth()->user()))
+                        ->schema([
+                            Forms\Components\Livewire::make(EmployeeProfileFieldsPanel::class)->lazy()
+                                ->key(fn (?Employee $record): string => 'employee-fields-'.($record?->getKey() ?? 'new')),
+                        ]),
                 ])->columnSpanFull(),
             ]);
     }

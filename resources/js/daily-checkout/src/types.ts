@@ -745,6 +745,8 @@ export interface StationRosterRow {
   from: string;
   through: string;
   hours: string;
+  /** The member's profile for a viewer who may open profiles; null or absent otherwise. */
+  profile_url?: string | null;
 }
 
 export interface StationRosterSection {
@@ -777,6 +779,30 @@ export interface StationOverview {
   requests: StationRequestSummary[];
   requests_total: number;
   alert: { active: boolean; units: StationOverviewUnit[] };
+  /** Today's cleaning for this station, from the department schedule an admin maintains. Absent from older servers. */
+  cleaning?: StationCleaningToday;
+}
+
+export interface StationCleaningEntry {
+  title: string;
+  /** One line per instruction. */
+  instructions: string[];
+  /** Set only for this date, replacing or adding to the usual weekday schedule. */
+  date_exception: boolean;
+  station_specific: boolean;
+}
+
+export interface StationCleaningToday {
+  /** Eastern calendar date, YYYY-MM-DD. */
+  date: string;
+  weekday: string;
+  date_label: string;
+  focus: StationCleaningEntry | null;
+  /** Why there is no focus today, when there is none. */
+  note: string | null;
+  extras: StationCleaningEntry[];
+  baseline: { title: string; instructions: string[] } | null;
+  source: string;
 }
 
 export type ApparatusServiceTicketStatus = 'submitted' | 'acknowledged' | 'scheduled' | 'in_progress' | 'waiting_for_parts' | 'completed' | 'cancelled';

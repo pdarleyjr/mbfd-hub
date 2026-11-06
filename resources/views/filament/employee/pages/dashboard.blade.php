@@ -36,6 +36,16 @@
                     <div><dt>Division</dt><dd>{{ $bidAssignment->division_label }}</dd></div>
                 @endif
                 <div><dt>A-Day</dt><dd>{{ $bidAssignment->a_day_label }}</dd></div>
+                <div><dt>Fuel PIN</dt><dd @class(['ep-fuel-pin' => $fuelPin !== null]) translate="no">{{ $fuelPin ?? 'Not on file' }}</dd></div>
+            </dl>
+        </section>
+    @else
+        <section class="ep-panel" aria-labelledby="my-details-heading">
+            <div class="ep-panel-header">
+                <h2 id="my-details-heading" class="ep-panel-title">My details</h2>
+            </div>
+            <dl class="ep-bid-details">
+                <div><dt>Fuel PIN</dt><dd @class(['ep-fuel-pin' => $fuelPin !== null]) translate="no">{{ $fuelPin ?? 'Not on file' }}</dd></div>
             </dl>
         </section>
     @endif
