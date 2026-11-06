@@ -24,7 +24,7 @@ import {
  */
 
 const BANNER = '#mbfd-pwa-banner';
-const BUSY_MESSAGE = 'An update is ready. It will apply when you finish.';
+const BUSY_MESSAGE = 'Update available. Finish or save your work before refreshing.';
 const RELEASE_A = 'aaaaaaaaaaaa';
 const RELEASE_B = 'bbbbbbbbbbbb';
 const NEW_CACHE = 'mbfd-checkout-v12';
@@ -408,7 +408,7 @@ test('a deploy while a draft has unsaved edits: banner, no reload, then exactly 
     await expect.poll(() => registrar(page).then((value) => value?.pending)).toBe(RELEASE_B);
     const banner = page.locator(BANNER);
     await expect(banner).toContainText(BUSY_MESSAGE);
-    const refresh = banner.getByRole('button', { name: 'Refresh now' });
+    const refresh = banner.getByRole('button', { name: 'Refresh app' });
     await expect(refresh).toHaveAttribute('aria-disabled', 'true');
     expect((await refresh.boundingBox())?.height ?? 0, 'touch target').toBeGreaterThanOrEqual(44);
 

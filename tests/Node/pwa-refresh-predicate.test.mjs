@@ -149,7 +149,7 @@ test('an action in ANOTHER component does not forget text typed elsewhere on the
   typeInto(typed, 'Half-written note in the page form');
 
   commit(['markRead'], [other]);
-  assert.equal(isUnsafeToRefresh(), true, 'a widget action must not make "Refresh now" discard the page form');
+  assert.equal(isUnsafeToRefresh(), true, 'a widget action must not make "Refresh app" discard the page form');
   clearFieldEdits();
 });
 

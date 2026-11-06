@@ -18,7 +18,7 @@ import { localPhpBinary } from './support/test-environment';
 const SENT = 'Narcotics check sent to Captain 5.';
 const RELEASE_A = 'aaaaaaaaaaaa';
 const RELEASE_B = 'bbbbbbbbbbbb';
-const BUSY_MESSAGE = 'An update is ready. It will apply when you finish.';
+const BUSY_MESSAGE = 'Update available. Finish or save your work before refreshing.';
 const BUSY_REASON = 'narcotics-check';
 const GPS_MARKER = 'MBFD-E2E-GPS-25.7907N-80.1300W';
 const SELF_REVIEW_MESSAGE = 'Another Captain 5 reviewer needs to review your own narcotics check.';
@@ -236,13 +236,13 @@ const armUnloadProbe = (page: Page) =>
 const unloadStarted = (page: Page): Promise<boolean> =>
   page.evaluate(() => Boolean((window as unknown as { __e2eUnloading?: boolean }).__e2eUnloading)).catch(() => true);
 
-/** A new release shows the banner; while a photo is held "Refresh now" is refused and nothing reloads. */
+/** A new release shows the banner; while a photo is held "Refresh app" is refused and nothing reloads. */
 async function expectRefreshHeld(page: Page, releases: ReleaseState): Promise<void> {
   releases.served = RELEASE_B;
   await checkNow(page);
   const banner = page.locator('#mbfd-pwa-banner');
   await expect(banner).toContainText(BUSY_MESSAGE);
-  const refresh = banner.getByRole('button', { name: 'Refresh now' });
+  const refresh = banner.getByRole('button', { name: 'Refresh app' });
   await expect(refresh).toHaveAttribute('aria-disabled', 'true');
   await armUnloadProbe(page);
   await refresh.click({ force: true });
@@ -515,7 +515,7 @@ test.describe.serial('Narcotics check', () => {
     });
   });
 
-  test('member: a failed upload keeps the photo and offers a retry; the held photo blocks Refresh now; one tap-pair sends one record; confirmation waits for the server', async ({ browser }, info) => {
+  test('member: a failed upload keeps the photo and offers a retry; the held photo blocks Refresh app; one tap-pair sends one record; confirmation waits for the server', async ({ browser }, info) => {
     const state = run(info);
     await as(browser, info, 'member', async ({ page }) => {
       const releases: ReleaseState = { served: RELEASE_A };
@@ -572,7 +572,7 @@ test.describe.serial('Narcotics check', () => {
       await expect(page.getByRole('heading', { name: SENT })).toHaveCount(0);
       await expect(sendButton(page)).toBeDisabled();
       expect(await busyReasons(page), 'sending is busy').toEqual([BUSY_REASON]);
-      await expect(page.locator('#mbfd-pwa-banner').getByRole('button', { name: 'Refresh now' })).toHaveAttribute('aria-disabled', 'true');
+      await expect(page.locator('#mbfd-pwa-banner').getByRole('button', { name: 'Refresh app' })).toHaveAttribute('aria-disabled', 'true');
 
       openGate();
       await expect(page.getByRole('heading', { name: SENT })).toBeVisible();
@@ -582,7 +582,7 @@ test.describe.serial('Narcotics check', () => {
 
       // 3. Saved: nothing is held, the banner works, and exactly one record exists.
       // The narcotics reason is released. (The whole Forms page also carries data-mbfd-unsaved-work-guard, because other
-      // Forms keep work in memory, so the banner's "Refresh now" stays held until the member leaves Forms. That page-level
+      // Forms keep work in memory, so the banner's "Refresh app" stays held until the member leaves Forms. That page-level
       // guard is older than this feature and is not asserted here.)
       await expect.poll(() => busyReasons(page)).toEqual([]);
       expect(attempts).toBe(2);
