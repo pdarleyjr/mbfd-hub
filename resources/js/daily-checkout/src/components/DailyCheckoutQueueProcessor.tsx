@@ -9,6 +9,7 @@ import {
   withDeadline,
 } from '../utils/dailyCheckoutSubmissionQueue';
 import { READ_TIMEOUT_MS } from '../utils/api';
+import { startPhotoUploadSync } from '../utils/photoUploadQueue';
 import { processPendingSubmissions } from '../lib/sync';
 import { db } from '../lib/db';
 import { OfflineIdentitySignInRequiredError, refreshOfflineIdentity } from '../lib/offlineIdentity';
@@ -37,6 +38,9 @@ const genericPendingCount = (): Promise<number> => db.pendingSubmissions
  * replays never navigate away from open work.
  */
 export default function DailyCheckoutQueueProcessor() {
+  // Photos are sent on their own (one at a time, with their own backoff), apart from the checkouts that name them.
+  useEffect(() => startPhotoUploadSync(), []);
+
   useEffect(() => {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;

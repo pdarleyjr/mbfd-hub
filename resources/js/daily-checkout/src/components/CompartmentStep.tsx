@@ -8,6 +8,8 @@ import ApparatusBlueprint from './ApparatusBlueprint';
 import InventoryCorrectionForm from './InventoryCorrectionForm';
 import { correctionLink, emptyCorrectionForm, markerForItem, questionFor, unlistedMarkers, type CorrectionForm, type InventoryCorrectionContext } from '../utils/inventoryCorrections';
 import { photoProblem } from '../utils/photoFile';
+import { discardQueuedPhoto, queuePhoto } from '../utils/photoUploadQueue';
+import QueuedPhotoPreview from './QueuedPhotoPreview';
 import type { LiveIssues } from '../utils/liveFindings';
 import FindingsSummary, { type SummaryEntry } from './findings/FindingsSummary';
 import IssueCard from './findings/IssueCard';
@@ -182,15 +184,17 @@ export default function CompartmentStep({ checklistType, usesVehicleId = true, c
 
   const resetPhotoInput = (itemId: string) => setPhotoResets(previous => ({ ...previous, [itemId]: (previous[itemId] ?? 0) + 1 }));
 
-  const removePhoto = (compartmentId: string, itemId: string) => {
-    update(compartmentId, itemId, { photo: undefined });
+  const removePhoto = (compartmentId: string, itemId: string, photoId?: string) => {
+    update(compartmentId, itemId, { photo: undefined, photo_id: undefined });
+    void discardQueuedPhoto(photoId);
     resetPhotoInput(itemId);
     setAnnouncement('Photo removed.');
     // The Remove button unmounts with the preview; keep keyboard focus on the photo picker.
     requestAnimationFrame(() => document.getElementById(`photo-${itemId}`)?.focus());
   };
 
-  const capturePhoto = (compartmentId: string, itemId: string, file?: File) => {
+  /** Shrunk on the phone, saved on this device and sent on its own; the item keeps only the photo's id. */
+  const capturePhoto = (compartmentId: string, itemId: string, file?: File, replacing?: string) => {
     if (!file) return;
     const problem = photoProblem(file);
     if (problem) {
@@ -199,10 +203,15 @@ export default function CompartmentStep({ checklistType, usesVehicleId = true, c
       return;
     }
     setPhotoError(null);
-    const reader = new FileReader();
-    reader.onload = () => update(compartmentId, itemId, { photo: String(reader.result) });
-    reader.onerror = () => setPhotoError('The image could not be read. Choose it again.');
-    reader.readAsDataURL(file);
+    setAnnouncement('Preparing photo…');
+    queuePhoto(file).then((photoId) => {
+      update(compartmentId, itemId, { photo: undefined, photo_id: photoId });
+      void discardQueuedPhoto(replacing);
+      setAnnouncement('Photo saved. It is sent in the background.');
+    }).catch((error: unknown) => {
+      setPhotoError(error instanceof Error ? error.message : 'The image could not be read. Choose it again.');
+      resetPhotoInput(itemId);
+    });
   };
 
   const unlistedPending = inventory && current ? unlistedMarkers(inventory.markers, current.id) : { pending: 0, question: false };
@@ -331,11 +340,9 @@ export default function CompartmentStep({ checklistType, usesVehicleId = true, c
               <textarea id={`note-${item.id}`} rows={2} value={item.notes ?? ''} onChange={event => update(current.id, item.id, { notes: event.target.value })} maxLength={2000} />
               <label htmlFor={`photo-${item.id}`}>Photo (optional)</label>
               {/* No forced capture: phones offer the camera or the photo library. The key resets the picker after a change. */}
-              <input key={`photo-${item.id}-${photoResets[item.id] ?? 0}`} id={`photo-${item.id}`} type="file" accept="image/*" onChange={event => capturePhoto(current.id, item.id, event.target.files?.[0])} />
-              {item.photo && <div className="inspection-photo-preview">
-                <img src={item.photo} alt={`Photo of ${item.name}`} className="inspection-photo" />
-                <button type="button" className="hub-btn hub-btn--destructive" aria-label={`Remove photo of ${item.name}`} onClick={() => removePhoto(current.id, item.id)}>Remove photo</button>
-              </div>}
+              <input key={`photo-${item.id}-${photoResets[item.id] ?? 0}`} id={`photo-${item.id}`} type="file" accept="image/*,.heic,.heif" onChange={event => capturePhoto(current.id, item.id, event.target.files?.[0], item.photo_id)} />
+              {(item.photo_id || item.photo) && <QueuedPhotoPreview photoId={item.photo_id} legacySrc={item.photo_id ? undefined : item.photo}
+                alt={`Photo of ${item.name}`} removeLabel={`Remove photo of ${item.name}`} onRemove={() => removePhoto(current.id, item.id, item.photo_id)} />}
               {inventory && <InventoryCorrectionForm mode="item" fieldId={`ic-${current.id}-${item.id}`} compartment={current} compartments={compartments} item={item}
                 form={correctionFormFor(correctionKey, item.expectedQuantity)} onForm={patchCorrectionForm(correctionKey, item.expectedQuantity)} context={inventory} />}
             </div>}

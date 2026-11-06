@@ -33,6 +33,8 @@ final class TakeHomeInspectionFileController extends Controller
             'photo' => ['required', 'file', 'max:'.TakeHomeInspectionPhotoStore::MAX_UPLOAD_KB],
             'angle' => ['required', Rule::in($angles)],
             'check_key' => ['nullable', 'required_if:angle,issue', Rule::in(array_keys(TakeHomeVehicleInspection::CHECKS))],
+            // The phone's id for this photo: a retry with the same id never stores a second copy.
+            'client_photo_id' => ['nullable', 'uuid'],
         ], [
             'photo.required' => 'Choose or take a photo first.',
             'photo.max' => 'That photo is larger than 30 MB. Take it again with the camera button.',
@@ -41,7 +43,8 @@ final class TakeHomeInspectionFileController extends Controller
 
         /** @var User $user */
         $user = $request->user();
-        $photo = $store->store($request->file('photo'), $user, $data['angle'], $data['check_key'] ?? null);
+        $clientPhotoId = isset($data['client_photo_id']) ? strtolower((string) $data['client_photo_id']) : null;
+        ['photo' => $photo, 'created' => $created] = $store->store($request->file('photo'), $user, $data['angle'], $data['check_key'] ?? null, $clientPhotoId);
 
         return response()->json([
             'uuid' => $photo->uuid,
@@ -50,7 +53,8 @@ final class TakeHomeInspectionFileController extends Controller
             'height' => $photo->height,
             'angle' => $photo->angle,
             'check_key' => $photo->check_key,
-        ], 201, ['Cache-Control' => 'private, no-store']);
+            'processing' => $photo->isPendingConversion(),
+        ], $created ? 201 : 200, ['Cache-Control' => 'private, no-store']);
     }
 
     public function photo(Request $request, TakeHomeVehicleInspectionPhoto $photo): Response

@@ -2,9 +2,11 @@
  * Take Home Vehicle Inspection form (vanilla JS, phone first).
  *
  * - Four steps with per-step validation; the server stays authoritative.
- * - Photos are resized on the device (JPEG, max 2400px) and uploaded one at a
- *   time with progress and Retry. If the browser cannot decode the file (for
- *   example HEIC in Chrome) the original is sent and the server converts it.
+ * - Photos are resized on the device (JPEG, long edge 2048 px, no metadata) and
+ *   uploaded one at a time with progress, a 90 s deadline and automatic retries.
+ *   Each photo keeps one id for every attempt, so a retry never stores a second
+ *   copy. If the browser cannot decode the file (for example HEIC in Chrome)
+ *   the original is sent and the server converts it in the background.
  * - Answers, chosen vehicle/driver and uploaded photo IDs are saved on this
  *   device so an interruption or refresh never loses work. The signature is
  *   never stored locally.
@@ -12,6 +14,8 @@
  */
 
 import { ServerClock } from './shared/server-clock.ts';
+import { preparePhoto as shrinkPhoto } from './shared/photo-compression.ts';
+import { firstErrorMessage, isRetryablePhotoStatus, photoRetryDelayMs, sendPhoto } from './shared/photo-upload.ts';
 
 const form = document.getElementById('thvi-form');
 
@@ -25,7 +29,8 @@ function initTakeHomeInspection(form) {
     const DRAFT_KEY = `thvi-draft:${config.userKey}`;
     const RECENT_KEY = `thvi-recent:${config.userKey}`;
     const DRAFT_MAX_AGE_MS = 72 * 3600 * 1000;
-    const MAX_EDGE = 2400;
+    /** Automatic attempts per photo before the member is asked to tap Retry. */
+    const AUTO_ATTEMPTS = 4;
     const STEP_COUNT = 4;
 
     const $ = (selector, root = form) => root.querySelector(selector);
@@ -106,8 +111,12 @@ function initTakeHomeInspection(form) {
 
     const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    /** Photo URLs are always rebuilt from the server route template and a validated id. */
+    /**
+     * A photo taken in this visit shows the copy already on the phone (no download).
+     * Otherwise the URL is rebuilt from the server route template and a validated id.
+     */
     function photoSrc(photo) {
+        if (photo?.localUrl) return photo.localUrl;
         return photo && UUID_PATTERN.test(String(photo.uuid)) ? config.urls.photo.replace('__UUID__', photo.uuid) : '';
     }
 
@@ -731,8 +740,8 @@ function initTakeHomeInspection(form) {
         status.textContent = 'Preparing photo…';
         try {
             const prepared = await preparePhoto(file);
-            const result = await uploadPhoto(prepared, 'issue', key, (percent) => { status.textContent = `Uploading ${percent}%`; });
-            state.issuePhotos[key].push({ uuid: result.uuid });
+            const result = await uploadPhoto(prepared, 'issue', key, (percent) => { status.textContent = `Uploading ${percent}%`; }, (message) => { status.textContent = message; });
+            state.issuePhotos[key].push({ uuid: result.uuid, localUrl: prepared.localUrl });
             status.className = 'thvi-photo__status is-ok';
             status.textContent = 'Issue photo uploaded.';
             renderCheck(key);
@@ -832,8 +841,8 @@ function initTakeHomeInspection(form) {
         const previous = state.photos[key];
         delete state.photos[key];
         try {
+            // A retry sends the same prepared photo with the same id, so the server keeps one copy.
             const prepared = isRetry && file.prepared ? file : await preparePhoto(file);
-            prepared.prepared = true;
             pendingFiles.set(key, prepared);
             renderPhoto(key, true);
             bar.hidden = false;
@@ -841,8 +850,8 @@ function initTakeHomeInspection(form) {
             const result = await uploadPhoto(prepared, key, null, (percent) => {
                 status.textContent = `Uploading ${percent}%`;
                 bar.firstElementChild.style.width = `${percent}%`;
-            });
-            state.photos[key] = { uuid: result.uuid };
+            }, (message) => { status.textContent = message; });
+            state.photos[key] = { uuid: result.uuid, localUrl: prepared.localUrl };
             pendingFiles.delete(key);
             photoSlots[key].busy = false;
             renderPhoto(key);
@@ -860,70 +869,61 @@ function initTakeHomeInspection(form) {
         }
     }
 
-    /** Resize on the device; fall back to the original file when it cannot be decoded here. */
+    /**
+     * Shrink on the device (falls back to the original when it cannot be decoded here) and
+     * give the photo its id, kept for every attempt so the server never stores it twice.
+     */
     async function preparePhoto(file) {
-        const name = (file.name || 'photo').replace(/\.[^.]+$/, '');
-        try {
-            const image = await loadImage(file);
-            const width = image.naturalWidth;
-            const height = image.naturalHeight;
-            if (!width || !height) throw new Error('decode');
-            const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.round(width * scale);
-            canvas.height = Math.round(height * scale);
-            const context = canvas.getContext('2d');
-            context.fillStyle = '#ffffff';
-            context.fillRect(0, 0, canvas.width, canvas.height);
-            context.drawImage(image, 0, 0, canvas.width, canvas.height);
-            URL.revokeObjectURL(image.src);
-            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-            if (!blob) throw new Error('encode');
-            return { blob, filename: `${name}.jpg` };
-        } catch {
-            return { blob: file, filename: file.name || 'photo' };
-        }
+        const prepared = await shrinkPhoto(file);
+        return { ...prepared, clientPhotoId: uuid(), localUrl: URL.createObjectURL(prepared.blob), prepared: true };
     }
 
-    function loadImage(file) {
-        return new Promise((resolve, reject) => {
-            const image = new Image();
-            image.decoding = 'async';
-            image.onload = () => resolve(image);
-            image.onerror = () => { URL.revokeObjectURL(image.src); reject(new Error('decode')); };
-            image.src = URL.createObjectURL(file);
-        });
+    // One upload at a time: on a weak signal, parallel uploads only make each one slower.
+    let uploadLane = Promise.resolve();
+
+    function uploadPhoto(prepared, angle, checkKey, onProgress, onStatus) {
+        const run = uploadLane.then(() => uploadWithRetries(prepared, angle, checkKey, onProgress, onStatus));
+        uploadLane = run.catch(() => undefined);
+        return run;
     }
 
-    function uploadPhoto(prepared, angle, checkKey, onProgress) {
-        return new Promise((resolve, reject) => {
+    function waitForSignal(onStatus) {
+        if (navigator.onLine !== false) return Promise.resolve();
+        onStatus('No signal. The photo will upload when you are back online.');
+        return new Promise((resolve) => window.addEventListener('online', () => resolve(), { once: true }));
+    }
+
+    function pause(attempt, retryAfter, onStatus) {
+        const delay = photoRetryDelayMs(attempt, retryAfter);
+        onStatus(`Weak connection. Trying again in ${Math.round(delay / 1000)} s…`);
+        return new Promise((resolve) => window.setTimeout(resolve, delay));
+    }
+
+    async function uploadWithRetries(prepared, angle, checkKey, onProgress, onStatus) {
+        for (let attempt = 0; ; attempt++) {
+            await waitForSignal(onStatus);
             const data = new FormData();
             data.append('photo', prepared.blob, prepared.filename);
             data.append('angle', angle === 'issue' ? 'issue' : angle);
+            data.append('client_photo_id', prepared.clientPhotoId);
             if (checkKey) data.append('check_key', checkKey);
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', config.urls.photos);
-            xhr.setRequestHeader('X-CSRF-TOKEN', csrf);
-            xhr.setRequestHeader('Accept', 'application/json');
-            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-            xhr.timeout = 180000;
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
-            };
-            xhr.onload = () => {
-                let json = {};
-                try { json = JSON.parse(xhr.responseText || '{}'); } catch { json = {}; }
-                if (xhr.status === 201) { onProgress(100); resolve(json); return; }
-                if (xhr.status === 422) { reject(new Error(firstError(json) || 'That photo could not be used. Take it again.')); return; }
-                if (xhr.status === 413) { reject(new Error('That photo is too large. Use Take photo instead.')); return; }
-                if (xhr.status === 401 || xhr.status === 419) { reject(new Error('Your session expired. Reload the page; your answers are saved.')); return; }
-                if (xhr.status === 429) { reject(new Error('Too many uploads at once. Wait a moment, then tap Retry.')); return; }
-                reject(new Error('Upload failed. Tap Retry.'));
-            };
-            xhr.onerror = () => reject(new Error('Upload failed: no connection. Tap Retry when you have signal.'));
-            xhr.ontimeout = () => reject(new Error('Upload timed out. Tap Retry.'));
-            xhr.send(data);
-        });
+            const last = attempt + 1 >= AUTO_ATTEMPTS;
+            let response;
+            try {
+                response = await sendPhoto(config.urls.photos, data, { headers: { 'X-CSRF-TOKEN': csrf }, onProgress });
+            } catch (error) {
+                if (!last) { await pause(attempt, undefined, onStatus); continue; }
+                throw new Error(error?.kind === 'timeout' ? 'Upload timed out. Tap Retry.' : 'Upload failed: no connection. Tap Retry when you have signal.');
+            }
+            const { status, json } = response;
+            if (status === 200 || status === 201) return json;
+            if (status === 422) throw new Error(firstErrorMessage(json) || 'That photo could not be used. Take it again.');
+            if (status === 413) throw new Error('That photo is too large. Use Take photo instead.');
+            if (status === 401 || status === 419) throw new Error('Your session expired. Reload the page; your answers are saved.');
+            if (status === 409) throw new Error('That photo could not be matched. Take or choose it again.');
+            if (isRetryablePhotoStatus(status) && !last) { await pause(attempt, response.retryAfterMs, onStatus); continue; }
+            throw new Error(status === 429 ? 'Too many uploads at once. Wait a moment, then tap Retry.' : 'Upload failed. Tap Retry.');
+        }
     }
 
     // ---------- step 4: final answers ----------

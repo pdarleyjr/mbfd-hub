@@ -94,6 +94,12 @@ class DefectResource extends Resource
                     ->directory('defects')
                     ->image()
                     ->imageEditor()
+                    // Shrunk in the browser before upload, like the member apps (long edge 2048 px).
+                    ->imageResizeMode('contain')
+                    ->imageResizeTargetWidth('2048')
+                    ->imageResizeTargetHeight('2048')
+                    ->imageResizeUpscale(false)
+                    ->maxSize(25600)
                     ->columnSpanFull(),
 
                 // The lifecycle is changed only by the corrective-action workflow (the inspection page

@@ -151,7 +151,8 @@ jobs:
           docker exec "$RUNTIME_CONTAINER" supervisord --version
           for _ in $(seq 1 10); do
             status="$(docker exec "$RUNTIME_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status || true)"
-            if printf '%s\n' "$status" | grep -Eq '^php +RUNNING ' \
+            if printf '%s\n' "$status" | grep -Eq '^php-fpm +RUNNING ' \
+              && printf '%s\n' "$status" | grep -Eq '^nginx +RUNNING ' \
               && printf '%s\n' "$status" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING ' \
               && printf '%s\n' "$status" | grep -Eq '^reverb +RUNNING ' \
               && printf '%s\n' "$status" | grep -Eq '^scheduler +RUNNING '; then
@@ -160,7 +161,8 @@ jobs:
             sleep 1
           done
           printf '%s\n' "$status"
-          printf '%s\n' "$status" | grep -Eq '^php +RUNNING '
+          printf '%s\n' "$status" | grep -Eq '^php-fpm +RUNNING '
+          printf '%s\n' "$status" | grep -Eq '^nginx +RUNNING '
           printf '%s\n' "$status" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING '
           printf '%s\n' "$status" | grep -Eq '^reverb +RUNNING '
           printf '%s\n' "$status" | grep -Eq '^scheduler +RUNNING '
@@ -171,6 +173,15 @@ jobs:
           test -z "$(docker port "$RUNTIME_CONTAINER")"
           test "$(docker exec "$RUNTIME_CONTAINER" curl --silent --show-error --max-time 10 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' http://localhost:8081/daily/stations/6)" = '302'
           test "$(docker exec "$RUNTIME_CONTAINER" curl --silent --show-error --max-time 10 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' http://localhost:8081/api/public/stations)" = '302'
+          # Web tier: nginx -> php-fpm, hashed assets long-cached, service worker revalidated, bodies over 100 MB refused.
+          test "$(docker exec "$RUNTIME_CONTAINER" curl --silent --show-error --max-time 10 http://127.0.0.1:8081/fpm-ping)" = 'pong'
+          ASSET_PATH="$(docker exec "$RUNTIME_CONTAINER" sh -c 'cd /var/www/html/public && ls build/assets/*.js | head -n 1')"
+          test -n "$ASSET_PATH"
+          docker exec "$RUNTIME_CONTAINER" curl --silent --show-error --max-time 10 --head "http://localhost:8081/$ASSET_PATH" \
+            | grep -Fi 'Cache-Control: public, max-age=31536000, immutable'
+          docker exec "$RUNTIME_CONTAINER" curl --silent --show-error --max-time 10 --head http://localhost:8081/sw.js \
+            | grep -Fi 'Cache-Control: no-cache, must-revalidate'
+          test "$(docker exec "$RUNTIME_CONTAINER" curl --silent --max-time 10 --output /dev/null --write-out '%{http_code}' --request POST --header 'Content-Length: 104857601' http://localhost:8081/up)" = '413'
           sleep 5
           docker exec "$RUNTIME_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status
 

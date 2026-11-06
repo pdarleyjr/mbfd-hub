@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { readFileSync } from 'node:fs';
 import { readDrafts, replaceDrafts } from './support/daily-checkout-drafts';
+import { PHOTO_UPLOAD_PATH, photoUploadAnswer, previewDigest, readQueuedPhotos, uploadedPhotoId } from './support/daily-checkout-photos';
 import { resolveBlueprint } from '../../resources/js/daily-checkout/src/data/apparatusBlueprints';
 import type { InspectionSubmission, InspectionRevision, ChecklistData, OpenFinding } from '../../resources/js/daily-checkout/src/types';
 
@@ -41,6 +42,7 @@ async function fixture(page: Page, options: { checklist?: typeof sourceChecklist
   if (checklist.schema_version === 2) await page.clock.setFixedTime(new Date(`${inspectionDate}T13:00:00Z`));
   const submissions: InspectionSubmission[] = [];
   const revisions: Array<{ reason: string; value?: number }> = [];
+  const photoUploads: string[] = [];
   let userId = 401;
   await page.route('**/images/mbfd-official-seal-256.png', route => route.fulfill({ path: 'public/images/mbfd-official-seal-256.png' }));
   await page.route('**/images/icons/checkout-apparatus.svg', route => route.fulfill({ path: 'public/images/icons/checkout-apparatus.svg', contentType: 'image/svg+xml' }));
@@ -65,6 +67,11 @@ async function fixture(page: Page, options: { checklist?: typeof sourceChecklist
       submissions.push(route.request().postDataJSON());
       return route.fulfill({ status: 201, json: { success: true, review_status: 'approved' } });
     }
+    if (path === PHOTO_UPLOAD_PATH && route.request().method() === 'POST') {
+      const photoId = uploadedPhotoId(route.request());
+      photoUploads.push(photoId);
+      return route.fulfill(photoUploadAnswer(photoId));
+    }
     if (path === '/api/public/inspection-revisions') return route.fulfill({ json: { data: userId === 401 ? options.revisions ?? [] : [] } });
     if (path === '/api/public/inspection-exceptions/701/revision') {
       revisions.push(route.request().postDataJSON());
@@ -76,7 +83,7 @@ async function fixture(page: Page, options: { checklist?: typeof sourceChecklist
   });
   await page.goto(`/daily/vehicle-inspections/${vehicle.slug}`);
   await expect(page.getByRole('heading', { name: vehicle.name, exact: true })).toBeVisible();
-  return { submissions, revisions, setUserId: (id: number) => { userId = id; } };
+  return { submissions, revisions, photoUploads, setUserId: (id: number) => { userId = id; } };
 }
 
 async function showAreaPicker(page: Page) {
@@ -339,35 +346,34 @@ test('multiple large photos persist in IndexedDB and restore exactly without loc
   expect(buffer.length).toBeGreaterThan(3_000_000);
   expect(buffer.length).toBeLessThan(5_000_000);
   const rows = page.locator('.equipment-row');
+  const digests: string[] = [];
   for (const index of [0, 1]) {
     await rows.nth(index).locator('.equipment-expand').click();
     await rows.nth(index).getByLabel('Photo (optional)').setInputFiles({ name: `evidence-${index}.png`, mimeType: 'image/png', buffer });
-    await expect(rows.nth(index).locator('img')).toHaveAttribute('src', photo);
+    // The preview shows the copy saved on this device (IndexedDB photoUploads), never an inline data URL.
+    digests.push(await previewDigest(rows.nth(index).locator('img')));
   }
-  await expect.poll(() => page.evaluate(async () => {
-    const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('mbfd-daily-checkout');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    if (!database.objectStoreNames.contains('dailyCheckoutDrafts')) {
-      database.close();
-      return 0;
-    }
-    const drafts = await new Promise<Array<{ data: { compartments: Array<{ items: Array<{ photo?: string }> }> } }>>((resolve, reject) => {
-      const request = database.transaction('dailyCheckoutDrafts').objectStore('dailyCheckoutDrafts').getAll();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    database.close();
-    return drafts.flatMap(draft => draft.data.compartments.flatMap(area => area.items)).filter(item => item.photo).length;
-  })).toBe(2);
+  // The draft names each photo by id only; the bytes are kept once, in the device's photo store.
+  const draftPhotoIds = async () => (await readDrafts(page)).flatMap(draft => draft.data.compartments.flatMap(area => area.items))
+    .flatMap(item => (item.photo ? ['inline'] : []).concat(item.photo_id ? [item.photo_id] : []));
+  await expect.poll(async () => (await draftPhotoIds()).length).toBe(2);
+  const photoIds = await draftPhotoIds();
+  expect(photoIds).not.toContain('inline');
+  const stored = await readQueuedPhotos(page);
+  expect(stored.map(record => record.id).sort()).toEqual([...photoIds].sort());
+  for (const record of stored) {
+    expect(record.ownerUserId).toBe(401);
+    expect(record.bytes).toBeGreaterThan(0);
+    expect(record.bytes).toBeLessThan(buffer.length);
+  }
+  // Each photo is sent once, on its own request.
+  await expect.poll(() => [...api.photoUploads].sort()).toEqual([...photoIds].sort());
   expect(await page.evaluate(() => Object.values(localStorage).some(value => value.includes('data:image/')))).toBe(false);
   await page.reload();
   await expect(page.getByText(/Restored from autosave/)).toBeVisible();
   for (const index of [0, 1]) {
     await rows.nth(index).locator('.equipment-expand').click();
-    await expect(rows.nth(index).locator('img')).toHaveAttribute('src', photo);
+    expect(await previewDigest(rows.nth(index).locator('img'))).toBe(digests[index]);
   }
   api.setUserId(402);
   await page.reload();
@@ -377,7 +383,8 @@ test('multiple large photos persist in IndexedDB and restore exactly without loc
   api.setUserId(401);
   await page.reload();
   await rows.first().locator('.equipment-expand').click();
-  await expect(rows.first().locator('img')).toHaveAttribute('src', photo);
+  expect(await previewDigest(rows.first().locator('img'))).toBe(digests[0]);
+  expect(api.photoUploads).toHaveLength(2);
 });
 
 test('legacy draft migration removes only its source after durable storage', async ({ page }) => {

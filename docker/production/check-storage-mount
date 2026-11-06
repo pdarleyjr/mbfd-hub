@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+#
+# Fail closed when storage/app should come from another disk but does not.
+#
+# compose.prod.image.yaml sets HUB_STORAGE_APP_SENTINEL_REQUIRED=1 only when
+# HUB_STORAGE_APP_PATH is set (storage/app on the /mnt/mbfd-storage array). The
+# bind mount refuses a missing source, but an unmounted array still leaves its
+# empty mountpoint directory on the root disk, and the container would start
+# with no photos and write new uploads to the wrong disk. The runbook
+# (docs/ops/storage-on-mbfd-storage.md) puts .mbfd-storage-sentinel at the top of
+# the real storage/app; without it nothing starts. Unset: no check (unchanged).
+#
+# Called by start-production-container and by deploy.yml before activation.
+
+set -euo pipefail
+
+STORAGE_SENTINEL=/var/www/html/storage/app/.mbfd-storage-sentinel
+
+if [ "${HUB_STORAGE_APP_SENTINEL_REQUIRED:-}" = '1' ] && [ ! -f "$STORAGE_SENTINEL" ]; then
+    echo "storage/app comes from HUB_STORAGE_APP_PATH but $STORAGE_SENTINEL is missing: the storage array is not mounted (or not the right directory). Refusing to start." >&2
+    exit 1
+fi
