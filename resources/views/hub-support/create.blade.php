@@ -22,7 +22,7 @@
                 @error('description') <p id="description-error" role="alert" class="text-sm text-hub-danger">{{ $message }}</p> @enderror
             </div>
             <div>
-                <label for="attachments" class="block font-semibold">Add screenshot or file <span class="font-normal text-hub-ink-secondary">(optional)</span></label>
+                <label for="attachments" class="font-semibold">+ Add screenshot or file</label> <span class="text-sm text-hub-ink-secondary">(optional)</span>
                 <input id="attachments" type="file" name="attachments[]" accept="image/png,image/jpeg,application/pdf" multiple @if($errors->has('attachments') || $errors->has('attachments.*')) aria-invalid="true" aria-describedby="attachments-errors" @endif class="mt-2 block w-full text-sm text-hub-ink-secondary file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-lg file:border file:border-solid file:border-hub-border-strong file:bg-white file:px-4 file:text-sm file:font-semibold file:text-hub-ink hover:file:bg-hub-surface-muted">
                 <div id="attachments-errors">
                     @error('attachments') <p role="alert" class="text-sm text-hub-danger">{{ $message }}</p> @enderror
