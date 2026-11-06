@@ -1238,11 +1238,12 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 }
 
 /* Feedback Quotes */
+/* A quoted comment is a white well inside the section's glass, edged evenly (no side stripe). */
 .wg-feedback-quote {
     padding: 0.875rem 1rem;
-    border-left: 3px solid rgb(var(--hub-border-strong));
-    background-color: rgb(var(--hub-surface-muted));
-    border-radius: 0 0.5rem 0.5rem 0;
+    border: 1px solid rgb(var(--hub-border));
+    background-color: rgb(var(--hub-well));
+    border-radius: var(--hub-radius-control);
     margin-bottom: 0.75rem;
 }
 

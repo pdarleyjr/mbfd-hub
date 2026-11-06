@@ -3,12 +3,20 @@
         $member = method_exists($this, 'getCurrentMember') ? $this->getCurrentMember() : null;
         $workgroups = method_exists($this, 'getAvailableWorkgroups') ? $this->getAvailableWorkgroups() : collect();
         $sessions = $member ? $this->getAccessibleSessions($member) : collect();
-        $stats = $this->getWorkgroupStats();
+        $stats = collect($this->getWorkgroupStats());
+        // Names (workgroup, session) read as context; only the counts form the readout strip.
+        [$counts, $context] = $stats->partition(fn ($stat): bool => is_numeric($stat->getValue()));
+        $toneClass = fn ($stat): string => match ($stat->getColor()) {
+            'success' => 'hub-tag--success',
+            'warning' => 'hub-tag--warning',
+            'danger' => 'hub-tag--danger',
+            default => '',
+        };
     @endphp
 
     @if($workgroups->count() > 1)
         <div class="wg-context-switcher" role="group" aria-label="Select workgroup">
-            <span class="hub-portal-eyebrow">Workgroup</span>
+            <span class="wg-switcher-label">Workgroup</span>
             @foreach($workgroups as $workgroup)
                 <button
                     type="button"
@@ -26,7 +34,7 @@
 
     @if($sessions->count() > 1)
         <div class="wg-context-switcher" role="group" aria-label="Select evaluation session">
-            <span class="hub-portal-eyebrow">Session</span>
+            <span class="wg-switcher-label">Session</span>
             @foreach($sessions as $session)
                 <button
                     type="button"
@@ -44,49 +52,34 @@
                 </button>
             @endforeach
         </div>
-    @elseif($sessions->count() === 1)
-        <div class="hub-portal-actions">
-            <x-heroicon-o-calendar class="h-5 w-5 text-primary-600" />
-            <span class="text-sm font-semibold">{{ $sessions->first()->name }}</span>
-            @if($sessions->first()->status === 'active')<span class="hub-tag hub-tag--success">Active session</span>@endif
-        </div>
     @endif
 
-    <dl class="wg-overview-stats" aria-label="Workgroup summary">
-        @foreach($stats as $stat)
-            <div class="wg-overview-stat">
-                <dt class="text-sm font-medium text-gray-600">
-                    @if($stat->getDescriptionIcon())
-                        <x-dynamic-component :component="$stat->getDescriptionIcon()" class="wg-overview-stat-icon text-primary-600" />
-                    @endif
-                    {{ $stat->getLabel() }}
-                </dt>
-                <dd @class([
-                    'mt-1 text-2xl font-semibold',
-                    'text-green-700' => $stat->getColor() === 'success',
-                    'text-amber-700' => $stat->getColor() === 'warning',
-                    'text-red-700' => $stat->getColor() === 'danger',
-                    'text-primary-700' => in_array($stat->getColor(), ['primary', 'info'], true),
-                    'text-gray-900' => !in_array($stat->getColor(), ['success', 'warning', 'danger', 'primary', 'info'], true),
-                ])>{{ $stat->getValue() }}
-                    @if($stat->getDescription())<p class="mt-1 text-xs font-normal text-gray-600">{{ $stat->getDescription() }}</p>@endif
-                </dd>
-            </div>
-        @endforeach
-    </dl>
+    @if($context->isNotEmpty())
+        <dl class="wg-context" aria-label="Current workgroup">
+            @foreach($context as $stat)
+                <div class="wg-context__item">
+                    <dt>{{ $stat->getLabel() }}</dt>
+                    <dd>
+                        <span class="wg-context__value">{{ $stat->getValue() }}</span>
+                        @if($stat->getDescription())<span class="hub-tag {{ $toneClass($stat) }}">{{ ucfirst((string) $stat->getDescription()) }}</span>@endif
+                    </dd>
+                </div>
+            @endforeach
+        </dl>
+    @endif
 
-    <section aria-labelledby="workgroup-workspace-heading">
-        <h2 id="workgroup-workspace-heading" class="hub-portal-section-title">Workgroup workspace</h2>
-        <div class="wg-workspace-nav">
-            <a href="{{ \App\Filament\Workgroup\Pages\Evaluations::getUrl() }}" class="wg-workspace-primary">
-                <x-heroicon-o-clipboard-document-check />
-                <div><span class="font-semibold">Continue evaluations</span><small>Review candidate products and record your findings.</small></div>
-                <x-heroicon-o-arrow-right class="ml-auto" />
-            </a>
-            <nav class="wg-workspace-resources" aria-label="Shared workgroup resources">
-                <a href="{{ \App\Filament\Workgroup\Pages\Files::getUrl() }}"><x-heroicon-o-document-duplicate /><span>Files</span><small>Session materials</small></a>
-                @if(\App\Filament\Workgroup\Pages\Notes::canAccess())<a href="{{ \App\Filament\Workgroup\Pages\Notes::getUrl() }}"><x-heroicon-o-pencil-square /><span>Notes</span><small>Personal and shared</small></a>@endif
-            </nav>
-        </div>
-    </section>
+    @if($counts->isNotEmpty())
+        <dl class="wg-overview-stats wg-overview-stats--counts" aria-label="Workgroup summary">
+            @foreach($counts as $stat)
+                <div class="wg-overview-stat">
+                    <dt class="wg-overview-stat__label">{{ $stat->getLabel() }}</dt>
+                    <dd @class([
+                        'wg-overview-stat__value',
+                        'wg-overview-stat__value--warning' => $stat->getColor() === 'warning' && (int) $stat->getValue() > 0,
+                    ])>{{ $stat->getValue() }}</dd>
+                    @if($stat->getDescription())<dd class="wg-overview-stat__note">{{ $stat->getDescription() }}</dd>@endif
+                </div>
+            @endforeach
+        </dl>
+    @endif
 </x-filament-panels::page>
