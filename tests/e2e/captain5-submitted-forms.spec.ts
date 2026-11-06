@@ -411,7 +411,7 @@ test.describe('active forms', () => {
     await page.getByTestId('ems-select-all-ready').click();
     await expect(page.getByTestId('ems-selection-count')).toHaveText('2 forms selected');
     await expect(page.getByRole('button', { name: 'Reconcile with Supply Room Inventory' })).toBeVisible();
-    await page.getByRole('button', { name: 'Clear', exact: true }).click();
+    await page.getByRole('button', { name: 'Unselect all', exact: true }).click();
     await expect(page.getByTestId('ems-selection-bar')).toHaveCount(0);
   });
 });

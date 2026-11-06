@@ -45,6 +45,29 @@ final class TakeHomeInspectionAccess
         return (int) $inspection->inspector_user_id === (int) $user->getKey() || self::canViewAll($user);
     }
 
+    /**
+     * Only the member who submitted an inspection may correct it, and only while
+     * Fleet has not cleared it. There is no time limit.
+     */
+    public static function canEdit(?User $user, TakeHomeVehicleInspection $inspection): bool
+    {
+        if (! $user instanceof User || ! $user->isAuthenticationAllowed()) {
+            return false;
+        }
+
+        return (int) $inspection->inspector_user_id === (int) $user->getKey() && ! $inspection->isArchived();
+    }
+
+    /**
+     * Clearing (archiving) a handled inspection and restoring it belong to the people
+     * who review every inspection: the Fleet viewers above. Captain 5 has no access to
+     * take-home inspections, so is not included.
+     */
+    public static function canClear(?User $user): bool
+    {
+        return self::canViewAll($user);
+    }
+
     public static function canViewPhoto(?User $user, TakeHomeVehicleInspectionPhoto $photo): bool
     {
         if (! $user instanceof User || ! $user->isAuthenticationAllowed()) {

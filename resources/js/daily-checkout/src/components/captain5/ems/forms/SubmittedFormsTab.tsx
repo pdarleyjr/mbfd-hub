@@ -8,13 +8,14 @@ import FamilyFilter from './FamilyFilter';
 import FormCard from './FormCard';
 import FormDetailSheet from './FormDetailSheet';
 import {
-  ACTIVE_PER_PAGE, ALL_FAMILIES, ARCHIVED_PER_PAGE, familyOptions, familyShort, isFamilyFilter, listKey, matchesFamily, mergeSummary, pruneSelection, readyIds,
+  ACTIVE_PER_PAGE, ALL_FAMILIES, ARCHIVED_PER_PAGE, clearDoneText, familyOptions, familyShort, isFamilyFilter, listKey, matchesFamily, mergeSummary, pruneSelection, readyIds,
   reconcileDoneText, toggleId,
 } from './logic';
 import ReconcileSheet from './ReconcileSheet';
 import RejectSheet, { type RejectTarget } from './RejectSheet';
 import { DoneNotice, SelectionBar } from './SelectionBar';
 import type { FormDetail, FormSummary, FormView, ReconcileResult } from './types';
+import { useClearForms } from './useClearForms';
 import { useMasterItems } from './useMasterItems';
 
 interface Props {
@@ -48,8 +49,12 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
   const [rejecting, setRejecting] = useState<RejectTarget | null>(null);
   const [reconcileIds, setReconcileIds] = useState<readonly string[] | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [doneTone, setDoneTone] = useState<'success' | 'warning'>('success');
+  /** Forms the last Clear archived: Undo on the notice restores them. */
+  const [undoIds, setUndoIds] = useState<readonly string[] | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const master = useMasterItems(onForbidden);
+  const batch = useClearForms(onForbidden);
 
   useEffect(() => {
     const timer = setTimeout(() => { setQ(search); setPage(1); }, DEBOUNCE_MS);
@@ -62,7 +67,7 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
   const perPage = view === 'active' ? ACTIVE_PER_PAGE : ARCHIVED_PER_PAGE;
   const query = view === 'archived' ? q : '';
   // The answer remembers which view it is for, so switching chips never shows the old view's forms under the new heading.
-  const { data: loaded, error, loading, reload, setData } = useEmsLoad(
+  const { data: loaded, error, loading, reload, setData, applyLocal } = useEmsLoad(
     async () => ({ ...(await fetchForms(view, { q: query, page, perPage, family })), view, family }),
     listKey(view, query, page, family),
     { tick, onForbidden },
@@ -77,8 +82,53 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
   /** The page's own refresh (it bumps `tick`) brings the list, the badge and any open form up to date. */
   const refresh = onChanged;
 
-  const change = (next: FormView) => { setView(next); setPage(1); setDone(null); };
-  const changeFamily = (next: string) => { setFamilyChoice(next); setPage(1); setDone(null); };
+  const notify = (text: string, tone: 'success' | 'warning' = 'success', undo: readonly string[] | null = null) => {
+    setDone(text);
+    setDoneTone(tone);
+    setUndoIds(undo !== null && undo.length > 0 ? undo : null);
+    setAnnouncement(text);
+  };
+  const change = (next: FormView) => { setView(next); setPage(1); setDone(null); setUndoIds(null); };
+  const changeFamily = (next: string) => { setFamilyChoice(next); setPage(1); setDone(null); setUndoIds(null); };
+
+  /** Cleared or restored forms leave the list in view at once; the refresh that follows brings the server's answer. */
+  const dropRows = (ids: readonly string[]) => {
+    applyLocal((current) => (current ? {
+      ...current,
+      forms: current.forms.filter((row) => !ids.includes(row.id)),
+      meta: { ...current.meta, total: Math.max(0, current.meta.total - current.forms.filter((row) => ids.includes(row.id)).length) },
+    } : current));
+    setSelected((current) => (ids.some((id) => current.has(id)) ? new Set([...current].filter((id) => !ids.includes(id))) : current));
+  };
+  const cleared = (detail: FormDetail) => {
+    dropRows([detail.id]);
+    notify(clearDoneText(1, 0), 'success', [detail.id]);
+    refresh();
+  };
+  const restored = (detail: FormDetail) => {
+    dropRows([detail.id]);
+    notify(`Restored ${detail.target_label} form ${detail.number} to Active.`);
+    refresh();
+  };
+  const clearSelected = async () => {
+    const outcome = await batch.clear([...selected]);
+    if (outcome === null) return;
+    dropRows(outcome.done);
+    setSelected(new Set(outcome.failed.map((entry) => entry.id)));
+    notify(clearDoneText(outcome.done.length, outcome.failed.length, outcome.failed[0]?.message ?? null), outcome.failed.length > 0 ? 'warning' : 'success', outcome.done);
+    refresh();
+  };
+  const undoClear = async () => {
+    if (undoIds === null) return;
+    const outcome = await batch.restore(undoIds);
+    if (outcome === null) return;
+    const back = outcome.done.length;
+    const text = outcome.failed.length === 0
+      ? `Restored ${back} ${back === 1 ? 'form' : 'forms'} to Active.`
+      : `Restored ${back} of ${undoIds.length} forms. ${outcome.failed[0].message}`;
+    notify(text, outcome.failed.length > 0 ? 'warning' : 'success', outcome.failed.length > 0 ? outcome.failed.map((entry) => entry.id) : null);
+    refresh();
+  };
 
   const apply = (detail: FormDetail) => {
     setData((current) => (current ? { ...current, forms: current.forms.map((row) => (row.id === detail.id ? mergeSummary(row, detail) : row)) } : current));
@@ -95,11 +145,9 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
     setAnnouncement(`Sent ${detail.target_label} form ${detail.number} back to ${detail.submitter_name}.`);
   };
   const reconciled = (result: ReconcileResult) => {
-    const text = reconcileDoneText(result);
     setReconcileIds(null);
     setSelected(new Set());
-    setDone(text);
-    setAnnouncement(text);
+    notify(reconcileDoneText(result));
     refresh();
   };
   const leaveOut = (ids: string[]) => {
@@ -113,6 +161,7 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
   const openCard = (form: FormSummary) => (
     <FormCard key={form.id} form={form} view={view} canAct={canAct} selected={selected.has(form.id)}
       onToggle={(id) => setSelected((current) => toggleId(current, id))} onOpen={onOpenRequest} onAcknowledged={acknowledged}
+      onCleared={cleared} onRestored={restored}
       onReject={(target) => setRejecting({ id: target.id, member: target.submitter_name, number: target.number })} onConflict={refresh} />
   );
 
@@ -129,7 +178,7 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
       </div>
 
       {view === 'active'
-        ? <p className={HINT}>Acknowledge each form, then tick the ones that are ready and reconcile them with the supply room.</p>
+        ? <p className={HINT}>Acknowledge each form, then tick the ones that are ready and reconcile them with the supply room. If you handed the supplies over yourself, Clear the form: it moves to Archived and stock does not change.</p>
         : (
           <div>
             <label className={LABEL} htmlFor="ems-forms-search">Search archived forms</label>
@@ -145,7 +194,7 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
         <EmptyState
           icon={<ClipboardList className="hub-empty__icon" aria-hidden="true" />}
           title={view === 'active' ? (familyName ? `No ${familyName} forms waiting` : 'No forms waiting') : narrowed ? 'No archived forms match this search' : familyName ? `No archived ${familyName} forms yet` : 'No archived forms yet'}
-          body={view === 'active' ? 'When an apparatus submits a medical inventory form it appears here for you to acknowledge and reconcile.' : narrowed ? 'Try a different number, member or unit.' : 'Reconciled forms and older records are kept here.'}
+          body={view === 'active' ? 'When an apparatus submits a medical inventory form it appears here for you to acknowledge and reconcile.' : narrowed ? 'Try a different number, member or unit.' : 'Reconciled and cleared forms and older records are kept here.'}
           action={view === 'archived' && narrowed ? <button type="button" className={BTN_SECONDARY} onClick={() => setSearch('')}>Clear search</button> : undefined}
         />
       )}
@@ -156,8 +205,15 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
         </div>
       )}
 
-      {view === 'active' && selected.size > 0 && <SelectionBar count={selected.size} onClear={() => setSelected(new Set())} onReconcile={() => { setDone(null); setReconcileIds([...selected]); }} />}
-      {done !== null && !(view === 'active' && selected.size > 0) && <DoneNotice text={done} onDismiss={() => setDone(null)} />}
+      {view === 'active' && selected.size > 0 && (
+        <SelectionBar count={selected.size} onClear={() => setSelected(new Set())} clearing={batch.busy === 'clear'}
+          onReconcile={() => { setDone(null); setUndoIds(null); setReconcileIds([...selected]); }}
+          onClearForms={canAct ? () => void clearSelected() : undefined} />
+      )}
+      {done !== null && !(view === 'active' && selected.size > 0) && (
+        <DoneNotice text={done} tone={doneTone} onDismiss={() => { setDone(null); setUndoIds(null); }}
+          onUndo={undoIds !== null && canAct ? () => void undoClear() : undefined} undoing={batch.busy === 'restore'} />
+      )}
       <div className="sr-only" role="status" aria-live="polite" data-testid="ems-forms-announce">{announcement}</div>
 
       <RejectSheet target={rejecting} onClose={() => setRejecting(null)} onDone={rejected} onConflict={refresh} />

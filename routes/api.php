@@ -448,7 +448,12 @@ Route::prefix('captain5')
             ->middleware('throttle:60,1,captain5-actions')->name('issues.act');
         Route::post('/issues/{defect}/messages', 'message')->whereNumber('defect')
             ->middleware('throttle:30,1,captain5-messages')->name('issues.message');
+        Route::get('/inspections/cleared', 'clearedInspections')->name('inspections.cleared');
         Route::get('/inspections/{inspection}', 'inspection')->whereNumber('inspection')->name('inspections.show');
+        Route::post('/inspections/{inspection}/clear', 'clearInspection')->whereNumber('inspection')
+            ->middleware('throttle:60,1,captain5-actions')->name('inspections.clear');
+        Route::post('/inspections/{inspection}/restore', 'restoreInspection')->whereNumber('inspection')
+            ->middleware('throttle:60,1,captain5-actions')->name('inspections.restore');
         Route::post('/inspections/{inspection}/clarification', 'clarification')->whereNumber('inspection')
             ->middleware('throttle:30,1,captain5-messages')->name('inspections.clarification');
         Route::post('/handoff', 'writeHandoff')->name('handoff.store');
