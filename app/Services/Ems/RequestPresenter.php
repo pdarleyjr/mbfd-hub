@@ -97,6 +97,12 @@ final class RequestPresenter
             'can_acknowledge' => $workable && ! $request->isAcknowledged(),
             'can_reject' => $workable,
             'can_reconcile' => $workable && $request->isAcknowledged(),
+            // Clear = Captain 5 handed the supplies over himself: the form is closed and archived, stock does not move.
+            'can_clear' => $workable,
+            // Restore puts a cleared form back in Active. A record the older Issue workflow closed stays a record.
+            'can_restore' => $request->status === InventoryRequest::CLOSED && ! $issued,
+            'close_reason' => $request->close_reason,
+            'closed_by' => $request->status === InventoryRequest::CLOSED ? $this->closedBy($request) : null,
             'reconciled_at' => $request->reconciled_at?->toIso8601String(),
             'reconciled_by' => $request->reconciled_by_name,
             'items_preview' => $wanted->take(self::ITEM_PREVIEW_COUNT)->map(fn (InventoryRequestLine $line): array => [
@@ -146,6 +152,17 @@ final class RequestPresenter
 
         return in_array($request->status, [InventoryRequest::SUBMITTED, InventoryRequest::REVIEWED, InventoryRequest::PREPARED, InventoryRequest::RETURNED], true)
             && $request->lines->sum('issued_qty') === 0;
+    }
+
+    /** Who closed the form, as the history recorded it (name snapshot). */
+    private function closedBy(InventoryRequest $request): ?string
+    {
+        if ($request->relationLoaded('latestClose')) {
+            return $request->latestClose?->actor_name;
+        }
+
+        return InventoryRequestEvent::query()->where('request_id', $request->getKey())->where('action', 'closed')
+            ->orderByDesc('id')->value('actor_name');
     }
 
     private function canRevise(InventoryRequest $request): bool

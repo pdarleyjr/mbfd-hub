@@ -42,6 +42,16 @@ export const rejectForm = async (uuid: string, reason: string, key: string): Pro
   normalizeForm((await call<FormDetail>(`/requests/${enc(uuid)}/reject`, post({ reason }), key)).data)
 );
 
+/** Clear: closed and archived with the reason given. Stock does not move (reconcile is the step that deducts). */
+export const clearForm = async (uuid: string, reason: string, key: string): Promise<FormDetail> => (
+  normalizeForm((await call<FormDetail>(`/requests/${enc(uuid)}/close`, post({ reason }), key)).data)
+);
+
+/** Restore: a cleared form goes back to Active, still acknowledged. */
+export const restoreForm = async (uuid: string, reason: string, key: string): Promise<FormDetail> => (
+  normalizeForm((await call<FormDetail>(`/requests/${enc(uuid)}/reopen`, post({ reason }), key)).data)
+);
+
 export async function fetchReconcilePreview(ids: readonly string[]): Promise<FormsPreview> {
   const data = (await call<FormsPreview>(`/forms/reconcile/preview?ids=${enc(ids.join(','))}`)).data;
   return {

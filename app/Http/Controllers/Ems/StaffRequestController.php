@@ -64,7 +64,7 @@ final class StaffRequestController extends Controller
                 'q.max' => 'Search text can be at most 100 characters.', 'q.string' => 'Search text must be plain text.',
             ]);
 
-            $query = InventoryRequest::query()->with('lines')->withCount('lines');
+            $query = InventoryRequest::query()->with(['lines', 'latestClose'])->withCount('lines');
             $status = array_values(array_intersect(array_filter(explode(',', (string) ($f['status'] ?? ''))), InventoryRequest::STATUSES));
             if ($status !== []) {
                 $query->whereIn('status', $status);

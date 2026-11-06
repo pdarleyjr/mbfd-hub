@@ -7,10 +7,58 @@ import type { Tone } from '../ui/status';
 import { dateTimeText, kindLabel, newKey } from './format';
 import type { InspectionView } from './types';
 import { BTN_PRIMARY, BTN_SECONDARY, FIELD, HINT, LABEL, Sheet } from './ui';
+import { useInspectionClear } from './useInspectionClear';
 
 interface Props {
   inspectionId: number | null;
+  /** The viewer may act on the Captain 5 page: Clear and Restore are offered on a Rescue checkout. */
+  canAct?: boolean;
   onClose: () => void;
+  /** The checkout was cleared or restored: the workspace reloads. */
+  onChanged?: () => void;
+}
+
+/**
+ * Clear takes a handled Rescue checkout off the Captain 5 list; Restore puts it back. The checkout itself never changes.
+ * An optional note is kept with the clear in the inspection's history.
+ */
+function ClearPanel({ inspection, onDone }: { inspection: InspectionView; onDone: () => void }) {
+  const [note, setNote] = useState('');
+  const action = useInspectionClear();
+  const busy = action.busyId !== null;
+  const cleared = Boolean(inspection.cleared_at);
+
+  const run = async () => {
+    const done = cleared ? await action.restore(inspection.id) : await action.clear(inspection.id, note);
+    if (done === null) return;
+    setNote('');
+    onDone();
+  };
+
+  return (
+    <section className="space-y-2 rounded-hub-control border border-hub-border bg-hub-n-25 p-3 sm:p-4" aria-label="Clear from your list" data-testid="captain5-inspection-clear">
+      <h3 className="font-heading text-base font-bold text-hub-ink">{cleared ? 'Cleared from your list' : 'Clear from your list'}</h3>
+      {cleared
+        ? (
+          <p className="text-sm text-hub-ink" data-testid="captain5-inspection-cleared">
+            Cleared{inspection.cleared_by ? ` by ${inspection.cleared_by}` : ''}{inspection.cleared_at ? `, ${dateTimeText(inspection.cleared_at)}` : ''}{inspection.clear_note ? `: ${inspection.clear_note}` : ''}
+          </p>
+        )
+        : (
+          <>
+            <p className={HINT}>Clear this checkout once you have handled it. It moves to Cleared on the Today tab and the checkout itself does not change.</p>
+            <div>
+              <label className={LABEL} htmlFor="c5-clear-note">Note (optional)</label>
+              <input id="c5-clear-note" type="text" className={FIELD} value={note} disabled={busy} maxLength={500} autoComplete="off" onChange={(event) => setNote(event.target.value)} />
+            </div>
+          </>
+        )}
+      {action.error && <p role="alert" className="hub-callout hub-callout--warning p-3 text-sm">{action.error}</p>}
+      <button type="button" data-testid={cleared ? 'captain5-inspection-restore' : 'captain5-inspection-clear-button'} className={BTN_SECONDARY} disabled={busy} aria-busy={busy} onClick={() => void run()}>
+        {busy ? (cleared ? 'Restoring…' : 'Clearing…') : (cleared ? 'Restore to the Today list' : 'Clear')}
+      </button>
+    </section>
+  );
 }
 
 const ITEM_TONE: Record<string, Tone> = { present: 'success', missing: 'danger', damaged: 'danger' };
@@ -65,7 +113,7 @@ function Clarification({ inspection }: { inspection: InspectionView }) {
   );
 }
 
-export default function InspectionSheet({ inspectionId, onClose }: Props) {
+export default function InspectionSheet({ inspectionId, canAct = false, onClose, onChanged }: Props) {
   const [inspection, setInspection] = useState<InspectionView | null>(null);
   const [error, setError] = useState<Captain5ApiError | null>(null);
   const [loading, setLoading] = useState(false);
@@ -134,6 +182,9 @@ export default function InspectionSheet({ inspectionId, onClose }: Props) {
             </section>
           ))}
           {inspection.kind === 'rescue' && <Clarification key={inspection.id} inspection={inspection} />}
+          {inspection.kind === 'rescue' && canAct && (
+            <ClearPanel key={`clear-${inspection.id}`} inspection={inspection} onDone={() => { setAttempt((n) => n + 1); onChanged?.(); }} />
+          )}
         </div>
       )}
     </Sheet>

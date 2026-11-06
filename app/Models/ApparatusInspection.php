@@ -70,6 +70,9 @@ class ApparatusInspection extends Model
         'miles' => 'integer',
         'completed_at' => 'datetime',
         'test_excluded_at' => 'datetime',
+        // Captain 5 handled this checkout and took it off his active list (Captain5InspectionClearing). Not a
+        // submitted observation, so the immutability guard above leaves it alone; set with forceFill only.
+        'captain5_cleared_at' => 'datetime',
     ];
 
     public function scopeOperational(Builder $query): Builder
@@ -134,6 +137,12 @@ class ApparatusInspection extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function captain5ClearedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'captain5_cleared_by_user_id');
     }
 
     public function actorUser(): BelongsTo

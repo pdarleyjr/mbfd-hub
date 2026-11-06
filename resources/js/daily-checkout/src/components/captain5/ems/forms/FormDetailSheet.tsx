@@ -10,9 +10,10 @@ import { BTN_SECONDARY, HINT, LiveNote } from '../shared';
 import { fetchForm } from './api';
 import FormActionButtons from './FormActionButtons';
 import {
-  ackText, archiveText, formEventSentence, FORM_STATUS_TONE, isOlderRecord, isReturned, isWorkingStatus, returnedText, revisionTag,
+  ackText, archiveText, formEventSentence, formStatusLabel, FORM_STATUS_TONE, isCleared, isOlderRecord, isReturned, isWorkingStatus, returnedText, revisionTag,
 } from './logic';
 import RejectSheet, { type RejectTarget } from './RejectSheet';
+import RestoreButton from './RestoreButton';
 import type { FormDetail } from './types';
 import type { RequestLine } from '../types';
 
@@ -116,7 +117,8 @@ export default function FormDetailSheet({ uuid, canAct, tick, onOpenForm, onClos
 
   const unavailable = error !== null && (error.status === 403 || error.status === 404);
   const working = form !== null && isWorkingStatus(form.status);
-  const readOnly = form !== null && !working && !isReturned(form);
+  const restorable = form !== null && canAct && isCleared(form);
+  const readOnly = form !== null && !working && !isReturned(form) && !restorable;
   const revision = form ? revisionTag(form) : null;
 
   return (
@@ -145,7 +147,7 @@ export default function FormDetailSheet({ uuid, canAct, tick, onOpenForm, onClos
         {form && (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center gap-1.5">
-              <Tag tone={FORM_STATUS_TONE[form.status] ?? 'neutral'}>{form.status_label}</Tag>
+              <Tag tone={FORM_STATUS_TONE[form.status] ?? 'neutral'}>{formStatusLabel(form)}</Tag>
               {revision && <Tag tone="info">{revision}</Tag>}
               {readOnly && <Tag>Read only</Tag>}
             </div>
@@ -162,10 +164,16 @@ export default function FormDetailSheet({ uuid, canAct, tick, onOpenForm, onClos
                 form={form}
                 canAct={canAct}
                 testIdPrefix="ems-sheet"
+                withClearNote
                 onAcknowledged={(detail) => saved(detail, 'Acknowledged. You can now select this form on the list to reconcile it.')}
+                onCleared={(detail) => saved(detail, 'Cleared. The form is in Archived and supply room stock did not change. Restore brings it back to Active.')}
                 onReject={() => setRejecting({ id: form.id, member: form.submitter_name, number: form.number })}
                 onConflict={conflict}
               />
+            )}
+            {restorable && (
+              <RestoreButton form={form} testId="ems-sheet-restore" onConflict={conflict}
+                onRestored={(detail) => saved(detail, 'Restored. The form is back in Active.')} />
             )}
 
             <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2" data-testid="ems-form-summary">
@@ -175,6 +183,8 @@ export default function FormDetailSheet({ uuid, canAct, tick, onOpenForm, onClos
               <Fact label="Number">{form.number}</Fact>
               <Fact label="Member's note">{form.member_note}</Fact>
               <Fact label="Reconciled">{form.reconciled_at ? `${etDateTime(form.reconciled_at)}${form.reconciled_by ? ` by ${form.reconciled_by}` : ''}` : null}</Fact>
+              <Fact label="Cleared">{isCleared(form) && form.closed_at ? `${etDateTime(form.closed_at)}${form.closed_by ? ` by ${form.closed_by}` : ''}` : null}</Fact>
+              <Fact label="Clear reason">{isCleared(form) ? form.close_reason : null}</Fact>
             </dl>
 
             <section aria-labelledby="ems-form-lines-heading" className="space-y-4" data-testid="ems-form-lines">

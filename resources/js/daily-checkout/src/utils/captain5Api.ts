@@ -1,7 +1,7 @@
 import type { OnDuty } from '../components/acting/types';
 import { ACTIONS } from '../components/captain5/actionForms';
 import type {
-  Captain5Summary, Handoff, InspectionView, IssueActionName, IssueActionRequest, IssueDetail, IssueSummary, RescueTruck, RescueTruckChange, Workspace,
+  Captain5Summary, ClearedInspection, Handoff, InspectionView, IssueActionName, IssueActionRequest, IssueDetail, IssueSummary, RescueTruck, RescueTruckChange, Workspace,
 } from '../components/captain5/types';
 import { ApiRequestError, fetchWithTimeout, mutationHeaders } from './api';
 import { parseVehicleIdentification } from './vehicleIdentification';
@@ -231,6 +231,44 @@ export async function fetchInspection(id: number): Promise<InspectionView> {
   const payload = await request<{ inspection?: InspectionView }>(`/inspections/${id}`);
   const inspection = asRecord(payload.inspection) as unknown as InspectionView;
   return { ...inspection, compartments: asArray<InspectionView['compartments'][number]>(inspection.compartments).map((c) => ({ ...c, items: asArray(c.items) })) };
+}
+
+/** What the server says about a checkout's Clear after a clear or a restore. */
+export interface InspectionClearState { inspection_id: number; cleared_at: string | null; cleared_by: string | null; clear_note: string | null }
+
+const clearStateOf = (raw: unknown): InspectionClearState => {
+  const item = asRecord(raw);
+  return {
+    inspection_id: typeof item.inspection_id === 'number' ? item.inspection_id : 0,
+    cleared_at: asIso(item.cleared_at),
+    cleared_by: asText(item.cleared_by),
+    clear_note: asText(item.clear_note),
+  };
+};
+
+/** Takes a handled Rescue checkout off the Captain 5 list. The checkout itself does not change; a repeat is harmless. */
+export async function clearInspection(inspectionId: number, note = ''): Promise<InspectionClearState> {
+  const text = note.trim();
+  return clearStateOf(await request(`/inspections/${inspectionId}/clear`, json(text === '' ? {} : { note: text })));
+}
+
+/** Puts a cleared Rescue checkout back on the Captain 5 list. A repeat is harmless. */
+export async function restoreInspection(inspectionId: number): Promise<InspectionClearState> {
+  return clearStateOf(await request(`/inspections/${inspectionId}/restore`, json({})));
+}
+
+export async function fetchClearedInspections(): Promise<ClearedInspection[]> {
+  const payload = await request<{ inspections?: unknown }>('/inspections/cleared');
+  return asArray(payload.inspections).map((raw) => {
+    const item = asRecord(raw);
+    return {
+      ...clearStateOf(raw),
+      apparatus_id: typeof item.apparatus_id === 'number' ? item.apparatus_id : 0,
+      unit: asText(item.unit) ?? 'Unit',
+      submitted_at: asIso(item.submitted_at),
+      submitted_by: asText(item.submitted_by),
+    };
+  });
 }
 
 export async function postClarification(inspectionId: number, body: string, clientMessageId: string): Promise<void> {
