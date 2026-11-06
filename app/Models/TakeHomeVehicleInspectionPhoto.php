@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A privately stored, re-encoded inspection photo. Uploaded before submission
  * (unattached) and attached to exactly one inspection on submit.
+ *
+ * @property int $conversion_attempts times photos:maintain queued a stalled conversion again
  */
 class TakeHomeVehicleInspectionPhoto extends Model
 {
@@ -22,16 +24,19 @@ class TakeHomeVehicleInspectionPhoto extends Model
         'angle',
         'check_key',
         'path',
+        'source_path',
         'width',
         'height',
         'bytes',
         'sha256',
+        'conversion_attempts',
     ];
 
     protected $casts = [
         'width' => 'integer',
         'height' => 'integer',
         'bytes' => 'integer',
+        'conversion_attempts' => 'integer',
     ];
 
     /** @return BelongsTo<TakeHomeVehicleInspection, $this> */
@@ -44,6 +49,12 @@ class TakeHomeVehicleInspectionPhoto extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by_user_id');
+    }
+
+    /** True while the original waits for the queued conversion (the JPEG is not written yet). */
+    public function isPendingConversion(): bool
+    {
+        return is_string($this->source_path) && $this->source_path !== '';
     }
 
     public function label(): string

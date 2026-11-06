@@ -17,14 +17,34 @@ services:
       WWWUSER: "${HUB_WWWUSER:?HUB_WWWUSER must match the mounted storage owner}"
       WWWGROUP: "${HUB_WWWGROUP:?HUB_WWWGROUP must match the mounted storage group}"
       LARAVEL_SAIL: 1
-      # The PHP built-in server otherwise handles one request at a time, so one slow
-      # page blocks every member. artisan serve honours this because LARAVEL_SAIL=1;
-      # sessions and cache use Redis in production, so workers share no file locks.
+      # Web tier: nginx + php-fpm (docker/production/php-fpm.conf). Pool size is
+      # tunable here without a rebuild.
+      PHP_FPM_MAX_CHILDREN: "${HUB_PHP_FPM_MAX_CHILDREN:-32}"
+      # Read only by images built before the php-fpm runtime (artisan serve with
+      # LARAVEL_SAIL=1). Kept so a manual rollback to such an image still runs
+      # 8 workers instead of one; the php-fpm image ignores it.
       PHP_CLI_SERVER_WORKERS: "${HUB_PHP_CLI_SERVER_WORKERS:-8}"
       XDEBUG_MODE: "off"
+      # "1" only when HUB_STORAGE_APP_PATH is set: the entrypoint (and deploy, before
+      # activation) then refuses to start unless storage/app holds .mbfd-storage-sentinel,
+      # because an unmounted array still leaves its empty mountpoint directory on the
+      # root disk. Unset: empty, no check. See docker/production/check-storage-mount.
+      HUB_STORAGE_APP_SENTINEL_REQUIRED: "${HUB_STORAGE_APP_PATH:+1}"
     volumes:
       - "${HUB_APP_ENV_FILE:?HUB_APP_ENV_FILE must point to the host-managed Laravel environment file}:/var/www/html/.env:ro"
       - "${HUB_STORAGE_PATH:?HUB_STORAGE_PATH must be the existing writable Hub storage directory}:/var/www/html/storage"
+      # Uploaded and generated files (storage/app: private + public disks) may
+      # live on the large array while framework cache, sessions and logs stay on
+      # HUB_STORAGE_PATH. Unset, it is HUB_STORAGE_PATH/app itself (no change).
+      # A missing source fails the start instead of silently creating an empty,
+      # root-owned directory; a present but empty mountpoint (array not mounted)
+      # fails the sentinel check above.
+      # Runbook: docs/ops/storage-on-mbfd-storage.md
+      - type: bind
+        source: "${HUB_STORAGE_APP_PATH:-${HUB_STORAGE_PATH}/app}"
+        target: /var/www/html/storage/app
+        bind:
+          create_host_path: false
       - "${HUB_GOOGLE_SA_PATH:-/dev/null}:/run/secrets/google_service_account.json:ro"
     networks:
       - mbfd-net
@@ -32,6 +52,13 @@ services:
       - cmd-feed
     security_opt:
       - no-new-privileges:true
+    # nginx writes one JSON access-log line per request to stdout next to the
+    # queue/scheduler output; keep more than the daemon's 5 x 10 MB default.
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/up"]
       interval: 30s

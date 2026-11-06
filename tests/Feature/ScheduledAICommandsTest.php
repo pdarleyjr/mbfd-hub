@@ -25,6 +25,7 @@ class ScheduledAICommandsTest extends TestCase
         $project = $this->createCapitalProject(ProjectPriority::Medium);
 
         $aiService = Mockery::mock(CloudflareAIService::class);
+        $aiService->shouldReceive('isEnabled')->once()->andReturnTrue();
         $aiService->shouldReceive('canMakeRequest')->once()->andReturnTrue();
         $aiService->shouldReceive('prioritizeProjects')
             ->once()
@@ -60,6 +61,7 @@ class ScheduledAICommandsTest extends TestCase
         $project = $this->createCapitalProject(ProjectPriority::Medium);
 
         $aiService = Mockery::mock(CloudflareAIService::class);
+        $aiService->shouldReceive('isEnabled')->once()->andReturnTrue();
         $aiService->shouldReceive('canMakeRequest')->once()->andReturnTrue();
         $aiService->shouldReceive('generateWeeklySummary')
             ->once()
@@ -94,10 +96,48 @@ class ScheduledAICommandsTest extends TestCase
         )->once();
     }
 
+    public function test_analyze_priorities_skips_without_generation_when_gateway_is_unreachable(): void
+    {
+        $this->useGateway();
+        Http::fake(['http://gateway.test:11440/*' => Http::failedConnection()]);
+        $project = $this->createCapitalProject(ProjectPriority::Medium);
+        Log::spy();
+
+        $this->artisan('projects:analyze-priorities')
+            ->expectsOutputToContain('AI service is not configured or not reachable')
+            ->assertExitCode(0);
+
+        $this->assertNull($project->fresh()->ai_priority_rank);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/health/ready'));
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '/v1/chat/completions'));
+        Log::shouldNotHaveReceived('error');
+        Log::shouldHaveReceived('info')->withArgs(
+            fn (string $message): bool => $message === 'Scheduled task projects:analyze-priorities skipped - AI service not available',
+        )->once();
+        $this->assertDatabaseMissing('ai_analysis_logs', ['type' => 'priority_ranking']);
+    }
+
+    public function test_analyze_priorities_does_nothing_when_turned_off(): void
+    {
+        config()->set('cloudflare.ai.project_priorities.enabled', false);
+        Http::preventStrayRequests();
+        Http::fake();
+        $this->createCapitalProject(ProjectPriority::Medium);
+
+        $this->artisan('projects:analyze-priorities')
+            ->expectsOutputToContain('turned off')
+            ->assertExitCode(0);
+
+        Http::assertNothingSent();
+        $this->assertDatabaseMissing('ai_analysis_logs', ['type' => 'priority_ranking']);
+    }
+
     public function test_analyze_priorities_still_fails_on_unexpected_errors(): void
     {
         $this->createCapitalProject(ProjectPriority::Medium);
         $aiService = Mockery::mock(CloudflareAIService::class);
+        $aiService->shouldReceive('isEnabled')->once()->andReturnTrue();
         $aiService->shouldReceive('canMakeRequest')->once()->andReturnTrue();
         $aiService->shouldReceive('prioritizeProjects')->once()->andThrow(new \LogicException('bug'));
         $this->app->instance(CloudflareAIService::class, $aiService);
@@ -119,14 +159,23 @@ class ScheduledAICommandsTest extends TestCase
         )->once();
     }
 
-    private function useGatewayReturning(int $status): void
+    private function useGateway(): void
     {
         config()->set('cloudflare.ai.driver', 'gateway');
         config()->set('cloudflare.ai.gateway.url', 'http://gateway.test:11440');
         config()->set('cloudflare.ai.gateway.capability', 'mbfd-general');
         config()->set('cloudflare.ai.gateway.credential', 'gateway-test-secret');
         Http::preventStrayRequests();
-        Http::fake(['http://gateway.test:11440/*' => Http::response('unavailable', $status)]);
+    }
+
+    /** The gateway reports ready, then every generation request answers $status. */
+    private function useGatewayReturning(int $status): void
+    {
+        $this->useGateway();
+        Http::fake([
+            'http://gateway.test:11440/health/ready' => Http::response(['status' => 'ready']),
+            'http://gateway.test:11440/*' => Http::response('unavailable', $status),
+        ]);
     }
 
     private function createCapitalProject(ProjectPriority $priority): CapitalProject

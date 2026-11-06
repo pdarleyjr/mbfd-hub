@@ -94,7 +94,13 @@ class DefectsRelationManager extends RelationManager implements ExportableTable
                     ->disk('public')
                     ->directory('defects')
                     ->image()
-                    ->imageEditor(),
+                    ->imageEditor()
+                    // Shrunk in the browser before upload, like the member apps (long edge 2048 px).
+                    ->imageResizeMode('contain')
+                    ->imageResizeTargetWidth('2048')
+                    ->imageResizeTargetHeight('2048')
+                    ->imageResizeUpscale(false)
+                    ->maxSize(25600),
 
                 // There is deliberately NO status field here. An issue's status changes only through
                 // DefectCorrectiveActions (Acknowledge, Update, Resolve, Close — No Action Required, Reopen),

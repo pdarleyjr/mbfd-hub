@@ -56,9 +56,13 @@ test('groups keep the template order and leave ungrouped fields for the collapse
 test('only a photo the server can store is accepted, before the member signs', () => {
   assert.equal(photoProblem({ type: 'image/jpeg', size: 1000 }), null);
   assert.equal(photoProblem({ type: 'image/webp', size: 1000 }), null);
-  assert.equal(photoProblem({ type: 'image/heic', size: 1000 }), PHOTO_FORMAT_MESSAGE);
+  // iPhone originals: shrunk to JPEG on the phone, or converted by the server when the browser cannot.
+  assert.equal(photoProblem({ type: 'image/heic', size: 1000 }), null);
+  assert.equal(photoProblem({ type: '', name: 'IMG_0001.HEIC', size: 1000 }), null);
+  // A full-size camera original is fine: it is shrunk before it is sent.
+  assert.equal(photoProblem({ type: 'image/jpeg', size: 9_000_000 }), null);
   assert.equal(photoProblem({ type: 'image/tiff', size: 1000 }), PHOTO_FORMAT_MESSAGE);
-  assert.equal(photoProblem({ type: 'application/pdf', size: 1000 }), PHOTO_REJECTED_MESSAGE);
+  assert.equal(photoProblem({ type: 'application/pdf', size: 1000 }), PHOTO_FORMAT_MESSAGE);
   assert.equal(photoProblem({ type: 'image/png', size: MAX_PHOTO_BYTES + 1 }), PHOTO_REJECTED_MESSAGE);
 });
 

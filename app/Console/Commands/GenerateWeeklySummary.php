@@ -49,7 +49,8 @@ class GenerateWeeklySummary extends Command
             $aiSummary = null;
             $aiService = app(CloudflareAIService::class);
 
-            if ($aiService->canMakeRequest() && $activeProjects->isNotEmpty()) {
+            // isEnabled() is the bounded gateway readiness probe; an unreachable gateway is skipped in seconds.
+            if ($activeProjects->isNotEmpty() && $aiService->isEnabled() && $aiService->canMakeRequest()) {
                 $this->info('Requesting AI-generated summary...');
                 try {
                     $aiSummary = $aiService->generateWeeklySummary($activeProjects);

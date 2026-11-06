@@ -175,10 +175,11 @@ final class TakeHomeInspectionSubmitter
         foreach ($ids as $uuid => $expected) {
             $photo = $photos->get($uuid);
             $field = $expected['check_key'] === null ? 'photos.'.$expected['angle'] : 'issue_photos.'.$expected['check_key'];
+            // A photo still waiting for its queued conversion counts: the original is safely stored.
             $valid = $photo !== null
                 && $photo->angle === $expected['angle']
                 && $photo->check_key === $expected['check_key']
-                && $disk->exists($photo->path);
+                && ($disk->exists($photo->path) || ($photo->isPendingConversion() && $disk->exists((string) $photo->source_path)));
             if (! $valid) {
                 $label = $expected['check_key'] === null
                     ? TakeHomeVehicleInspection::PHOTO_ANGLES[$expected['angle']]

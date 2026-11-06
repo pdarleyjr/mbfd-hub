@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { readDrafts } from './support/daily-checkout-drafts';
+import { PHOTO_UPLOAD_PATH, photoUploadAnswer, previewDigest, readQueuedPhotos, uploadedPhotoId } from './support/daily-checkout-photos';
 
 declare global {
   interface Window {
@@ -243,24 +244,40 @@ test('multiple camera-sized photos survive a real offline reload and queue repla
   const buffer = Buffer.from(photo.split(',')[1], 'base64');
   expect(buffer.length).toBeGreaterThan(3_000_000);
   expect(buffer.length).toBeLessThan(5_000_000);
+  // Photo uploads are XHRs the service worker forwards; the context route sees them.
+  const photoUploads: string[] = [];
+  await context.route(`**${PHOTO_UPLOAD_PATH}`, route => {
+    const photoId = uploadedPhotoId(route.request());
+    photoUploads.push(photoId);
+    return route.fulfill(photoUploadAnswer(photoId));
+  });
+  // The photos are taken with no signal, so they wait on the device through the reload and the replay.
+  await context.setOffline(true);
   const rows = page.locator('.equipment-row');
+  const digests: string[] = [];
   for (const index of [0, 1]) {
     await rows.nth(index).locator('.equipment-expand').click();
     await rows.nth(index).getByRole('button', { name: 'Damaged', exact: true }).click();
     await rows.nth(index).getByLabel('Photo (optional)').setInputFiles({ name: `test-evidence-${index}.png`, mimeType: 'image/png', buffer });
+    digests.push(await previewDigest(rows.nth(index).locator('img')));
   }
-  await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments[0]?.items.filter(item => item.photo === photo).length).toBe(2);
+  const draftPhotoIds = async () => ((await readDrafts(page))[0]?.data.compartments[0]?.items ?? []).flatMap(item => (item.photo ? ['inline'] : []).concat(item.photo_id ? [item.photo_id] : []));
+  await expect.poll(async () => (await draftPhotoIds()).length).toBe(2);
+  const photoIds = await draftPhotoIds();
+  expect(photoIds).not.toContain('inline');
+  expect(new Set(photoIds).size).toBe(2);
+  expect((await readQueuedPhotos(page)).map(record => [record.id, record.status, record.ownerUserId]).sort())
+    .toEqual(photoIds.map(id => [id, 'pending', 101]).sort());
   expect(await page.evaluate(() => Object.values(localStorage).some(value => value.includes('data:image/')))).toBe(false);
-  await context.setOffline(true);
   await page.reload();
-  // The two camera-sized IndexedDB values are intentionally several MB each.
-  // Allow a loaded CI runner enough time to hydrate them before treating the
-  // durable offline recovery contract as failed.
+  // The two camera-sized photos are kept in IndexedDB. Allow a loaded CI runner enough
+  // time to hydrate the draft before treating the durable offline recovery contract as failed.
   await expect(page.getByText(/Restored from autosave/)).toBeVisible({ timeout: 15_000 });
   for (const index of [0, 1]) {
     await rows.nth(index).locator('.equipment-expand').click();
-    await expect(rows.nth(index).locator('img')).toHaveAttribute('src', photo);
+    expect(await previewDigest(rows.nth(index).locator('img'))).toBe(digests[index]);
   }
+  expect(photoUploads).toEqual([]);
   await rows.last().getByLabel('Notes (optional)').fill('Verified offline after reload.');
   await page.getByRole('button', { name: 'Continue: Vehicle & Shift', exact: true }).click();
   await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('B');
@@ -281,17 +298,26 @@ test('multiple camera-sized photos survive a real offline reload and queue repla
   const queued = await queuedInspections(page);
   expect(queued).toHaveLength(1);
   expect(queued[0]).toMatchObject({ ownerUserId: 101, ownerSecurityVersion: 1, data: { operator_name: 'PWA Member', employee_id: 1101, shift: 'B', unit_number: 'TEST-101' } });
+  // The queued checkout names its photos by id; their bytes stay in the photo store.
+  const queuedItems = (queued[0].data as { compartments: Array<{ items: Array<{ photo?: string; photo_id?: string }> }> }).compartments.flatMap(area => area.items);
+  expect(queuedItems.filter(item => item.photo !== undefined)).toEqual([]);
+  expect(queuedItems.flatMap(item => (item.photo_id ? [item.photo_id] : [])).sort()).toEqual([...photoIds].sort());
   await page.reload();
   expect(await queuedInspections(page)).toHaveLength(1);
+  expect(photoUploads).toEqual([]);
   await context.setOffline(false);
   await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
   await expect.poll(async () => (await readDrafts(page)).length).toBe(0);
   const submissions = await page.evaluate(() => window.__pwaSubmissions);
   expect(submissions).toHaveLength(1);
   expect(submissions[0]).toEqual(queued[0].data);
+  // Each photo reaches the Hub once, on its own request.
+  await expect.poll(() => [...photoUploads].sort(), { timeout: 15_000 }).toEqual([...photoIds].sort());
+  await expect.poll(async () => (await readQueuedPhotos(page)).map(record => record.status)).toEqual(['sent', 'sent']);
   await page.evaluate(() => { window.dispatchEvent(new Event('online')); window.dispatchEvent(new Event('online')); });
   await expect(page.getByText('Inspection received', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.__pwaSubmissions.length)).toBe(1);
+  expect(photoUploads).toHaveLength(2);
   await page.screenshot({ path: testInfo.outputPath('large-photo-offline-replay.png') });
 });
 

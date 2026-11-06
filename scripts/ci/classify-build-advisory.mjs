@@ -41,6 +41,11 @@ const expires = Date.parse('2026-11-12T00:00:00Z');
 // 2026-11-05: docker/production/Dockerfile re-pinned for one added step in the final stage that purges apt and
 // libapt-pkg from the shipped image (HIGH CVE-2026-109518, no Ubuntu fix yet; apt is build tooling only). No build
 // dependency, version or lock changed; the Tailwind 3 / braces graph is byte-identical.
+// 2026-11-05: docker/production/Dockerfile re-pinned for the production web tier (Ubuntu nginx and php8.5-fpm
+// replace `artisan serve`; web-tier config files copied and proven at build time). No npm or Composer
+// dependency, version or lock changed; the Tailwind 3 / braces graph is byte-identical.
+// 2026-11-05: docker/production/Dockerfile re-pinned for the storage mount guard: it copies
+// docker/production/check-storage-mount into the image and makes it executable. Nothing else changed.
 const inputs = {
     '.': {
         'package.json': 'b5e98205856a0c21842199c5a88a0b34ff1476fd94582645c95350b07be23989',
@@ -52,7 +57,7 @@ const inputs = {
     },
 };
 const runtimeInputs = {
-    'docker/production/Dockerfile': '7dc4d8f038a662bfc0466b5f575795bc9b4faeb16daf836016f9b9e01c7743b4',
+    'docker/production/Dockerfile': '964bc667a59caf41db24c4dfd3f3ebf83e391a813c271a543880f1608ea5b2ff',
     '.dockerignore': 'c360145b9617b149ed9b27b613b63cc577e2abd22005efa5367f608e71c67dbc',
 };
 const vacationInputs = {

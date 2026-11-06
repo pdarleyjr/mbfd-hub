@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readDrafts } from './support/daily-checkout-drafts';
+import { PHOTO_UPLOAD_PATH, photoUploadAnswer, readQueuedPhotos, uploadedPhotoId } from './support/daily-checkout-photos';
 import { expectNoHorizontalOverflow } from './support/no-horizontal-overflow';
 
 /**
@@ -101,6 +102,8 @@ const closedPages: Record<string, { data: unknown[]; next_cursor: string | null 
 
 interface Api {
   submissions: Array<Record<string, any>>;
+  /** client_photo_id of each photo upload, in arrival order. */
+  photoUploads: string[];
   findingsRequests: number;
   historyRequests: number[];
   closedRequests: Array<string | null>;
@@ -114,6 +117,7 @@ interface Api {
 async function mockApi(page: Page): Promise<Api> {
   const api: Api = {
     submissions: [],
+    photoUploads: [],
     findingsRequests: 0,
     historyRequests: [],
     closedRequests: [],
@@ -171,6 +175,11 @@ async function mockApi(page: Page): Promise<Api> {
     }
     if (path === '/api/public/stations/1') {
       return route.fulfill({ json: { id: 1, name: 'Station 1', station_number: 1, address: '1 Test Street', city: 'Miami Beach', state: 'FL', zip_code: '33139', phone: '', is_active: true, apparatuses: [apparatus] } });
+    }
+    if (path === PHOTO_UPLOAD_PATH && request.method() === 'POST') {
+      const photoId = uploadedPhotoId(request);
+      api.photoUploads.push(photoId);
+      return route.fulfill(photoUploadAnswer(photoId));
     }
     if (path === '/api/public/inspection-revisions') return route.fulfill({ json: { data: [] } });
     return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
@@ -447,10 +456,14 @@ test('concerns are posted with the checkout: a problem with a photo, an update t
   await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
   await expect.poll(() => api.submissions.length).toBe(1);
   expect(api.submissions[0].concerns).toEqual([
-    { client_id: expect.stringMatching(UUID), kind: 'issue', description: 'Cracked mirror housing', location: 'Officer side', photo: expect.stringMatching(/^data:image\/png;base64,/) },
+    { client_id: expect.stringMatching(UUID), kind: 'issue', description: 'Cracked mirror housing', location: 'Officer side', photo_id: expect.stringMatching(UUID) },
     { client_id: expect.stringMatching(UUID), kind: 'issue', description: 'Still not in the bay this morning', existing_issue_id: 41 },
     { client_id: expect.stringMatching(UUID), kind: 'note', description: 'Hose bed latch is stiff' },
   ]);
+  // The photo travels on its own request, once, under the id the concern names (never inline: no `photo` key above).
+  const photoId = api.submissions[0].concerns[0].photo_id as string;
+  await expect.poll(() => api.photoUploads).toEqual([photoId]);
+  expect((await readQueuedPhotos(page)).map(record => record.id)).toEqual([photoId]);
 });
 
 test('a checkout with no concerns has no concerns key', async ({ page }) => {

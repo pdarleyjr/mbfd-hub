@@ -276,7 +276,10 @@ export interface ChecklistItem {
   value?: ChecklistFieldValue;
   valueRequired?: boolean;
   notes?: string;
-  photo?: string; // base64 encoded image
+  /** Inline data URL: only drafts saved before photos were queued separately still hold one. */
+  photo?: string;
+  /** Id of the photo queued on this device (utils/photoUploadQueue.ts); the checkout sends only this. */
+  photo_id?: string;
   inputType?: ChecklistInputType;
   expectedQuantity?: number;
   /** Display only: shown as one muted line in the expanded item details. */
@@ -367,6 +370,7 @@ export interface Defect {
   item_id?: string;
   notes?: string;
   photo?: string;
+  photo_id?: string;
   /** Present only when the member marked new damage that affects safe operation. */
   significant?: boolean;
 }
@@ -389,6 +393,7 @@ export interface SubmittedChecklistItem {
   status: ItemStatus;
   observed: boolean;
   photo?: string;
+  photo_id?: string;
   value?: ChecklistFieldValue;
   notes: string | null;
   significant?: true;

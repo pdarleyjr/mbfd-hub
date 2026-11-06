@@ -54,6 +54,7 @@ export function mergeDraftAnswers(current: Compartment[], saved: Compartment[]):
       const kept = {
         ...(before.notes !== undefined ? { notes: before.notes } : {}),
         ...(before.photo !== undefined ? { photo: before.photo } : {}),
+        ...(before.photo_id !== undefined ? { photo_id: before.photo_id } : {}),
         ...(before.value !== undefined ? { value: before.value } : {}),
       };
       if (itemChanged(item, before)) {

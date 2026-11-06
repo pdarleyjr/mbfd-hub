@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace Tests\Feature\Fleet;
 
 use App\Enums\AccountStatus;
+use App\Jobs\Photos\ProcessTakeHomeInspectionPhoto;
 use App\Models\Employee;
 use App\Models\TakeHomeVehicleInspection;
 use App\Models\TakeHomeVehicleInspectionPhoto;
 use App\Models\UnitMasterVehicle;
 use App\Models\UnitMasterVehicleChange;
 use App\Models\User;
+use App\Services\Photos\PhotoNormalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use LogicException;
@@ -164,7 +167,7 @@ final class TakeHomeVehicleInspectionTest extends TestCase
         $this->assertSame(2, UnitMasterVehicle::query()->count());
     }
 
-    public function test_photo_upload_is_re_encoded_private_and_only_visible_to_the_uploader(): void
+    public function test_photo_upload_is_a_clean_private_jpeg_only_visible_to_the_uploader(): void
     {
         $user = $this->member();
         $response = $this->actingAs($user)->post(self::BASE.'/photos', [
@@ -184,6 +187,84 @@ final class TakeHomeVehicleInspectionTest extends TestCase
             ->assertHeader('Content-Type', 'image/jpeg')
             ->assertHeader('Cache-Control', 'max-age=0, no-store, private');
         $this->actingAs($this->member())->get(self::BASE.'/photos/'.$photo->uuid)->assertNotFound();
+    }
+
+    public function test_a_clean_phone_jpeg_is_stored_exactly_as_sent_without_queued_work(): void
+    {
+        Queue::fake();
+        $file = UploadedFile::fake()->image('front.jpg', 2048, 1536);
+        $sent = (string) file_get_contents($file->getRealPath());
+
+        $response = $this->actingAs($this->member())->post(self::BASE.'/photos', ['photo' => $file, 'angle' => 'front'], ['Accept' => 'application/json'])
+            ->assertCreated()->assertJsonPath('processing', false);
+
+        $photo = TakeHomeVehicleInspectionPhoto::query()->where('uuid', $response->json('uuid'))->firstOrFail();
+        $this->assertSame($sent, Storage::disk('local')->get($photo->path));
+        $this->assertSame(hash('sha256', $sent), $photo->sha256);
+        $this->assertSame([2048, 1536], [$photo->width, $photo->height]);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_a_retried_upload_with_the_same_photo_id_stores_one_copy(): void
+    {
+        $user = $this->member();
+        $id = (string) Str::uuid();
+        $send = fn (User $as) => $this->actingAs($as)->post(self::BASE.'/photos', [
+            'photo' => UploadedFile::fake()->image('front.jpg', 1600, 1200),
+            'angle' => 'front',
+            'client_photo_id' => $id,
+        ], ['Accept' => 'application/json']);
+
+        $send($user)->assertCreated()->assertJsonPath('uuid', $id);
+        $send($user)->assertOk()->assertJsonPath('uuid', $id);
+        $send($this->member())->assertStatus(409);
+
+        $this->assertSame(1, TakeHomeVehicleInspectionPhoto::query()->count());
+        $this->assertCount(1, Storage::disk('local')->allFiles('take-home-inspections'));
+    }
+
+    public function test_an_original_the_phone_could_not_shrink_is_converted_by_a_queued_job(): void
+    {
+        Queue::fake();
+        $user = $this->member();
+        $vehicle = $this->vehicle(['veh_number' => '22514']);
+        $response = $this->actingAs($user)->post(self::BASE.'/photos', [
+            'photo' => UploadedFile::fake()->image('front.png', 3000, 2000),
+            'angle' => 'front',
+        ], ['Accept' => 'application/json'])->assertCreated()->assertJsonPath('processing', true);
+
+        $photo = TakeHomeVehicleInspectionPhoto::query()->where('uuid', $response->json('uuid'))->firstOrFail();
+        $this->assertNotNull($photo->source_path);
+        Storage::disk('local')->assertExists((string) $photo->source_path);
+        Storage::disk('local')->assertMissing($photo->path);
+        Queue::assertPushed(ProcessTakeHomeInspectionPhoto::class, fn (ProcessTakeHomeInspectionPhoto $job): bool => $job->uuid === $photo->uuid);
+
+        // The inspection can be submitted while the conversion is still waiting.
+        $payload = $this->payload($user, $vehicle);
+        $payload['photos']['front'] = $photo->uuid;
+        $this->actingAs($user)->postJson(self::BASE, $payload)->assertCreated();
+
+        (new ProcessTakeHomeInspectionPhoto($photo->uuid))->handle(app(PhotoNormalizer::class));
+
+        $photo->refresh();
+        $this->assertNull($photo->source_path);
+        $this->assertSame([2048, 1365], [$photo->width, $photo->height]);
+        $this->assertStringStartsWith("\xFF\xD8\xFF", (string) Storage::disk('local')->get($photo->path));
+        $this->assertSame(0, count(Storage::disk('local')->allFiles('take-home-inspections/incoming')));
+    }
+
+    public function test_an_iphone_heic_original_is_accepted_and_queued(): void
+    {
+        Queue::fake();
+        $heic = "\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic".str_repeat("\x00", 64);
+
+        $this->actingAs($this->member())->post(self::BASE.'/photos', [
+            'photo' => UploadedFile::fake()->createWithContent('IMG_0001.HEIC', $heic),
+            'angle' => 'rear',
+        ], ['Accept' => 'application/json'])->assertCreated()->assertJsonPath('processing', true);
+
+        $this->assertStringEndsWith('.heic', (string) TakeHomeVehicleInspectionPhoto::query()->sole()->source_path);
+        Queue::assertPushed(ProcessTakeHomeInspectionPhoto::class);
     }
 
     public function test_non_image_uploads_are_rejected(): void
