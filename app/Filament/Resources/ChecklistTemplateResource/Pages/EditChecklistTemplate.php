@@ -422,7 +422,7 @@ class EditChecklistTemplate extends Page
             ->label('Compare with previous')
             ->icon('heroicon-o-arrows-right-left')
             ->link()
-            ->modalHeading(fn (array $arguments): string => 'Changes in v'.($this->historyVersion($arguments)?->version_number ?? '?'))
+            ->modalHeading(fn (array $arguments): string => 'Changes in v'.($this->historyVersion($arguments)->version_number ?? '?'))
             ->modalWidth(MaxWidth::FourExtraLarge)
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
@@ -443,7 +443,7 @@ class EditChecklistTemplate extends Page
             ->label('View JSON')
             ->icon('heroicon-o-code-bracket')
             ->link()
-            ->modalHeading(fn (array $arguments): string => 'v'.($this->historyVersion($arguments)?->version_number ?? '?').' JSON')
+            ->modalHeading(fn (array $arguments): string => 'v'.($this->historyVersion($arguments)->version_number ?? '?').' JSON')
             ->modalWidth(MaxWidth::FourExtraLarge)
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
@@ -465,7 +465,7 @@ class EditChecklistTemplate extends Page
             ->color('warning')
             ->visible(fn (): bool => $this->canManage())
             ->requiresConfirmation()
-            ->modalHeading(fn (array $arguments): string => 'Restore v'.($this->historyVersion($arguments)?->version_number ?? '?').' as the draft?')
+            ->modalHeading(fn (array $arguments): string => 'Restore v'.($this->historyVersion($arguments)->version_number ?? '?').' as the draft?')
             ->modalDescription(fn (): string => ($this->draftId !== null ? 'The open draft is replaced by this version\'s checklist. ' : 'This version\'s checklist becomes the draft. ')
                 .'Nothing changes for members until you publish it.')
             ->modalSubmitActionLabel('Restore as draft')
@@ -669,7 +669,7 @@ class EditChecklistTemplate extends Page
     private function fillFrom(array $checklist): void
     {
         $form = $this->editor()->toForm($checklist);
-        $this->locationOptions = collect($form['compartments'] ?? [])
+        $this->locationOptions = collect($form['compartments'])
             ->mapWithKeys(fn (array $compartment): array => [(string) $compartment['id'] => (string) $compartment['name']])
             ->all();
         $this->form->fill($form);
@@ -811,30 +811,30 @@ class EditChecklistTemplate extends Page
         if (! is_array($entry)) {
             return [];
         }
-        $published = is_array($entry['published'] ?? null) ? $entry['published'] : null;
-        $draft = is_array($entry['draft'] ?? null) ? $entry['draft'] : null;
+        $published = $entry['published'];
+        $draft = $entry['draft'];
 
         return [
-            'source' => (string) ($entry['source'] ?? 'file'),
-            'compartment_count' => (int) ($entry['compartment_count'] ?? 0),
-            'item_count' => (int) ($entry['item_count'] ?? 0),
-            'units' => array_values(array_map(static fn (array $unit): array => [
-                'label' => (string) ($unit['label'] ?? ''),
-                'daily_checkout' => (bool) ($unit['daily_checkout'] ?? true),
-            ], (array) ($entry['units'] ?? []))),
+            'source' => $entry['source'],
+            'compartment_count' => $entry['compartment_count'],
+            'item_count' => $entry['item_count'],
+            'units' => array_map(static fn (array $unit): array => [
+                'label' => $unit['label'],
+                'daily_checkout' => $unit['daily_checkout'],
+            ], $entry['units']),
             'published' => $published === null ? null : [
-                'version_number' => $published['version_number'] ?? null,
-                'published_at' => ChecklistTemplateResource::when($published['published_at'] ?? null),
-                'published_by' => $published['published_by'] ?? null,
-                'change_summary' => $published['change_summary'] ?? null,
+                'version_number' => $published['version_number'],
+                'published_at' => ChecklistTemplateResource::when($published['published_at']),
+                'published_by' => $published['published_by'],
+                'change_summary' => $published['change_summary'],
             ],
             'draft' => $draft === null ? null : [
-                'updated_at' => ChecklistTemplateResource::when($draft['updated_at'] ?? null),
-                'updated_by' => $draft['updated_by'] ?? null,
-                'has_changes' => (bool) ($draft['has_changes'] ?? false),
+                'updated_at' => ChecklistTemplateResource::when($draft['updated_at']),
+                'updated_by' => $draft['updated_by'],
+                'has_changes' => $draft['has_changes'],
             ],
-            'file_drift' => (bool) ($entry['file_drift'] ?? false),
-            'file_error' => $entry['file_error'] ?? null,
+            'file_drift' => $entry['file_drift'],
+            'file_error' => $entry['file_error'],
         ];
     }
 

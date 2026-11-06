@@ -1,6 +1,6 @@
 # Daily Checkout Checklist Template Editor
 
-Status: implementation contract (2026-11-06). Branch `claude/awesome-ritchie-ilqfoi`.
+Status: implemented (2026-11-06). Branch `claude/awesome-ritchie-ilqfoi`.
 Scope: the Daily Checkout apparatus checklists (`/daily`) resolved by
 `App\Services\DailyCheckoutChecklistResolver`. Take-Home Vehicle Inspections, station inventory,
 TRT inventory and supply stock are out of scope and are not touched.
@@ -35,6 +35,7 @@ that keeps working with everything that already depends on the checklist.
 | `status` string(20) | `draft` (at most one per type), `published` (at most one per type), `retired` (was published, then replaced or reverted), `discarded` |
 | `version_number` unsigned int nullable | assigned on publish: max published number for the type + 1 |
 | `checklist` json | full template JSON |
+| `base_checklist` json nullable | the live checklist the draft started from (aliases are computed against it) |
 | `checklist_hash` char(64) | `DailyCheckoutChecklistResolver::versionOf($checklist)` |
 | `based_on_hash` char(64) | hash of the live baseline when the draft was started |
 | `based_on_version_id` nullable | the published version the draft started from (null = repository file) |
@@ -89,8 +90,16 @@ existing `title` or `name` key, whichever the template uses; unique, ≤120) and
   moved item → base compartment name in the item's `legacyCompartmentNames`; renamed compartment →
   base name in the compartment's `legacyCompartmentNames`. Renaming back removes nothing that the
   base already had.
-- A compartment can be deleted only when empty. Removing an item removes it from the next issued
+- Deleting a compartment in the editor asks for confirmation and removes its items with it (move an
+  item elsewhere first with Location to keep it). The server refuses an item that points at a
+  compartment deleted in the same save. A draft may hold an empty compartment, but it cannot be
+  published until it has an item or is deleted. Removing an item removes it from the next issued
   checklist; open defects stay open (the preview counts them).
+- Names are unique case-insensitively (compartments across the checklist, items within a compartment).
+- Import may change only `compartments`; every other top-level key must equal the live checklist. An
+  imported item without an id keeps its positional id only when that id still names the same item;
+  an id that belonged to removed equipment is refused. Restore copies a version's compartments and
+  items only.
 - The result must pass `DailyCheckoutChecklistResolver::isSubmittable()` plus the field rules above.
 
 ## 5. Publish protocol (one transaction)
@@ -108,8 +117,11 @@ existing `title` or `name` key, whichever the template uses; unique, ≤120) and
 7. Audit event `published` with the diff counts and per-unit before/after versions.
 
 "Revert to repository file" uses the same protocol with no new published row.
-"Restore version N" copies that version's checklist into a new draft (published only through the
-normal publish flow).
+"Restore version N" copies that version's compartments and items into the draft (published only
+through the normal publish flow).
+
+The preview's per-unit `conflicts` lists only overlay conflicts the publish would newly cause. The
+diff also reports `items_reordered` (order changes inside a compartment), which counts as a change.
 
 ## 6. Access
 
@@ -121,11 +133,13 @@ normal publish flow).
 
 `Fleet > Checklist templates` (Filament resource on the version model).
 
-- Index: one card/row per template with source (repository file / published vN), compartments,
-  items, units using it, open draft (by, when), last publication (by, when, summary), file-drift flag.
+- Index: one card per template with source (repository file / published vN), compartments,
+  items, units using it, open draft (by, when), last publication (by, when, summary), file-drift flag;
+  below it the "Publication record" table (drafts, published and replaced versions, with exports).
+- The apparatus profile's "More" menu links managers to the template that unit uses.
 - Editor `/admin/checklist-templates/{type}`: compartments as collapsible, reorderable sections;
   items as reorderable rows (name, quantity, brand, model, description, note, location select).
-  Header actions: Save draft, Preview & publish (diff + per-unit impact + required summary +
+  Header actions: Save draft (Ctrl/Cmd+S), Preview & publish (diff + per-unit impact + required summary +
   confirmation), Discard draft, Export JSON, Import JSON (into the draft, validated), Revert to
   repository file. History: every published version with publisher, date, summary, diff against
   its predecessor, View JSON and Restore as draft.
@@ -136,3 +150,13 @@ normal publish flow).
 - `php artisan checklist-templates:export {type} [--write]` — prints the live baseline JSON; with
   `--write` replaces `storage/checklists/{type}_checklist.json` so a developer can commit the
   published version back into the repository.
+
+## 9. Verification
+
+- `tests/Feature/ChecklistTemplates/ChecklistTemplateEditorTest.php`: byte-identical resolution with nothing
+  published, an unchanged save of every shipped template reproduces it exactly, publish scope, grace
+  revisions, aliases and equipment identity, ids, concurrency, authorization, revert, import, restore,
+  medical scope, commands.
+- `tests/Feature/Filament/ChecklistTemplateEditorPageTest.php`: the admin pages end to end.
+- `tests/Integration/ChecklistTemplatePostgresTest.php` (`postgres` group): json round trip, partial unique
+  indexes, publish and revert with row locks on PostgreSQL.
