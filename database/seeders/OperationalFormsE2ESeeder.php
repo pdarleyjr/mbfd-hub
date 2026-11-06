@@ -7,6 +7,7 @@ use App\Models\DepartmentUpdate;
 use App\Models\Employee;
 use App\Models\OperationalFormRecord;
 use App\Models\Station;
+use App\Models\UnitMasterVehicle;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
@@ -129,6 +130,17 @@ class OperationalFormsE2ESeeder extends Seeder
 
         $this->seedControlledSamples($employee);
         $this->seedMedicalInventoryRequest();
+        $this->seedAccidentReportVehicle();
+    }
+
+    /** A City vehicle for the Vehicle Accident Report picker, linked to the seeded Engine 1. The admin (a Captain) is the supervisor. */
+    private function seedAccidentReportVehicle(): void
+    {
+        $vehicle = UnitMasterVehicle::query()->firstOrCreate(
+            ['veh_number' => '4512'],
+            ['make' => 'Pierce', 'model' => 'Enforcer', 'year' => '2019', 'tag_number' => 'FL12345', 'asset_category' => 'Pumper', 'record_source' => 'e2e'],
+        );
+        Apparatus::query()->where('unit_id', 'E1')->update(['unit_master_vehicle_id' => $vehicle->id]);
     }
 
     /** The tracked EMS source forms (Airway Bag, ALS Med Bag, ALS Transport Vehicle) and two units for the Medical Inventory Request. */

@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Services\Dashboards;
 
 use App\Filament\Pages\IssueGroupPage;
+use App\Services\Dashboards\Sources\Vehicle\TakeHomeInspectionNoticeSource;
 use App\Support\Dashboards\DashboardIssue;
 use App\Support\Dashboards\DashboardView;
 
 /**
- * What each of the three dashboards shows, as plain view data: exact counts from the sources (stat
+ * What each of the four dashboards shows, as plain view data: exact counts from the sources (stat
  * cards, or the Overview's filter chips), the main lists combined per unit, and the stage queues. No
  * trend arrows or deltas: there is no grounded comparator for them.
  */
@@ -25,7 +26,19 @@ final class DashboardLayout
     ];
 
     /**
-     * @param  array{vehicle: ?string, station: ?string, messages: ?string}  $links
+     * Stage queue of the Member Requests board. The sub-stages are tags the request sources set from each record's real
+     * status (Sources\Requests\RequestTags); "Member replied" only appears while something is in it.
+     */
+    private const REQUEST_STAGES = [
+        ['key' => 'awaiting_response', 'label' => 'Needs review', 'icon' => 'heroicon-m-exclamation-circle', 'tone' => 'danger', 'countKey' => 'awaiting_response', 'stage' => 'awaiting_response'],
+        ['key' => 'member_replied', 'label' => 'Member replied', 'icon' => 'heroicon-m-chat-bubble-left-ellipsis', 'tone' => 'violet', 'countKey' => 'member_replied', 'tag' => 'member_replied', 'hideEmpty' => true],
+        ['key' => 'waiting_member', 'label' => 'Waiting on the member', 'icon' => 'heroicon-m-user', 'tone' => 'warning', 'countKey' => 'waiting_member', 'tag' => 'waiting_member'],
+        ['key' => 'awaiting_pickup', 'label' => 'Ordered or awaiting pickup', 'icon' => 'heroicon-m-truck', 'tone' => 'info', 'countKey' => 'awaiting_pickup', 'tag' => 'awaiting_pickup'],
+        ['key' => 'resolved', 'label' => 'Completed today', 'icon' => 'heroicon-m-check-circle', 'tone' => 'success', 'countKey' => 'resolved_today', 'stage' => 'resolved'],
+    ];
+
+    /**
+     * @param  array{vehicle: ?string, station: ?string, messages: ?string, requests?: ?string}  $links
      * @return array{stats: list<array<string, mixed>>, main: list<array<string, mixed>>, side: list<array<string, mixed>>, primaryLane: ?string}
      */
     public static function for(DashboardView $view, DashboardSnapshot $snapshot, array $links, ?string $filterLabel = null): array
@@ -34,13 +47,55 @@ final class DashboardLayout
             DashboardView::Overview => self::overview($snapshot, $links, DashboardFilters::laneOf($view, $snapshot->filter)),
             DashboardView::VehicleCheckout => self::vehicle($snapshot, $links, $filterLabel),
             DashboardView::StationOperations => self::station($snapshot, $links, $filterLabel),
+            DashboardView::MemberRequests => self::memberRequests($snapshot, $filterLabel),
         };
+    }
+
+    /** @return array<string, mixed> */
+    private static function memberRequests(DashboardSnapshot $s, ?string $filterLabel): array
+    {
+        $lane = DashboardSnapshot::LANE_REQUESTS;
+        $rows = $s->rowsIn($lane);
+        $exact = $filterLabel === null;
+        $groups = [];
+        foreach (self::REQUEST_STAGES as $stage) {
+            $inStage = array_values(array_filter($rows, static fn (DashboardIssue $row): bool => isset($stage['tag'])
+                ? $row->isOpen() && in_array($stage['tag'], $row->tags, true)
+                : $row->stage === $stage['stage']));
+            $count = $exact && $s->hasCount($stage['countKey'], $lane) ? $s->count($stage['countKey'], $lane) : null;
+            if (($stage['hideEmpty'] ?? false) && $inStage === [] && ! $count) {
+                continue;
+            }
+            $groups[] = [
+                'key' => $stage['key'], 'label' => $stage['label'], 'icon' => $stage['icon'], 'tone' => $stage['tone'],
+                'rows' => self::rows(array_slice($inStage, 0, self::ROWS_PER_STAGE), $s),
+                'count' => $count,
+            ];
+        }
+
+        return [
+            'primaryLane' => $lane,
+            'stats' => [
+                self::stat('open', 'Open requests', $s->count('open', $lane), 'Not completed, denied or cancelled', 'heroicon-o-inbox-stack', 'danger'),
+                self::stat('awaiting_response', 'Needs review', $s->count('awaiting_response', $lane), 'No staff action yet', 'heroicon-o-clock', 'warning'),
+                self::stat('awaiting_pickup', 'Ordered or awaiting pickup', $s->count('awaiting_pickup', $lane), 'Ordered, arrived or ready', 'heroicon-o-truck', 'info'),
+                self::stat('resolved_today', 'Completed today', $s->count('resolved_today', $lane), 'This operational day', 'heroicon-o-check-circle', 'success'),
+            ],
+            'main' => [
+                self::card('member-requests', 'Requests by member', $filterLabel ? 'Filtered: '.$filterLabel : 'One row per member, open requests first.', 'heroicon-o-clipboard-document-list', 'info',
+                    self::groups($rows, $s), $filterLabel ? 'No member requests match “'.$filterLabel.'”.' : 'No open member requests.'),
+            ],
+            'side' => [
+                ['type' => 'queue', 'id' => 'request-stages', 'title' => 'Where requests stand', 'note' => $filterLabel ? 'Filtered: '.$filterLabel : null,
+                    'icon' => 'heroicon-o-queue-list', 'groups' => $groups],
+            ],
+        ];
     }
 
     /**
      * The filter chips carry the counts here, so the Overview has no separate stat cards.
      *
-     * @param  array{vehicle: ?string, station: ?string, messages: ?string}  $links
+     * @param  array{vehicle: ?string, station: ?string, messages: ?string, requests?: ?string}  $links
      */
     private static function overview(DashboardSnapshot $s, array $links, ?string $onlyLane): array
     {
@@ -48,6 +103,7 @@ final class DashboardLayout
         $station = DashboardSnapshot::LANE_STATION;
         $messages = DashboardSnapshot::LANE_MESSAGES;
         $cards = [
+            // Take-home inspections (notices, approved on submission) follow the open issues here; they are not counted.
             $vehicle => self::card('lane-vehicle', 'Apparatus', 'Open checkout issues, one row per unit.', 'heroicon-o-truck', 'danger',
                 self::groups($s->rowsIn($vehicle), $s), 'No open vehicle issues for this operational day.', $links['vehicle'], 'vehicle checkout issues', filterKey: 'apparatus'),
             $station => self::card('lane-station', 'Stations', 'Open requests, one row per station.', 'heroicon-o-building-office', 'warning',
@@ -55,6 +111,16 @@ final class DashboardLayout
             $messages => self::card('lane-messages', 'Personnel', 'Messages and reports, one row per member.', 'heroicon-o-users', 'violet',
                 self::groups($s->rowsIn($messages), $s), 'No open personnel items for this operational day.', $links['messages'], 'Support Services messages', filterKey: 'personnel'),
         ];
+        // Its own lane, not inside Personnel: a request waits on staff to order, issue or decide, while a Personnel row
+        // is a conversation. Only admins who can see a request source get the lane at all.
+        $requests = DashboardSnapshot::LANE_REQUESTS;
+        if ($s->hasLane($requests)) {
+            $cards[$requests] = self::card('lane-requests', 'Requests', 'Uniforms, PPE and equipment, one row per member.', 'heroicon-o-clipboard-document-list', 'info',
+                self::groups($s->rowsIn($requests), $s), 'No open member requests.', $links['requests'] ?? null, 'member requests', filterKey: 'requests');
+        }
+        if ($onlyLane !== null && ! isset($cards[$onlyLane])) {
+            $onlyLane = null;
+        }
 
         return [
             'primaryLane' => $onlyLane,
@@ -64,12 +130,27 @@ final class DashboardLayout
         ];
     }
 
-    /** @param  array{vehicle: ?string, station: ?string, messages: ?string}  $links */
+    /** @param  array{vehicle: ?string, station: ?string, messages: ?string, requests?: ?string}  $links */
     private static function vehicle(DashboardSnapshot $s, array $links, ?string $filterLabel): array
     {
         $lane = DashboardSnapshot::LANE_VEHICLE;
-        $rows = $s->rowsIn($lane);
+        $all = $s->rowsIn($lane);
+        // Notices (take-home inspections, approved on submission) get their own card, apart from the issues to work.
+        $notices = array_values(array_filter($all, static fn (DashboardIssue $r): bool => $r->isNotice()));
+        $rows = array_values(array_filter($all, static fn (DashboardIssue $r): bool => ! $r->isNotice()));
         $special = array_values(array_filter($rows, static fn (DashboardIssue $r): bool => array_intersect(['marine', 'special'], $r->tags) !== []));
+        $side = [
+            self::queue('apparatus-queue', 'Apparatus workflow queue', $filterLabel ? 'Filtered: '.$filterLabel : null, 'heroicon-o-cog-6-tooth', $s, $lane, $filterLabel === null),
+            self::card('marine-special', 'Marine & specialty units', null, 'heroicon-o-lifebuoy', 'info',
+                self::groups($special, $s), 'No open marine or specialty unit issues.', null, null, true),
+        ];
+        // Only for Fleet viewers (the source reports "notices" only to them), and only unfiltered: a chip never matches a notice.
+        if ($filterLabel === null && $s->hasCount('notices', $lane)) {
+            $side[] = self::card('take-home-notices', 'Take-home inspections',
+                'Approved automatically. Shown for '.TakeHomeInspectionNoticeSource::noticeHours().' hours; nothing to act on.',
+                'heroicon-o-clipboard-document-check', 'neutral', self::groups($notices, $s),
+                'No take-home inspections in the last '.TakeHomeInspectionNoticeSource::noticeHours().' hours.');
+        }
 
         return [
             'primaryLane' => $lane,
@@ -83,15 +164,11 @@ final class DashboardLayout
                 self::card('priority-apparatus', 'Priority apparatus alerts', $filterLabel ? 'Filtered: '.$filterLabel : 'One row per unit, most severe first.', 'heroicon-o-exclamation-circle', 'danger',
                     self::groups($rows, $s), $filterLabel ? 'No apparatus issues match “'.$filterLabel.'” for this operational day.' : 'No open vehicle issues for this operational day.'),
             ],
-            'side' => [
-                self::queue('apparatus-queue', 'Apparatus workflow queue', $filterLabel ? 'Filtered: '.$filterLabel : null, 'heroicon-o-cog-6-tooth', $s, $lane, $filterLabel === null),
-                self::card('marine-special', 'Marine & specialty units', null, 'heroicon-o-lifebuoy', 'info',
-                    self::groups($special, $s), 'No open marine or specialty unit issues.', null, null, true),
-            ],
+            'side' => $side,
         ];
     }
 
-    /** @param  array{vehicle: ?string, station: ?string, messages: ?string}  $links */
+    /** @param  array{vehicle: ?string, station: ?string, messages: ?string, requests?: ?string}  $links */
     private static function station(DashboardSnapshot $s, array $links, ?string $filterLabel): array
     {
         $lane = DashboardSnapshot::LANE_STATION;

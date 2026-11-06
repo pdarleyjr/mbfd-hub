@@ -11,8 +11,10 @@ use App\Models\User;
 use App\Services\AiAutomation\AiIntake;
 use App\Services\Captain5\Captain5IssueScope;
 use App\Services\Defects\DefectParticipants;
+use App\Services\MemberReplies\MemberReplyLedger;
 use App\Services\Security\Captain5Access;
 use App\Support\Fleet\InspectionReviewers;
+use App\Support\MemberReplies\ReplySubject;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -290,6 +292,7 @@ final class IssueMessageService
         if ($notify) {
             $this->notifications->messagePosted($message, $data['kind'] ?? null, $inspection);
         }
+        $this->markReplyState($message, $authorContext, $visibility, $inspection, $defect);
         // A crew member's own new message on an issue thread gets the AI Response receipt (never a correction,
         // never staff or Captain 5, never an internal note). Never throws and is a no-op while the switch is OFF.
         if ($defect !== null && $original === null
@@ -299,6 +302,61 @@ final class IssueMessageService
         }
 
         return $message;
+    }
+
+    /**
+     * A participant's member-visible message leaves the thread waiting on staff; a member-visible answer from
+     * Logistics or Captain 5 clears it. Internal notes change nothing (docs/member-replies.md section 4).
+     */
+    private function markReplyState(ApparatusIssueMessage $message, string $authorContext, string $visibility, ?ApparatusInspection $inspection, ?ApparatusDefect $defect): void
+    {
+        if ($visibility !== ApparatusIssueMessage::VISIBILITY_MEMBER) {
+            return;
+        }
+        [$type, $id] = $defect !== null
+            ? [ReplySubject::APPARATUS_DEFECT, (int) $defect->getKey()]
+            : [ReplySubject::APPARATUS_INSPECTION, (int) $inspection?->getKey()];
+        if ($id === 0) {
+            return;
+        }
+        $ledger = app(MemberReplyLedger::class);
+        if ($authorContext === ApparatusIssueMessage::CONTEXT_MEMBER) {
+            $ledger->memberReplied($type, $id, $message->author, $message->created_at);
+        } else {
+            $ledger->staffReplied($type, $id, $message->created_at);
+        }
+    }
+
+    /**
+     * Whether the user may read and write an issue's thread as a crew member: a participant, or the owner of an
+     * inspection that reported or observed it. Staff access is decided separately (canPost / threadFor).
+     */
+    public function followsDefect(User $user, ApparatusDefect $defect): bool
+    {
+        return $this->mayFollowDefect($user, $defect);
+    }
+
+    /**
+     * The member-visible messages of an issue thread, for a crew member who follows it. Internal notes are never
+     * returned, even to a viewer who also holds a reviewer role.
+     *
+     * @return Collection<int, ApparatusIssueMessage>
+     *
+     * @throws AuthorizationException
+     */
+    public function memberThreadForDefect(User $viewer, ApparatusDefect $defect): Collection
+    {
+        if (! $this->mayFollowDefect($viewer, $defect)) {
+            throw new AuthorizationException('You can only use the thread of an issue you reported or follow.');
+        }
+
+        return ApparatusIssueMessage::query()
+            ->with('author:id,name,display_name')
+            ->where('apparatus_defect_id', $defect->getKey())
+            ->memberVisible()
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
     }
 
     private function existing(User $author, ?string $clientMessageId): ?ApparatusIssueMessage

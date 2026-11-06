@@ -1,9 +1,10 @@
+import { protectedUiOrigin } from '../support/test-environment';
 import { expect, test } from '@playwright/test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { uiAuditEnvironment } from '../../../playwright.ui-audit.config';
 
-const origin = 'http://127.0.0.1:8127';
+const origin = protectedUiOrigin;
 const artifactDir = resolve(process.env.UI_AUDIT_ARTIFACT_DIR ?? 'test-results/ui-audit-artifacts');
 const personas = JSON.parse(readFileSync('test-results/protected-ui-auth/personas.json', 'utf8')) as Record<string, string>;
 

@@ -15,6 +15,8 @@ use App\Models\Apparatus;
 use App\Models\Station;
 use App\Models\UnitMasterVehicle;
 use App\Support\Fleet\ApparatusOverview;
+use App\Support\Fleet\FrontlineUnits;
+use Closure;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -24,6 +26,7 @@ use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 /**
  * Fleet -> Apparatus: the operational profile Fleet managers and mechanics
@@ -58,11 +61,16 @@ class ApparatusResource extends Resource
     /** Each unit's own PM interval; 300 hours when none is set (matches Apparatus::getPmHealthStatus()). */
     public const PM_INTERVAL_SQL = 'COALESCE(pm_interval_hours, 300)';
 
+    /**
+     * One page a Fleet manager reads at a glance: the unit and the truck on it now at the top, then the truck itself,
+     * then the unit assignment (read only, changed through a guarded action), then everything else folded away. Every
+     * field the page has always had is still here.
+     */
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Overview')
+                Forms\Components\Section::make('Unit and truck')
                     ->schema([
                         Forms\Components\View::make('filament.resources.apparatus-resource.partials.overview')
                             ->viewData(fn (?Apparatus $record): array => [
@@ -71,19 +79,11 @@ class ApparatusResource extends Resource
                             ]),
                     ])
                     ->visible(fn (?Apparatus $record): bool => $record?->exists === true),
-                Forms\Components\Section::make('Unit')
+                self::truckSection(),
+                self::unitAssignmentSection(),
+                Forms\Components\Section::make('More settings')
+                    ->description('Station, assignment, class and Daily Checkout policy.')
                     ->schema([
-                        Forms\Components\TextInput::make('designation')
-                            ->label('Designation')
-                            ->placeholder('E 1, R 2, L 3')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('unit_id')
-                            ->label('Unit ID')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('class_description')
-                            ->label('Class')
-                            ->placeholder('ENGINE, RESCUE, LADDER')
-                            ->maxLength(255),
                         Forms\Components\Select::make('station_id')
                             ->relationship('station', 'station_number')
                             ->searchable()
@@ -95,67 +95,32 @@ class ApparatusResource extends Resource
                             ->placeholder('Station 1, Reserve')
                             ->maxLength(255),
                         Forms\Components\TextInput::make('current_location')
-                            ->label('Current location')
+                            ->label('Where the truck is now')
                             ->placeholder('Station 1, Fire Fleet')
                             ->maxLength(255),
-                        Forms\Components\Textarea::make('notes')
-                            ->label('Fleet notes')
-                            ->rows(2)
-                            ->columnSpanFull(),
-                    ])->columns(3),
-                Forms\Components\Section::make('Status and Daily Checkout')
-                    ->schema([
-                        Forms\Components\Select::make('status')
-                            ->label('Operational status')
-                            ->options(ApparatusWorkflowActions::STATUS_OPTIONS)
-                            ->default('In Service'),
+                        Forms\Components\TextInput::make('class_description')
+                            ->label('Class')
+                            ->placeholder('ENGINE, RESCUE, LADDER')
+                            ->maxLength(255),
                         Forms\Components\Select::make('daily_checkout_requirement')
                             ->label('Daily Checkout policy')
                             ->options(DailyCheckoutRequirement::options())
                             ->default(DailyCheckoutRequirement::Unknown->value)
                             ->required()
-                            ->helperText('Classify explicitly. This does not change the operational status.'),
+                            ->helperText('Classify explicitly. This does not change the truck status.'),
                         Forms\Components\Select::make('daily_checkout_template')
                             ->label('Approved Daily Checkout template')
                             ->options(DailyCheckoutChecklistTemplate::options())
                             ->default(DailyCheckoutChecklistTemplate::Pending->value)
                             ->required()
                             ->helperText('Pending permits only approved Engine, Rescue, and Ladder family mapping. Specialty and administrative apparatus stay blocked until a template is selected.'),
-                    ])->columns(3),
-                Forms\Components\Section::make('Vehicle')
-                    ->description(fn (?Apparatus $record): string => self::vehicleSectionDescription($record))
+                    ])
+                    ->columns(3)
+                    ->collapsible()
+                    ->collapsed(fn (?Apparatus $record): bool => $record?->exists === true),
+                Forms\Components\Section::make('Maintenance and PM')
+                    ->description('Service history and PM intervals for this truck.')
                     ->schema([
-                        Forms\Components\TextInput::make('vehicle_number')
-                            ->label('Vehicle #')
-                            ->maxLength(50)
-                            ->disabled(fn (?Apparatus $record): bool => self::isLinked($record))
-                            ->dehydrated(fn (?Apparatus $record): bool => ! self::isLinked($record))
-                            ->helperText(fn (?Apparatus $record): string => self::isLinked($record)
-                                ? 'Set by the linked vehicle record. Use "Change vehicle record" under More to point this unit at a different vehicle.'
-                                : 'Links this unit to the Master Vehicle Inventory vehicle with the same number.'),
-                        Forms\Components\TextInput::make('year')
-                            ->numeric()
-                            ->minValue(1950)
-                            ->maxValue(2100)
-                            ->placeholder('YYYY'),
-                        Forms\Components\TextInput::make('make')->maxLength(255),
-                        Forms\Components\TextInput::make('model')->maxLength(255),
-                        Forms\Components\TextInput::make('vin')
-                            ->label('VIN')
-                            ->maxLength(255)
-                            ->columnSpan(2),
-                    ])->columns(4),
-                Forms\Components\Section::make('Meters and PM')
-                    ->schema([
-                        Forms\Components\TextInput::make('current_engine_hours')
-                            ->label('Engine hours')
-                            ->numeric()
-                            ->step(0.1)
-                            ->suffix('hrs'),
-                        Forms\Components\TextInput::make('current_miles')
-                            ->label('Odometer')
-                            ->numeric()
-                            ->suffix('mi'),
                         Forms\Components\Select::make('last_service_type')
                             ->label('Last service type')
                             ->options(ApparatusPmServiceType::options()),
@@ -191,8 +156,112 @@ class ApparatusResource extends Resource
                     ])
                     ->columns(4)
                     ->collapsible()
-                    ->visible(fn () => auth()->user()?->can('manage_pm_settings') ?? true),
+                    ->collapsed(fn (?Apparatus $record): bool => $record?->exists === true)
+                    ->visible(fn (): bool => self::canManagePm()),
             ]);
+    }
+
+    /** The physical vehicle: what stays with it when a unit moves to another truck. */
+    private static function truckSection(): Forms\Components\Section
+    {
+        return Forms\Components\Section::make('This truck')
+            ->description(fn (?Apparatus $record): string => self::vehicleSectionDescription($record))
+            ->schema([
+                Forms\Components\TextInput::make('vehicle_number')
+                    ->label('Vehicle # (the physical truck)')
+                    ->maxLength(50)
+                    ->disabled(fn (?Apparatus $record): bool => self::isLinked($record))
+                    ->dehydrated(fn (?Apparatus $record): bool => ! self::isLinked($record))
+                    ->helperText(fn (?Apparatus $record): string => self::isLinked($record)
+                        ? 'Set by the linked vehicle record. Use "Change vehicle record" under More to point this truck at a different vehicle.'
+                        : 'The number on the truck, like 20503. Links it to the Master Vehicle Inventory vehicle with the same number.'),
+                Forms\Components\TextInput::make('vin')
+                    ->label('VIN')
+                    ->maxLength(255)
+                    ->columnSpan(2),
+                Forms\Components\Select::make('status')
+                    ->label('Truck status')
+                    ->options(ApparatusWorkflowActions::STATUS_OPTIONS)
+                    ->default('In Service')
+                    ->helperText(fn (?Apparatus $record): ?string => ApparatusWorkflowActions::frontlineStatusHint($record))
+                    ->rule(fn (?Apparatus $record): Closure => ApparatusWorkflowActions::frontlineStatusRule($record)),
+                Forms\Components\TextInput::make('year')
+                    ->numeric()
+                    ->minValue(1950)
+                    ->maxValue(2100)
+                    ->placeholder('YYYY'),
+                Forms\Components\TextInput::make('make')->maxLength(255),
+                Forms\Components\TextInput::make('model')->maxLength(255),
+                Forms\Components\TextInput::make('current_engine_hours')
+                    ->label('Engine hours')
+                    ->numeric()
+                    ->step(0.1)
+                    ->suffix('hrs')
+                    ->visible(fn (): bool => self::canManagePm()),
+                Forms\Components\TextInput::make('current_miles')
+                    ->label('Odometer')
+                    ->numeric()
+                    ->suffix('mi')
+                    ->visible(fn (): bool => self::canManagePm()),
+                Forms\Components\Textarea::make('notes')
+                    ->label('Fleet notes')
+                    ->rows(2)
+                    ->columnSpanFull(),
+            ])
+            ->columns(4);
+    }
+
+    /**
+     * The unit this truck runs as (E1, Engine 1). Read only on an existing record: putting a different truck on a unit is
+     * Swap truck, and correcting the fields is the guarded Change unit assignment action. A new record types them here.
+     */
+    private static function unitAssignmentSection(): Forms\Components\Section
+    {
+        $show = static fn (string $label, Closure $value): Forms\Components\Placeholder => Forms\Components\Placeholder::make('unit_view_'.Str::slug($label, '_'))
+            ->label($label)
+            ->content(static fn (?Apparatus $record): string => (string) ($value($record) ?: 'Not set'));
+
+        return Forms\Components\Section::make('Unit assignment')
+            ->description(fn (?Apparatus $record): string => $record?->exists === true
+                ? 'The unit this truck is running as. To put a different truck on the unit, use Swap truck at the top of the page. Change unit assignment is only for correcting this record.'
+                : 'The unit this truck runs as, like E1. Leave blank for a spare truck. A unit ID is never a vehicle number.')
+            ->headerActions([
+                ApparatusWorkflowActions::changeUnitAssignment(Forms\Components\Actions\Action::make('changeUnitAssignment'))
+                    ->visible(fn (?Apparatus $record, mixed $livewire): bool => $record?->exists === true && $livewire instanceof Pages\EditApparatus),
+            ])
+            ->schema(fn (?Apparatus $record): array => $record?->exists === true
+                ? [
+                    $show('Unit ID', fn (Apparatus $truck): mixed => $truck->getAttribute('unit_id')),
+                    $show('Designation', fn (Apparatus $truck): mixed => $truck->designation),
+                    $show('Name', fn (Apparatus $truck): mixed => $truck->name),
+                    $show('Link name (slug)', fn (Apparatus $truck): mixed => $truck->slug),
+                    Forms\Components\Placeholder::make('unit_view_frontline')
+                        ->label('Front-line unit')
+                        ->content(fn (Apparatus $record): string => ($unit = FrontlineUnits::carriedBy($record)) !== null
+                            ? "Yes. {$unit} must always have a truck In Service."
+                            : 'No. A spare or support truck.')
+                        ->columnSpanFull(),
+                ]
+                : [
+                    Forms\Components\TextInput::make('unit_id')
+                        ->label('Unit ID')
+                        ->placeholder('E1')
+                        ->maxLength(255),
+                    Forms\Components\TextInput::make('designation')
+                        ->label('Designation')
+                        ->placeholder('E 1')
+                        ->maxLength(255),
+                    Forms\Components\TextInput::make('name')
+                        ->label('Name')
+                        ->placeholder('ENGINE E1')
+                        ->maxLength(255),
+                ])
+            ->columns(4);
+    }
+
+    private static function canManagePm(): bool
+    {
+        return auth()->user()?->can('manage_pm_settings') ?? true;
     }
 
     public static function table(Table $table): Table
@@ -215,7 +284,9 @@ class ApparatusResource extends Resource
                     ->sortable()
                     ->weight('bold')
                     ->placeholder('—'),
+                // Phone cards summarise unit, status, open work and PM; the rest opens in the row's details.
                 Tables\Columns\TextColumn::make('vehicle_number')->visibleFrom('md')
+                    ->extraHeaderAttributes(['data-hub-priority' => 4])
                     ->label('Vehicle')
                     ->description(fn (Apparatus $record): string => self::vehicleSummary($record))
                     ->color(fn (Apparatus $record): ?string => $record->master_link_status === Apparatus::MASTER_LINK_NEEDS_REVIEW ? 'warning' : null)
@@ -223,13 +294,15 @@ class ApparatusResource extends Resource
                     ->sortable()
                     ->toggleable()
                     ->placeholder('Not recorded'),
-                Tables\Columns\TextColumn::make('status')->visibleFrom('md')
+                Tables\Columns\TextColumn::make('status')
+                    ->extraHeaderAttributes(['data-hub-priority' => 1])
                     ->badge()
                     ->alignment(Alignment::Center)
                     ->color(fn (?string $state): string => self::statusColor($state))
                     ->sortable()
                     ->placeholder('Not set'),
-                Tables\Columns\TextColumn::make('open_work')->visibleFrom('md')
+                Tables\Columns\TextColumn::make('open_work')
+                    ->extraHeaderAttributes(['data-hub-priority' => 2])
                     ->label('Open work')
                     ->badge()
                     ->alignment(Alignment::Center)
@@ -237,7 +310,8 @@ class ApparatusResource extends Resource
                     ->color(fn (Apparatus $record): string => (int) $record->getAttribute('open_defects_count') > 0
                         ? 'danger'
                         : ((int) $record->getAttribute('open_tickets_count') > 0 ? 'warning' : 'success')),
-                Tables\Columns\TextColumn::make('pm_health_status')->visibleFrom('md')
+                Tables\Columns\TextColumn::make('pm_health_status')
+                    ->extraHeaderAttributes(['data-hub-priority' => 3])
                     ->label('PM')
                     ->badge()
                     ->alignment(Alignment::Center)
@@ -265,6 +339,7 @@ class ApparatusResource extends Resource
                         return "{$health['hours_since_pm']} of {$health['interval_hours']} engine hours since PM | {$miles} mi | Last PM: {$lastPm}";
                     }),
                 Tables\Columns\TextColumn::make('location_display')->visibleFrom('md')
+                    ->extraHeaderAttributes(['data-hub-priority' => 5])
                     ->label('Location')
                     ->getStateUsing(fn (Apparatus $record): string => self::locationLabel($record))
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(fn (Builder $q): Builder => $q
@@ -412,6 +487,8 @@ class ApparatusResource extends Resource
             ->recordUrl(fn (Apparatus $record): string => static::getUrl('view', ['record' => $record]))
             ->actions([
                 Tables\Actions\ActionGroup::make([
+                    ApparatusWorkflowActions::swapTruck(Tables\Actions\Action::make('swapTruck')),
+                    ApparatusWorkflowActions::takeOutOfService(Tables\Actions\Action::make('takeOutOfService')),
                     ApparatusWorkflowActions::changeStatus(Tables\Actions\Action::make('updateStatus')),
                     ApparatusWorkflowActions::scheduleService(Tables\Actions\Action::make('scheduleService')),
                     ApparatusWorkflowActions::logPm(Tables\Actions\Action::make('logPmService')),

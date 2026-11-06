@@ -91,6 +91,8 @@ export interface ClosedIssuesPage {
 export interface IssueHistory {
   issue: IssueSummary | null;
   timeline: TimelineEntry[];
+  /** The signed-in member is on this issue, so its conversation and reply box are theirs (docs/member-replies.md). */
+  participant?: boolean;
 }
 
 /** loading: nothing yet. live: the last request worked. stale: showing an earlier answer. unavailable: nothing to show. */
@@ -113,8 +115,10 @@ export interface ConcernSubmission {
   kind: ConcernKind;
   description: string;
   location?: string | null;
-  /** A data URL, with the same limits as a defect photo. */
+  /** A data URL: only from a draft saved before photos were queued separately. */
   photo?: string | null;
+  /** Id of the photo queued on this device and sent on its own request. */
+  photo_id?: string;
   existing_issue_id?: number | null;
 }
 
@@ -124,7 +128,9 @@ export interface ConcernDraft {
   kind: ConcernKind | null;
   description: string;
   location: string;
+  /** Inline data URL from an older draft. */
   photo?: string;
+  photo_id?: string;
   existing_issue_id: number | null;
 }
 

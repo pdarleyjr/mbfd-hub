@@ -21,7 +21,7 @@ final class PersonnelRequestNotifier
         $this->notifyAdmins($request, 'New '.$request->type->label(), "{$request->request_number} for {$request->beneficiary_name} is ready for review.");
 
         if ($request->type === PersonnelRequestType::Equipment) {
-            $this->notifyMember($request, 'Personnel equipment request submitted', "{$request->requester_name} submitted {$request->request_number} on your behalf.");
+            $this->notifyMember($request, 'Personnel equipment request submitted', "{$request->requester_name} submitted {$request->request_number} on your behalf.", includeRequester: false);
         }
     }
 
@@ -96,15 +96,23 @@ final class PersonnelRequestNotifier
         ));
     }
 
-    private function notifyMember(PersonnelRequest $request, string $title, string $body, ?PersonnelRequestItem $item = null): void
+    private function notifyMember(PersonnelRequest $request, string $title, string $body, ?PersonnelRequestItem $item = null, bool $includeRequester = true): void
     {
-        $this->guarded(fn () => $this->queueMemberAlert($request, $title, $body, $item));
+        $this->guarded(fn () => $this->queueMemberAlert($request, $title, $body, $item, $includeRequester));
     }
 
-    private function queueMemberAlert(PersonnelRequest $request, string $title, string $body, ?PersonnelRequestItem $item = null): void
+    private function queueMemberAlert(PersonnelRequest $request, string $title, string $body, ?PersonnelRequestItem $item = null, bool $includeRequester = true): void
     {
-        $employee = $request->beneficiary;
-        if (! $employee) {
+        $this->alertEmployee($request, $request->beneficiary, $title, $body, $item);
+        // The officer who submitted it for the member is part of the request too (docs/member-replies.md section 3).
+        if ($includeRequester && $request->requester_employee_id !== null && (int) $request->requester_employee_id !== (int) $request->beneficiary_employee_id) {
+            $this->alertEmployee($request, $request->requester, $title, $body, $item);
+        }
+    }
+
+    private function alertEmployee(PersonnelRequest $request, mixed $employee, string $title, string $body, ?PersonnelRequestItem $item): void
+    {
+        if (! $employee instanceof \App\Models\Employee) {
             return;
         }
         $url = '/employee/my-requests/'.$request->getRouteKey().($item ? '#item-'.$item->id : '');

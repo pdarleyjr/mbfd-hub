@@ -18,37 +18,82 @@
             ->when(! \App\Support\Fleet\VehicleDocumentAccess::canSensitive(auth()->user()), fn ($q) => $q->where('is_sensitive', false))
             ->count()
         : null;
+    $frontlineUnit = \App\Support\Fleet\FrontlineUnits::carriedBy($apparatus);
+    $unitLabel = $apparatus->designation ?: $apparatus->name ?: $apparatus->unit_id;
+    $vin = trim((string) $apparatus->vin);
+    $vinTail = $vin === '' ? null : (mb_strlen($vin) > 6 ? 'ending '.mb_substr($vin, -6) : $vin);
+    $meters = array_filter([
+        $apparatus->current_miles !== null ? number_format((int) $apparatus->current_miles).' mi' : null,
+        $apparatus->current_engine_hours !== null ? number_format((float) $apparatus->current_engine_hours, 1).' engine hrs' : null,
+    ]);
 @endphp
 
 {{-- Layout and colour: semantic hub-insp-* classes in resources/css/filament/hub-inspection-views.css. --}}
 <div class="hub-insp hub-insp-stack" data-apparatus-overview>
     <div class="hub-insp-overview-head">
-        <h2>{{ $apparatus->designation ?: $apparatus->name ?: 'Apparatus' }}</h2>
+        <h2>{{ $unitLabel ? $unitLabel.' on truck '.($apparatus->vehicle_number ?: 'not recorded') : 'Truck '.($apparatus->vehicle_number ?: 'not recorded') }}</h2>
         <span class="hub-insp-badge hub-insp-badge--lg hub-insp-badge--{{ $statusTone }}">{{ $status }}</span>
+        @if ($frontlineUnit)
+            <span class="hub-insp-badge hub-insp-badge--info" data-frontline-badge>Front-line unit</span>
+        @endif
+    </div>
+
+    <div class="hub-insp-twocol" data-unit-and-truck>
+        <div data-unit-card>
+            <p class="hub-insp-card__title">Unit</p>
+            <dl class="hub-insp-facts hub-insp-facts--plain">
+                <div>
+                    <dt>Unit</dt>
+                    <dd>{{ $apparatus->unit_id ?: 'None (spare truck)' }}</dd>
+                </div>
+                <div>
+                    <dt>Name</dt>
+                    <dd>{{ $apparatus->name ?: ($apparatus->designation ?: 'Not set') }}</dd>
+                </div>
+                <div>
+                    <dt>Station</dt>
+                    <dd>{{ $station ? 'Station '.$station->station_number : 'Not set' }}</dd>
+                </div>
+                <div>
+                    <dt>Class</dt>
+                    <dd>{{ $apparatus->class_description ?: ($apparatus->type ?: 'Not set') }}</dd>
+                </div>
+            </dl>
+            <p class="hub-insp-sub">
+                @if ($frontlineUnit)
+                    {{ $frontlineUnit }} must always have a truck In Service. When this truck goes down, use Swap truck.
+                @else
+                    Not a front-line unit.
+                @endif
+            </p>
+        </div>
+        <div data-truck-card>
+            <p class="hub-insp-card__title">Truck on it now</p>
+            <dl class="hub-insp-facts hub-insp-facts--plain">
+                <div>
+                    <dt>Vehicle #</dt>
+                    <dd>{{ $apparatus->vehicle_number ?: 'Not recorded' }}</dd>
+                </div>
+                <div>
+                    <dt>VIN</dt>
+                    <dd>{{ $vinTail ?? 'Not recorded' }}</dd>
+                </div>
+                <div>
+                    <dt>Truck status</dt>
+                    <dd>{{ $status }}</dd>
+                </div>
+                <div>
+                    <dt>Meters</dt>
+                    <dd>{{ $meters === [] ? 'Not recorded' : implode(' · ', $meters) }}</dd>
+                </div>
+            </dl>
+            <p class="hub-insp-sub">{{ $apparatus->assignment ?: ($apparatus->current_location ?: 'Location not recorded') }}</p>
+        </div>
     </div>
 
     @can('viewAny', \App\Models\ApparatusChangeout::class)
         @include('filament.resources.apparatus-resource.partials.current-assignment', ['assignment' => \App\Support\Fleet\ApparatusCurrentAssignment::for($apparatus)])
     @endcan
-
-    <dl class="hub-insp-facts hub-insp-facts--plain">
-        <div>
-            <dt>Vehicle #</dt>
-            <dd>{{ $apparatus->vehicle_number ?: '—' }}</dd>
-        </div>
-        <div>
-            <dt>Class</dt>
-            <dd>{{ $apparatus->class_description ?: ($apparatus->type ?: '—') }}</dd>
-        </div>
-        <div>
-            <dt>Station</dt>
-            <dd>{{ $station ? 'Station '.$station->station_number : '—' }}</dd>
-        </div>
-        <div>
-            <dt>Assignment</dt>
-            <dd>{{ $apparatus->assignment ?: ($apparatus->current_location ?: '—') }}</dd>
-        </div>
-    </dl>
 
     @if ($master)
         <div class="hub-insp-card" data-vehicle-record>

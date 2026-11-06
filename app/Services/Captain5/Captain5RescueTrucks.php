@@ -94,6 +94,7 @@ final class Captain5RescueTrucks
                     'name' => $item->item_name,
                     'note' => $item->note,
                 ])->values()->all(),
+                $changeout->isWithoutReplacement(),
             ))->values()->all();
     }
 
@@ -101,7 +102,7 @@ final class Captain5RescueTrucks
      * @param  list<array{name: string, note: string|null}>  $leftBehind
      * @return array<string, mixed>
      */
-    private function change(string $id, string $unit, ?string $from, ?string $to, ?CarbonInterface $at, string $by, ?string $note, array $leftBehind): array
+    private function change(string $id, string $unit, ?string $from, ?string $to, ?CarbonInterface $at, string $by, ?string $note, array $leftBehind, bool $withoutReplacement = false): array
     {
         return [
             'id' => $id,
@@ -113,6 +114,8 @@ final class Captain5RescueTrucks
             'recent' => $at !== null && $at->greaterThanOrEqualTo(now()->subHours(self::RECENT_HOURS)),
             'note' => $note !== null && trim($note) !== '' ? trim($note) : null,
             'left_behind' => $leftBehind,
+            // An admin took the unit's only truck out of service: same truck on both sides, nothing moved.
+            'without_replacement' => $withoutReplacement,
         ];
     }
 

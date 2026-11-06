@@ -67,13 +67,13 @@
                 <td class="wg-gtt-center">
                     @if(($item['advance_yes'] ?? 0) > 0 || ($item['advance_no'] ?? 0) > 0)
                     <span class="wg-gtt-small">
-                        <span class="wg-gtt-yes">{{ $item['advance_yes'] ?? 0 }}✓</span>
+                        <span class="wg-gtt-yes">{{ $item['advance_yes'] ?? 0 }}<x-heroicon-m-check class="inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" /><span class="sr-only"> to advance</span></span>
                         @if(($item['advance_no'] ?? 0) > 0)
-                        <span class="wg-gtt-no">{{ $item['advance_no'] }}✕</span>
+                        <span class="wg-gtt-no">{{ $item['advance_no'] }}<x-heroicon-m-x-mark class="inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" /><span class="sr-only"> not to advance</span></span>
                         @endif
                     </span>
                     @if(($item['deal_breakers'] ?? 0) > 0)
-                    <span class="wg-gtt-small wg-gtt-no" title="{{ $item['deal_breakers'] }} deal-breaker(s)">⚠️</span>
+                    <span class="wg-gtt-small wg-gtt-no" title="{{ $item['deal_breakers'] }} deal-breaker(s)"><x-heroicon-m-exclamation-triangle class="inline h-4 w-4 align-[-3px]" aria-hidden="true" /><span class="sr-only">{{ $item['deal_breakers'] }} deal-breaker(s)</span></span>
                     @endif
                     @else
                     <span class="wg-gtt-empty wg-gtt-small">—</span>

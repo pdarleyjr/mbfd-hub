@@ -24,7 +24,13 @@ final class PersonnelTableService
 {
     public const COLORS = ['gray', 'info', 'success', 'warning', 'danger'];
 
-    public const TYPES = ['checkbox', 'text', 'notes', 'number', 'date', 'select', 'multiselect', 'status'];
+    public const TYPES = ['checkbox', 'text', 'notes', 'number', 'date', 'select', 'multiselect', 'status', 'link'];
+
+    /** Who may see a column. "directory": everyone who opens the directory. "personnel_managers": directory editors only. */
+    public const VIEW_ACCESS = ['directory', 'personnel_managers'];
+
+    /** Optional keys that place a master-directory column on member profiles. Absent keys keep the column off profiles. */
+    public const PROFILE_KEYS = ['profile_section', 'profile_order', 'required', 'view_access'];
 
     private const LEGACY_MANAGERS = ['admin.personnel.manage', 'admin.members.manage'];
 
@@ -390,7 +396,12 @@ final class PersonnelTableService
             'visibility' => ['required', Rule::in(['private', 'shared'])], 'membership_mode' => ['required', Rule::in(['fixed', 'dynamic'])],
             'criteria' => ['required', 'array', 'max:20'], 'source_columns' => ['required', 'array', 'min:1', 'max:25'],
             'source_columns.*' => ['required', 'string', 'distinct', Rule::in(array_keys($this->source->fields()))],
-            'columns' => ['present', 'array', 'max:40'], 'columns.*' => ['array:id,label,type,options,hidden,color,highlight_when,highlight_value'],
+            'columns' => ['present', 'array', 'max:40'],
+            'columns.*' => ['array:id,label,type,options,hidden,color,highlight_when,highlight_value,'.implode(',', self::PROFILE_KEYS)],
+            'columns.*.profile_section' => ['sometimes', 'nullable', 'string', 'max:60'],
+            'columns.*.profile_order' => ['sometimes', 'nullable', 'integer', 'between:0,9999'],
+            'columns.*.required' => ['sometimes', 'nullable', 'boolean'],
+            'columns.*.view_access' => ['sometimes', 'nullable', Rule::in(self::VIEW_ACCESS)],
             'columns.*.id' => ['sometimes', 'uuid', 'distinct'], 'columns.*.label' => ['required', 'string', 'max:80'],
             'columns.*.type' => ['required', Rule::in(self::TYPES)], 'columns.*.options' => ['sometimes', 'array', 'max:40'],
             'columns.*.options.*' => ['required', 'string', 'max:100'],
@@ -416,7 +427,7 @@ final class PersonnelTableService
             $column['color'] = $column['color'] ?: null;
             $column['hidden'] = (bool) $column['hidden'];
 
-            return $column;
+            return $this->normalizedProfileKeys($column);
         }, $validated['columns']);
 
         return $validated;
@@ -465,6 +476,7 @@ final class PersonnelTableService
             'date' => ['nullable', 'date_format:Y-m-d'],
             'select', 'status' => ['nullable', 'string', Rule::in($column['options'])],
             'multiselect' => ['nullable', 'array', 'max:40'],
+            'link' => ['nullable', 'string', 'max:2000', 'url:http,https'],
             default => throw ValidationException::withMessages(['column' => 'This tracking column type is unsupported. Choose a supported column type.']),
         };
         $payload = Validator::make(['value' => $value], [
@@ -474,8 +486,78 @@ final class PersonnelTableService
         return match ($column['type']) {
             'checkbox' => (bool) $payload['value'],
             'number' => $payload['value'] === null || $payload['value'] === '' ? null : (float) $payload['value'],
+            'link' => blank($payload['value'] ?? null) ? null : trim((string) $payload['value']),
             default => $payload['value'] ?? null,
         };
+    }
+
+    /**
+     * Profile placement keys are optional. A stored definition without them stays exactly as it was; when the
+     * editor sends them they are normalized so a blank section takes the column off profiles.
+     *
+     * @param  array<string, mixed>  $column
+     * @return array<string, mixed>
+     */
+    private function normalizedProfileKeys(array $column): array
+    {
+        if (array_key_exists('profile_section', $column)) {
+            $section = trim((string) ($column['profile_section'] ?? ''));
+            $column['profile_section'] = $section === '' ? null : $section;
+        }
+        if (array_key_exists('profile_order', $column)) {
+            $column['profile_order'] = $column['profile_order'] === null || $column['profile_order'] === '' ? null : (int) $column['profile_order'];
+        }
+        if (array_key_exists('required', $column)) {
+            $column['required'] = (bool) $column['required'];
+        }
+        if (array_key_exists('view_access', $column)) {
+            $column['view_access'] = in_array($column['view_access'], self::VIEW_ACCESS, true) ? $column['view_access'] : 'directory';
+        }
+
+        return $column;
+    }
+
+    /** A stored link value, only when it is an http or https address. Anything else renders as plain text. */
+    public static function safeLink(mixed $value): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+        $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+
+        return in_array($scheme, ['http', 'https'], true) && filter_var($value, FILTER_VALIDATE_URL) !== false ? $value : null;
+    }
+
+    /** Whether this actor may see a column's values (directory, Details, filters and profiles). */
+    public function canSeeColumn(User $actor, PersonnelTable $table, array $column): bool
+    {
+        return ($column['view_access'] ?? 'directory') !== 'personnel_managers' || $this->canManage($actor, $table);
+    }
+
+    /** The master table, read only. Null until someone with directory access first opens it. */
+    public function masterTable(): ?PersonnelTable
+    {
+        return PersonnelTable::query()->where('directory_key', 'master')->first();
+    }
+
+    /**
+     * Master-directory columns an administrator placed on profiles, grouped by section. Sections appear in the
+     * order of their first field; fields follow profile order, then column order.
+     *
+     * @return array<string, list<array<string, mixed>>> section name => columns
+     */
+    public static function profileSections(?PersonnelTable $table): array
+    {
+        $columns = array_values(array_filter($table->columns ?? [], static fn (array $column): bool => filled($column['profile_section'] ?? null)));
+        $position = array_flip(array_column($columns, 'id'));
+        usort($columns, static fn (array $a, array $b): int => [$a['profile_order'] ?? PHP_INT_MAX, $position[$a['id']]]
+            <=> [$b['profile_order'] ?? PHP_INT_MAX, $position[$b['id']]]);
+        $sections = [];
+        foreach ($columns as $column) {
+            $sections[trim((string) $column['profile_section'])][] = $column;
+        }
+
+        return $sections;
     }
 
     private function lifecycle(User $actor, PersonnelTable $table, int $expectedVersion, string $action): PersonnelTable

@@ -15,7 +15,7 @@ const adminPassword = process.env.OPERATIONAL_FORMS_E2E_ADMIN_PASSWORD ?? 'Opera
 
 const RELEASE_A = 'aaaaaaaaaaaa';
 const RELEASE_B = 'bbbbbbbbbbbb';
-const BUSY_MESSAGE = 'An update is ready. It will apply when you finish.';
+const BUSY_MESSAGE = 'Update available. Finish or save your work before refreshing.';
 const BANNER = '#mbfd-pwa-banner';
 
 interface ReleaseState {
@@ -228,7 +228,7 @@ test('a new release never reloads a busy page, shows the banner, reloads once wh
   await expect(banner).toBeVisible();
   await expect(banner).toHaveAttribute('role', 'status');
   await expect(banner).toContainText(BUSY_MESSAGE);
-  const refresh = banner.getByRole('button', { name: 'Refresh now' });
+  const refresh = banner.getByRole('button', { name: 'Refresh app' });
   await expect(refresh).toHaveAttribute('aria-disabled', 'true');
   expect((await refresh.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
 
@@ -242,7 +242,7 @@ test('a new release never reloads a busy page, shows the banner, reloads once wh
   await expect(banner).toBeVisible();
   await refresh.click({ force: true });
   await page.waitForTimeout(500);
-  expect(await unloadStarted(page), 'a disabled Refresh now must do nothing').toBe(false);
+  expect(await unloadStarted(page), 'a disabled Refresh app must do nothing').toBe(false);
   expect(navigations()).toBe(before);
 
   // 3. The work finishes: exactly one reload happens.
@@ -263,7 +263,7 @@ test('a new release never reloads a busy page, shows the banner, reloads once wh
   expect(navigations()).toBe(afterFirst);
 
   // 5. The banner now offers a manual refresh, which the member may still use.
-  const manual = page.locator(BANNER).getByRole('button', { name: 'Refresh now' });
+  const manual = page.locator(BANNER).getByRole('button', { name: 'Refresh app' });
   await expect(manual).not.toHaveAttribute('aria-disabled', 'true');
   const manualReload = page.waitForEvent('framenavigated', (frame) => frame === page.mainFrame());
   await manual.click();
@@ -279,8 +279,8 @@ test('an idle visible page shows the banner and only reloads once it is hidden',
   state.served = RELEASE_B;
   await checkNow(page);
   const banner = page.locator(BANNER);
-  await expect(banner).toContainText('An update is ready.');
-  await expect(banner.getByRole('button', { name: 'Refresh now' })).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(banner).toContainText('Update available.');
+  await expect(banner.getByRole('button', { name: 'Refresh app' })).not.toHaveAttribute('aria-disabled', 'true');
 
   const before = navigations();
   await armUnloadProbe(page);
@@ -325,7 +325,7 @@ const addUnregisteredTextarea = (page: Page) =>
     document.body.appendChild(field);
   });
 
-test('one safety predicate: "Refresh now" never reloads over typed text that no feature registered', async ({ page }) => {
+test('one safety predicate: "Refresh app" never reloads over typed text that no feature registered', async ({ page }) => {
   const state: ReleaseState = { served: RELEASE_A, rendered: RELEASE_A };
   const navigations = trackNavigations(page);
   await openHome(page, state);
@@ -341,21 +341,21 @@ test('one safety predicate: "Refresh now" never reloads over typed text that no 
   // The manual path used to skip typed fields: the button must now be held back like every other path.
   const banner = page.locator(BANNER);
   await expect(banner).toContainText(BUSY_MESSAGE);
-  const refresh = banner.getByRole('button', { name: 'Refresh now' });
+  const refresh = banner.getByRole('button', { name: 'Refresh app' });
   await expect(refresh).toHaveAttribute('aria-disabled', 'true');
 
   const before = navigations();
   await armUnloadProbe(page);
   await refresh.click({ force: true });
   await page.waitForTimeout(800);
-  expect(await unloadStarted(page), 'Refresh now must not unload a page holding typed text').toBe(false);
+  expect(await unloadStarted(page), 'Refresh app must not unload a page holding typed text').toBe(false);
   expect(navigations()).toBe(before);
   await expect(field).toHaveValue('Engine 5 pump test notes');
   await expect(banner).toContainText(BUSY_MESSAGE);
 
   // The work is gone: the banner re-renders on the member's own edit, with no busy event involved.
   await field.fill('');
-  await expect(banner.getByRole('button', { name: 'Refresh now' })).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(banner.getByRole('button', { name: 'Refresh app' })).not.toHaveAttribute('aria-disabled', 'true');
   await expect(banner).not.toContainText(BUSY_MESSAGE);
 });
 
@@ -369,8 +369,8 @@ test('typing after the banner was drawn flips it to busy, and a stale click is r
   state.served = RELEASE_B;
   await checkNow(page);
   const banner = page.locator(BANNER);
-  const refresh = banner.getByRole('button', { name: 'Refresh now' });
-  await expect(banner).toContainText('An update is ready.');
+  const refresh = banner.getByRole('button', { name: 'Refresh app' });
+  await expect(banner).toContainText('Update available.');
   await expect(refresh).not.toHaveAttribute('aria-disabled', 'true');
 
   // Real typing re-renders the banner (capturing input listener), no feature involved.
@@ -382,7 +382,7 @@ test('typing after the banner was drawn flips it to busy, and a stale click is r
   await expect(refresh).not.toHaveAttribute('aria-disabled', 'true');
 
   // A value a script fills in (Livewire/Filament hydrating a form) is not work the member typed:
-  // it must not leave "Refresh now" disabled on every admin page.
+  // it must not leave "Refresh app" disabled on every admin page.
   await page.evaluate(() => {
     const filled = document.createElement('textarea');
     filled.id = 'e2e-script-filled-field';
@@ -405,7 +405,7 @@ test('typing after the banner was drawn flips it to busy, and a stale click is r
   await expect(field).toHaveValue('Typed after the banner was drawn');
 });
 
-test('a registered employee-message busy reason disables Refresh now until it is cleared', async ({ page }) => {
+test('a registered employee-message busy reason disables Refresh app until it is cleared', async ({ page }) => {
   const state: ReleaseState = { served: RELEASE_A, rendered: RELEASE_A };
   const navigations = trackNavigations(page);
   await openHome(page, state);
@@ -413,7 +413,7 @@ test('a registered employee-message busy reason disables Refresh now until it is
   state.served = RELEASE_B;
   await checkNow(page);
   const banner = page.locator(BANNER);
-  const refresh = banner.getByRole('button', { name: 'Refresh now' });
+  const refresh = banner.getByRole('button', { name: 'Refresh app' });
   await expect(refresh).not.toHaveAttribute('aria-disabled', 'true');
 
   const reason = 'employee-message:test';
@@ -441,7 +441,7 @@ test('a registered employee-message busy reason disables Refresh now until it is
   expect(navigations()).toBe(before);
 
   await toggle(false);
-  await expect(banner.getByRole('button', { name: 'Refresh now' })).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(banner.getByRole('button', { name: 'Refresh app' })).not.toHaveAttribute('aria-disabled', 'true');
 });
 
 // ---------------------------------------------------------------------------
@@ -675,7 +675,7 @@ test('M4: with the server reachable and the same release, a chunk that is not mi
   await page.waitForTimeout(1200);
   expect(await unloadStarted(page)).toBe(false);
   expect(navigations()).toBe(before);
-  await expect(page.locator(BANNER).getByRole('button', { name: 'Refresh now' })).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(page.locator(BANNER).getByRole('button', { name: 'Refresh app' })).not.toHaveAttribute('aria-disabled', 'true');
 });
 // ---------------------------------------------------------------------------
 // Notification deep links (worker -> page)

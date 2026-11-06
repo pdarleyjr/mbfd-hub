@@ -31,7 +31,7 @@ final class PruneTakeHomeInspectionUploads extends Command
             ->orderBy('id')
             ->chunkById(200, function ($photos) use ($disk, &$removed): void {
                 foreach ($photos as $photo) {
-                    $disk->delete($photo->path);
+                    $disk->delete(array_values(array_filter([$photo->path, $photo->source_path])));
                     $photo->delete();
                     $removed++;
                 }

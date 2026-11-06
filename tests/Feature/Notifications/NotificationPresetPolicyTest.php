@@ -60,6 +60,9 @@ final class NotificationPresetPolicyTest extends TestCase
         // Supply room screen withdrawals: in-app per withdrawal and one daily email; no phone alerts (2026-11-03).
         'ems_supply_withdrawals' => [true, false, true],
         'command_communications' => [true, true, true],
+        // Accident reports (critical): in-app, push and city email; push and email carry only type and reference (2026-11-05).
+        'accident_reports' => [true, true, true],
+        'accident_supervisor_requests' => [true, true, true],
     ];
 
     protected function setUp(): void
@@ -192,7 +195,7 @@ final class NotificationPresetPolicyTest extends TestCase
 
                 continue;
             }
-            if (in_array($category->key, ['fleet_operational_alerts', 'roster_moves', 'ems_low_stock', 'ems_supply_withdrawals'], true)) {
+            if (in_array($category->key, ['fleet_operational_alerts', 'roster_moves', 'ems_low_stock', 'ems_supply_withdrawals', 'accident_reports', 'accident_supervisor_requests'], true)) {
                 $this->assertSame([false, false, false], $this->stored($user, $category->key), 'newer than this migration, whose list is frozen');
 
                 continue;

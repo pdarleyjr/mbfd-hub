@@ -105,6 +105,12 @@ Schedule::command('fleet:prune-take-home-uploads')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Member photo uploads: abandoned Daily Checkout uploads, stalled conversions, spent originals, old Livewire temporary files.
+Schedule::command('photos:maintain')
+    ->hourlyAt(25)
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // EMS low-stock alerts: a safety net behind the check that follows every stock change.
 Schedule::command('ems:stock-alerts')
     ->everyTenMinutes()

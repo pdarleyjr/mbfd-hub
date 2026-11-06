@@ -14,7 +14,7 @@ ARG WWWGROUP
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
     SUPERVISOR_PHP_USER=sail \
-    SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=8081"
+    PHP_FPM_MAX_CHILDREN=32
 
 WORKDIR /var/www/html
 
@@ -68,6 +68,7 @@ RUN set -eux; \
         curl \
         git \
         gnupg \
+        nginx \
         openssh-client \
         poppler-utils \
         python3 \
@@ -87,6 +88,7 @@ RUN set -eux; \
         php8.5-bcmath \
         php8.5-cli \
         php8.5-curl \
+        php8.5-fpm \
         php8.5-gd \
         php8.5-igbinary \
         php8.5-imagick \
@@ -137,9 +139,31 @@ ENV POLICY_LIBRARY_PYTHON_BINARY=/opt/policy-library-python/bin/python
 
 COPY docker/production/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/production/php.ini /etc/php/8.5/cli/conf.d/99-mbfd-production.ini
+COPY docker/production/php.ini /etc/php/8.5/fpm/conf.d/99-mbfd-production.ini
+COPY docker/production/php-fpm.ini /etc/php/8.5/fpm/conf.d/99-mbfd-web.ini
+COPY docker/production/php-fpm.conf /etc/php/8.5/fpm/php-fpm-hub.conf
+COPY docker/production/nginx.conf /etc/nginx/hub/nginx.conf
 COPY docker/production/start-production-container /usr/local/bin/start-production-container
+COPY docker/production/check-storage-mount /usr/local/bin/check-storage-mount
 
-RUN chmod 0755 /usr/local/bin/start-production-container
+# The web tier (nginx + php-fpm) runs as sail, so its sockets, pid files and
+# request/response spool directories live in one sail-owned tree. The web pool
+# must load exactly the CLI's extensions (pcntl is CLI-only; cgi-fcgi is the
+# FPM SAPI itself).
+RUN set -eu; \
+    chmod 0755 /usr/local/bin/start-production-container /usr/local/bin/check-storage-mount; \
+    install -d -o sail -g sail -m 0700 /var/lib/hub-web /var/lib/hub-web/run /var/lib/hub-web/tmp; \
+    for spool in client-body proxy fastcgi uwsgi scgi; do \
+        install -d -o sail -g sail -m 0700 "/var/lib/hub-web/tmp/$spool"; \
+    done; \
+    rm -f /etc/nginx/sites-enabled/default /etc/php/8.5/fpm/pool.d/www.conf; \
+    php -m | grep -vx pcntl > /tmp/cli-modules; \
+    php-fpm8.5 -m | grep -vx cgi-fcgi > /tmp/fpm-modules; \
+    diff -u /tmp/cli-modules /tmp/fpm-modules; \
+    php-fpm8.5 -i | grep -qx 'opcache.validate_timestamps => Off => Off'; \
+    php-fpm8.5 -i | grep -qx 'upload_max_filesize => 100M => 100M'; \
+    php -i | grep -qx 'opcache.validate_timestamps => On => On'; \
+    rm -f /tmp/cli-modules /tmp/fpm-modules
 
 EXPOSE 8081/tcp
 EXPOSE 8080/tcp
@@ -284,3 +308,9 @@ RUN set -eux; \
     if dpkg-query -W -f='${Status}\n' apt libapt-pkg6.0t64 2>/dev/null | grep -q 'ok installed'; then exit 1; fi
 
 USER sail
+
+# Prove the web tier configuration as the runtime identity (never as root: a
+# root `nginx -t` would chown the spool directories to nobody).
+RUN set -eu; \
+    /usr/sbin/nginx -t -q -e stderr -c /etc/nginx/hub/nginx.conf; \
+    /usr/sbin/php-fpm8.5 -t --fpm-config /etc/php/8.5/fpm/php-fpm-hub.conf

@@ -3,7 +3,12 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { chromium } from 'playwright';
 
-const origin = 'http://127.0.0.1:8127';
+// Same loopback-only rule as protectedUiOrigin in test-environment.ts (this file runs as plain Node).
+const origin = (() => {
+  const url = new URL(process.env.PROTECTED_UI_E2E_ORIGIN ?? 'http://127.0.0.1:8127');
+  assert(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) && !url.username && !url.password);
+  return url.toString().replace(/\/$/, '');
+})();
 
 async function login() {
   assert(!existsSync('.env') && !existsSync('.env.testing'));

@@ -201,11 +201,11 @@ final class StationSupplyRequestResourceTest extends TestCase
             ->assertSee('Medium');
     }
 
-    public function test_it_sits_in_the_operations_group_without_its_own_icon_or_badge(): void
+    public function test_it_sits_in_the_stations_group_without_its_own_icon_or_badge(): void
     {
         $this->actingAsStaff(['admin.stations.view']);
 
-        $this->assertSame('Operations', StationSupplyRequestResource::getNavigationGroup());
+        $this->assertSame('Stations', StationSupplyRequestResource::getNavigationGroup());
         $this->assertSame('Supply Requests', StationSupplyRequestResource::getNavigationLabel());
         $this->assertNull(StationSupplyRequestResource::getNavigationIcon());
         $this->assertNull(StationSupplyRequestResource::getNavigationBadge());

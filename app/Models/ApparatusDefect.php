@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Media\MemberMedia;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 class ApparatusDefect extends Model
 {
@@ -342,7 +342,8 @@ class ApparatusDefect extends Model
             return null;
         }
 
-        return Storage::disk('public')->exists($path) ? $path : null;
+        // Private disk first, then a public copy photos:make-private has not moved yet.
+        return MemberMedia::exists($path) ? $path : null;
     }
 
     public function hasMissingPhotoReference(): bool

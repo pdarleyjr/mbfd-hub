@@ -127,7 +127,7 @@ final class ResponseComposerTest extends TestCase
 
     public function test_gas_meter_scba_component_and_captain5_replies(): void
     {
-        $this->assertSame('Acknowledged. Coordinate a replacement gas meter or detector with Support Services or the appropriate equipment technician. Call or text first so availability can be confirmed.', $this->findings([new Finding('Four Gas Meter', 'missing')])->text);
+        $this->assertSame('Acknowledged. Coordinate with the on-duty Air Tech to have the gas meter or detector checked or swapped out. Notify your officer and contact 300 if immediate assistance or after-hours coordination is needed.', $this->findings([new Finding('Four Gas Meter', 'missing')])->text);
 
         $air = $this->findings([new Finding('SCBA Regulator', 'damaged')]);
         $this->assertSame('Acknowledged. Coordinate with the on-duty Air Tech to have the item checked or swapped out. Notify your officer and contact 300 if immediate assistance or after-hours coordination is needed.', $air->text);

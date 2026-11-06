@@ -173,6 +173,8 @@ export interface RescueTruckChange {
   recent: boolean;
   note: string | null;
   left_behind: RescueTruckLeftBehind[];
+  /** An admin took the unit's only truck out of service: nothing moved, from and to are the same truck. */
+  without_replacement: boolean;
 }
 
 export interface HandoffNote {

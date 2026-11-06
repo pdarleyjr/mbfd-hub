@@ -220,6 +220,21 @@ class ViewUnitMasterVehicle extends ViewRecord
                     ])
                     ->collapsible(),
 
+                // Accident reports for this vehicle: restricted to accident report access; others never see the section.
+                Section::make('Accident reports')
+                    ->visible(fn (): bool => \App\Support\Personnel\PersonnelAccess::canViewAccidents(auth('web')->user()))
+                    ->schema([
+                        ViewEntry::make('accident_reports')
+                            ->hiddenLabel()
+                            ->view('filament.fleet.vehicle-accident-reports')
+                            ->viewData(fn (UnitMasterVehicle $record): array => [
+                                'reports' => \App\Models\AccidentReport::query()->submitted()
+                                    ->where('unit_master_vehicle_id', $record->getKey())
+                                    ->with(['subject:id,name', 'document:id,ulid,version'])
+                                    ->latest('occurred_at')->limit(50)->get(),
+                            ]),
+                    ])
+                    ->collapsible(),
                 Section::make('Proposed corrections')
                     ->description('Differences reported by an inspection or the FY27 list. The master record changes only when Fleet accepts.')
                     ->schema([

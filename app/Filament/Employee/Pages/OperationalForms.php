@@ -3,13 +3,18 @@
 namespace App\Filament\Employee\Pages;
 
 use App\Concerns\ResolvesCanonicalEmployee;
+use App\Models\AccidentReport;
+use App\Models\User;
+use App\Services\Accidents\AccidentReportService;
 use App\Services\Ems\FormFamilies;
 use App\Services\Narcotics\NarcoticsCheckAccess;
 use App\Services\OperationalForms\FrocImportLimits;
 use App\Support\Ems\EmsLinks;
 use App\Support\Narcotics\NarcoticsLinks;
+use App\Support\Personnel\PersonnelAccess;
 use Filament\Pages\Page;
 use Illuminate\Support\Str;
+use Throwable;
 
 class OperationalForms extends Page
 {
@@ -31,6 +36,13 @@ class OperationalForms extends Page
 
     protected static ?int $navigationSort = 1;
 
+    /** Deep-link keys (?form=...) for the accident reports and the memorandum; the notifications link to the first. */
+    public const ACCIDENT_FORM_KEY = 'accident-report';
+
+    public const SUPERVISOR_REPORT_FORM_KEY = 'supervisor-accident-report';
+
+    public const MEMORANDUM_FORM_KEY = 'memorandum';
+
     public function getViewData(): array
     {
         $employee = $this->authenticatedEmployee();
@@ -50,9 +62,15 @@ class OperationalForms extends Page
                     'guide' => url('/documents/MBFD_Operational_Forms_User_Guide.pdf'),
                     'ems' => $this->emsEndpoints(),
                     'narcotics' => $this->narcoticsEndpoints(),
+                    'personnel' => $this->personnelEndpoints(),
                 ],
                 'deep_link' => $this->emsDeepLink(),
                 'narcotics_deep_link' => $this->narcoticsDeepLink(),
+                'personnel_deep_link' => $this->personnelDeepLink(),
+                'personnel' => [
+                    'can_supervise' => PersonnelAccess::canSupervise(auth('web')->user()),
+                    'awaiting_supervisor' => $this->awaitingSupervisorCount(),
+                ],
                 'library_links' => $this->libraryLinks(),
                 'csrf_token' => csrf_token(),
                 'build' => config('app.version', 'development'),
@@ -123,6 +141,83 @@ class OperationalForms extends Page
     }
 
     /**
+     * The accident report and memorandum JSON API (routes/personnel-forms.php). The per-report URLs carry the
+     * placeholder __ULID__, which the app replaces with the report id. The employee search is the lookup that
+     * returns the employee record id the accident API expects (the Forms employee search returns badge numbers only).
+     *
+     * @return array<string, string>
+     */
+    private function personnelEndpoints(): array
+    {
+        $placeholder = '__ULID__';
+
+        return [
+            'accidents_form' => route('employee.forms.api.accidents.form'),
+            'accidents' => route('employee.forms.api.accidents.index'),
+            'accident' => route('employee.forms.api.accidents.show', ['report' => $placeholder]),
+            'accident_submit' => route('employee.forms.api.accidents.submit', ['report' => $placeholder]),
+            'accident_supervisor' => route('employee.forms.api.accidents.supervisor', ['report' => $placeholder]),
+            'accident_preview' => route('employee.forms.api.accidents.preview', ['report' => $placeholder]),
+            'memorandum_form' => route('employee.forms.api.memorandum.form'),
+            'memorandum_pdf' => route('employee.forms.api.memorandum.pdf'),
+            'memorandum_support_services' => route('employee.forms.api.memorandum.support-services'),
+            'memorandum_email' => route('employee.forms.api.memorandum.email'),
+            'employee_search' => route('take-home-inspections.employees.search'),
+            'placeholder' => $placeholder,
+        ];
+    }
+
+    /**
+     * Which accident report or memorandum view the page opens first: ?form=accident-report (new vehicle report),
+     * &report=<ulid> (one report; the supervisor notification links here), &view=mine (the member's reports),
+     * ?form=supervisor-accident-report, ?form=memorandum. Anything else is ignored.
+     *
+     * @return array{view: string|null, report: string|null}
+     */
+    private function personnelDeepLink(): array
+    {
+        $form = request()->query('form');
+        if ($form === self::ACCIDENT_FORM_KEY) {
+            $report = trim((string) request()->query('report', ''));
+            if (Str::isUlid($report)) {
+                return ['view' => 'report', 'report' => $report];
+            }
+
+            return ['view' => request()->query('view') === 'mine' ? 'mine' : 'vehicle', 'report' => null];
+        }
+
+        return match ($form) {
+            self::SUPERVISOR_REPORT_FORM_KEY => ['view' => 'supervisor-report', 'report' => null],
+            self::MEMORANDUM_FORM_KEY => ['view' => 'memo', 'report' => null],
+            default => ['view' => null, 'report' => null],
+        };
+    }
+
+    /** Vehicle Accident Reports routed to this member that wait for the supervisor's part. */
+    private function awaitingSupervisorCount(): int
+    {
+        $user = auth('web')->user();
+        if (! $user instanceof User || $user->employeeProfile === null) {
+            return 0;
+        }
+        try {
+            $service = app(AccidentReportService::class);
+
+            return $service->forMember($user)
+                ->where('status', AccidentReport::STATUS_AWAITING_SUPERVISOR)
+                ->limit(100)
+                ->get()
+                ->filter(fn (AccidentReport $report): bool => $service->canCompleteSupervisorPart($user, $report))
+                ->count();
+        } catch (Throwable $exception) {
+            // The Forms page must still open; the reports list shows the same items with an "Awaiting you" badge.
+            report($exception);
+
+            return 0;
+        }
+    }
+
+    /**
      * Which medical inventory view the page opens first, from the query string: ?form=<a family's form_key> (a new request on
      * that form; the old ?form=medical-inventory-request opens ALS Transport), &view=mine (own list), ?ems_request=<uuid>
      * (one request, which opens in its own form so `family` is null). `family` is the FormFamilies key of the form asked for.
@@ -163,6 +258,36 @@ class OperationalForms extends Page
             'in_app' => true,
             'secondary' => ['label' => 'My narcotics checks', 'href' => url(NarcoticsLinks::memberChecks())],
         ]] : [];
+        $forms = url('/employee/forms');
+        $supervisor = PersonnelAccess::canSupervise(auth('web')->user()) ? [[
+            'key' => self::SUPERVISOR_REPORT_FORM_KEY,
+            'title' => "Supervisor's Report of Accident",
+            'description' => 'For supervisors: report any accident involving an employee. Sign in the Hub, then download the official form for Risk Management.',
+            'href' => $forms.'?form='.self::SUPERVISOR_REPORT_FORM_KEY,
+            'action_label' => 'Start a report',
+            'in_app' => true,
+        ]] : [];
+
+        $personnel = [
+            [
+                'key' => self::ACCIDENT_FORM_KEY,
+                'title' => 'Vehicle Accident Report',
+                'description' => 'The driver completes this side after any accident in a City vehicle. Your supervisor completes their part next.',
+                'href' => $forms.'?form='.self::ACCIDENT_FORM_KEY,
+                'action_label' => 'Start a report',
+                'in_app' => true,
+                'secondary' => ['label' => 'My accident reports', 'href' => $forms.'?form='.self::ACCIDENT_FORM_KEY.'&view=mine'],
+            ],
+            ...$supervisor,
+            [
+                'key' => self::MEMORANDUM_FORM_KEY,
+                'title' => 'Interoffice Memorandum',
+                'description' => 'Write an MBFD Interoffice Memorandum. Send it to Support Services, or download the PDF for anyone else.',
+                'href' => $forms.'?form='.self::MEMORANDUM_FORM_KEY,
+                'action_label' => 'Write a memorandum',
+                'in_app' => true,
+            ],
+        ];
 
         // One card per medical inventory form, in the families' order: the card's key is the form's deep-link key.
         $inventoryForms = array_map(static fn (array $family): array => [
@@ -185,6 +310,7 @@ class OperationalForms extends Page
                 'action_label' => 'Open inspections',
             ],
             ...$narcotics,
+            ...$personnel,
         ];
     }
 }

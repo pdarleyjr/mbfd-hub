@@ -160,9 +160,11 @@
                                     @if(count($item['images']) > 0)
                                         <div class="trt-thumbs">
                                             @foreach($item['images'] as $imagePath)
-                                                <button type="button" class="trt-inventory-control" aria-label="Open photo of {{ $item['item_name'] }}" x-on:click.stop="$dispatch('show-full-image', '{{ asset('storage/' . $imagePath) }}')">
+                                                @php($imageUrl = \App\Support\Media\MemberMedia::url($imagePath))
+                                                @continue($imageUrl === null)
+                                                <button type="button" class="trt-inventory-control" aria-label="Open photo of {{ $item['item_name'] }}" x-on:click.stop="$dispatch('show-full-image', '{{ $imageUrl }}')">
                                                 <img
-                                                    src="{{ asset('storage/' . $imagePath) }}"
+                                                    src="{{ $imageUrl }}"
                                                     alt="Photo"
                                                     class="trt-thumb"
                                                     loading="lazy"
@@ -262,11 +264,12 @@
                                         <span>Action: <strong class="trt-cap">{{ $entry['action'] }}</strong></span>
                                     @endif
                                 </div>
-                                @if($entry['image_path'])
+                                @php($entryImageUrl = $entry['image_path'] ? \App\Support\Media\MemberMedia::url($entry['image_path']) : null)
+                                @if($entryImageUrl)
                                     <div class="trt-entry__photo">
-                                        <button type="button" class="trt-inventory-control" aria-label="Open entry photo" x-on:click.stop="$dispatch('show-full-image', '{{ asset('storage/' . $entry['image_path']) }}')">
+                                        <button type="button" class="trt-inventory-control" aria-label="Open entry photo" x-on:click.stop="$dispatch('show-full-image', '{{ $entryImageUrl }}')">
                                         <img
-                                            src="{{ asset('storage/' . $entry['image_path']) }}"
+                                            src="{{ $entryImageUrl }}"
                                             alt="Entry photo"
                                             class="trt-thumb trt-thumb--lg"
                                             loading="lazy"

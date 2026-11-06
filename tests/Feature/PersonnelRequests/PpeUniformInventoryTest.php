@@ -151,7 +151,9 @@ final class PpeUniformInventoryTest extends TestCase
             }
         }
         $outside = array_values(array_filter($visible, fn (string $class): bool => ! str_starts_with($class, PersonnelUniformsEquipment::class)
-            && $class !== \App\Filament\Pages\Dashboard::class));
+            && $class !== \App\Filament\Pages\Dashboard::class
+            // Their own dashboard: uniform orders and PPE requests, one row per member.
+            && $class !== \App\Filament\Pages\MemberRequestsDashboard::class));
 
         $this->assertSame([], $outside, 'Only the Personnel Uniforms & Equipment area should be offered.');
         $this->get(PersonnelUniformResource::getUrl('index'))->assertOk()->assertSee('Firefighting PPE / Uniforms');

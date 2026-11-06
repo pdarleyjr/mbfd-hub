@@ -233,7 +233,7 @@ class TrtInventoryController extends Controller
     }
 
     /**
-     * Decode base64 image, validate magic bytes, store to public disk, return path.
+     * Decode base64 image, validate magic bytes, store on the private member image disk, return path.
      */
     private function processBase64Image(string $base64, int $catalogItemId): ?string
     {

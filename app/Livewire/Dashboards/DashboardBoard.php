@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Dashboards;
 
 use App\Filament\Admin\Pages\EmployeeMessages;
+use App\Filament\Pages\MemberRequestsDashboard;
 use App\Filament\Pages\StationOperationsDashboard;
 use App\Filament\Pages\VehicleCheckoutDashboard;
 use App\Models\User;
@@ -23,7 +24,7 @@ use Livewire\Component;
 use Throwable;
 
 /**
- * Body of one admin dashboard (overview, vehicle checkout or station operations): operational-day
+ * Body of one admin dashboard (overview, vehicle checkout, station operations or member requests): operational-day
  * banner with honest freshness, stat cards, filter chips and the issue lists. Polls every 30 s while
  * visible; the read model caches a load for a few seconds per user. Rows open IssueActionPanel.
  */
@@ -139,7 +140,7 @@ final class DashboardBoard extends Component
         return $chips;
     }
 
-    /** @return array{vehicle: ?string, station: ?string, messages: ?string} */
+    /** @return array{vehicle: ?string, station: ?string, messages: ?string, requests: ?string} */
     private function links(User $user): array
     {
         $boards = DashboardAccess::canViewOperationsBoards($user);
@@ -148,6 +149,7 @@ final class DashboardBoard extends Component
             'vehicle' => $boards ? VehicleCheckoutDashboard::getUrl() : null,
             'station' => $boards ? StationOperationsDashboard::getUrl() : null,
             'messages' => $this->safeUrl(static fn (): ?string => EmployeeMessages::canAccess() ? EmployeeMessages::getUrl() : null),
+            'requests' => DashboardAccess::canViewMemberRequests($user) ? MemberRequestsDashboard::getUrl() : null,
         ];
     }
 

@@ -13,6 +13,7 @@ use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionConcern;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
+use App\Services\Fleet\UnitIdentityGuard;
 use App\Support\Fleet\DefectActionStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -274,9 +275,12 @@ final class ApparatusIssueHistoryTest extends TestCase
         $other = $this->apparatus('E3', 'TEST-103', 'engine');
         $defect = $this->defect(['item' => 'Cracked mirror']);
         // The units swap trucks: each row keeps its own vehicle, and the unit names move. History belongs to the vehicle.
-        $this->truck->update(['unit_id' => 'TMP']);
-        $other->update(['designation' => 'E2', 'unit_id' => 'E2']);
-        $this->truck->update(['designation' => 'E3', 'unit_id' => 'E3']);
+        // Done by hand here, so it passes the in-between states the way VehicleSwapService does.
+        UnitIdentityGuard::whileMovingUnits(function () use ($other): void {
+            $this->truck->update(['unit_id' => 'TMP']);
+            $other->update(['designation' => 'E2', 'unit_id' => 'E2']);
+            $this->truck->update(['designation' => 'E3', 'unit_id' => 'E3']);
+        });
 
         $this->getJson("/api/public/apparatuses/{$this->truck->id}/findings")->assertOk()
             ->assertJsonPath('open.0.id', $defect->id);

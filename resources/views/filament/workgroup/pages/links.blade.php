@@ -12,7 +12,7 @@
                 </div>
                 <div class="wl-body">
                     <h3 class="wl-title">Workgroup Analysis Report</h3>
-                    <p class="wl-desc">2026 Technical Product Comparison Analysis — Extrication equipment performance data with interactive Chart.js visualizations and manufacturer rankings.</p>
+                    <p class="wl-desc">2026 product comparison of extrication equipment, with performance charts and manufacturer rankings.</p>
                 </div>
             </div>
         </a>
@@ -29,7 +29,7 @@
                 </div>
                 <div class="wl-body">
                     <h3 class="wl-title">Workgroup Data Dashboard</h3>
-                    <p class="wl-desc">Interactive React-based evaluation dashboard with tabbed navigation across brand rankings, extrication tools, saws, stabilization, and specialty assets.</p>
+                    <p class="wl-desc">Evaluation results by brand ranking, extrication tools, saws, stabilization and specialty assets.</p>
                 </div>
             </div>
         </a>
@@ -46,7 +46,7 @@
                 </div>
                 <div class="wl-body">
                     <h3 class="wl-title">Mid-Mount L1 Proposed Inventory</h3>
-                    <p class="wl-desc">Ladder 1 apparatus modernization dashboard with full compartment inventory, KPI widgets, compliance flags, and native Excel export with embedded pricing formulas.</p>
+                    <p class="wl-desc">Ladder 1 compartment inventory with compliance flags and an Excel export that includes pricing.</p>
                 </div>
             </div>
         </a>
@@ -63,7 +63,7 @@
                 </div>
                 <div class="wl-body">
                     <h3 class="wl-title">Workgroup Final Session Presentation</h3>
-                    <p class="wl-desc">Reveal.js slide deck for the final review meeting — interactive charts, equipment comparisons, deliberation agenda, and consensus-building framework. Use arrow keys or click to navigate.</p>
+                    <p class="wl-desc">Slides for the final review meeting: equipment comparisons, charts and the agenda. Use the arrow keys to move between slides.</p>
                 </div>
             </div>
         </a>
@@ -81,9 +81,9 @@
                 <div class="wl-body">
                     <div class="wl-titlerow">
                         <h3 class="wl-title">MBFD Workgroup Evaluation Results</h3>
-                        <span class="wl-tag">PDF Ready</span>
+                        <span class="hub-tag hub-tag--info">Print or PDF</span>
                     </div>
-                    <p class="wl-desc">Professional technical evaluation report — 14 products, 6 categories, Charts, data tables, product images, and one-click PDF/print export. Formatted for administrators.</p>
+                    <p class="wl-desc">Technical evaluation report for administrators: 14 products in 6 categories, with charts, tables and product images.</p>
                 </div>
             </div>
         </a>
@@ -101,9 +101,9 @@
                 <div class="wl-body">
                     <div class="wl-titlerow">
                         <h3 class="wl-title">MBFD Workgroup Summary</h3>
-                        <span class="wl-tag">PDF Ready</span>
+                        <span class="hub-tag hub-tag--info">Print or PDF</span>
                     </div>
-                    <p class="wl-desc">Complete equipment evaluation, procurement analysis, and final selection report — 14 products, 6 manufacturers, 4 operational categories with product images, data tables, and one-click PDF/print export. Formatted for command staff distribution.</p>
+                    <p class="wl-desc">Evaluation, procurement analysis and final selection for command staff: 14 products, 6 manufacturers, 4 operational categories.</p>
                 </div>
             </div>
         </a>

@@ -3,11 +3,11 @@ import test from 'node:test';
 
 /**
  * Refresh safety (resources/js/pwa/busy.ts):
- *  - isUnsafeToRefresh(): every refresh a member can see or ask for (banner, "Refresh now") —
+ *  - isUnsafeToRefresh(): every refresh a member can see or ask for (banner, "Refresh app") —
  *    busy reason / page guard / edited editor or file / text the member TYPED and has not saved.
  *  - isUnsafeForAutomaticReload(): reloads nobody asked for — all of the above, plus any control
  *    that differs from the server-rendered page (Filament fills fields from script, so that
- *    comparison alone would leave "Refresh now" disabled on almost every admin page).
+ *    comparison alone would leave "Refresh app" disabled on almost every admin page).
  * The messaging feature registers `employee-message:<uuid>` reasons in window.__mbfdBusy and these
  * must hold the refresh back exactly like any other busy reason.
  */
@@ -66,7 +66,7 @@ test('text the member typed makes every refresh unsafe; clearing it makes it saf
   clearFieldEdits();
 });
 
-test('a field filled by script after load does not disable "Refresh now", but still holds back an automatic reload', () => {
+test('a field filled by script after load does not disable "Refresh app", but still holds back an automatic reload', () => {
   const field = textarea('Filled by Livewire', '');
   controls = [field];
   assert.equal(isUnsafeToRefresh(), false, 'nothing the member typed would be lost');

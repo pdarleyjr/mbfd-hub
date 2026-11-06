@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Shift, InventoryV2Item, InventoryV2Category, SupplyRequest } from '../types';
 import { ApiClient } from '../utils/api';
 import { HUB_TIMEZONE } from '../../../shared/timezone.ts';
+import SubmissionConversationDisclosure from './conversation/SubmissionConversationDisclosure';
 
 interface InventoryCountPageProps {
   stationId: number;
@@ -433,6 +434,7 @@ export default function InventoryCountPage({
                     <div className="text-xs text-gray-500">
                       {new Date(request.created_at).toLocaleString('en-US', { timeZone: HUB_TIMEZONE, dateStyle: 'short', timeStyle: 'short' })}
                     </div>
+                    {request.member_conversation?.participant === true && <SubmissionConversationDisclosure type="station_supply_request" id={request.id} />}
                   </div>
                 ))
               )}

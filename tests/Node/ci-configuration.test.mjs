@@ -439,7 +439,8 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(backgroundServices, /php artisan queue:restart/);
   assert.match(backgroundServices, /supervisorctl -c \/etc\/supervisor\/conf\.d\/supervisord\.conf restart 'queue-worker:\*'/);
   assert.match(backgroundServices, /supervisorctl -c \/etc\/supervisor\/conf\.d\/supervisord\.conf status/);
-  assert.match(backgroundServices, /\^php \+RUNNING /);
+  assert.match(backgroundServices, /\^php-fpm \+RUNNING /);
+  assert.match(backgroundServices, /\^nginx \+RUNNING /);
   assert.match(backgroundServices, /\^queue-worker:queue-worker_00 \+RUNNING /);
   assert.match(backgroundServices, /\^reverb \+RUNNING /);
   assert.doesNotMatch(backgroundServices, /pgrep/);
@@ -535,6 +536,9 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(productionDockerfile, /USER sail/);
   assert.doesNotMatch(productionEntrypoint, /\b(?:user|group)mod\b|\bchown\b/);
   assert.match(productionEntrypoint, /baked non-root sail identity/);
+  // storage/app on the array: an unmounted array (empty mountpoint) never starts the Hub.
+  assert.match(productionEntrypoint, /\/usr\/local\/bin\/check-storage-mount\s+exec \/usr\/bin\/supervisord/);
+  assert.match(imageCompose, /HUB_STORAGE_APP_SENTINEL_REQUIRED: "\$\{HUB_STORAGE_APP_PATH:\+1\}"/);
 
   const aggregate = workflowJob(gates, "release-gates");
   assert.doesNotMatch(aggregate, /if:\s*\$\{\{\s*always\(\)\s*\}\}/);
@@ -633,14 +637,62 @@ test("the PHP server routes Daily SPA navigation through Laravel authentication"
   assert.match(server, /require_once\s+\$publicPath\s*\.\s*['"]\/index\.php['"]/);
 });
 
-test("the production web server runs several PHP workers under Supervisor", () => {
+test("the production web server is nginx in front of a php-fpm pool under Supervisor", () => {
   const supervisor = readFileSync(resolve(root, "docker/production/supervisord.conf"), "utf8");
   const compose = readFileSync(resolve(root, "compose.prod.image.yaml"), "utf8");
+  const dockerfile = readFileSync(resolve(root, "docker/production/Dockerfile"), "utf8");
+  const nginx = readFileSync(resolve(root, "docker/production/nginx.conf"), "utf8");
+  const fpm = readFileSync(resolve(root, "docker/production/php-fpm.conf"), "utf8");
 
-  // artisan serve only honours PHP_CLI_SERVER_WORKERS with LARAVEL_SAIL=1 (or --no-reload).
+  // The PHP built-in server (one single-threaded worker per in-flight request) is gone from production.
+  assert.doesNotMatch(supervisor, /artisan serve/);
+  assert.doesNotMatch(dockerfile, /artisan serve|SUPERVISOR_PHP_COMMAND/);
+  assert.match(supervisor, /^\[program:php-fpm\]\r?\ncommand=\/usr\/sbin\/php-fpm8\.5 --nodaemonize --fpm-config \/etc\/php\/8\.5\/fpm\/php-fpm-hub\.conf\r?$/m);
+  assert.match(supervisor, /^\[program:nginx\]\r?\ncommand=\/usr\/sbin\/nginx -e stderr -c \/etc\/nginx\/hub\/nginx\.conf\r?$/m);
+  assert.match(nginx, /^\s+listen 8081 default_server;\r?$/m);
+  assert.match(nginx, /client_max_body_size 100m;/);
+  assert.match(nginx, /fastcgi_request_buffering on;/);
+  assert.match(fpm, /^pm\.max_children = \$\{PHP_FPM_MAX_CHILDREN\}\r?$/m);
+  assert.match(fpm, /^clear_env = no\r?$/m);
+  assert.match(dockerfile, /PHP_FPM_MAX_CHILDREN=32/);
+  assert.match(compose, /PHP_FPM_MAX_CHILDREN: "\$\{HUB_PHP_FPM_MAX_CHILDREN:-32\}"/);
+  // A manual rollback to a pre-php-fpm image still gets its 8 built-in server workers.
   assert.match(compose, /PHP_CLI_SERVER_WORKERS: "\$\{HUB_PHP_CLI_SERVER_WORKERS:-8\}"/);
-  assert.match(supervisor, /environment=LARAVEL_SAIL="1"/);
   assert.match(compose, /LARAVEL_SAIL: 1/);
+});
+
+test("nginx keeps the built-in server's routing and asset caching contract", () => {
+  const nginx = readFileSync(resolve(root, "docker/production/nginx.conf"), "utf8");
+
+  // Only real files bypass Laravel; directories (e.g. /daily/) and everything else reach index.php.
+  assert.match(nginx, /location \/ \{\r?\n\s+charset utf-8;\r?\n\s+try_files \$uri \/index\.php\?\$query_string;/);
+  assert.doesNotMatch(nginx, /try_files[^;]*\$uri\//);
+  assert.match(nginx, /fastcgi_param SCRIPT_NAME \/index\.php;/);
+  assert.match(nginx, /location ~ \\\.php\$ \{\r?\n\s+rewrite \^ \/index\.php last;/);
+  assert.match(nginx, /\^\/\(\?:build\|daily\)\/assets\//);
+  assert.match(nginx, /Cache-Control "public, max-age=31536000, immutable"/);
+  assert.match(nginx, /Service-Worker-Allowed "\/admin\/"/);
+  assert.match(nginx, /Cache-Control "no-cache, must-revalidate"/);
+  // Members' addresses come from Cloudflare for the access log only; PHP keeps the trusted proxy peer.
+  assert.match(nginx, /real_ip_header CF-Connecting-IP;/);
+  assert.match(nginx, /fastcgi_param REMOTE_ADDR \$realip_remote_addr;/);
+  assert.match(nginx, /"request_time":\$request_time/);
+  assert.match(nginx, /"upstream_time":"\$upstream_response_time"/);
+  assert.doesNotMatch(nginx, /\$request_uri"/);
+});
+
+test("deploy reloads php-fpm after rewriting caches and verifies the web tier", () => {
+  const deploy = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
+  const activate = workflowStep(deploy, "Migrate and activate prebuilt Hub image");
+  const services = workflowStep(deploy, "Restart Hub queues and verify background services");
+
+  assert.match(
+    activate,
+    /php artisan filament:clear-cached-components\r?\n(?:\s+#.*\r?\n)*\s+docker exec "\$HUB_APP_CONTAINER" supervisorctl -c \/etc\/supervisor\/conf\.d\/supervisord\.conf signal USR2 php-fpm/,
+  );
+  assert.match(services, /grep -Eq '\^php-fpm \+RUNNING '/);
+  assert.match(services, /grep -Eq '\^nginx \+RUNNING '/);
+  assert.match(services, /http:\/\/127\.0\.0\.1:8081\/fpm-ping\)" = 'pong'/);
 });
 
 test("the PHP server long-caches only content-hashed Vite assets and deploy caches events", () => {
@@ -661,7 +713,8 @@ test("the immutable image starts Supervisor without privilege-switch directives"
 
   assert.match(dockerfile, /COPY docker\/production\/supervisord\.conf \/etc\/supervisor\/conf\.d\/supervisord\.conf/);
   assert.doesNotMatch(supervisor, /^user\s*=/mi);
-  assert.match(supervisor, /\[program:php\]/);
+  assert.match(supervisor, /\[program:php-fpm\]/);
+  assert.match(supervisor, /\[program:nginx\]/);
   assert.match(supervisor, /\[program:queue-worker\]/);
   assert.match(supervisor, /\[program:reverb\]/);
   assert.match(supervisor, /\[program:scheduler\]/);
@@ -671,7 +724,12 @@ test("the immutable image starts Supervisor without privilege-switch directives"
   assert.match(runtime, /--network none/);
   assert.match(runtime, /supervisord --version/);
   assert.match(runtime, /supervisorctl -c \/etc\/supervisor\/conf\.d\/supervisord\.conf status/);
+  assert.match(runtime, /\^php-fpm \+RUNNING/);
+  assert.match(runtime, /\^nginx \+RUNNING/);
   assert.match(runtime, /queue-worker:queue-worker_00 \+RUNNING/);
+  assert.match(runtime, /fpm-ping\)" = 'pong'/);
+  assert.match(runtime, /Cache-Control: public, max-age=31536000, immutable/);
+  assert.match(runtime, /Content-Length: 104857601' http:\/\/localhost:8081\/up\)" = '413'/);
   assert.match(runtime, /test "\$\(docker exec "\$RUNTIME_CONTAINER" id -u\)" = 1000/);
   assert.match(runtime, /http:\/\/localhost:8081\/daily\/stations\/6[^\r\n]*\)" = '302'/);
   assert.match(runtime, /http:\/\/localhost:8081\/api\/public\/stations[^\r\n]*\)" = '302'/);

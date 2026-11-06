@@ -20,6 +20,13 @@ return [
             'default' => env('CLOUDFLARE_AI_MODEL', '@cf/meta/llama-3-8b-instruct'),
         ],
 
+        // Daily capital-project ranking (projects:analyze-priorities). On by
+        // default because it currently succeeds against the gateway; set false
+        // to stop the run without touching the rest of the AI integration.
+        'project_priorities' => [
+            'enabled' => (bool) env('PROJECT_PRIORITY_AI_ENABLED', true),
+        ],
+
         'rate_limit' => [
             'daily_neurons' => env('CLOUDFLARE_AI_DAILY_LIMIT', 9900),
             'cache_key' => 'cloudflare_ai_requests',

@@ -276,7 +276,10 @@ export interface ChecklistItem {
   value?: ChecklistFieldValue;
   valueRequired?: boolean;
   notes?: string;
-  photo?: string; // base64 encoded image
+  /** Inline data URL: only drafts saved before photos were queued separately still hold one. */
+  photo?: string;
+  /** Id of the photo queued on this device (utils/photoUploadQueue.ts); the checkout sends only this. */
+  photo_id?: string;
   inputType?: ChecklistInputType;
   expectedQuantity?: number;
   /** Display only: shown as one muted line in the expanded item details. */
@@ -367,6 +370,7 @@ export interface Defect {
   item_id?: string;
   notes?: string;
   photo?: string;
+  photo_id?: string;
   /** Present only when the member marked new damage that affects safe operation. */
   significant?: boolean;
 }
@@ -389,6 +393,7 @@ export interface SubmittedChecklistItem {
   status: ItemStatus;
   observed: boolean;
   photo?: string;
+  photo_id?: string;
   value?: ChecklistFieldValue;
   notes: string | null;
   significant?: true;
@@ -694,6 +699,8 @@ export interface StationRequestSummary {
   ai_receipt?: AiReceipt | null;
   items?: StationRequestItem[];
   updates?: StationRequestUpdate[];
+  /** Server-decided: this member sent it, so its conversation and reply box are theirs (docs/member-replies.md). */
+  member_conversation?: { participant: boolean };
 }
 
 /** A unit on a station's Overview for the current 7 AM to 7 AM window. Frontline units owe a daily inspection. */
@@ -743,6 +750,8 @@ export interface StationRosterRow {
   from: string;
   through: string;
   hours: string;
+  /** The member's profile for a viewer who may open profiles; null or absent otherwise. */
+  profile_url?: string | null;
 }
 
 export interface StationRosterSection {
@@ -775,6 +784,30 @@ export interface StationOverview {
   requests: StationRequestSummary[];
   requests_total: number;
   alert: { active: boolean; units: StationOverviewUnit[] };
+  /** Today's cleaning for this station, from the department schedule an admin maintains. Absent from older servers. */
+  cleaning?: StationCleaningToday;
+}
+
+export interface StationCleaningEntry {
+  title: string;
+  /** One line per instruction. */
+  instructions: string[];
+  /** Set only for this date, replacing or adding to the usual weekday schedule. */
+  date_exception: boolean;
+  station_specific: boolean;
+}
+
+export interface StationCleaningToday {
+  /** Eastern calendar date, YYYY-MM-DD. */
+  date: string;
+  weekday: string;
+  date_label: string;
+  focus: StationCleaningEntry | null;
+  /** Why there is no focus today, when there is none. */
+  note: string | null;
+  extras: StationCleaningEntry[];
+  baseline: { title: string; instructions: string[] } | null;
+  source: string;
 }
 
 export type ApparatusServiceTicketStatus = 'submitted' | 'acknowledged' | 'scheduled' | 'in_progress' | 'waiting_for_parts' | 'completed' | 'cancelled';
@@ -807,6 +840,8 @@ export interface ApparatusServiceTicketSummary {
   created_at: string;
   updated_at: string;
   updates?: ApparatusServiceTicketUpdate[];
+  /** Server-decided: this member sent it, so its conversation and reply box are theirs (docs/member-replies.md). */
+  member_conversation?: { participant: boolean };
 }
 
 export interface StationActivityEntry {
@@ -1141,6 +1176,8 @@ export interface SupplyRequest {
   created_by_shift: Shift;
   created_at: string;
   updated_at: string;
+  /** Server-decided: this member sent it, so its conversation and reply box are theirs (docs/member-replies.md). */
+  member_conversation?: { participant: boolean };
 }
 
 export interface UpdateItemRequest {

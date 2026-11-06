@@ -7,6 +7,7 @@ use App\Filament\Resources\RecommendationResource;
 use App\Filament\Support\DefectCorrectiveActions;
 use App\Filament\Support\DefectHistory;
 use App\Filament\Support\DefectServiceTicketActions;
+use App\Filament\Support\MemberMediaFields;
 use App\Models\AdminAlertEvent;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
@@ -14,6 +15,7 @@ use App\Models\ApparatusDefectRecommendation;
 use App\Services\Exports\ExportableTable;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
+use App\Support\Media\MemberMedia;
 use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -89,12 +91,16 @@ class DefectsRelationManager extends RelationManager implements ExportableTable
                 Forms\Components\Textarea::make('notes')
                     ->rows(3),
 
-                Forms\Components\FileUpload::make('photo_path')
+                MemberMediaFields::photoUpload('photo_path', 'defects')
                     ->label('Photo')
-                    ->disk('public')
-                    ->directory('defects')
                     ->image()
-                    ->imageEditor(),
+                    ->imageEditor()
+                    // Shrunk in the browser before upload, like the member apps (long edge 2048 px).
+                    ->imageResizeMode('contain')
+                    ->imageResizeTargetWidth('2048')
+                    ->imageResizeTargetHeight('2048')
+                    ->imageResizeUpscale(false)
+                    ->maxSize(25600),
 
                 // There is deliberately NO status field here. An issue's status changes only through
                 // DefectCorrectiveActions (Acknowledge, Update, Resolve, Close — No Action Required, Reopen),
@@ -137,8 +143,7 @@ class DefectsRelationManager extends RelationManager implements ExportableTable
             ->columns([
                 Tables\Columns\ImageColumn::make('photo_path')
                     ->label('Photo')
-                    ->getStateUsing(fn (ApparatusDefect $record): ?string => $record->availablePhotoPath())
-                    ->disk('public')
+                    ->getStateUsing(fn (ApparatusDefect $record): ?string => MemberMedia::url($record->availablePhotoPath()))
                     ->width(48)
                     ->height(48)
                     ->square()

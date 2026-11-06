@@ -541,7 +541,6 @@ body[data-hub-ui="2"] {
     min-height: 72px;
     padding: 12px 16px;
     border: 1px solid rgb(var(--hub-glass-border));
-    border-top: 3px solid rgb(var(--tile-accent));
     border-radius: var(--hub-radius-card);
     background: rgb(var(--hub-glass) / var(--hub-glass-alpha));
     box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card);
@@ -554,9 +553,10 @@ body[data-hub-ui="2"] {
 
 [data-hub-ui="2"] .hub-tile:hover {
     border-color: rgb(var(--tile-accent) / 0.4);
-    border-top-color: rgb(var(--tile-accent));
     background: rgb(var(--hub-well));
 }
+
+[data-hub-ui="2"] .hub-tile:hover .hub-tile__affordance { color: rgb(var(--tile-accent)); }
 
 [data-hub-ui="2"] .hub-tile--operations { --tile-accent: var(--hub2-domain-operations); }
 [data-hub-ui="2"] .hub-tile--logistics { --tile-accent: var(--hub2-domain-logistics); }
@@ -564,10 +564,15 @@ body[data-hub-ui="2"] {
 [data-hub-ui="2"] .hub-tile--training { --tile-accent: var(--hub2-domain-training); }
 [data-hub-ui="2"] .hub-tile--programs { --tile-accent: var(--hub2-domain-programs); }
 
+/* The module is identified by its tinted glyph chip, not by a coloured edge on the tile. */
 [data-hub-ui="2"] .hub-tile__glyph {
+    box-sizing: content-box;
     width: 20px;
     height: 20px;
     flex: none;
+    padding: 8px;
+    border-radius: var(--hub2-radius-md);
+    background: rgb(var(--tile-accent) / 0.1);
     color: rgb(var(--tile-accent));
 }
 
@@ -594,6 +599,7 @@ body[data-hub-ui="2"] {
     height: 16px;
     flex: none;
     color: rgb(var(--hub2-n-500));
+    transition: color var(--hub2-duration-fast) var(--hub2-ease-enter);
 }
 
 /* ------------------------------------------------------------------ */
@@ -608,7 +614,10 @@ body[data-hub-ui="2"] {
     [data-hub-ui="2"] .home-layout > [data-home-column="rail"] { position: sticky; top: calc(var(--hub-shell-bar-height) + 24px); }
 }
 
-[data-hub-ui="2"] .home-layout .hub-section__header { min-height: 40px; align-items: center; }
+/* Both column headers are one 44px heading row with no rule: the glass list and the tiles carry the structure,
+   so the two columns start on the same line and the phone does not stack three hairlines. */
+[data-hub-ui="2"] .home-layout .hub-section__header { min-height: 44px; align-items: center; margin: 0; padding: 0; border-bottom: 0; }
+[data-hub-ui="2"] .home-updates { overflow: hidden; margin-top: 12px; }
 
 [data-hub-ui="2"] .home-today {
     display: flex;
@@ -664,6 +673,10 @@ body[data-hub-ui="2"] {
 }
 [data-hub-ui="2"] .hub-tiles--rail .hub-tile { min-height: 56px; padding: 8px 16px; border-top-width: 1px; }
 [data-hub-ui="2"] .hub-tiles--rail .hub-tile:hover { border-top-color: rgb(var(--tile-accent) / 0.4); }
+/* Phones: one line of description per row, so each destination is a single thumb-height row (full text on wider screens). */
+@media (max-width: 639.98px) {
+    [data-hub-ui="2"] .hub-tiles--rail .hub-tile__description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
+}
 
 /* Additional Links: one native <details> card in the rail. The summary is the tile row; links stack beneath it. */
 [data-hub-ui="2"] .hub-additional,

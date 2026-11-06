@@ -26,6 +26,9 @@ final class PersonnelCapabilityAdministrationTest extends TestCase
         'personnel.tables.view', 'personnel.tables.create', 'personnel.tables.edit',
         'personnel.tables.share', 'personnel.tables.export', 'personnel.tables.archive',
         'personnel.promotions.manage',
+        'personnel.documents.view', 'personnel.documents.manage',
+        'personnel.accidents.view', 'personnel.accidents.manage', 'personnel.accidents.supervise',
+        'personnel.fuel_ids.view', 'personnel.fuel_ids.manage',
     ];
 
     public function test_all_personnel_capabilities_can_be_granted_and_revoked_with_audit_and_separate_panel_access(): void

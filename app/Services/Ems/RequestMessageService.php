@@ -8,6 +8,8 @@ use App\Models\Ems\InventoryRequest;
 use App\Models\Ems\InventoryRequestEvent;
 use App\Models\Ems\InventoryRequestMessage;
 use App\Models\User;
+use App\Services\MemberReplies\MemberReplyLedger;
+use App\Support\MemberReplies\ReplySubject;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -81,6 +83,10 @@ final class RequestMessageService
             ]);
             $request->update(['last_activity_at' => now()]);
             $this->notifier->messagePosted($message);
+            // The shared awaiting-staff ledger (docs/member-replies.md section 4).
+            $member
+                ? app(MemberReplyLedger::class)->memberReplied(ReplySubject::EMS_INVENTORY_REQUEST, (int) $request->getKey(), $user, $message->created_at)
+                : app(MemberReplyLedger::class)->staffReplied(ReplySubject::EMS_INVENTORY_REQUEST, (int) $request->getKey(), $message->created_at);
 
             return $this->presenter->message($message) + ['request_id' => $request->uuid];
         });

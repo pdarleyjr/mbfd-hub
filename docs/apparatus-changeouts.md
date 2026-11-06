@@ -22,6 +22,16 @@ schedule does.
 7. A checklist template is the expected list, not a custody record. `apparatus_changeout_items` records what a named person
    said happened at a named time, and never edits templates, overlays, inspections or defects.
 8. Every state change goes through a service with server-side authorization. UI code never writes these tables.
+9. A unit is not a truck. `App\Services\Fleet\UnitIdentityGuard` runs on every apparatus save and refuses a unit ID or
+   designation that is another truck's vehicle number or another row's unit, a vehicle number that names another unit,
+   and unit fields that disagree (unit ID E1 with designation "E 11"). Only `VehicleSwapService` moves identities past it.
+10. A front-line unit (`config/daily_checkout_frontline.php`) is never Out of Service; its truck can be. On the Apparatus
+    pages, taking that truck out of service asks which truck runs as the unit and swaps. If none is available, a Fleet
+    manager records it with `ApparatusChangeoutService::recordWithoutReplacement`: mode `no_replacement`, nothing moves, the
+    truck goes Out of Service, and Fleet is told exactly as for a swap. The record has the same truck on both sides, so
+    readers that ask where a unit went or what it left (`ApparatusChangeout::scopeRealMoves`) skip it, and screens say
+    "E 1 kept on truck 20503 (no replacement available)". `FrontlineCoverage` warns on the Apparatus pages
+    until a truck is swapped onto the unit, in the same words the `daily-checkout:apply-approved-policy` gate uses.
 
 ## 2. Records
 
@@ -50,7 +60,7 @@ says the planned date has passed, until a changeout or Fleet closes it.
 ### Changeout fields
 
 `status` is always `completed` and `handoff_status` always `complete`. `acknowledged_at` and `acknowledged_by_user_id` say Fleet
-has seen it. `move_audit` holds `mode` (`start` or `handoff_only`), the before and after of both trucks, `old_truck_status`,
+has seen it. `move_audit` holds `mode` (`start`, `handoff_only` or `no_replacement`), the before and after of both trucks, `old_truck_status`,
 `new_truck_status`, `new_truck_record`, `displaced_unit`, `review_notes` and `corrections_left_on_truck`. The columns
 `decided_*`, `quantity_moved`, `condition`, `item_class`, `verified_*` and `apparatus_defect_id` remain in the schema, unused.
 

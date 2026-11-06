@@ -1,3 +1,4 @@
+import { protectedUiOrigin } from './support/test-environment';
 import { execFileSync } from 'node:child_process';
 import canonicalSetup from './protected-ui.setup';
 import { protectedUiInventoryEnvironment } from '../../playwright.protected-ui-inventory.config';
@@ -17,7 +18,7 @@ export default async function setup() {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
-    await page.goto(new URL(routes['/member-onboarding/invite'], 'http://127.0.0.1:8127').href);
+    await page.goto(new URL(routes['/member-onboarding/invite'], protectedUiOrigin).href);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.waitForURL(url => url.pathname === '/member-onboarding');
     await page.context().storageState({ path: 'test-results/protected-ui-auth/onboarding-state.json' });

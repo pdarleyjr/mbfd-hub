@@ -10,11 +10,12 @@ import {
 } from '../utils/dailyCheckoutSubmissionQueue';
 import { contextualBackLabel, safeContextualPath } from '../utils/contextualBack';
 import { isReportedIssues, type ReportedIssues } from '../utils/receiptIssues';
+import PhotoSyncNotice from './PhotoSyncNotice';
 
 const RECEIPT_OUTCOMES: readonly InspectionReceiptOutcome[] = ['submitted', 'pending_review', 'accepted_with_exception', 'queued'];
 
 /** What the member reported on this checkout, when the receipt knows it (an immediate online send). */
-type ReceiptState = Partial<InspectionReceiptState> & { issues?: ReportedIssues };
+type ReceiptState = Partial<InspectionReceiptState> & { issues?: ReportedIssues; photoIds?: string[] };
 
 const readReceiptState = (state: unknown): ReceiptState => {
   if (!state || typeof state !== 'object') return {};
@@ -25,6 +26,7 @@ const readReceiptState = (state: unknown): ReceiptState => {
     queuedSubmissionId: typeof candidate.queuedSubmissionId === 'string' ? candidate.queuedSubmissionId : undefined,
     returnTo: typeof candidate.returnTo === 'string' ? candidate.returnTo : undefined,
     issues: isReportedIssues(candidate.issues) ? candidate.issues : undefined,
+    photoIds: Array.isArray(candidate.photoIds) ? candidate.photoIds.filter((id): id is string => typeof id === 'string') : undefined,
   };
 };
 
@@ -60,6 +62,7 @@ export default function SuccessPage() {
   const returnTo = inAppPath(receipt.returnTo) ?? '/stations';
   const returnLabel = returnTo === '/vehicle-inspections' ? 'Back to vehicle inspections' : contextualBackLabel(`/daily${returnTo}`);
   const receiptReturnTo = receipt.returnTo;
+  const photoIds = receipt.photoIds;
 
   useEffect(() => {
     // Vibrate on success
@@ -82,14 +85,14 @@ export default function SuccessPage() {
       // Only the mounted success page for this exact queue record changes
       // state. A different operator route is never redirected by background
       // synchronization.
-      const state: InspectionReceiptState = { outcome: syncedOutcome, queuedSubmissionId, returnTo: receiptReturnTo };
+      const state: InspectionReceiptState & { photoIds?: string[] } = { outcome: syncedOutcome, queuedSubmissionId, returnTo: receiptReturnTo, photoIds };
       setSearchParams({}, { replace: true, state });
     };
 
     window.addEventListener(DAILY_CHECKOUT_QUEUE_SYNC_EVENT, handleQueueSync);
 
     return () => window.removeEventListener(DAILY_CHECKOUT_QUEUE_SYNC_EVENT, handleQueueSync);
-  }, [isQueued, queuedSubmissionId, receiptReturnTo, setSearchParams]);
+  }, [isQueued, queuedSubmissionId, receiptReturnTo, photoIds, setSearchParams]);
 
   return (
     <section
@@ -121,6 +124,7 @@ export default function SuccessPage() {
           </p>
         )}
       </div>
+      {photoIds && photoIds.length > 0 && <PhotoSyncNotice ids={photoIds} className="mt-2" />}
 
       <div className="mt-6 flex flex-col gap-3">
         <Link

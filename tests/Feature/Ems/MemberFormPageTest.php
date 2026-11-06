@@ -61,7 +61,7 @@ final class MemberFormPageTest extends TestCase
         $this->assertSame(url('/employee/forms/api/ems/requests/__UUID__/cancel'), $ems['cancel']);
 
         $links = collect($bootstrap['library_links'])->keyBy('key');
-        $this->assertSame(['als-transport-inventory', 'als-non-transport-inventory', 'fire-boat-6-medical-inventory', 'bls-detail-medical-inventory', 'take-home-vehicle-inspection', 'narcotics-check'], $links->keys()->all());
+        $this->assertSame(['als-transport-inventory', 'als-non-transport-inventory', 'fire-boat-6-medical-inventory', 'bls-detail-medical-inventory', 'take-home-vehicle-inspection', 'narcotics-check', 'accident-report', 'memorandum'], $links->keys()->all());
         $entry = $links['als-transport-inventory'];
         $this->assertSame('ALS Transport Inventory Form', $entry['title']);
         $this->assertTrue($entry['in_app']);

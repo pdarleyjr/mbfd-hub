@@ -53,6 +53,8 @@ import { prefillBlankCompartments, prefillBlankFieldValues, prefillCompartments,
 import { checklistUsesVehicleId, defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
 import { activeVehicleIdentification, optionalIdentification, toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
 import { ClipboardList, Gauge, StickyNote, Truck, Users } from 'lucide-react';
+import { photoIdsOf } from '../utils/photoUploadQueue';
+import PhotoSyncNotice from './PhotoSyncNotice';
 
 type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'notes' | 'submit';
 
@@ -262,12 +264,15 @@ export default function InspectionWizard() {
   }
   const autosaver = autosaverRef.current;
 
-  const showReceipt = (outcome: InspectionReceiptOutcome, queuedSubmissionId?: string, issues?: ReportedIssues) => {
+  const showReceipt = (outcome: InspectionReceiptOutcome, queuedSubmissionId?: string, issues?: ReportedIssues, photoIds?: string[]) => {
     // The queue-change and replay-result paths can both report one acceptance.
     if (receiptShownRef.current) return;
     receiptShownRef.current = true;
     // `issues` is only known for an immediate online send (the member's own answers); replayed sends omit it.
-    const state: InspectionReceiptState & { issues?: ReportedIssues } = { outcome, queuedSubmissionId, returnTo: returnTo ?? undefined, ...(issues ? { issues } : {}) };
+    // `photoIds` lets the receipt say how many of this checkout's photos have reached the Hub.
+    const state: InspectionReceiptState & { issues?: ReportedIssues; photoIds?: string[] } = {
+      outcome, queuedSubmissionId, returnTo: returnTo ?? undefined, ...(issues ? { issues } : {}), ...(photoIds && photoIds.length > 0 ? { photoIds } : {}),
+    };
     navigate(outcome === 'queued' ? '/success?queued=true' : '/success', { state });
   };
 
@@ -828,7 +833,9 @@ export default function InspectionWizard() {
               compartment: compartment.name,
               status: item.status,
               notes: item.notes,
-              photo: item.photo,
+              // Photos travel on their own requests and are named by id. An inline photo from an older
+              // draft rides once, on the item; the server gives the finding the item's photo.
+              ...(item.photo_id ? { photo_id: item.photo_id } : {}),
               ...(item.status === 'Damaged' && item.significant === true ? { significant: true } : {}),
               ...(checklist.schema_version === 2 ? {
                 compartment_id: compartment.id,
@@ -867,7 +874,7 @@ export default function InspectionWizard() {
             status: item.status,
             observed: item.observed === true,
             ...(item.status === 'Damaged' && item.significant === true ? { significant: true as const } : {}),
-            ...(item.photo ? { photo: item.photo } : {}),
+            ...(item.photo_id ? { photo_id: item.photo_id } : item.photo ? { photo: item.photo } : {}),
             ...(item.value !== undefined ? { value: item.value } : {}),
             notes: item.notes || null,
           })),
@@ -909,7 +916,7 @@ export default function InspectionWizard() {
           navigator.vibrate([50, 100, 50]);
         }
         
-        showReceipt('queued', queueId);
+        showReceipt('queued', queueId, undefined, photoIdsOf(submission));
       } else {
         const submissionResult = await submitQueuedInspection(queueId);
         if (submissionResult !== 'submitted' && submissionResult !== 'pending_review' && submissionResult !== 'accepted_with_exception') {
@@ -921,7 +928,7 @@ export default function InspectionWizard() {
           navigator.vibrate(200);
         }
         
-        showReceipt(submissionResult, undefined, reportedIssuesFor(submission));
+        showReceipt(submissionResult, undefined, reportedIssuesFor(submission), photoIdsOf(submission));
       }
     } catch (err) {
       setSubmissionError(err instanceof Error ? err.message : 'Failed to submit inspection');
@@ -1365,6 +1372,9 @@ export default function InspectionWizard() {
           </button>
         </div>
       )}
+
+      {/* Photos are sent on their own and never hold the checkout back; this only says where they are. */}
+      {currentStep === 'submit' && <PhotoSyncNotice ids={photoIdsOf({ compartments, concerns })} className="mb-3" />}
 
       {currentStep === 'submit' && (
         <SubmitStep

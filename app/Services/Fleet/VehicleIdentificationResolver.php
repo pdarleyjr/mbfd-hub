@@ -363,6 +363,9 @@ final class VehicleIdentificationResolver
             $this->link->link($apparatus, $locked, $ledger->actor);
         } catch (UniqueConstraintViolationException) {
             return $this->needsReview($ledger, $answers, "Vehicle record {$locked->veh_number} was linked to another unit at the same moment.");
+        } catch (UnitIdentityConflict $conflict) {
+            // The record's number names another unit: Fleet decides, and the checkout itself still goes through.
+            return $this->needsReview($ledger, $answers, $conflict->summary());
         }
         $apparatus->refresh();
         $ledger->record(VehicleIdentificationLedger::RECORD, ApparatusIdentificationEvent::EVENT_MATCHED, [
@@ -486,6 +489,9 @@ final class VehicleIdentificationResolver
             return DB::transaction(fn (): array => $this->createRecordAndLink($ledger, $answers));
         } catch (UniqueConstraintViolationException) {
             return $this->needsReview($ledger, $answers, 'A vehicle record for this unit was created at the same moment.');
+        } catch (UnitIdentityConflict $conflict) {
+            // The savepoint also took back the new record: the typed number names another unit, so Fleet decides.
+            return $this->needsReview($ledger, $answers, $conflict->summary());
         }
     }
 

@@ -114,6 +114,8 @@ final class CloudflareEmailDispatcher
             'identity_recovery',
             'identity_administrative_recovery',
             'member_onboarding_invitation',
+            // A member's own copy of a memorandum addressed outside the Hub: the Hub keeps no copy of it.
+            'personnel_memorandum_copy',
         ], true);
         $email = OutboundEmail::query()->create([
             'provider' => 'cloudflare',

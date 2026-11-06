@@ -39,7 +39,7 @@ class AdminDashboard extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Overview of all workgroups, sessions, evaluations, and results.';
+        return null;
     }
 
     protected function getHeaderActions(): array
@@ -48,7 +48,7 @@ class AdminDashboard extends Page
 
         return [
             ExportAction::make('exportAIReport')
-                ->label('🤖 Export AI Report')
+                ->label('Export AI Report')
                 ->color('primary')
                 ->exporter(WorkgroupAIReportExporter::class)
                 ->tooltip('Export all products with AI-generated analytical summaries')

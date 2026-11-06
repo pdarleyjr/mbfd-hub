@@ -6,6 +6,7 @@ use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\StationResource\Pages;
 use App\Filament\Resources\StationResource\RelationManagers;
+use App\Filament\Resources\StationResource\StationCleaningSection;
 use App\Filament\Resources\StationResource\StationOperationsSection;
 use App\Models\Station;
 use App\Services\StationStaffingService;
@@ -28,7 +29,7 @@ class StationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
 
-    protected static ?string $navigationGroup = 'Operations';
+    protected static ?string $navigationGroup = 'Stations';
 
     protected static ?int $navigationSort = 20;
 
@@ -112,6 +113,7 @@ class StationResource extends Resource
         return $infolist
             ->schema([
                 StationOperationsSection::make(),
+                StationCleaningSection::make(),
                 Infolists\Components\Section::make('Station Photo')
                     ->schema([
                         Infolists\Components\ImageEntry::make('photo')
@@ -226,7 +228,9 @@ class StationResource extends Resource
                 Tables\Columns\TextColumn::make('address')->visibleFrom('md')
                     ->searchable()
                     ->limit(30),
-                Tables\Columns\TextColumn::make('captain_in_charge')->visibleFrom('md')
+                // Phone cards: station, address and phone, then captain and active status.
+                Tables\Columns\TextColumn::make('captain_in_charge')
+                    ->extraHeaderAttributes(['data-hub-priority' => 1])
                     ->searchable()
                     ->label('Captain'),
                 Tables\Columns\TextColumn::make('phone')->visibleFrom('md')
@@ -243,7 +247,8 @@ class StationResource extends Resource
                 Tables\Columns\TextColumn::make('rooms_count')->visibleFrom('md')
                     ->counts('rooms')
                     ->label('Rooms'),
-                Tables\Columns\IconColumn::make('is_active')->visibleFrom('md')
+                Tables\Columns\IconColumn::make('is_active')
+                    ->extraHeaderAttributes(['data-hub-priority' => 2])
                     ->label('Active')
                     ->boolean()
                     ->sortable(),
@@ -306,6 +311,7 @@ class StationResource extends Resource
             'create' => Pages\CreateStation::route('/create'),
             'view' => Pages\ViewStation::route('/{record}'),
             'edit' => Pages\EditStation::route('/{record}/edit'),
+            'cleaning' => Pages\ManageStationCleaning::route('/{record}/cleaning'),
         ];
     }
 }

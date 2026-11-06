@@ -25,11 +25,8 @@
 [data-hub-ui="2"] .thvi-step__body { display: grid; gap: 16px; padding: 16px; }
 @media (min-width: 640px) { [data-hub-ui="2"] .thvi-step__body { padding: 20px 24px; } }
 
-[data-hub-ui="2"] .thvi-type {
-    display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px;
-    border-radius: var(--hub-radius-pill); background: rgb(var(--hub2-action-tint)); color: rgb(var(--hub2-action));
-    font-size: 13px; font-weight: 700;
-}
+/* The inspection type is a quiet caption under the title, not a second badge repeating it. */
+[data-hub-ui="2"] .thvi-type { color: rgb(var(--hub2-n-600)); font-size: 13px; font-weight: 600; }
 
 [data-hub-ui="2"] .thvi-field { display: grid; gap: 6px; min-width: 0; }
 [data-hub-ui="2"] .thvi-label { font-size: 14px; font-weight: 700; color: rgb(var(--hub2-n-900)); }

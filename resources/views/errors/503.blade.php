@@ -2,5 +2,5 @@
 @isset($exception)
     @include('errors.hub', ['code' => 503, 'title' => 'Hub temporarily unavailable', 'message' => 'The Hub is temporarily unavailable. Please try again shortly.'])
 @else
-    @include('errors.hub', ['code' => 503, 'eyebrow' => 'SCHEDULED UPDATE', 'refreshSeconds' => 30, 'title' => 'MBFD Hub is being updated', 'message' => 'The Hub is down for an update for approximately 2 to 8 minutes. This page reloads on its own and you do not need to do anything.'])
+    @include('errors.hub', ['code' => 503, 'eyebrow' => 'SCHEDULED UPDATE', 'refreshSeconds' => 30, 'retry' => true, 'title' => 'Updating MBFD Hub', 'message' => "We're applying an update to improve MBFD Hub. Please try again shortly.", 'note' => 'If you have a form or other work in progress, keep your current page open.'])
 @endisset

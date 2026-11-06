@@ -10,7 +10,9 @@ import {
   newConcernDraft,
   suggestExistingIssue,
 } from '../../utils/concerns.ts';
-import { photoProblem, readPhotoFile } from '../../utils/photoFile.ts';
+import { photoProblem } from '../../utils/photoFile.ts';
+import { discardQueuedPhoto, queuePhoto } from '../../utils/photoUploadQueue';
+import QueuedPhotoPreview from '../QueuedPhotoPreview';
 import { createClientSubmissionId } from '../../utils/storage';
 import './findings.css';
 
@@ -54,6 +56,7 @@ export default function ConcernsSection({ concerns, onChange, openIssues, showEr
   };
 
   const remove = (id: string) => {
+    void discardQueuedPhoto(concerns.find(draft => draft.client_id === id)?.photo_id);
     onChange(previous => previous.filter(draft => draft.client_id !== id));
     setPhotoError(null);
     requestAnimationFrame(() => addRef.current?.focus());
@@ -68,14 +71,20 @@ export default function ConcernsSection({ concerns, onChange, openIssues, showEr
       return;
     }
     setPhotoError(null);
-    readPhotoFile(file).then(photo => patch(id, { photo })).catch((error: unknown) => {
+    // Shrunk on the phone, saved on this device and sent on its own; the entry keeps only the photo id.
+    const replacing = concerns.find(draft => draft.client_id === id)?.photo_id;
+    queuePhoto(file).then((photoId) => {
+      patch(id, { photo: undefined, photo_id: photoId });
+      void discardQueuedPhoto(replacing);
+    }).catch((error: unknown) => {
       setPhotoError({ id, message: error instanceof Error ? error.message : 'The image could not be read. Choose it again.' });
       resetPicker(id);
     });
   };
 
-  const removePhoto = (id: string) => {
-    patch(id, { photo: undefined });
+  const removePhoto = (id: string, photoId?: string) => {
+    patch(id, { photo: undefined, photo_id: undefined });
+    void discardQueuedPhoto(photoId);
     resetPicker(id);
     requestAnimationFrame(() => document.getElementById(`concern-photo-${id}`)?.focus());
   };
@@ -156,13 +165,11 @@ export default function ConcernsSection({ concerns, onChange, openIssues, showEr
             )}
 
             <label htmlFor={`concern-photo-${id}`}>Photo (optional)</label>
-            <input key={`concern-photo-${id}-${pickerResets[id] ?? 0}`} id={`concern-photo-${id}`} type="file" accept="image/*" onChange={event => choosePhoto(id, event.target.files?.[0])} />
+            <input key={`concern-photo-${id}-${pickerResets[id] ?? 0}`} id={`concern-photo-${id}`} type="file" accept="image/*,.heic,.heif" onChange={event => choosePhoto(id, event.target.files?.[0])} />
             {photoError?.id === id && <p role="alert" className="concern-error">{photoError.message}</p>}
-            {draft.photo && (
-              <div className="inspection-photo-preview">
-                <img src={draft.photo} alt={`Photo for entry ${index + 1}`} className="inspection-photo" />
-                <button type="button" className="hub-btn hub-btn--destructive" onClick={() => removePhoto(id)}>Remove photo</button>
-              </div>
+            {(draft.photo_id || draft.photo) && (
+              <QueuedPhotoPreview photoId={draft.photo_id} legacySrc={draft.photo_id ? undefined : draft.photo} alt={`Photo for entry ${index + 1}`}
+                removeLabel={`Remove photo for entry ${index + 1}`} onRemove={() => removePhoto(id, draft.photo_id)} />
             )}
 
             <button type="button" className="hub-btn hub-btn--tertiary concern-remove" onClick={() => remove(id)}>Remove entry {index + 1}</button>

@@ -82,7 +82,7 @@ order.
   can never reset typed text or the selection.
 * While the composer holds text, is sending, or holds a failed send, it registers the busy reason
   `employee-message:<id>` in the shared `window.__mbfdBusy` registry and dispatches
-  `mbfd:busy-change`, so neither the automatic nor the **manual** "Refresh now" path reloads the page.
+  `mbfd:busy-change`, so neither the automatic nor the **manual** "Refresh app" path reloads the page.
   Text is cleared and the reason released only after the server confirms the message was saved.
 * Offline: the send button reports "You're offline …" and keeps the draft; nothing is ever shown as
   sent without a server confirmation. A timed-out send keeps the draft and the same request id, so a

@@ -17,7 +17,7 @@
     <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub-header :back-href="route('take-home-inspections.index')" back-label="Take Home Inspections" />
     <main id="main" class="hub-page__main thvi-main mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-        <x-hub.page-header title="Take Home Vehicle Inspection" :eyebrow="$inspection->reference" :description="'Submitted '.$inspection->submittedAtLocal().' by '.$inspection->inspector_name">
+        <x-hub.page-header title="Take Home Vehicle Inspection" :description="$inspection->reference.' · Submitted '.$inspection->submittedAtLocal().' by '.$inspection->inspector_name">
             <a href="{{ route('take-home-inspections.pdf', $inspection) }}" class="hub-btn hub-btn--primary">Download PDF</a>
             @if($isOwn)
                 <a href="{{ route('take-home-inspections.create') }}" class="hub-btn hub-btn--secondary">New inspection</a>
@@ -68,6 +68,10 @@
                         @if($issuePhotos->isNotEmpty())
                             <div class="thvi-thumbs mt-2">
                                 @foreach($issuePhotos as $photo)
+                                    @if($photo->isPendingConversion())
+                                        <p class="hub-well p-3 text-sm">Photo still being processed.</p>
+                                        @continue
+                                    @endif
                                     <a class="thvi-thumb" href="{{ route('take-home-inspections.photo', $photo) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="{{ $photo->label() }}"><img src="{{ route('take-home-inspections.photo', $photo) }}" alt="{{ $photo->label() }}" loading="lazy"></a>
                                 @endforeach
                             </div>
@@ -83,7 +87,9 @@
                 @foreach(Inspection::PHOTO_ANGLES as $angle => $label)
                     @php($photo = $inspection->photos->firstWhere('angle', $angle))
                     <figure>
-                        @if($photo)
+                        @if($photo?->isPendingConversion())
+                            <p class="hub-well p-6 text-center text-sm">Photo received, still being processed. Refresh in a minute.</p>
+                        @elseif($photo)
                             <a href="{{ route('take-home-inspections.photo', $photo) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="{{ $label }}"><img src="{{ route('take-home-inspections.photo', $photo) }}" alt="{{ $label }}" loading="lazy"></a>
                         @else
                             <p class="hub-well p-6 text-center text-sm">Not provided</p>

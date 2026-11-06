@@ -50,6 +50,7 @@ final class InspectionConcernsTest extends TestCase
     {
         parent::setUp();
         Storage::fake('public');
+        Storage::fake('local');
         $this->member = $this->actingAsCanonicalFixture('E01-CONCERNS', 'Concern Reporter');
         $this->boat = $this->makeFireBoat6();
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-31 09:00:00', 'America/New_York'));
@@ -254,7 +255,7 @@ final class InspectionConcernsTest extends TestCase
         foreach ($rows as $row) {
             $this->assertStringStartsWith('defects/', $row->photo_path);
             $this->assertStringNotContainsString('base64', json_encode($row->getAttributes(), JSON_THROW_ON_ERROR));
-            Storage::disk('public')->assertExists($row->photo_path);
+            Storage::disk('local')->assertExists($row->photo_path);
             $this->get("/api/public/inspection-concerns/{$row->id}/photo")->assertOk();
         }
         $defect = ApparatusDefect::query()->sole();
@@ -271,7 +272,7 @@ final class InspectionConcernsTest extends TestCase
 
         $this->submit($payload)->assertUnprocessable();
 
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertSame([], Storage::disk('local')->allFiles());
         $this->assertDatabaseCount('apparatus_inspection_concerns', 0);
         $this->assertDatabaseCount('apparatus_inspections', 0);
     }
@@ -291,7 +292,7 @@ final class InspectionConcernsTest extends TestCase
         $this->assertDatabaseCount('apparatus_defects', 1);
         $this->assertDatabaseCount('apparatus_defect_events', 1);
         $this->assertDatabaseCount('apparatus_defect_observations', 1);
-        $this->assertCount(1, Storage::disk('public')->allFiles('defects'));
+        $this->assertCount(1, Storage::disk('local')->allFiles('defects'));
 
         $changed = $payload;
         $changed['concerns'][0]['description'] = 'A different note';

@@ -12,6 +12,7 @@ use App\Services\Defects\DefectMemberCorrection;
 use App\Services\Defects\MemberCorrectionRefused;
 use App\Services\Defects\StretcherIssueReporter;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
+use App\Support\Media\MemberMedia;
 use App\Support\Security\Base64Image;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -98,7 +99,7 @@ final class MemberIssueActionsController extends Controller
     {
         $bytes = (string) file_get_contents((string) $photo->getRealPath());
         $mime = (string) $photo->getMimeType();
-        $path = Base64Image::store('data:'.$mime.';base64,'.base64_encode($bytes), 'defects', 'stretcher', 'public', self::STRETCHER_PHOTO_MAX_BYTES);
+        $path = Base64Image::store('data:'.$mime.';base64,'.base64_encode($bytes), 'defects', 'stretcher', MemberMedia::disk(), self::STRETCHER_PHOTO_MAX_BYTES);
         if ($path === null) {
             throw ValidationException::withMessages(['photo' => 'Use a JPEG, PNG or WebP photo under 10 MB.']);
         }
@@ -109,7 +110,7 @@ final class MemberIssueActionsController extends Controller
     private function forgetPhoto(?string $path): void
     {
         if ($path !== null) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
+            MemberMedia::delete($path);
         }
     }
 

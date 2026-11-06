@@ -1,0 +1,19 @@
+{
+  "form_key": "vehicle-accident-report",
+  "display_name": "City of Miami Beach Vehicle Accident Report",
+  "template_sha256": "6f2cb17a638a04cfb9d61af9bad54d60a33b25a3de557f4c9ac26cb634effbf3",
+  "layout_sha256": "df6c14913b96f0b5f45ecb8c79647c13d81a30ca7b827d8c98aaf69e2df84cf2",
+  "expected_page_count": 2,
+  "expected_page_sizes": [
+    [
+      612,
+      792
+    ],
+    [
+      612,
+      792
+    ]
+  ],
+  "renderer_contract_version": "1.0",
+  "template_source": "Official City/MBFD PDF supplied 2026-11-05; unusable AcroForm widgets removed, page content unchanged."
+}

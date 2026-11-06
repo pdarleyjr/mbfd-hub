@@ -39,7 +39,7 @@ final class MasterPersonnelDirectoryTest extends TestCase
         $employee = $this->employee('Taylor Fixture', '00125', 'Lieutenant');
         $this->actingAsAdminWith(['admin.personnel.view']);
 
-        $this->get('/admin/master-personnel-directory')->assertOk()->assertSee('Master Personnel Directory');
+        $this->get('/admin/master-personnel-directory')->assertOk()->assertSee('Personnel Directory');
         Livewire::test(MasterPersonnelDirectory::class)
             ->assertCanSeeTableRecords([$employee])
             ->call('updateTableColumnState', 'rank', (string) $employee->id, 'Captain');

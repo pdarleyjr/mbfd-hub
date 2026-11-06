@@ -182,9 +182,11 @@ class StationInventoryV2Controller extends Controller
             ->active()
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function ($req) {
+            ->map(function ($req) use ($request) {
                 return [
                     'id' => $req->id,
+                    // Additive, per viewer: whether this member sent it and so may open its conversation (docs/member-replies.md).
+                    'member_conversation' => ['participant' => \App\Support\MemberReplies\SubmissionConversationAccess::isParticipant($request->user(), \App\Support\MemberReplies\ReplySubject::STATION_SUPPLY_REQUEST, $req)],
                     'request_text' => $req->request_text,
                     'status' => $req->status,
                     'public_response' => $req->public_response,

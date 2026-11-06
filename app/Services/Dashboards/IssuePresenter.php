@@ -15,13 +15,18 @@ final class IssuePresenter
 {
     public const THUMB_SIZE = 88;
 
+    private const NOTICE_ICON = 'heroicon-o-clipboard-document-check';
+
     /**
      * @return array{ref: string, subject: ?string, title: string, summary: ?string, severity: string, severityLabel: string,
      *     stage: string, statusLabel: string, time: string, timeIso: string, actor: ?string, initials: ?string,
-     *     image: ?string, image2x: ?string, imageKind: ?string, alt: string, icon: string, cta: string, lane: string}
+     *     image: ?string, image2x: ?string, imageKind: ?string, alt: string, icon: string, cta: string, lane: string, age: ?string,
+     *     memberReplied: bool, notice: bool}
      */
     public static function row(DashboardIssue $issue, string $lane): array
     {
+        $age = $issue->isOpen() ? self::age($issue->occurredAt) : null;
+
         $image = DashboardImages::url($issue->imageKey, self::THUMB_SIZE);
 
         return [
@@ -38,14 +43,20 @@ final class IssuePresenter
             'time' => self::time($issue->occurredAt),
             'timeIso' => $issue->occurredAt->toIso8601String(),
             'actor' => $issue->actorLabel,
-            'initials' => self::initials($issue->actorLabel),
+            // A request row is about the member (its subject); everywhere else the reporter is the person shown.
+            'initials' => self::initials($lane === DashboardSnapshot::LANE_REQUESTS ? ($issue->subject ?? $issue->actorLabel) : $issue->actorLabel),
             'image' => $image,
             'image2x' => $image === null ? null : DashboardImages::url($issue->imageKey, self::THUMB_SIZE * 2),
             'imageKind' => $image === null ? null : DashboardImages::kind($issue->imageKey),
             'alt' => $issue->subject ?? $issue->title,
-            'icon' => self::fallbackIcon($issue->imageKey, $lane),
+            'icon' => $issue->isNotice() ? self::NOTICE_ICON : self::fallbackIcon($issue->imageKey, $lane),
             'cta' => self::cta($issue->stage),
             'lane' => $lane,
+            'age' => $age,
+            // Set by a source's member-reply hook (Support\RecentlyClosedSource::whereMemberReplied()).
+            'memberReplied' => $issue->isOpen() && in_array('member_replied', $issue->tags, true),
+            // Information only (DashboardIssue::STAGE_NOTICE): shown without a priority badge and never counted.
+            'notice' => $issue->isNotice(),
         ];
     }
 
@@ -77,10 +88,11 @@ final class IssuePresenter
         $reporters = array_values(array_unique(array_filter(array_map(static fn (DashboardIssue $issue): ?string => $issue->actorLabel, $issues))));
         $noun = match ($lane) {
             DashboardSnapshot::LANE_VEHICLE => 'issue',
-            DashboardSnapshot::LANE_STATION => 'request',
+            DashboardSnapshot::LANE_STATION, DashboardSnapshot::LANE_REQUESTS => 'request',
             default => 'item',
         };
         $shown = $open > 0 ? $open : $count;
+        $openSince = array_map(static fn (DashboardIssue $issue): int => $issue->occurredAt->getTimestamp(), array_filter($issues, static fn (DashboardIssue $issue): bool => $issue->isOpen()));
 
         return [
             ...self::row($lead, $lane),
@@ -95,7 +107,10 @@ final class IssuePresenter
             'time' => self::time(CarbonImmutable::createFromTimestamp($newest)),
             'timeIso' => CarbonImmutable::createFromTimestamp($newest)->toIso8601String(),
             'actor' => count($reporters) === 1 && $lead->subject !== null ? $reporters[0] : null,
-            'initials' => self::initials($lead->actorLabel),
+            'initials' => self::initials($lane === DashboardSnapshot::LANE_REQUESTS ? ($lead->subject ?? $lead->actorLabel) : $lead->actorLabel),
+            // How long the oldest open one has waited.
+            'age' => $openSince === [] ? null : self::age(CarbonImmutable::createFromTimestamp(min($openSince))),
+            'memberReplied' => array_filter($issues, static fn (DashboardIssue $issue): bool => $issue->isOpen() && in_array('member_replied', $issue->tags, true)) !== [],
             'cta' => $stage === 'resolved' ? 'View all' : self::cta($stage).' all',
             'count' => $count,
             'href' => $href,
@@ -127,12 +142,25 @@ final class IssuePresenter
         };
     }
 
+    /** How long an open item has waited, short and exact to the unit shown: "Under 1 h", "5 h", "3 d". */
+    public static function age(DateTimeInterface $since, ?DateTimeInterface $now = null): string
+    {
+        $seconds = max(0, ($now === null ? CarbonImmutable::now() : CarbonImmutable::instance($now))->getTimestamp() - $since->getTimestamp());
+        $hours = intdiv($seconds, 3600);
+
+        return match (true) {
+            $hours < 1 => 'Under 1 h',
+            $hours < 48 => $hours.' h',
+            default => intdiv($hours, 24).' d',
+        };
+    }
+
     public static function cta(string $stage): string
     {
         return match ($stage) {
             'awaiting_response' => 'Review',
             'in_progress' => 'Update',
-            'resolved' => 'View',
+            'resolved', DashboardIssue::STAGE_NOTICE => 'View',
             default => 'Open',
         };
     }
@@ -160,6 +188,7 @@ final class IssuePresenter
         return match (true) {
             str_starts_with((string) $imageKey, 'apparatus:'), $lane === DashboardSnapshot::LANE_VEHICLE => 'heroicon-o-truck',
             str_starts_with((string) $imageKey, 'station:'), $lane === DashboardSnapshot::LANE_STATION => 'heroicon-o-building-office',
+            $lane === DashboardSnapshot::LANE_REQUESTS => 'heroicon-o-clipboard-document-list',
             default => 'heroicon-o-chat-bubble-left-right',
         };
     }

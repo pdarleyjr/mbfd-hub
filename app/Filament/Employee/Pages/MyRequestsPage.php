@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Employee\Pages;
 
 use App\Concerns\ResolvesCanonicalEmployee;
+use App\Models\PersonnelRequest;
 use Filament\Pages\Page;
 
 class MyRequestsPage extends Page
@@ -30,7 +31,12 @@ class MyRequestsPage extends Page
         $employee = $this->authenticatedEmployee();
 
         return [
-            'requests' => $employee->personnelRequests()->with(['items', 'originatingStation'])->latest()->paginate(20),
+            // Requests for this member and requests this member (an officer) submitted for someone else: both are theirs to follow.
+            'requests' => PersonnelRequest::query()
+                ->where(fn ($mine) => $mine->where('beneficiary_employee_id', $employee->getKey())->orWhere('requester_employee_id', $employee->getKey()))
+                ->with(['items', 'originatingStation'])
+                ->latest()
+                ->paginate(20),
             'legacyRequests' => $employee->equipmentRequests()->latest()->limit(20)->get(),
         ];
     }

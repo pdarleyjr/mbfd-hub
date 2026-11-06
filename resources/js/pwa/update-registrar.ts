@@ -63,8 +63,8 @@ const MIN_CHECK_GAP_MS = 60_000;
 const WORKER_SETTLE_TIMEOUT_MS = 8_000;
 const ACTIVATE_TIMEOUT_MS = 1_500;
 const RELEASE_PATTERN = /^[0-9a-f]{12}$/;
-const MESSAGE_BUSY = 'An update is ready. It will apply when you finish.';
-const MESSAGE_READY = 'An update is ready.';
+const MESSAGE_BUSY = 'Update available. Finish or save your work before refreshing.';
+const MESSAGE_READY = "Update available. Refresh the app when you're ready.";
 const MESSAGE_CHUNK = 'Part of this page could not load. Refresh to continue.';
 const MESSAGE_OFFLINE = "You're offline. Some screens will load when you're back online.";
 const MESSAGE_NAVIGATE = 'A notification is waiting.';
@@ -402,7 +402,7 @@ function createRegistrar(first: UpdateRegistrarOptions): RegistrarState {
         renderedUnsafe = busy;
         const message = pendingReason === 'chunk' ? MESSAGE_CHUNK : busy ? MESSAGE_BUSY : MESSAGE_READY;
         renderRow('update', message, [
-            { label: 'Refresh now', primary: true, disabled: busy, onActivate: refreshNow },
+            { label: 'Refresh app', primary: true, disabled: busy, onActivate: refreshNow },
             {
                 label: 'Later',
                 onActivate: () => {

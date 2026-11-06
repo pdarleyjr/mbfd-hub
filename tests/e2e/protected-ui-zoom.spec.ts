@@ -1,3 +1,4 @@
+import { protectedUiOrigin } from './support/test-environment';
 import { chromium, expect, test, type CDPSession, type Page, type TestInfo, type Worker } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -160,7 +161,7 @@ async function capture(page: Page, cdp: CDPSession, info: TestInfo, name: string
 
 test('native browser zoom preserves command board and ordinary reflow', async ({ baseURL }, info) => {
   test.setTimeout(180_000);
-  expect(baseURL).toBe('http://127.0.0.1:8127');
+  expect(baseURL).toBe(protectedUiOrigin);
   const width = info.project.use.viewport?.width;
   expect(width, 'Run through a protected UI width project').toBeDefined();
   const storage = info.project.use.storageState;

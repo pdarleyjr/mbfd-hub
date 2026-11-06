@@ -1,0 +1,573 @@
+{
+ "schema": "mbfd-overlay-layout",
+ "schema_version": "1.0",
+ "coordinate_origin": "top-left points",
+ "min_size": 6.5,
+ "fields": [
+  {
+   "key": "employee_name",
+   "label": "Employee's name",
+   "page": 1,
+   "type": "text",
+   "x": 137,
+   "baseline": 104,
+   "width": 167,
+   "size": 10
+  },
+  {
+   "key": "employee_id",
+   "label": "ID / clock no.",
+   "page": 1,
+   "type": "text",
+   "x": 407,
+   "baseline": 103,
+   "width": 172,
+   "size": 10
+  },
+  {
+   "key": "division",
+   "label": "Division",
+   "page": 1,
+   "type": "text",
+   "x": 137,
+   "baseline": 121.5,
+   "width": 167,
+   "size": 10
+  },
+  {
+   "key": "department",
+   "label": "Department",
+   "page": 1,
+   "type": "text",
+   "x": 406,
+   "baseline": 121.5,
+   "width": 172,
+   "size": 10
+  },
+  {
+   "key": "age",
+   "label": "Age",
+   "page": 1,
+   "type": "text",
+   "x": 137,
+   "baseline": 139.5,
+   "width": 167,
+   "size": 10
+  },
+  {
+   "key": "classification",
+   "label": "Classification",
+   "page": 1,
+   "type": "text",
+   "x": 406,
+   "baseline": 139.5,
+   "width": 173,
+   "size": 10
+  },
+  {
+   "key": "accident_date",
+   "label": "Date",
+   "page": 1,
+   "type": "text",
+   "x": 74,
+   "baseline": 199,
+   "width": 68,
+   "size": 10
+  },
+  {
+   "key": "accident_time",
+   "label": "Time",
+   "page": 1,
+   "type": "text",
+   "x": 191,
+   "baseline": 199,
+   "width": 95,
+   "size": 10
+  },
+  {
+   "key": "place",
+   "label": "Place",
+   "page": 1,
+   "type": "text",
+   "x": 345,
+   "baseline": 199,
+   "width": 233,
+   "size": 10
+  },
+  {
+   "key": "first_reported_to",
+   "label": "Accident first reported to",
+   "page": 1,
+   "type": "text",
+   "x": 190,
+   "baseline": 219,
+   "width": 388,
+   "size": 10
+  },
+  {
+   "key": "witnesses",
+   "label": "Witnesses",
+   "page": 1,
+   "type": "text",
+   "x": 112,
+   "baseline": 240,
+   "width": 466,
+   "size": 10
+  },
+  {
+   "key": "description",
+   "label": "Describe how accident occurred",
+   "page": 1,
+   "type": "lines",
+   "size": 10,
+   "lines": [
+    {
+     "x": 230,
+     "baseline": 260,
+     "width": 349
+    },
+    {
+     "x": 33,
+     "baseline": 280.5,
+     "width": 546
+    },
+    {
+     "x": 33,
+     "baseline": 300.5,
+     "width": 546
+    },
+    {
+     "x": 33,
+     "baseline": 320,
+     "width": 546
+    }
+   ]
+  },
+  {
+   "key": "type_of_injury",
+   "label": "Type of injury",
+   "page": 1,
+   "type": "text",
+   "x": 123,
+   "baseline": 340,
+   "width": 181,
+   "size": 10
+  },
+  {
+   "key": "part_of_body",
+   "label": "Part of body",
+   "page": 1,
+   "type": "text",
+   "x": 392,
+   "baseline": 341,
+   "width": 187,
+   "size": 10
+  },
+  {
+   "key": "medical_treatment_by",
+   "label": "Medical treatment by",
+   "page": 1,
+   "type": "text",
+   "x": 163,
+   "baseline": 361,
+   "width": 415,
+   "size": 10
+  },
+  {
+   "key": "losing_time_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 265,
+   "baseline": 380,
+   "size": 11,
+   "box": [
+    260,
+    366,
+    278,
+    384
+   ]
+  },
+  {
+   "key": "losing_time_no",
+   "page": 1,
+   "type": "mark",
+   "x": 337,
+   "baseline": 380,
+   "size": 11,
+   "box": [
+    332,
+    366,
+    350,
+    384
+   ]
+  },
+  {
+   "key": "cause_inadequate_supervision",
+   "page": 1,
+   "type": "mark",
+   "x": 46,
+   "baseline": 420,
+   "size": 11,
+   "box": [
+    41,
+    406,
+    59,
+    424
+   ]
+  },
+  {
+   "key": "cause_carelessness",
+   "page": 1,
+   "type": "mark",
+   "x": 323,
+   "baseline": 418,
+   "size": 11,
+   "box": [
+    318,
+    404,
+    336,
+    422
+   ]
+  },
+  {
+   "key": "cause_improper_instructions",
+   "page": 1,
+   "type": "mark",
+   "x": 47,
+   "baseline": 442,
+   "size": 11,
+   "box": [
+    42,
+    428,
+    60,
+    446
+   ]
+  },
+  {
+   "key": "cause_poor_judgement",
+   "page": 1,
+   "type": "mark",
+   "x": 323,
+   "baseline": 440,
+   "size": 11,
+   "box": [
+    318,
+    426,
+    336,
+    444
+   ]
+  },
+  {
+   "key": "cause_failed_to_follow_orders",
+   "page": 1,
+   "type": "mark",
+   "x": 47,
+   "baseline": 462,
+   "size": 11,
+   "box": [
+    42,
+    448,
+    60,
+    466
+   ]
+  },
+  {
+   "key": "cause_failure_to_use_safety_equipment",
+   "page": 1,
+   "type": "mark",
+   "x": 323,
+   "baseline": 461,
+   "size": 11,
+   "box": [
+    318,
+    447,
+    336,
+    465
+   ]
+  },
+  {
+   "key": "cause_unsuited_for_position",
+   "page": 1,
+   "type": "mark",
+   "x": 47,
+   "baseline": 482,
+   "size": 11,
+   "box": [
+    42,
+    468,
+    60,
+    486
+   ]
+  },
+  {
+   "key": "cause_dangerous_condition",
+   "page": 1,
+   "type": "mark",
+   "x": 322,
+   "baseline": 481,
+   "size": 11,
+   "box": [
+    317,
+    467,
+    335,
+    485
+   ]
+  },
+  {
+   "key": "cause_poor_work_attitude",
+   "page": 1,
+   "type": "mark",
+   "x": 47,
+   "baseline": 502,
+   "size": 11,
+   "box": [
+    42,
+    488,
+    60,
+    506
+   ]
+  },
+  {
+   "key": "cause_defective_equipment",
+   "page": 1,
+   "type": "mark",
+   "x": 322,
+   "baseline": 502,
+   "size": 11,
+   "box": [
+    317,
+    488,
+    335,
+    506
+   ]
+  },
+  {
+   "key": "cause_another_party",
+   "page": 1,
+   "type": "mark",
+   "x": 48,
+   "baseline": 522,
+   "size": 11,
+   "box": [
+    43,
+    508,
+    61,
+    526
+   ]
+  },
+  {
+   "key": "cause_another_party_explain",
+   "label": "Caused by another party (explain)",
+   "page": 1,
+   "type": "text",
+   "x": 267,
+   "baseline": 523,
+   "width": 313,
+   "size": 10
+  },
+  {
+   "key": "cause_other",
+   "page": 1,
+   "type": "mark",
+   "x": 47,
+   "baseline": 542,
+   "size": 11,
+   "box": [
+    42,
+    528,
+    60,
+    546
+   ]
+  },
+  {
+   "key": "cause_other_explain",
+   "label": "Other cause (explain)",
+   "page": 1,
+   "type": "text",
+   "x": 164,
+   "baseline": 542,
+   "width": 414,
+   "size": 10
+  },
+  {
+   "key": "action_instructed_employee",
+   "page": 1,
+   "type": "mark",
+   "x": 47,
+   "baseline": 582,
+   "size": 11,
+   "box": [
+    42,
+    568,
+    60,
+    586
+   ]
+  },
+  {
+   "key": "action_replaced_repaired_equipment",
+   "page": 1,
+   "type": "mark",
+   "x": 322,
+   "baseline": 582,
+   "size": 11,
+   "box": [
+    317,
+    568,
+    335,
+    586
+   ]
+  },
+  {
+   "key": "action_training",
+   "page": 1,
+   "type": "mark",
+   "x": 46,
+   "baseline": 603,
+   "size": 11,
+   "box": [
+    41,
+    589,
+    59,
+    607
+   ]
+  },
+  {
+   "key": "action_changed_job_duties",
+   "page": 1,
+   "type": "mark",
+   "x": 321,
+   "baseline": 602,
+   "size": 11,
+   "box": [
+    316,
+    588,
+    334,
+    606
+   ]
+  },
+  {
+   "key": "action_corrected_hazard",
+   "page": 1,
+   "type": "mark",
+   "x": 47,
+   "baseline": 623,
+   "size": 11,
+   "box": [
+    42,
+    609,
+    60,
+    627
+   ]
+  },
+  {
+   "key": "action_other",
+   "page": 1,
+   "type": "mark",
+   "x": 321,
+   "baseline": 622,
+   "size": 11,
+   "box": [
+    316,
+    608,
+    334,
+    626
+   ]
+  },
+  {
+   "key": "action_other_explain",
+   "label": "Other action (explain)",
+   "page": 1,
+   "type": "text",
+   "x": 433,
+   "baseline": 623,
+   "width": 146,
+   "size": 10
+  },
+  {
+   "key": "similar_accidents_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 282,
+   "baseline": 660,
+   "size": 11,
+   "box": [
+    277,
+    646,
+    295,
+    664
+   ]
+  },
+  {
+   "key": "similar_accidents_no",
+   "page": 1,
+   "type": "mark",
+   "x": 352,
+   "baseline": 661,
+   "size": 11,
+   "box": [
+    347,
+    647,
+    365,
+    665
+   ]
+  },
+  {
+   "key": "similar_accidents_explain",
+   "label": "Similar accidents (explain)",
+   "page": 1,
+   "type": "text",
+   "x": 96,
+   "baseline": 681,
+   "width": 484,
+   "size": 10
+  },
+  {
+   "key": "signed_date",
+   "label": "Date",
+   "page": 1,
+   "type": "text",
+   "x": 33,
+   "baseline": 718,
+   "width": 136,
+   "size": 10
+  },
+  {
+   "key": "supervisor_signature",
+   "page": 1,
+   "type": "image",
+   "x": 188,
+   "bottom": 720,
+   "width": 214,
+   "height": 18
+  },
+  {
+   "key": "supervisor_title",
+   "label": "Title",
+   "page": 1,
+   "type": "text",
+   "x": 420,
+   "baseline": 718,
+   "width": 160,
+   "size": 10
+  },
+  {
+   "key": "supervisor_esign_note",
+   "label": "Supervisor electronic signature record",
+   "page": 1,
+   "type": "lines",
+   "size": 6.5,
+   "lines": [
+    {
+     "x": 33,
+     "baseline": 780,
+     "width": 546
+    },
+    {
+     "x": 33,
+     "baseline": 788,
+     "width": 546
+    }
+   ]
+  }
+ ]
+}

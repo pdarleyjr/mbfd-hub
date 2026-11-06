@@ -30,6 +30,7 @@ export function restoreConcernDrafts(value: unknown): ConcernDraft[] {
       description: typeof draft.description === 'string' ? draft.description : '',
       location: typeof draft.location === 'string' ? draft.location : '',
       ...(typeof draft.photo === 'string' && draft.photo !== '' ? { photo: draft.photo } : {}),
+      ...(typeof draft.photo_id === 'string' && draft.photo_id !== '' ? { photo_id: draft.photo_id } : {}),
       existing_issue_id: Number.isInteger(draft.existing_issue_id) ? draft.existing_issue_id as number : null,
     }];
   }).slice(0, MAX_CONCERNS);
@@ -37,7 +38,7 @@ export function restoreConcernDrafts(value: unknown): ConcernDraft[] {
 
 /** An entry the member has started. Choosing note or problem alone does not count: nothing was said. */
 export const concernStarted = (draft: ConcernDraft): boolean => (
-  draft.description.trim() !== '' || draft.location.trim() !== '' || Boolean(draft.photo) || draft.existing_issue_id !== null
+  draft.description.trim() !== '' || draft.location.trim() !== '' || Boolean(draft.photo) || Boolean(draft.photo_id) || draft.existing_issue_id !== null
 );
 
 export interface ConcernProblem {
@@ -78,7 +79,8 @@ export function toConcernSubmissions(drafts: ConcernDraft[]): ConcernSubmission[
         kind: draft.existing_issue_id !== null ? 'issue' : draft.kind ?? 'note',
         description: draft.description.trim().slice(0, MAX_CONCERN_DESCRIPTION),
         ...(location !== '' ? { location } : {}),
-        ...(draft.photo ? { photo: draft.photo } : {}),
+        // A queued photo travels on its own request; only an older draft still carries one inline.
+        ...(draft.photo_id ? { photo_id: draft.photo_id } : draft.photo ? { photo: draft.photo } : {}),
         ...(draft.existing_issue_id !== null ? { existing_issue_id: draft.existing_issue_id } : {}),
       };
     });

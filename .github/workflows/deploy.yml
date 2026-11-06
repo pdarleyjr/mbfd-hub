@@ -346,6 +346,8 @@ jobs:
           HUB_IMAGE_REF="$IMAGE_REF" docker compose --env-file "$HUB_IMAGE_RUNTIME_ENV" -f compose.prod.image.yaml run --interactive=false --rm --no-deps --pull never \
             --volume "$HUB_BACKUP_DIR:/evidence" --entrypoint bash laravel.test -lc '
               set -euo pipefail
+              # Before the running release is replaced: storage/app on the array must really be mounted.
+              /usr/local/bin/check-storage-mount
               php artisan identity:provision-universal-accounts --format=json > "/evidence/$1"
               php artisan identity:established-account-integrity --write="/evidence/$2" --no-interaction
             ' bash "$INVENTORY_NAME" "$SNAPSHOT_NAME"
@@ -392,6 +394,98 @@ jobs:
             exit 1
           fi
           REMOTE
+
+      # A page still open across the switch lazy-loads chunks by hashed names the new image lacks.
+      # Keep the running release's build/daily assets on the host; nginx serves them read-only only
+      # when the current image has no such file (docs/ops/retained-assets.md). The old container keeps
+      # serving until the next step recreates it, so these are exactly the files being replaced.
+      # Best effort by design: any failure here is a warning and never blocks, fails or rolls back the
+      # release (its own step, so no error in it can reach the activation step's set -e).
+      - name: Retain the running release's hashed assets
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          set -uo pipefail
+          if ! ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          set -uo pipefail
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          RETAINED_ASSETS_DIR=/var/lib/mbfd-hub/retained-assets
+          RETAINED_ASSETS_MAX_AGE_MINUTES=4320
+          RETAINED_ASSETS_MAX_BYTES=524288000
+          warn() { printf '::warning title=Hashed asset retention::%s\n' "$*"; }
+
+          STAGING="$(mktemp -d)" || { warn 'No staging directory; nothing was retained.'; exit 0; }
+          trap 'rm -rf -- "$STAGING"' EXIT
+          OLD_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$HUB_APP_CONTAINER")" \
+            || { warn 'The running Hub container could not be inspected; nothing was retained.'; exit 0; }
+          for AREA in build daily; do
+            mkdir -p "$STAGING/$AREA" \
+              && timeout 120 docker cp "$HUB_APP_CONTAINER:/var/www/html/public/$AREA/assets/." "$STAGING/$AREA/assets" \
+              || warn "Could not copy public/$AREA/assets from the running release."
+          done
+          chmod -R a+rX -- "$STAGING" || warn 'Could not make the staged assets readable.'
+
+          # Root only inside a network-less, read-only, capability-free throwaway container of the
+          # running image (no host-side privilege rules needed); --volume creates the root-owned 0755 host
+          # directory on first use. Same hashed name means same bytes: an existing file is never
+          # overwritten. Every staged file is touched (mtime = when it was last part of a replaced
+          # release), then files untouched for 72 hours go, then the oldest until at most 500 MB.
+          timeout 180 docker run --rm --network none --pull never --read-only --tmpfs /tmp \
+            --user 0:0 --cap-drop=ALL --security-opt=no-new-privileges --entrypoint sh \
+            --mount type=bind,src="$STAGING",dst=/staging,readonly \
+            --volume "$RETAINED_ASSETS_DIR:/retained" \
+            "$OLD_IMAGE_ID" -uc '
+              MAX_AGE_MINUTES="$1"
+              MAX_BYTES="$2"
+              STATUS=0
+              COPIED=0
+              KEPT=0
+              chmod 0755 /retained || STATUS=1
+              for AREA in build daily; do
+                SRC="/staging/$AREA/assets"
+                DST="/retained/$AREA/assets"
+                [ -d "$SRC" ] || continue
+                mkdir -p "$DST" || { echo "Cannot create $DST." >&2; STATUS=1; continue; }
+                chmod 0755 "/retained/$AREA" "$DST" || STATUS=1
+                for FILE in "$SRC"/*; do
+                  [ -f "$FILE" ] || continue
+                  NAME="${FILE##*/}"
+                  if [ -e "$DST/$NAME" ]; then
+                    cmp -s "$FILE" "$DST/$NAME" \
+                      || { echo "Kept the existing $AREA/assets/$NAME (same name, different bytes)." >&2; STATUS=1; }
+                    KEPT=$((KEPT + 1))
+                  elif cp "$FILE" "$DST/.$NAME.partial" && chmod 0644 "$DST/.$NAME.partial" \
+                    && mv "$DST/.$NAME.partial" "$DST/$NAME"; then
+                    COPIED=$((COPIED + 1))
+                  else
+                    rm -f -- "$DST/.$NAME.partial"
+                    echo "Could not retain $AREA/assets/$NAME." >&2
+                    STATUS=1
+                    continue
+                  fi
+                  touch -c -- "$DST/$NAME" || STATUS=1
+                done
+              done
+              find /retained -type f -name ".*.partial" -delete || STATUS=1
+              find /retained -type f -mmin +"$MAX_AGE_MINUTES" -delete || STATUS=1
+              TOTAL="$(find /retained -type f -printf "%s\n" | { T=0; while read -r S; do T=$((T + S)); done; echo "$T"; })"
+              if [ "$TOTAL" -gt "$MAX_BYTES" ]; then
+                find /retained -type f -printf "%T@ %s %p\n" | sort -n | {
+                  while read -r MTIME SIZE FILE; do
+                    [ "$TOTAL" -le "$MAX_BYTES" ] && break
+                    rm -f -- "$FILE" && TOTAL=$((TOTAL - SIZE))
+                  done
+                } || STATUS=1
+              fi
+              echo "Retained hashed assets: $COPIED new, $KEPT already kept; now $(find /retained -type f | wc -l) files, $(du -sh /retained | cut -f1)."
+              exit "$STATUS"
+            ' sh "$RETAINED_ASSETS_MAX_AGE_MINUTES" "$RETAINED_ASSETS_MAX_BYTES" \
+            || warn 'Retaining, pruning or capping did not fully succeed; the release continues.'
+          exit 0
+          REMOTE
+          then
+            echo '::warning title=Hashed asset retention::The host step did not complete; the release continues without retained assets.'
+          fi
 
       - name: Migrate and activate prebuilt Hub image
         env:
@@ -472,6 +566,9 @@ jobs:
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan view:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan event:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan filament:clear-cached-components
+          # php-fpm's OPcache never re-reads PHP files (immutable image); a graceful reload starts a fresh
+          # cache that sees the config/route/view/event caches written above. In-flight requests finish.
+          docker exec "$HUB_APP_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf signal USR2 php-fpm
           # Rows the previous image's workers wrote between the projection and the switch get their owner now.
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan defects:project-ownership --pending --no-interaction
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan defects:project-ownership --verify --no-interaction
@@ -582,7 +679,9 @@ jobs:
             sleep 1
           done
           printf '%s\n' "$SUPERVISOR_STATUS"
-          printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^php +RUNNING '
+          printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^php-fpm +RUNNING '
+          printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^nginx +RUNNING '
+          test "$(docker exec "$HUB_APP_CONTAINER" curl -fsS http://127.0.0.1:8081/fpm-ping)" = 'pong'
           printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING '
           printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^reverb +RUNNING '
           REMOTE

@@ -25,7 +25,8 @@ class DeploymentBackgroundServiceConfigTest extends TestCase
             $supervisor
         );
         $this->assertStringContainsString('supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status', $workflow);
-        $this->assertStringContainsString("grep -Eq '^php +RUNNING '", $workflow);
+        $this->assertStringContainsString("grep -Eq '^php-fpm +RUNNING '", $workflow);
+        $this->assertStringContainsString("grep -Eq '^nginx +RUNNING '", $workflow);
         $this->assertStringContainsString("grep -Eq '^queue-worker:queue-worker_00 +RUNNING '", $workflow);
         $this->assertStringContainsString("grep -Eq '^reverb +RUNNING '", $workflow);
         $this->assertStringNotContainsString("pgrep -af '^/usr/bin/php /var/www/html/artisan reverb:start '", $workflow);

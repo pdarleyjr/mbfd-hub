@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\DailyRoster\DailyRosterController;
+use App\Http\Controllers\DailyRoster\RosterProfileController;
 use App\Http\Controllers\HomeDutyController;
 use App\Http\Middleware\CanonicalHostRedirect;
 use App\Http\Middleware\PreventPreviousUrlStorage;
@@ -29,6 +30,15 @@ Route::get('/daily-roster/members/{employeeId}', [DailyRosterController::class, 
     ->where('employeeId', '[^/]{1,32}')
     ->middleware(['auth:web', 'throttle:daily-roster-member'])
     ->name('daily-roster.member');
+
+/*
+| A roster name to the member's personnel profile, by the verified Employee ID on the roster row. Personnel
+| profile access (Employees & Access) is checked by the controller before the ID is looked up.
+*/
+Route::get('/admin/personnel/by-employee-id/{employeeId}', [RosterProfileController::class, 'show'])
+    ->where('employeeId', '[^/]{1,32}')
+    ->middleware([CanonicalHostRedirect::class, 'auth:web', 'throttle:60,1'])
+    ->name('daily-roster.profile');
 
 Route::get('/daily-roster/pdf', [DailyRosterController::class, 'pdf'])
     ->middleware(['auth:web', 'throttle:daily-roster-pdf'])

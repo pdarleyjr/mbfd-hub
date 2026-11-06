@@ -3,7 +3,7 @@
     <p class="ep-eq-identity">{{ collect([$user->name, $user->rank ?: null, 'Employee ID '.($user->employee_id ?? 'Not assigned')])->filter()->implode(' · ') }}</p>
 
     @if($activeEquipment->isEmpty() && $history->isEmpty())
-        <div class="ep-empty-full">
+        <div class="ep-empty-full hub-panel">
             <div class="ep-empty-inner">
                 <svg class="ep-empty-big-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
@@ -11,7 +11,7 @@
                 <h3 class="ep-empty-heading">No equipment assigned yet</h3>
                 <p class="ep-empty-body">Your assigned gear and uniforms will appear here once assigned by a logistics administrator.</p>
                 <a href="{{ \App\Filament\Employee\Pages\RequestEquipmentPage::getUrl(panel: 'employee') }}" class="ep-empty-cta">
-                    Request Uniforms →
+                    Request Uniforms
                 </a>
             </div>
         </div>

@@ -71,6 +71,18 @@ class EditEmployee extends EditRecord
         return $this->getRecord()->employee_id.' — '.$this->getRecord()->name;
     }
 
+    /** Profiles are opened from the Personnel Directory, so the trail leads back there. */
+    public function getBreadcrumbs(): array
+    {
+        return [\App\Filament\Pages\MasterPersonnelDirectory::getUrl() => 'Personnel Directory', $this->getRecord()->name];
+    }
+
+    protected function getCancelFormAction(): Actions\Action
+    {
+        return parent::getCancelFormAction()
+            ->url($this->previousUrl ?? \App\Filament\Pages\MasterPersonnelDirectory::getUrl());
+    }
+
     protected function getSaveFormAction(): \Filament\Actions\Action
     {
         return parent::getSaveFormAction()->label('Save profile changes')->keyBindings([])

@@ -127,7 +127,7 @@
         'mbfd-dash-body--lanes' => $layout['side'] === [] && count($layout['main']) > 1,
         'mbfd-dash-body--single' => $layout['side'] === [] && count($layout['main']) === 1,
         'mbfd-dash-body--split' => $layout['side'] !== [],
-    ])>
+    ]) data-lanes="{{ count($layout['main']) }}">
         <div class="mbfd-dash-main">
             @foreach ($layout['main'] as $card)
                 @include('filament.dashboards.partials.list-card', $card)

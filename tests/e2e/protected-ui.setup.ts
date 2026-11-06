@@ -1,3 +1,4 @@
+import { protectedUiOrigin } from './support/test-environment';
 import { chromium, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
@@ -15,12 +16,12 @@ export default async function setup() {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
-    await page.goto('http://127.0.0.1:8127/login');
+    await page.goto(`${protectedUiOrigin}/login`);
     await page.getByLabel('Employee ID or email').fill('99871');
     await page.getByLabel('Password', { exact: true }).fill(protectedUiEnvironment.PROTECTED_UI_E2E_PASSWORD);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.waitForURL(url => url.pathname !== '/login');
-    const adminResponse = await page.goto('http://127.0.0.1:8127/admin', { waitUntil: 'domcontentloaded' });
+    const adminResponse = await page.goto(`${protectedUiOrigin}/admin`, { waitUntil: 'domcontentloaded' });
     mkdirSync('test-results/protected-ui-setup', { recursive: true });
     await page.screenshot({ path: 'test-results/protected-ui-setup/admin.png', fullPage: true });
     console.log(`Protected UI authentication destination: ${new URL(page.url()).pathname}; status: ${adminResponse?.status()}`);

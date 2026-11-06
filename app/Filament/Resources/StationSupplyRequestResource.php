@@ -8,6 +8,7 @@ use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\StationSupplyRequestResource\Pages;
 use App\Filament\Support\ArchiveFilter;
+use App\Filament\Support\SubmissionConversationActions;
 use App\Models\Station;
 use App\Models\StationInventoryAudit;
 use App\Models\StationSupplyRequest;
@@ -17,6 +18,7 @@ use App\Services\SupportTriage\TriageProjector;
 use App\Services\SupportTriage\TriageSql;
 use App\Support\DecisionReason;
 use App\Support\HubTimezone;
+use App\Support\MemberReplies\ReplySubject;
 use Filament\Forms;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -38,8 +40,8 @@ class StationSupplyRequestResource extends Resource
 
     protected static ?string $model = StationSupplyRequest::class;
 
-    // No icon: the Operations navigation group already carries one.
-    protected static ?string $navigationGroup = 'Operations';
+    // No icon: the Stations navigation group already carries one.
+    protected static ?string $navigationGroup = 'Stations';
 
     protected static ?int $navigationSort = 31;
 
@@ -174,6 +176,7 @@ class StationSupplyRequestResource extends Resource
     {
         return [
             Tables\Actions\ViewAction::make(),
+            SubmissionConversationActions::row(ReplySubject::STATION_SUPPLY_REQUEST),
             Tables\Actions\EditAction::make()
                 ->visible(fn (StationSupplyRequest $record): bool => self::canManage() && ! $record->isArchived())
                 ->using(function (StationSupplyRequest $record, array $data): StationSupplyRequest {

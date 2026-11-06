@@ -48,6 +48,9 @@ class ApparatusChangeout extends Model
     /** The old truck after every swap, whatever it was before. */
     public const OLD_TRUCK_STATUS = 'Out of Service';
 
+    /** move_audit.mode when an admin took a unit's only truck out of service: nothing moved (ApparatusChangeoutPlanner). */
+    public const MODE_NO_REPLACEMENT = 'no_replacement';
+
     protected $fillable = [
         'client_submission_id',
         'payload_hash',
@@ -96,7 +99,28 @@ class ApparatusChangeout extends Model
     /** "R 44 changed trucks: 17503 to 1033", as every alert about this change reads. */
     public function headline(): string
     {
+        if ($this->isWithoutReplacement()) {
+            return $this->unit_designation.' has no truck in service: truck '.($this->from_vehicle_number ?: 'not recorded').' is '.self::OLD_TRUCK_STATUS;
+        }
+
         return $this->unit_designation.' changed trucks: '.($this->from_vehicle_number ?: 'not recorded').' to '.$this->to_vehicle_number;
+    }
+
+    /** An admin took the unit's only truck out of service because no other truck was available. */
+    public function isWithoutReplacement(): bool
+    {
+        return ($this->move_audit['mode'] ?? null) === self::MODE_NO_REPLACEMENT;
+    }
+
+    /** "Truck 17503 to truck 1033", or "E 1 kept on truck 20503 (no replacement available)" when nothing moved. */
+    public function trucksPhrase(): string
+    {
+        $from = $this->from_vehicle_number ?: 'not recorded';
+        if ($this->isWithoutReplacement()) {
+            return "{$this->unit_designation} kept on truck {$from} (no replacement available)";
+        }
+
+        return "Truck {$from} to truck {$this->to_vehicle_number}";
     }
 
     /** @return list<string> what Fleet should look at: a traded unit, a new record, a number two records share */
@@ -109,6 +133,19 @@ class ApparatusChangeout extends Model
     public function scopeUnacknowledged(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_COMPLETED)->whereNull('acknowledged_at');
+    }
+
+    /**
+     * Changeouts that moved a unit between trucks. A no-replacement record (an admin took the unit's only truck out of
+     * service) has the same truck on both sides and moved nothing, so it never answers "where did this unit go" or
+     * "what did it leave behind". It still shows wherever Fleet is told about changes.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeRealMoves(Builder $query): Builder
+    {
+        return $query->where(static fn (Builder $inner): Builder => $inner->whereNull('move_audit->mode')
+            ->orWhere('move_audit->mode', '!=', self::MODE_NO_REPLACEMENT));
     }
 
     /** @param Builder<self> $query */

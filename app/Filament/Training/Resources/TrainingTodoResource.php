@@ -90,6 +90,7 @@ class TrainingTodoResource extends Resource
                             'in_progress' => 'In Progress',
                             default => ucfirst($state),
                         })
+                        ->grow(false)
                         ->sortable(),
                     TextColumn::make('priority')
                         ->badge()
@@ -100,15 +101,18 @@ class TrainingTodoResource extends Resource
                             default => 'gray',
                         })
                         ->formatStateUsing(fn (string $state): string => ucfirst($state))
+                        ->grow(false)
                         ->sortable(),
+                    // The status and priority badges keep their natural width, so the task gets the room.
                     TextColumn::make('title')
+                        ->grow()
                         ->weight('medium')
                         ->searchable()
                         ->sortable()
                         ->description(function ($record) {
                             $desc = Str::of(strip_tags($record->description ?? ''))->squish()->limit(90);
                             $assigned = $record->assignees->pluck('name')->filter()->join(', ');
-                            $meta = $assigned ? "👤 {$assigned}" : null;
+                            $meta = $assigned ? "Assigned: {$assigned}" : null;
 
                             return trim($desc.($meta ? "\n{$meta}" : ''));
                         }),

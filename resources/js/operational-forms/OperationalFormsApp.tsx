@@ -5,7 +5,7 @@ import {
 } from '@fluentui/react-components';
 import {
     AlertTriangle, ArrowLeft, BookOpen, Check, ChevronRight, ClipboardList, Clock3, Cloud, Copy, Download,
-    Bot, Eye, FileArchive, FileCheck2, FilePenLine, FilePlus2, FileUp, Home, Library, LoaderCircle, Plus, Printer, RefreshCw, Save,
+    Bot, Car, Eye, FileArchive, FileCheck2, FilePenLine, FilePlus2, FileText, FileUp, Home, Library, LoaderCircle, Plus, Printer, RefreshCw, Save,
     ShieldAlert, ShieldCheck, Sparkles, Stethoscope, Trash2, Truck, UsersRound, WifiOff,
 } from 'lucide-react';
 import { ApiError, createApi } from './api';
@@ -22,11 +22,19 @@ import { createNarcoticsApi } from './narcotics/narcoticsApi';
 import { BUSY_REASON as NARCOTICS_BUSY, FORM_KEY as NARCOTICS_FORM_KEY, searchForView as narcoticsSearchForView, viewFromDeepLink as narcoticsViewFromDeepLink, viewFromSearch as narcoticsViewFromSearch } from './narcotics/narcoticsImage.js';
 import { NarcoticsApp } from './narcotics/NarcoticsApp';
 import type { NarcoticsView } from './narcotics/narcoticsTypes';
+import { createPersonnelApi } from './personnel/personnelApi';
+import {
+    ACCIDENT_FORM_KEY as PERSONNEL_ACCIDENT_KEY, MEMO_FORM_KEY as PERSONNEL_MEMO_KEY, PERSONNEL_FORM_KEYS,
+    searchForView as personnelSearchForView, viewFromDeepLink as personnelViewFromDeepLink, viewFromSearch as personnelViewFromSearch,
+} from './personnel/personnelLogic.js';
+import type { PersonnelView } from './personnel/personnelTypes';
 import { busyReasons } from '../pwa/busy';
 import { openInDocumentViewer } from '../pwa/document-viewer';
 import type { BootstrapData, EditableFormType, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportConfig, FrocImportSummary, LibraryLink } from './types';
 
 const PdfPreview = lazy(() => import('./PdfPreview').then((module) => ({ default: module.PdfPreview })));
+// Accident reports and the memorandum load only when one of them is opened.
+const PersonnelApp = lazy(() => import('./personnel/PersonnelApp'));
 
 const hubFormsTheme = {
     ...webLightTheme,
@@ -97,7 +105,7 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     const emsNewForms = useMemo<EmsNewFormChoice[]>(() => {
         const choices = new Map<string, EmsNewFormChoice>();
         for (const entry of bootstrap.library_links ?? []) {
-            if (entry.in_app !== true || entry.key === NARCOTICS_FORM_KEY) continue;
+            if (!isMedicalCard(entry)) continue;
             const family = familyFromLibraryLink(entry);
             if (!choices.has(family)) choices.set(family, { family, title: entry.title, short: shortFormTitle(entry.title) });
         }
@@ -108,6 +116,12 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     const narcoticsEndpoints = bootstrap.endpoints.narcotics ?? null;
     const narcoticsApi = useMemo(() => (narcoticsEndpoints ? createNarcoticsApi(narcoticsEndpoints, bootstrap.csrf_token) : null), [narcoticsEndpoints, bootstrap.csrf_token]);
     const [narcoticsView, setNarcoticsView] = useState<NarcoticsView | null>(() => (narcoticsEndpoints ? (narcoticsViewFromDeepLink(bootstrap.narcotics_deep_link) as NarcoticsView | null) : null));
+
+    // Vehicle Accident Report, Supervisor's Report of Accident, Interoffice Memorandum (?form=accident-report|supervisor-accident-report|memorandum).
+    const personnelEndpoints = bootstrap.endpoints.personnel ?? null;
+    const personnelApi = useMemo(() => (personnelEndpoints ? createPersonnelApi(personnelEndpoints, bootstrap.csrf_token) : null), [personnelEndpoints, bootstrap.csrf_token]);
+    const [personnelView, setPersonnelView] = useState<PersonnelView | null>(() => (personnelEndpoints ? (personnelViewFromDeepLink(bootstrap.personnel_deep_link) as PersonnelView | null) : null));
+    const [personnelVisit, setPersonnelVisit] = useState(0);
 
     useEffect(() => { currentRef.current = current; }, [current]);
 
@@ -171,6 +185,22 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
         window.addEventListener('popstate', onPop);
         return () => window.removeEventListener('popstate', onPop);
     }, [narcoticsEndpoints, narcoticsView, confirmLeaveNarcotics]);
+    /** Each visit mounts the screen fresh, so "Start a report" after a submission opens an empty report. */
+    const goPersonnel = useCallback((view: PersonnelView | null) => {
+        setPersonnelView(view);
+        setPersonnelVisit((visit) => visit + 1);
+        const url = `${window.location.pathname}${personnelSearchForView(view)}`;
+        if (`${window.location.pathname}${window.location.search}` !== url) window.history.pushState({}, '', url);
+        window.scrollTo({ top: 0 });
+    }, []);
+
+    useEffect(() => {
+        if (!personnelEndpoints) return undefined;
+        const onPop = () => { setPersonnelView(personnelViewFromSearch(window.location.search) as PersonnelView | null); setPersonnelVisit((visit) => visit + 1); };
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+    }, [personnelEndpoints]);
+
     // A queued request opens again in its own form (a send without a family is ALS Transport).
     const editQueuedRequest = useCallback((entry: EmsOutboxEntry) => { setEmsEdit(entry); goEms({ name: 'form', family: familyOfPayload(entry.payload) }); }, [goEms]);
     const openEmsPdf = useCallback((url: string, name: string) => setPreview({ preview_url: url, display_name: name } as FormDocument), []);
@@ -367,15 +397,23 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
                 </header>
                 <div className="of-layout">
                     <nav className="of-rail" aria-label="Forms navigation">
-                        <button className={!current && !emsView && !narcoticsView ? 'active' : ''} onClick={() => { setCurrent(null); if (emsView) goEms(null); if (narcoticsView) goNarcotics(null); }}><Library size={19} /><span>Library</span></button>
+                        <button className={!current && !emsView && !narcoticsView && !personnelView ? 'active' : ''} onClick={() => { setCurrent(null); if (emsView) goEms(null); if (narcoticsView) goNarcotics(null); if (personnelView) goPersonnel(null); }}><Library size={19} /><span>Library</span></button>
                         {current && <button className="active"><FilePenLine size={19} /><span>Editor</span></button>}
                         {emsView && emsApi && <button className="active" aria-current="page"><ClipboardList size={19} /><span>Medical</span></button>}
                         {narcoticsView && narcoticsApi && <button className="active" aria-current="page"><ShieldAlert size={19} /><span>Narcotics</span></button>}
+                        {personnelView && personnelApi && <button className="active" aria-current="page">{personnelView.name === 'memo' ? <FileText size={19} /> : <Car size={19} />}<span>{personnelView.name === 'memo' ? 'Memo' : 'Accidents'}</span></button>}
                         <a href="/employee/dashboard"><Home size={19} /><span>Portal</span></a>
                     </nav>
                     <main className="of-main">
                         {message && <MessageBar intent={message.intent}><MessageBarBody>{message.text}</MessageBarBody></MessageBar>}
-                        {narcoticsView && narcoticsApi && !current ? (
+                        {personnelView && personnelApi && !current ? (
+                            <Suspense fallback={<div className="of-loading"><Spinner label="Opening the form…" /></div>}>
+                                <PersonnelApp
+                                    key={personnelVisit} api={personnelApi} owner={String(bootstrap.employee.id)} view={personnelView}
+                                    canSupervise={bootstrap.personnel?.can_supervise ?? false} navigate={goPersonnel} goForms={() => goPersonnel(null)} openPdf={openEmsPdf}
+                                />
+                            </Suspense>
+                        ) : narcoticsView && narcoticsApi && !current ? (
                             <NarcoticsApp api={narcoticsApi} view={narcoticsView} navigate={goNarcotics} goForms={() => goNarcotics(null)} />
                         ) : emsView && emsApi && !current ? (
                             <EmsApp
@@ -383,7 +421,7 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
                                 navigate={goEms} goForms={() => goEms(null)} editEntry={editQueuedRequest} openPdf={openEmsPdf} onSubmitted={() => void refreshRecordsQuietly()} newForms={emsNewForms}
                             />
                         ) : !current ? (
-                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} uploadFile={uploadFile} openRecord={openRecord} refresh={refreshLibrary} openDocument={openDocument} openGuide={() => openEmsPdf(bootstrap.endpoints.guide, 'Operational Forms user guide')} libraryLinks={bootstrap.library_links ?? []} openEms={emsApi ? goEms : undefined} emsOutbox={emsApi ? emsOutbox : undefined} editQueuedRequest={editQueuedRequest} openNarcotics={narcoticsApi ? goNarcotics : undefined} />
+                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} uploadFile={uploadFile} openRecord={openRecord} refresh={refreshLibrary} openDocument={openDocument} openGuide={() => openEmsPdf(bootstrap.endpoints.guide, 'Operational Forms user guide')} libraryLinks={bootstrap.library_links ?? []} openEms={emsApi ? goEms : undefined} emsOutbox={emsApi ? emsOutbox : undefined} editQueuedRequest={editQueuedRequest} openNarcotics={narcoticsApi ? goNarcotics : undefined} openPersonnel={personnelApi ? goPersonnel : undefined} awaitingSupervisor={bootstrap.personnel?.awaiting_supervisor ?? 0} />
                         ) : (
                             <EditorView
                                 record={current} definition={definitions.find((item) => item.form_type === current.form_type)}
@@ -413,16 +451,28 @@ function inAppClick(open: () => void) {
     };
 }
 
-const isMedicalCard = (entry: LibraryLink) => entry.in_app === true && entry.key !== NARCOTICS_FORM_KEY;
+/** A medical inventory card: every in-app card except Narcotics Check and the accident report and memorandum forms. */
+function isMedicalCard(entry: LibraryLink): boolean {
+    return entry.in_app === true && entry.key !== NARCOTICS_FORM_KEY && !PERSONNEL_FORM_KEYS.includes(entry.key);
+}
 
-function LibraryLinkCard({ entry, showSecondary, openEms, openNarcotics }: { entry: LibraryLink; showSecondary: boolean; openEms?: (view: EmsView) => void; openNarcotics?: (view: NarcoticsView) => void }) {
+/** The first screen of an accident report or memorandum card. */
+function personnelStartView(key: string): PersonnelView {
+    if (key === PERSONNEL_ACCIDENT_KEY) return { name: 'vehicle' };
+    if (key === PERSONNEL_MEMO_KEY) return { name: 'memo' };
+    return { name: 'supervisor-report' };
+}
+
+function LibraryLinkCard({ entry, showSecondary, openEms, openNarcotics, openPersonnel }: { entry: LibraryLink; showSecondary: boolean; openEms?: (view: EmsView) => void; openNarcotics?: (view: NarcoticsView) => void; openPersonnel?: (view: PersonnelView) => void }) {
     const narcotics = entry.key === NARCOTICS_FORM_KEY;
-    const inApp = entry.in_app === true && (narcotics ? openNarcotics !== undefined : openEms !== undefined);
+    const personnel = PERSONNEL_FORM_KEYS.includes(entry.key);
+    const inApp = entry.in_app === true && (personnel ? openPersonnel !== undefined : narcotics ? openNarcotics !== undefined : openEms !== undefined);
     // Each medical inventory card opens its own form; the plain link (middle click, open in new tab) carries the same `?form=`.
-    const openPrimary = () => (narcotics ? openNarcotics?.({ name: 'form' }) : openEms?.({ name: 'form', family: familyFromLibraryLink(entry) }));
-    const openSecondary = () => (narcotics ? openNarcotics?.({ name: 'mine' }) : openEms?.({ name: 'mine' }));
+    const openPrimary = () => (personnel ? openPersonnel?.(personnelStartView(entry.key)) : narcotics ? openNarcotics?.({ name: 'form' }) : openEms?.({ name: 'form', family: familyFromLibraryLink(entry) }));
+    const openSecondary = () => (personnel ? openPersonnel?.({ name: 'mine' }) : narcotics ? openNarcotics?.({ name: 'mine' }) : openEms?.({ name: 'mine' }));
+    const icon = entry.key === PERSONNEL_ACCIDENT_KEY ? <Car /> : entry.key === PERSONNEL_MEMO_KEY ? <FileText /> : personnel ? <ClipboardList /> : narcotics ? <ShieldAlert /> : entry.in_app ? <Stethoscope /> : <Truck />;
     return <article className="of-form-card" data-library-link={entry.key}>
-        <div className="of-form-card-icon">{narcotics ? <ShieldAlert /> : entry.in_app ? <Stethoscope /> : <Truck />}</div>
+        <div className="of-form-card-icon">{icon}</div>
         <div><h3>{entry.title}</h3><p>{entry.description}</p></div>
         <div className="ems-card-actions">
             <Button as="a" appearance="primary" href={entry.href} onClick={inApp ? inAppClick(openPrimary) : undefined} icon={<ChevronRight size={17} />} iconPosition="after">{entry.action_label}</Button>
@@ -431,7 +481,7 @@ function LibraryLinkCard({ entry, showSecondary, openEms, openNarcotics }: { ent
     </article>;
 }
 
-function LibraryView({ definitions, records, busy, createRecord, uploadFile, openRecord, refresh, openDocument, openGuide, libraryLinks, openEms, emsOutbox, editQueuedRequest, openNarcotics }: {
+function LibraryView({ definitions, records, busy, createRecord, uploadFile, openRecord, refresh, openDocument, openGuide, libraryLinks, openEms, emsOutbox, editQueuedRequest, openNarcotics, openPersonnel, awaitingSupervisor }: {
     definitions: FormDefinition[]; records: FormRecord[]; busy: boolean;
     createRecord: (type: EditableFormType) => Promise<void>;
     uploadFile: (name: string, file: File) => Promise<void>;
@@ -439,15 +489,22 @@ function LibraryView({ definitions, records, busy, createRecord, uploadFile, ope
     libraryLinks: LibraryLink[];
     openEms?: (view: EmsView) => void; emsOutbox?: EmsOutbox; editQueuedRequest: (entry: EmsOutboxEntry) => void;
     openNarcotics?: (view: NarcoticsView) => void;
+    openPersonnel?: (view: PersonnelView) => void; awaitingSupervisor: number;
 }) {
     // Four medical inventory cards would each say "My medical requests"; the list is the same for all, so it is offered once.
     const firstMedicalWithSecondary = libraryLinks.find((entry) => isMedicalCard(entry) && entry.secondary)?.key;
+    const awaitingHref = `${window.location.pathname}${personnelSearchForView({ name: 'mine' })}`;
     return <div className="of-library">
         <div className="of-page-heading"><div><p className="of-eyebrow">Controlled records workspace</p><h1>Operational Forms</h1><p>Start, resume, generate, or submit incident and reimbursement records.</p></div><div className="of-heading-actions"><Button icon={<BookOpen size={16} />} onClick={openGuide}>User guide</Button><Button icon={<RefreshCw size={16} />} onClick={refresh} disabled={busy}>Refresh</Button></div></div>
         {emsOutbox && openEms && <PendingRequests outbox={emsOutbox} openRequest={(id) => openEms({ name: 'detail', id })} editEntry={editQueuedRequest} />}
+        {openPersonnel && awaitingSupervisor > 0 && <article className="of-form-card of-awaiting-card" data-awaiting-supervisor={awaitingSupervisor}>
+            <div className="of-form-card-icon"><Car /></div>
+            <div><h3>Awaiting your supervisor's part ({awaitingSupervisor})</h3><p>{awaitingSupervisor === 1 ? 'A Vehicle Accident Report was routed to you.' : `${awaitingSupervisor} Vehicle Accident Reports were routed to you.`} Complete and sign the supervisor's part before the driver's tour of duty ends.</p></div>
+            <div className="ems-card-actions"><Button as="a" appearance="primary" href={awaitingHref} onClick={inAppClick(() => openPersonnel({ name: 'mine' }))} icon={<ChevronRight size={17} />} iconPosition="after">Open reports</Button></div>
+        </article>}
         <section aria-labelledby="start-form"><h2 id="start-form">Start a form</h2><div className="of-form-cards">
             {definitions.map((definition) => <article className="of-form-card" key={definition.form_type}><div className="of-form-card-icon">{definition.form_type === 'ics_214' ? <ClipboardList /> : <FileCheck2 />}</div><div><Badge appearance="outline">Version {definition.form_version}</Badge><h3>{definition.display_name}</h3><p>{definition.form_type === 'ics_214' ? 'Document unit resources and chronological incident activity.' : 'Capture firefighter labor, equipment, mileage, materials, and certification—with optional AI-assisted note import.'}</p></div><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={() => void createRecord(definition.form_type)}>Create form</Button></article>)}
-            {libraryLinks.map((entry) => <LibraryLinkCard key={entry.key} entry={entry} showSecondary={!isMedicalCard(entry) || entry.key === firstMedicalWithSecondary} openEms={openEms} openNarcotics={openNarcotics} />)}
+            {libraryLinks.map((entry) => <LibraryLinkCard key={entry.key} entry={entry} showSecondary={!isMedicalCard(entry) || entry.key === firstMedicalWithSecondary} openEms={openEms} openNarcotics={openNarcotics} openPersonnel={openPersonnel} />)}
         </div></section>
         <FileSubmissionCard upload={uploadFile} />
         <section aria-labelledby="recent-records"><div className="of-section-heading"><h2 id="recent-records">Recent records</h2><span>{records.length} record{records.length === 1 ? '' : 's'}</span></div>

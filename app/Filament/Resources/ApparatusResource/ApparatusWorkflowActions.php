@@ -8,24 +8,39 @@ use App\Enums\ApparatusPmServiceType;
 use App\Enums\ApparatusServiceTicketCategory;
 use App\Enums\ApparatusServiceTicketPriority;
 use App\Filament\Resources\ApparatusOperationalAlertResource;
+use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\UnitMasterVehicleResource;
 use App\Models\Apparatus;
+use App\Models\ApparatusChangeout;
 use App\Models\ApparatusOperationalAlert;
 use App\Models\UnitMasterVehicle;
 use App\Models\User;
 use App\Services\ApparatusServiceTicketWorkflowService;
+use App\Services\Fleet\ApparatusChangeoutPlanner;
+use App\Services\Fleet\ApparatusChangeoutPresenter;
+use App\Services\Fleet\ApparatusChangeoutService;
 use App\Services\Fleet\ApparatusMasterVehicleLink;
 use App\Services\Fleet\ApparatusOperationalAlertService;
+use App\Services\Fleet\ChangeoutConflictException;
+use App\Support\Fleet\FrontlineUnits;
+use App\Support\Fleet\UnitIdentity;
 use App\Support\HubNavigation;
 use App\Support\HubTimezone;
+use Closure;
+use Filament\Actions;
 use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use Filament\Resources\Pages\EditRecord;
+use Filament\Resources\Pages\ViewRecord;
+use Filament\Support\Exceptions\Halt;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Throwable;
 
 /**
  * The Fleet manager's and mechanics' everyday actions on one apparatus. The
@@ -64,6 +79,8 @@ final class ApparatusWorkflowActions
                     ->options(self::STATUS_OPTIONS)
                     ->default(fn (Apparatus $record): ?string => $record->getAttribute('status'))
                     ->native(false)
+                    ->helperText(fn (Apparatus $record): ?string => self::frontlineStatusHint($record))
+                    ->rule(fn (Apparatus $record): Closure => self::frontlineStatusRule($record))
                     ->required(),
             ])
             ->action(function (Apparatus $record, array $data): void {
@@ -443,6 +460,342 @@ final class ApparatusWorkflowActions
                     Notification::make()->success()->title('Alert added')->body(self::unitLabel($record))->send();
                 }
             });
+    }
+
+    /**
+     * The three truck actions every apparatus page leads with.
+     *
+     * @return list<Actions\Action>
+     */
+    public static function truckActions(): array
+    {
+        return [
+            self::swapTruck(Actions\Action::make('swapTruck')),
+            self::takeOutOfService(Actions\Action::make('takeOutOfService')),
+            self::returnToService(Actions\Action::make('returnToService')),
+        ];
+    }
+
+    /**
+     * Puts a different truck on this unit, now, through the one changeout service the crews use. No approval: the truck
+     * picked here takes the unit and goes In Service, and this truck becomes a spare and goes Out of Service.
+     *
+     * @template T of MountableAction
+     *
+     * @param  T  $action
+     * @return T
+     */
+    public static function swapTruck(MountableAction $action): MountableAction
+    {
+        return $action
+            ->label('Swap truck')
+            ->icon('heroicon-o-arrows-right-left')
+            ->color('primary')
+            ->authorize(fn (): bool => self::canManageChangeouts())
+            ->visible(fn (Apparatus $record): bool => filled($record->slug))
+            ->modalHeading(fn (Apparatus $record): string => 'Which truck will run as '.self::unitLabel($record).'?')
+            ->modalDescription(fn (Apparatus $record): string => self::swapConsequence($record))
+            ->modalSubmitActionLabel('Swap truck')
+            ->form(fn (Apparatus $record): array => self::replacementFields($record, false))
+            ->action(function (Apparatus $record, array $data, mixed $livewire): void {
+                self::swap($record, $data, $livewire);
+            });
+    }
+
+    /**
+     * A front-line unit is never out of service; its truck can be. For a truck carrying one, this asks which truck takes
+     * the unit and does the swap. If no truck is available, an admin can say so: the truck goes Out of Service, the unit
+     * stays on it, and Fleet is told the same way as a swap. Any other truck simply goes Out of Service.
+     *
+     * @template T of MountableAction
+     *
+     * @param  T  $action
+     * @return T
+     */
+    public static function takeOutOfService(MountableAction $action): MountableAction
+    {
+        return $action
+            ->label('Mark this truck out of service')
+            ->icon('heroicon-o-no-symbol')
+            ->color('danger')
+            ->authorize(fn (Apparatus $record): bool => self::canManageService($record))
+            ->visible(fn (Apparatus $record): bool => $record->getAttribute('status') !== ApparatusChangeout::OLD_TRUCK_STATUS)
+            ->modalHeading(fn (Apparatus $record): string => FrontlineUnits::isFrontline($record)
+                ? 'Which truck will run as '.self::unitLabel($record).'?'
+                : 'Mark truck '.($record->vehicle_number ?: self::unitLabel($record)).' out of service')
+            ->modalDescription(fn (Apparatus $record): string => FrontlineUnits::isFrontline($record)
+                ? self::unitLabel($record).' is a front-line unit, so it stays in service. Its truck can go out of service: '.self::swapConsequence($record)
+                : 'The truck will show Out of Service on the Apparatus list and the station boards.')
+            ->modalSubmitActionLabel(fn (Apparatus $record): string => FrontlineUnits::isFrontline($record) ? 'Save' : 'Mark out of service')
+            ->form(fn (Apparatus $record): array => FrontlineUnits::isFrontline($record) ? self::replacementFields($record, true) : [])
+            ->action(function (Apparatus $record, array $data, mixed $livewire): void {
+                if (! FrontlineUnits::isFrontline($record)) {
+                    self::setStatus($record, ApparatusChangeout::OLD_TRUCK_STATUS, $livewire);
+
+                    return;
+                }
+                if (! (bool) ($data['no_replacement'] ?? false)) {
+                    self::swap($record, $data, $livewire);
+
+                    return;
+                }
+                try {
+                    $changeout = app(ApparatusChangeoutService::class)->recordWithoutReplacement($record, self::actor(), (string) ($data['reason'] ?? ''));
+                } catch (ValidationException|AuthorizationException $exception) {
+                    self::refused($exception);
+                }
+                $record->refresh();
+                self::refreshStatusField($livewire);
+                Notification::make()->warning()
+                    ->title($changeout->headline())
+                    ->body('Fleet and the admin dashboard were told. Use Swap truck as soon as a truck is available.')
+                    ->persistent()
+                    ->send();
+            });
+    }
+
+    /**
+     * @template T of MountableAction
+     *
+     * @param  T  $action
+     * @return T
+     */
+    public static function returnToService(MountableAction $action): MountableAction
+    {
+        return $action
+            ->label('Mark this truck back in service')
+            ->icon('heroicon-o-check-circle')
+            ->color('success')
+            ->authorize(fn (Apparatus $record): bool => self::canManageService($record))
+            ->visible(fn (Apparatus $record): bool => $record->getAttribute('status') !== 'In Service')
+            ->requiresConfirmation()
+            ->modalHeading(fn (Apparatus $record): string => 'Put truck '.($record->vehicle_number ?: self::unitLabel($record)).' back in service?')
+            ->modalDescription(fn (Apparatus $record): string => 'It will show In Service as '.self::unitLabel($record).'. To put it on a different unit, use Swap truck on that unit.')
+            ->modalSubmitActionLabel('Mark in service')
+            ->action(function (Apparatus $record, mixed $livewire): void {
+                self::setStatus($record, 'In Service', $livewire);
+            });
+    }
+
+    /**
+     * The rare admin correction of the unit fields themselves: a typo, a renamed unit. It never moves a unit to another
+     * truck (that is Swap truck), and the identity guard on the model refuses a vehicle number, a unit another truck
+     * carries, or fields that disagree.
+     *
+     * @template T of MountableAction
+     *
+     * @param  T  $action
+     * @return T
+     */
+    public static function changeUnitAssignment(MountableAction $action): MountableAction
+    {
+        return $action
+            ->label('Change unit assignment')
+            ->icon('heroicon-o-pencil-square')
+            ->color('gray')
+            ->authorize(fn (Apparatus $record): bool => auth()->user()?->can('update', $record) ?? false)
+            ->modalHeading(fn (Apparatus $record): string => 'Change unit assignment · '.($record->vehicle_number ? 'truck '.$record->vehicle_number : self::unitLabel($record)))
+            ->modalDescription('Only for correcting this record. To put a different truck on a unit, close this and use Swap truck. A unit ID names the unit, like E1, never a vehicle number.')
+            ->modalSubmitActionLabel('Save unit assignment')
+            ->fillForm(fn (Apparatus $record): array => [
+                'unit_id' => $record->getAttribute('unit_id'),
+                'designation' => $record->designation,
+                'name' => $record->name,
+                'slug' => $record->slug,
+            ])
+            ->form([
+                Forms\Components\TextInput::make('unit_id')
+                    ->label('Unit ID')
+                    ->helperText('Like E1, R22 or FB6. The designation, name and link name below are filled in from it.')
+                    ->required()
+                    ->maxLength(255)
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function (Forms\Set $set, ?string $state, Apparatus $record): void {
+                        $unit = trim((string) $state);
+                        if ($unit === '') {
+                            return;
+                        }
+                        $set('designation', UnitIdentity::designationFor($unit));
+                        $set('name', UnitIdentity::nameFor($unit, $record->type));
+                        $set('slug', UnitIdentity::slugFor($unit));
+                    }),
+                Forms\Components\Grid::make(3)->schema([
+                    Forms\Components\TextInput::make('designation')->label('Designation')->placeholder('E 1')->maxLength(255),
+                    Forms\Components\TextInput::make('name')->label('Name')->placeholder('ENGINE E1')->maxLength(255),
+                    Forms\Components\TextInput::make('slug')
+                        ->label('Link name (slug)')
+                        ->placeholder('e1')
+                        ->helperText('Used in Daily Checkout links and alerts for this unit.')
+                        ->required()
+                        ->alphaDash()
+                        ->maxLength(255),
+                ]),
+                Forms\Components\Checkbox::make('confirmed')
+                    ->label('I am correcting this record, not moving the unit to a different truck.')
+                    ->accepted()
+                    ->validationMessages(['accepted' => 'Confirm that this is a correction. To move a unit, use Swap truck.']),
+            ])
+            ->action(function (Apparatus $record, array $data, MountableAction $action): void {
+                $fields = collect(UnitIdentity::FIELDS)
+                    ->mapWithKeys(static fn (string $field): array => [$field => filled($data[$field] ?? null) ? trim((string) $data[$field]) : null])
+                    ->all();
+                try {
+                    DB::transaction(static fn (): bool => $record->fill($fields)->save());
+                } catch (ValidationException $exception) {
+                    $record->refresh();
+                    self::refused($exception);
+                } catch (UniqueConstraintViolationException) {
+                    $record->refresh();
+                    Notification::make()->danger()->title('The unit assignment was not saved')
+                        ->body('Another truck record already uses that unit ID or link name.')->persistent()->send();
+                    $action->halt();
+                }
+                Notification::make()->success()->title('Unit assignment saved')->body('Truck '.($record->vehicle_number ?: 'record #'.$record->getKey()).' is listed as '.self::unitLabel($record).'.')->send();
+            });
+    }
+
+    /** Explains the steer on the status choices: a front-line unit's truck is taken out of service with a swap. */
+    public static function frontlineStatusHint(?Apparatus $record): ?string
+    {
+        $unit = $record instanceof Apparatus ? FrontlineUnits::carriedBy($record) : null;
+
+        return $unit === null ? null
+            : "{$unit} is a front-line unit and must have a truck In Service. To take this truck off {$unit}, use Mark this truck out of service or Swap truck at the top of the page.";
+    }
+
+    /** Server-side: a status other than In Service on a front-line unit's truck goes through the swap flow instead. */
+    public static function frontlineStatusRule(?Apparatus $record): Closure
+    {
+        return static function (string $attribute, mixed $value, Closure $fail) use ($record): void {
+            $unit = $record instanceof Apparatus && $record->exists ? FrontlineUnits::carriedBy($record) : null;
+            if ($unit === null || $value === 'In Service' || $value === $record->getOriginal('status')) {
+                return;
+            }
+            $fail("{$unit} is a front-line unit, so it cannot be {$value}. Use Mark this truck out of service to pick the truck that will run as {$unit}, or to record that no truck is available.");
+        };
+    }
+
+    /**
+     * The truck choice for a swap, and for a front-line truck going out of service, the explicit "no truck" escape hatch.
+     *
+     * @return list<Forms\Components\Component>
+     */
+    private static function replacementFields(Apparatus $record, bool $withEscapeHatch): array
+    {
+        $unit = self::unitLabel($record);
+        $showChoice = fn (Forms\Get $get): bool => ! $withEscapeHatch || ! (bool) $get('no_replacement');
+
+        return array_values(array_filter([
+            Forms\Components\Select::make('to_apparatus_id')
+                ->label('Truck from the fleet list')
+                ->options(fn (): array => self::swapOptions($record))
+                ->searchable()
+                ->visible($showChoice)
+                ->required(fn (Forms\Get $get): bool => $showChoice($get) && blank($get('to_vehicle_number')))
+                ->validationMessages(['required' => "Pick the truck that will run as {$unit}, or type its number."]),
+            Forms\Components\TextInput::make('to_vehicle_number')
+                ->label('Or type the vehicle number on the truck')
+                ->helperText('For a truck that is not on the list. A record is made for it and Fleet is asked to check it.')
+                ->maxLength(64)
+                ->visible($showChoice),
+            Forms\Components\Textarea::make('note')
+                ->label('Note for Fleet (optional)')
+                ->rows(2)
+                ->maxLength(1000)
+                ->visible($showChoice),
+            $withEscapeHatch ? Forms\Components\Toggle::make('no_replacement')
+                ->label("No truck is available. Keep {$unit} on this truck and mark the truck Out of Service anyway.")
+                ->helperText("Fleet and the admin dashboard are told, the same as a swap. {$unit} shows as having no truck in service until you swap a truck onto it.")
+                ->visible(fn (): bool => self::canManageChangeouts())
+                ->live() : null,
+            $withEscapeHatch ? Forms\Components\Textarea::make('reason')
+                ->label('Why no other truck can run as '.$unit)
+                ->rows(2)
+                ->maxLength(1000)
+                ->visible(fn (Forms\Get $get): bool => (bool) $get('no_replacement'))
+                ->required(fn (Forms\Get $get): bool => (bool) $get('no_replacement')) : null,
+        ]));
+    }
+
+    /**
+     * Spare trucks first, then trucks carrying another unit (that unit trades onto this truck). Same type first; any truck
+     * when the type has no other trucks.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private static function swapOptions(Apparatus $record): array
+    {
+        $choices = app(ApparatusChangeoutPlanner::class)->choices($record, null);
+        $label = static fn (array $row): string => trim($row['vehicle_number'].' · '.$row['label'].' ('.($row['status'] ?: 'no status').')');
+        $spares = collect($choices['candidates'])->mapWithKeys(static fn (array $row): array => [$row['apparatus_id'] => $label($row)])->all();
+        $others = collect($choices['other_vehicles'])->mapWithKeys(static fn (array $row): array => [$row['apparatus_id'] => $label($row).', trades units'])->all();
+        if ($spares === [] && $others === []) {
+            return ['Any truck' => self::truckOptions((int) $record->getKey(), false)];
+        }
+
+        return array_filter(['Spare trucks' => $spares, 'Trucks carrying another unit' => $others]);
+    }
+
+    private static function swapConsequence(Apparatus $record): string
+    {
+        $number = $record->vehicle_number ? 'Truck '.$record->vehicle_number : 'This truck';
+
+        return 'The truck you pick takes over '.self::unitLabel($record)." and goes In Service. {$number} becomes a spare and is marked Out of Service. No approval is needed, and Fleet is told.";
+    }
+
+    /** @param array<string, mixed> $data */
+    private static function swap(Apparatus $record, array $data, mixed $livewire): void
+    {
+        $toId = filled($data['to_apparatus_id'] ?? null) ? (int) $data['to_apparatus_id'] : null;
+        $toNumber = filled($data['to_vehicle_number'] ?? null) ? trim((string) $data['to_vehicle_number']) : null;
+        try {
+            $result = app(ApparatusChangeoutService::class)->submit($record, self::actor(), [
+                'client_submission_id' => (string) Str::uuid(),
+                'expected_vehicle_number' => $record->vehicle_number,
+                'expected_unit_slug' => (string) $record->slug,
+                'to_apparatus_id' => $toNumber === null ? $toId : null,
+                'to_vehicle_number' => $toNumber,
+                'note' => $data['note'] ?? null,
+            ]);
+        } catch (ValidationException|AuthorizationException|ChangeoutConflictException $exception) {
+            self::refused($exception);
+        }
+        $changeout = $result['changeout'];
+        Notification::make()->success()
+            ->title($changeout->headline())
+            ->body(ApparatusChangeoutPresenter::messageFor($changeout))
+            ->send();
+        // The unit now lives on the other truck: follow it there. A list row just refreshes.
+        if ($livewire instanceof ViewRecord || $livewire instanceof EditRecord) {
+            $livewire->redirect(ApparatusResource::getUrl('view', ['record' => $changeout->to_apparatus_id]));
+        }
+    }
+
+    private static function setStatus(Apparatus $record, string $status, mixed $livewire): void
+    {
+        app(ApparatusServiceTicketWorkflowService::class)->changeOperationalStatus($record, self::actor(), $status);
+        $record->refresh();
+        self::refreshStatusField($livewire);
+        Notification::make()->success()->title('Truck '.($record->vehicle_number ?: self::unitLabel($record)).' is now '.$status)->send();
+    }
+
+    /** An edit form open on the same truck must not save the old status back over the new one. */
+    private static function refreshStatusField(mixed $livewire): void
+    {
+        if ($livewire instanceof EditRecord) {
+            $livewire->refreshFormData(['status']);
+        }
+    }
+
+    /** Says why in plain words and keeps the modal open, so the admin can correct the choice. */
+    private static function refused(Throwable $exception): never
+    {
+        $body = $exception instanceof ValidationException
+            ? implode(' ', collect($exception->errors())->flatten()->unique()->all())
+            : ($exception->getMessage() ?: 'You do not have permission to do this.');
+        Notification::make()->danger()->title('Nothing was changed')->body($body)->persistent()->send();
+
+        throw new Halt;
     }
 
     /** @param array<string, mixed> $data */

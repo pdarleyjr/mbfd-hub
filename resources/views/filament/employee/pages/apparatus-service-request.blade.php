@@ -11,4 +11,19 @@
             </button>
         </div>
     </form>
+
+    @if($myTickets->isNotEmpty())
+        {{-- The member's own recent requests, each with its conversation (docs/member-replies.md section 2.3). --}}
+        <section class="hub-insp-card mt-6" aria-labelledby="my-service-requests" data-my-service-requests>
+            <h2 class="hub-insp-card__title" id="my-service-requests">Your recent service requests</h2>
+            <ul class="mt-3 space-y-2">
+                @foreach($myTickets as $ticket)
+                    <li>
+                        <a class="hub-insp-item__text font-semibold text-hub-blue" href="{{ \App\Services\MemberReplies\SubmissionConversationNotifier::memberUrl(\App\Support\MemberReplies\ReplySubject::APPARATUS_SERVICE_TICKET, (int) $ticket->id) }}">{{ $ticket->ticket_number }} · {{ $ticket->unit_designation_snapshot }} · {{ $ticket->title }}</a>
+                        <p class="hub-insp-item__sub">{{ str((string) $ticket->status)->replace('_', ' ')->title() }}@if($ticket->current_public_response) · {{ str($ticket->current_public_response)->limit(120) }}@endif</p>
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    @endif
 </x-filament-panels::page>

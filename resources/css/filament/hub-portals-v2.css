@@ -32,27 +32,32 @@
 [data-hub-portal="employee"] .ep-id-number { color: rgb(var(--hub-header)); font-weight: 650; }
 [data-hub-portal="employee"] :is(.ep-panel-link, .pr-compact-header a) { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; color: rgb(var(--hub-action-primary)); font-size: .875rem; font-weight: 600; text-decoration: none; }
 [data-hub-portal="employee"] :is(.ep-panel-link, .pr-compact-header a):hover { text-decoration: underline; text-underline-offset: 3px; }
-[data-hub-portal="employee"] .ep-stats-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 2rem; padding: 1.25rem 0; }
-[data-hub-portal="employee"] .ep-stat { display: flex; align-items: baseline; gap: .625rem; }
-[data-hub-portal="employee"] .ep-stat-value { color: rgb(var(--hub-header)); font-size: 1.625rem; font-weight: 650; line-height: 1.3; }
-[data-hub-portal="employee"] .ep-stat-pending { color: rgb(var(--hub-warning)); }
-[data-hub-portal="employee"] .ep-stat-label { color: rgb(var(--hub-ink-secondary)); font-size: .875rem; }
-[data-hub-portal="employee"] .ep-stat-divider { width: 1px; height: 1.75rem; background: rgb(var(--hub-border)); }
-[data-hub-portal="employee"] .ep-actions-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-[data-hub-portal="employee"] .ep-action-card { display: flex; align-items: center; gap: .875rem; min-height: 88px; padding: 1rem 1.125rem; border: 1px solid rgb(var(--hub-glass-border)); border-radius: var(--hub-radius-card); background: rgb(var(--hub-glass) / var(--hub-glass-alpha)); box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card); text-decoration: none; }
-[data-hub-portal="employee"] .ep-action-card:hover { border-color: rgb(var(--hub-action-primary)); background: rgb(var(--hub-action-primary) / .04); }
-[data-hub-portal="employee"] .ep-action-primary { background: rgb(var(--hub-action-primary)); border-color: rgb(var(--hub-action-primary)); }
-[data-hub-portal="employee"] .ep-action-primary:hover { background: rgb(var(--hub-action-primary-hover)); }
-[data-hub-portal="employee"] .ep-action-icon { display: flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; flex: none; color: rgb(var(--hub-action-primary)); }
-[data-hub-portal="employee"] .ep-action-body { display: flex; flex: 1; min-width: 0; flex-direction: column; }
-[data-hub-portal="employee"] .ep-action-title { color: rgb(var(--hub-ink)); font-size: .9375rem; font-weight: 650; }
-[data-hub-portal="employee"] .ep-action-desc { margin-top: .25rem; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
-[data-hub-portal="employee"] .ep-action-arrow { width: 1.125rem; height: 1.125rem; flex: none; color: rgb(var(--hub-action-primary)); }
-[data-hub-portal="employee"] .ep-action-primary :is(.ep-action-title, .ep-action-desc, .ep-action-icon, .ep-action-arrow) { color: rgb(var(--hub-n-0)); }
-[data-hub-portal="employee"] .ep-workspace-links { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; padding: .75rem 0 1.5rem; }
-[data-hub-portal="employee"] .ep-workspace-links a { display: inline-flex; align-items: center; min-height: 44px; color: rgb(var(--hub-action-primary)); font-size: .875rem; font-weight: 600; text-decoration: none; }
-[data-hub-portal="employee"] .ep-workspace-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
-[data-hub-portal="employee"] .ep-two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+[data-hub-portal="employee"] .ep-link-chevron { width: 1rem; height: 1rem; flex: none; }
+/*
+ * Dashboard: activity, then the member's destinations, then records, in one column. From 1280px the destinations
+ * are a sticky rail beside activity and records (Home's Quick Access pattern). The rail spans both rows; the extra
+ * height it needs goes to the records row, so activity never stretches.
+ */
+[data-hub-portal="employee"] .ep-dash { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+[data-hub-portal="employee"] .ep-dash > .act-card { margin: 0; }
+[data-hub-portal="employee"] .ep-dash__records { display: grid; gap: 1.5rem; min-width: 0; }
+[data-hub-portal="employee"] .ep-dash__rail { min-width: 0; }
+[data-hub-portal="employee"] .ep-dash__rail .hub-portal-section-title { margin: 0; }
+[data-hub-portal="employee"] .ep-tiles { margin: .625rem 0 0; padding: 0; list-style: none; }
+[data-hub-portal="employee"] .ep-tiles > li { display: flex; min-width: 0; }
+[data-hub-portal="employee"] .ep-tiles .hub-tile { flex: 1 1 auto; min-width: 0; }
+[data-hub-portal="employee"] .ep-tiles .hub-tag { flex: none; }
+@media (min-width: 1280px) {
+    [data-hub-portal="employee"] .ep-dash { grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem); grid-template-rows: auto 1fr; column-gap: 2rem; }
+    [data-hub-portal="employee"] .ep-dash > .act-card { grid-area: 1 / 1; }
+    [data-hub-portal="employee"] .ep-dash__records { grid-area: 2 / 1; }
+    [data-hub-portal="employee"] .ep-dash__rail { grid-area: 1 / 2 / 3 / 3; position: sticky; top: calc(var(--hub-shell-bar-height) + 1.5rem); }
+}
+/* Record panels share the activity card's glass; rows sit directly on it, divided by hairlines. */
+[data-hub-portal="employee"] .ep-two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 1.5rem; }
+[data-hub-portal="employee"] .ep-card { padding: .25rem 1.25rem .5rem; border: 1px solid rgb(var(--hub-glass-border)); border-radius: var(--hub-radius-card); background: rgb(var(--hub-glass) / var(--hub-glass-alpha)); box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card); }
+[data-hub-portal="employee"] .ep-rows { margin: 0; padding: 0; list-style: none; }
+[data-hub-portal="employee"] .ep-rows > .ep-list-item:last-child { border-bottom: 0; }
 [data-hub-portal="employee"] .ep-panel { min-width: 0; }
 [data-hub-portal="employee"] .ep-panel-header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; border-bottom: 1px solid rgb(var(--hub-border)); }
 [data-hub-portal="employee"] .ep-panel-title { color: rgb(var(--hub-header)); font-size: 1rem; font-weight: 650; }
@@ -62,6 +67,7 @@
 [data-hub-portal="employee"] .ep-bid-details > div { min-width: 0; }
 [data-hub-portal="employee"] .ep-bid-details dt { margin-bottom: .25rem; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
 [data-hub-portal="employee"] .ep-bid-details dd { color: rgb(var(--hub-ink)); font-size: 1rem; font-weight: 600; line-height: 1.5; }
+[data-hub-portal="employee"] .ep-bid-details dd.ep-fuel-pin { font-family: var(--hub-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-variant-numeric: tabular-nums; letter-spacing: .08em; }
 [data-hub-portal="employee"] .ep-bid-selection { grid-column: 1 / -1; }
 [data-hub-portal="employee"] .ep-bid-selection dd { color: rgb(var(--hub-header)); font-size: 1.375rem; }
 [data-hub-portal="employee"] .ep-list-item { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; min-height: 72px; padding: .875rem 0; border-bottom: 1px solid rgb(var(--hub-border-soft)); }
@@ -81,6 +87,17 @@
 [data-hub-portal="employee"] :is(.ep-empty-icon, .ep-empty-big-icon) { width: 2rem; height: 2rem; margin-bottom: .75rem; color: rgb(var(--hub-action-primary)); }
 [data-hub-portal="employee"] .ep-empty-heading { margin-bottom: .5rem; color: rgb(var(--hub-header)); font-size: 1.125rem; font-weight: 650; }
 [data-hub-portal="employee"] .ep-empty-body { margin-bottom: 1rem; }
+/* Full-page empty state (My Equipment): the same centred glass card as My Requests. */
+[data-hub-portal="employee"] .ep-empty-full { text-align: center; }
+[data-hub-portal="employee"] .ep-empty-full .ep-empty-inner { margin-inline: auto; }
+[data-hub-portal="employee"] .ep-empty-full .ep-empty-big-icon { display: block; width: 1.5rem; height: 1.5rem; margin: 0 auto .5rem; color: rgb(var(--hub-n-500)); }
+[data-hub-portal="employee"] .ep-empty-full .ep-empty-heading { margin-bottom: .25rem; color: rgb(var(--hub-n-800)); font-size: .9375rem; }
+/* Compact empty state inside a panel: one row, icon, sentence and (when there is one) the next action. */
+[data-hub-portal="employee"] .ep-empty--row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; padding: .875rem 0 .5rem; }
+[data-hub-portal="employee"] .ep-empty--row .ep-empty-icon { width: 1.25rem; height: 1.25rem; margin: 0; color: rgb(var(--hub-n-500)); }
+[data-hub-portal="employee"] .ep-empty--row p { flex: 1 1 12rem; min-width: 0; margin: 0; }
+[data-hub-portal="employee"] .ep-empty-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1rem; border: 1px solid rgb(var(--hub-action-primary) / .35); border-radius: var(--hub-radius-control); background: rgb(var(--hub-well)); color: rgb(var(--hub-action-primary)); font-size: .875rem; font-weight: 600; text-decoration: none; }
+[data-hub-portal="employee"] .ep-empty-link:hover { background: rgb(var(--hub2-action-tint)); }
 
 /* Assigned gear stays a table on larger screens; compact labeled records on phones. */
 [data-hub-portal="employee"] .ep-eq-summary { color: rgb(var(--hub-ink-secondary)); font-size: .875rem; }
@@ -134,7 +151,7 @@
 [data-hub-portal="employee"] .mr-main h3 { margin: .5rem 0 .25rem; font-size: .9375rem; font-weight: 650; }
 [data-hub-portal="employee"] .mr-main p { color: rgb(var(--hub-ink-secondary)); font-size: .875rem; }
 [data-hub-portal="employee"] .mr-main small { display: block; margin-top: .5rem; color: rgb(var(--hub-ink-secondary)); font-size: .75rem; }
-[data-hub-portal="employee"] .mr-arrow { padding: 1rem; color: rgb(var(--hub-action-primary)); }
+[data-hub-portal="employee"] .mr-arrow { box-sizing: content-box; width: 1.25rem; height: 1.25rem; flex: none; padding: 1rem; color: rgb(var(--hub-n-500)); }
 [data-hub-portal="employee"] .mr-legacy { margin-top: 1.5rem; padding: 1rem; border: 1px solid rgb(var(--hub-glass-border)); border-radius: var(--hub-radius-card); background: rgb(var(--hub-glass) / var(--hub-glass-alpha)); box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card); }
 [data-hub-portal="employee"] .mr-legacy summary { min-height: 44px; cursor: pointer; font-size: .875rem; font-weight: 600; }
 [data-hub-portal="employee"] .mr-legacy div { padding: 1rem 0; border-top: 1px solid rgb(var(--hub-border-soft)); font-size: .875rem; }
@@ -270,17 +287,16 @@
     [data-hub-portal="employee"] .pr-page-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 900px) {
-    [data-hub-portal="employee"] .ep-two-col,
     [data-hub-portal="workgroups"] .wg-workspace-nav,
     [data-hub-portal="training"] .training-settings-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
-    [data-hub-portal="employee"] .ep-actions-row { grid-template-columns: 1fr; }
-    [data-hub-portal="employee"] .ep-stats-bar { gap: 1rem; }
-    [data-hub-portal="employee"] .ep-stat { flex: 1 1 8rem; flex-direction: column; gap: .25rem; }
-    [data-hub-portal="employee"] .ep-stat-divider { display: none; }
+    [data-hub-portal="employee"] .ep-dash { gap: 1.25rem; }
+    [data-hub-portal="employee"] .ep-card { padding-inline: 1rem; }
+    [data-hub-portal="employee"] :is(.ast-employee-form, .ppe-form) { padding: 1rem; }
     [data-hub-portal="employee"] :is(.mr-toolbar, .ast-employee-submit, .ppe-submit-bar) { flex-direction: column; align-items: stretch; }
-    [data-hub-portal="employee"] :is(.ast-employee-submit, .ppe-submit-bar) p { flex-basis: auto; }
+    /* In a column the 20rem flex-basis became a 320px-tall blank band above the button. */
+    [data-hub-portal="employee"] :is(.mr-toolbar, .ast-employee-submit, .ppe-submit-bar) p { flex-basis: auto; }
             .fi-panel-employee .ppe-review, .fi-panel-employee .ppe-review-items ul { grid-template-columns: 1fr; }
     [data-hub-portal="employee"] .ep-eq-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     [data-hub-portal="employee"] .ep-eq-table :is(tbody, tr, td) { display: block; width: 100%; }
@@ -338,8 +354,8 @@
 }
 
 /* My activity: the member's own records in one list, on the dashboard card and on the full page. */
-[data-hub-portal="employee"] .act-card { margin-bottom: 1.5rem; padding: 1.25rem; border: 1px solid rgb(var(--hub-glass-border)); border-radius: var(--hub-radius-card); background: rgb(var(--hub-glass) / var(--hub-glass-alpha)); box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card); }
-[data-hub-portal="employee"] .act-card .ep-panel-header { padding-bottom: .25rem; }
+[data-hub-portal="employee"] .act-card { margin-bottom: 1.5rem; padding: .25rem 1.25rem .5rem; border: 1px solid rgb(var(--hub-glass-border)); border-radius: var(--hub-radius-card); background: rgb(var(--hub-glass) / var(--hub-glass-alpha)); box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card); }
+[data-hub-portal="employee"] :is(.act-card, .ep-card) > .ep-panel-header { min-height: 3.25rem; }
 [data-hub-portal="employee"] .act-list { margin: 0; padding: 0; list-style: none; }
 [data-hub-portal="employee"] .act-row { min-width: 0; border-bottom: 1px solid rgb(var(--hub-border-soft)); }
 [data-hub-portal="employee"] .act-row:last-child { border-bottom: 0; }
@@ -363,7 +379,7 @@
 [data-hub-portal="employee"] .act-pager__position { color: rgb(var(--hub-ink-secondary)); font-size: .875rem; }
 [data-hub-portal="employee"] .act-pager .rl-btn:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 640px) {
-    [data-hub-portal="employee"] .act-card { padding: 1rem; }
+    [data-hub-portal="employee"] .act-card { padding-inline: 1rem; }
     [data-hub-portal="employee"] .act-row__link { flex-wrap: wrap; }
     [data-hub-portal="employee"] .act-row__flags { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; width: 100%; max-width: none; padding-left: 1.25rem; text-align: left; }
     [data-hub-portal="employee"] .act-row__children { margin-left: .5rem; }

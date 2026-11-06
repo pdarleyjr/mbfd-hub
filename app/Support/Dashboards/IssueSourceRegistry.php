@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 /**
  * Container singleton listing every IssueSource. Sources are registered in
- * config/dashboards.php (vehicle_sources, station_sources) via DashboardServiceProvider. Routing an action is always by the
+ * config/dashboards.php (vehicle_sources, station_sources, request_sources) via DashboardServiceProvider. Routing an action is always by the
  * stable "<type>:<id>" ref, never by a class name from the client.
  */
 final class IssueSourceRegistry

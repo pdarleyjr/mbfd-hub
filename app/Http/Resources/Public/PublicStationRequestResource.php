@@ -42,6 +42,8 @@ class PublicStationRequestResource extends JsonResource
             'completed_at' => $stationRequest->completed_at,
             // Whether this member may mark it resolved (docs/unified-activity-and-ownership.md section 3). Server-decided.
             'member_resolution' => \App\Support\Stations\StationRequestMemberAccess::resolutionFor($request->user(), $stationRequest),
+            // Whether this member submitted it and so may open its conversation (docs/member-replies.md section 2.3).
+            'member_conversation' => ['participant' => \App\Support\MemberReplies\SubmissionConversationAccess::isParticipant($request->user(), \App\Support\MemberReplies\ReplySubject::STATION_REQUEST, $stationRequest)],
             'created_at' => $stationRequest->created_at,
             'updated_at' => $stationRequest->updated_at,
             'items' => $this->whenLoaded('items', fn () => $stationRequest->items->map(fn (StationRequestItem $item): array => [

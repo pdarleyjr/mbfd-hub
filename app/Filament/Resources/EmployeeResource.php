@@ -9,6 +9,8 @@ use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Filament\Support\EmployeeAccessSchema;
 use App\Jobs\IssueMemberOnboardingInvitation;
+use App\Livewire\Personnel\EmployeeProfileFieldsPanel;
+use App\Livewire\Personnel\EmployeeRecordsPanel;
 use App\Models\Employee;
 use App\Models\User;
 use Filament\Forms;
@@ -35,6 +37,15 @@ class EmployeeResource extends Resource
     protected static ?string $pluralModelLabel = 'Employees & Access';
 
     protected static ?int $navigationSort = 10;
+
+    /**
+     * The Personnel Directory is the one personnel list in navigation. Every page here keeps its URL: profiles open
+     * from the directory, and the onboarding list sits under the directory's Accounts menu.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public static function form(Form $form): Form
     {
@@ -79,6 +90,20 @@ class EmployeeResource extends Resource
                         ])
                         ->columns(2),
                     ...EmployeeAccessSchema::tabs(),
+                    // Loaded only when opened: nothing below runs while another tab is showing.
+                    Forms\Components\Tabs\Tab::make('Documents & records')
+                        ->visible(fn (?Employee $record): bool => $record instanceof Employee && $record->exists)
+                        ->schema([
+                            Forms\Components\Livewire::make(EmployeeRecordsPanel::class)->lazy()
+                                ->key(fn (?Employee $record): string => 'employee-records-'.($record?->getKey() ?? 'new')),
+                        ]),
+                    Forms\Components\Tabs\Tab::make('Additional details')
+                        ->visible(fn (?Employee $record): bool => $record instanceof Employee && $record->exists
+                            && EmployeeProfileFieldsPanel::hasFieldsFor(auth()->user()))
+                        ->schema([
+                            Forms\Components\Livewire::make(EmployeeProfileFieldsPanel::class)->lazy()
+                                ->key(fn (?Employee $record): string => 'employee-fields-'.($record?->getKey() ?? 'new')),
+                        ]),
                 ])->columnSpanFull(),
             ]);
     }
@@ -98,7 +123,9 @@ class EmployeeResource extends Resource
                     ->url(fn (Employee $record): string => static::getUrl('edit', ['record' => $record]))
                     ->searchable()
                     ->sortable(),
+                // Phone cards: the ID with name, rank and login under it, then activation and employment.
                 Tables\Columns\TextColumn::make('name')->visibleFrom('md')
+                    ->extraHeaderAttributes(['data-hub-priority' => 1])
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('rank')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
@@ -106,12 +133,20 @@ class EmployeeResource extends Resource
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('station')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->placeholder('Not assigned')->searchable(),
-                Tables\Columns\TextColumn::make('roster_status')->visibleFrom('md')->label('Employment')->badge()->placeholder('Not recorded'),
-                Tables\Columns\TextColumn::make('user.account_status')->visibleFrom('md')->label('Login')->badge()->placeholder('Awaiting account')
-                    ->formatStateUsing(fn ($state): string => ucfirst(str_replace('_', ' ', $state instanceof \BackedEnum ? $state->value : (string) $state))),
+                Tables\Columns\TextColumn::make('roster_status')->extraHeaderAttributes(['data-hub-priority' => 3])->label('Employment')->badge()->placeholder('Not recorded')
+                    ->formatStateUsing(fn ($state): string => ucfirst(str_replace('_', ' ', (string) $state)))
+                    ->color(fn ($state): string => (string) $state === 'active' ? 'success' : 'gray'),
+                Tables\Columns\TextColumn::make('user.account_status')->visibleFrom('md')->extraHeaderAttributes(['data-hub-priority' => 4])->label('Login')->badge()->placeholder('Awaiting account')
+                    ->formatStateUsing(fn ($state): string => ucfirst(str_replace('_', ' ', $state instanceof \BackedEnum ? $state->value : (string) $state)))
+                    ->color(fn ($state): string => match ($state instanceof \BackedEnum ? $state->value : (string) $state) {
+                        'active' => 'success', 'pending_activation' => 'warning', 'disabled', 'locked', 'suspended' => 'danger', default => 'gray'
+                    }),
                 Tables\Columns\TextColumn::make('invitation_delivery')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Invitation email')->badge()
                     ->state(fn (Employee $record): string => $record->user?->memberOnboardingInvitation?->emailDeliveryLabel() ?? 'Invitation not sent'),
-                Tables\Columns\TextColumn::make('invitation_status')->visibleFrom('md')->label('Account activation')->badge()
+                Tables\Columns\TextColumn::make('invitation_status')->extraHeaderAttributes(['data-hub-priority' => 2])->label('Account activation')->badge()
+                    ->color(fn (string $state): string => match (true) {
+                        $state === 'Account activated' => 'success', str_starts_with($state, 'Expired') => 'danger', in_array($state, ['Awaiting activation', 'Opened / redeemed'], true) => 'warning', default => 'gray'
+                    })
                     ->state(function (Employee $record): string {
                         $status = $record->user?->getRawOriginal('account_status');
                         if ($status === 'active') {
