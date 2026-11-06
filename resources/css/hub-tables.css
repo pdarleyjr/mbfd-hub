@@ -120,7 +120,10 @@ table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden] > * { min
   border-radius: var(--hub-radius-control);
   background-color: rgb(var(--hub-well));
   color: rgb(var(--hub-n-900));
-  padding-inline: 0.75rem;
+  /* The forms plugin draws the chevron in the right padding: keep text clear of it. */
+  padding-inline: 0.75rem 2.5rem;
+  flex: 1 1 10rem;
+  min-width: 10rem;
 }
 
 /* ---- Cards (phones and any container narrower than the essential columns) ---- */
@@ -163,6 +166,29 @@ table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="actions"] {
   justify-content: flex-end;
   border-top: 1px solid rgb(var(--hub-n-100));
   min-height: 2.75rem;
+}
+
+/*
+ * Card density: Filament pads every text/icon cell 16px top and bottom for its table rows. Inside a
+ * card each field is already its own padded row, so that inner padding doubled every field's height
+ * and pushed values below their labels. Only display cells are tightened; inputs keep theirs.
+ */
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"] :is(.fi-ta-text, .fi-ta-icon, .fi-ta-color, .fi-ta-image) {
+  padding-block: 0.375rem;
+  padding-inline: 0;
+}
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden])::before { padding-block-start: 0.375rem; }
+
+/* The row checkbox shares the first line with the lead field, mirroring the details chevron. */
+@supports selector(:has(*)) {
+  table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="select"] {
+    position: absolute;
+    inset-block-start: 0.25rem;
+    inset-inline-start: 0.25rem;
+    z-index: 1;
+    padding: 0 0.5rem;
+  }
+  table[data-hub-mode="cards"] > tbody > tr:has(> td[data-hub-kind="select"]) > td[data-hub-lead] { padding-inline-start: 3rem; }
 }
 
 /* Inputs inside narrow cells fill the cell instead of keeping their own minimum */

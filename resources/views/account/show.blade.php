@@ -10,7 +10,7 @@
     <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub-header back-label="Hub home" max-width="max-w-5xl" />
     <main id="main" class="hub-page__main mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-        <x-hub.page-header title="My account" eyebrow="MBFD Identity" description="Manage your Hub identity, security, and application access." />
+        <x-hub.page-header title="My account" description="Manage your Hub identity, security, and application access." />
         <section class="overflow-hidden hub-panel" aria-labelledby="identity-heading">
             <div class="border-b border-hub-border px-5 py-4"><h2 id="identity-heading" class="text-lg font-bold">Identity & security</h2><p class="mt-1 text-sm text-hub-muted">Your department identity and current security readiness.</p></div>
             <dl class="grid gap-px bg-hub-border sm:grid-cols-2">
@@ -46,7 +46,7 @@
                     @php($state = $applicationStates[$key])
                     <li class="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div><h3 class="font-semibold">{{ $application['label'] }}</h3><p class="text-sm text-hub-muted">{{ $state['status'] }}</p></div>
-                        <span class="w-fit rounded-full px-3 py-1 text-xs font-bold {{ $state['allowed'] ? 'bg-emerald-100 text-emerald-800' : 'bg-hub-surface-muted text-hub-ink-secondary' }}">{{ $state['allowed'] ? 'Available' : 'Unavailable' }}</span>
+                        <span class="hub-tag w-fit {{ $state['allowed'] ? 'hub-tag--success' : '' }}">{{ $state['allowed'] ? 'Available' : 'Unavailable' }}</span>
                     </li>
                 @endforeach
             </ul>

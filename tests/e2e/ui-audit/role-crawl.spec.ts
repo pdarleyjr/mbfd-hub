@@ -1,3 +1,4 @@
+import { protectedUiOrigin } from '../support/test-environment';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext, type BrowserContext, type Page } from '@playwright/test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -5,7 +6,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { fixtureSessionRenewal } from '../support/fixture-session-renewal';
 import { signInPersona } from './persona-sign-in';
 
-const origin = 'http://127.0.0.1:8127';
+const origin = protectedUiOrigin;
 const widths = [320, 390, 820, 1024, 1280, 1440, 1920];
 const seeds = ['/', '/admin', '/employee', '/workgroups', '/training', '/daily/stations', '/updates', '/support/issues', '/account'];
 const maxPagesPerPersona = process.env.UI_AUDIT_MAX_PAGES ? Number(process.env.UI_AUDIT_MAX_PAGES) : Infinity;

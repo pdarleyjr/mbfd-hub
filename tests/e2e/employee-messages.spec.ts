@@ -14,7 +14,7 @@ import { authDirectory, type PersonaName } from './employee-messages.setup';
 const MIN_TARGET_PX = 44;
 const RELEASE_A = 'aaaaaaaaaaaa';
 const RELEASE_B = 'bbbbbbbbbbbb';
-const BUSY_MESSAGE = 'An update is ready. It will apply when you finish.';
+const BUSY_MESSAGE = 'Update available. Finish or save your work before refreshing.';
 
 interface RunState {
   token: string;
@@ -384,7 +384,7 @@ const unloadStarted = (page: Page): Promise<boolean> =>
 
 /**
  * One draft-guard scenario for a composer: typing registers an employee-message busy reason, a Livewire
- * poll leaves the text alone, a pending update banner refuses "Refresh now" while the draft exists, and a
+ * poll leaves the text alone, a pending update banner refuses "Refresh app" while the draft exists, and a
  * confirmed send releases everything.
  */
 async function exerciseDraftGuard(page: Page, state: ReleaseState, composer: { textarea: string; send: string; pollComponent: string; sentText: string; confirmed: () => Promise<void> }): Promise<void> {
@@ -403,12 +403,12 @@ async function exerciseDraftGuard(page: Page, state: ReleaseState, composer: { t
   await expect(textarea).toHaveValue(draft);
   expect(await busyReasons(page)).toHaveLength(1);
 
-  // A new release arrives while the draft exists: banner, but no reload, and "Refresh now" is held back.
+  // A new release arrives while the draft exists: banner, but no reload, and "Refresh app" is held back.
   state.served = RELEASE_B;
   await checkNow(page);
   const banner = page.locator('#mbfd-pwa-banner');
   await expect(banner).toContainText(BUSY_MESSAGE);
-  const refresh = banner.getByRole('button', { name: 'Refresh now' });
+  const refresh = banner.getByRole('button', { name: 'Refresh app' });
   await expect(refresh).toHaveAttribute('aria-disabled', 'true');
   await armUnloadProbe(page);
   await refresh.click({ force: true });
@@ -422,12 +422,12 @@ async function exerciseDraftGuard(page: Page, state: ReleaseState, composer: { t
 
   // Saved: the busy reason is released and the banner becomes usable.
   await expect.poll(() => busyReasons(page)).toEqual([]);
-  await expect(banner.getByRole('button', { name: 'Refresh now' })).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(banner.getByRole('button', { name: 'Refresh app' })).not.toHaveAttribute('aria-disabled', 'true');
   await expect(banner).not.toContainText(BUSY_MESSAGE);
 }
 
 test.describe('Drafts and PWA updates', () => {
-  test('member page: a draft is busy, survives polls, blocks Refresh now, and is released once sent', async ({ browser }, info) => {
+  test('member page: a draft is busy, survives polls, blocks Refresh app, and is released once sent', async ({ browser }, info) => {
     const sent = `Draft guard member ${run(info).token}`;
     await as(browser, info, 'memberA', async ({ page }) => {
       const releases: ReleaseState = { served: RELEASE_A };
@@ -445,7 +445,7 @@ test.describe('Drafts and PWA updates', () => {
     });
   });
 
-  test('admin inbox: a reply draft is busy, survives polls, blocks Refresh now, and is released once sent', async ({ browser }, info) => {
+  test('admin inbox: a reply draft is busy, survives polls, blocks Refresh app, and is released once sent', async ({ browser }, info) => {
     const state = run(info);
     const sent = `Draft guard logistics ${state.token}`;
     // Its own conversation (from the view-only persona, who also holds a member profile), so the Logistics

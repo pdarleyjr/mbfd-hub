@@ -1,3 +1,4 @@
+import { protectedUiOrigin } from './test-environment';
 import { expect, type BrowserContext } from '@playwright/test';
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -5,7 +6,7 @@ import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { sanitizedTestEnvironment } from './test-environment';
 
-const origin = 'http://127.0.0.1:8127';
+const origin = protectedUiOrigin;
 const runLogin = promisify(execFile);
 const cookieNames = new Set(['laravel_session', 'XSRF-TOKEN']);
 type Identity = { userId: number; employeeProfileId: number; authenticated: true };
