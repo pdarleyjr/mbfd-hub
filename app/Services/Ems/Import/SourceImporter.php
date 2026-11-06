@@ -31,10 +31,26 @@ final class SourceImporter
         'airway_bag_inventory.json' => 'mbfd.ems.source_form.v1',
         'als_med_bag_inventory.json' => 'mbfd.ems.source_form.v1',
         'als_transport_vehicle_inventory.json' => 'mbfd.ems.source_form.v1',
+        'handtevy_inventory.json' => 'mbfd.ems.source_form.v1',
+        'als_non_transport_inventory.json' => 'mbfd.ems.source_form.v1',
+        'fire_boat_6_als_inventory.json' => 'mbfd.ems.source_form.v1',
+        'bls_detail_bag_inventory.json' => 'mbfd.ems.source_form.v1',
         'captain5_supply_room_inventory.json' => 'mbfd.ems.supply_room_source.v1',
     ];
 
-    private const FORM_KEYS = [SourceForm::AIRWAY, SourceForm::ALS, SourceForm::TRANSPORT];
+    private const FORM_KEYS = [
+        SourceForm::AIRWAY, SourceForm::ALS, SourceForm::TRANSPORT,
+        SourceForm::HANDTEVY, SourceForm::ALS_NON_TRANSPORT, SourceForm::FIRE_BOAT_6_ALS, SourceForm::BLS_DETAIL_BAG,
+    ];
+
+    /** The only printed cadence the four-form release knows: a check done on the first Tuesday of each month. */
+    public const CADENCES = ['monthly_first_tuesday'];
+
+    private const SEARCH_TERMS_MAX = 10;
+
+    private const SEARCH_TERM_LENGTH = 60;
+
+    private const TEXT_FLAG_LENGTH = 160;
 
     /** Supply fields an authorized person may edit; once edited, a re-import leaves them alone. */
     private const EDITABLE = [
@@ -143,7 +159,7 @@ final class SourceImporter
             return;
         }
 
-        $notes = ['source_notes' => array_values((array) ($source['notes'] ?? [])), 'pages' => $source['pages'] ?? null, 'extraction_sha256' => $extractionSha];
+        $notes = $this->formNotes($document, $source, $extractionSha);
         if ($form === null) {
             SourceForm::query()->where('key', $key)->where('active', true)->update(['active' => false]);
             $form = SourceForm::query()->create([
@@ -182,6 +198,91 @@ final class SourceImporter
     }
 
     /**
+     * What the form row keeps beyond its items. The extra keys exist only when the extraction has them, so a list that
+     * does not use them keeps exactly the notes it always had.
+     *
+     * @param  array<string, mixed>  $document
+     * @param  array<string, mixed>  $source
+     * @return array<string, mixed>
+     */
+    private function formNotes(array $document, array $source, string $extractionSha): array
+    {
+        $notes = ['source_notes' => array_values((array) ($source['notes'] ?? [])), 'pages' => $source['pages'] ?? null, 'extraction_sha256' => $extractionSha];
+
+        $header = $this->text($source['printed_header'] ?? null, 400);
+        if ($header !== null) {
+            $notes['printed_header'] = $header;
+        }
+        $review = array_values(array_filter(array_map(fn (mixed $note): ?string => $this->text($note, 1000), (array) ($source['review_notes'] ?? []))));
+        if ($review !== []) {
+            $notes['review_notes'] = $review;
+        }
+
+        $sectionNotes = [];
+        foreach ((array) ($document['sections'] ?? []) as $section) {
+            $section = (array) $section;
+            $note = $this->text($section['note'] ?? null, 500);
+            $cadence = $this->cadence($section['cadence'] ?? null);
+            if (isset($section['key']) && ($note !== null || $cadence !== null)) {
+                $sectionNotes[(string) $section['key']] = ['note' => $note, 'cadence' => $cadence];
+            }
+        }
+        if ($sectionNotes !== []) {
+            $notes['section_notes'] = $sectionNotes;
+        }
+
+        return $notes;
+    }
+
+    private function text(mixed $value, int $max): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return mb_substr(trim($value), 0, $max);
+    }
+
+    private function cadence(mixed $value): ?string
+    {
+        return is_string($value) && in_array($value, self::CADENCES, true) ? $value : null;
+    }
+
+    /**
+     * The extra things a list prints beside an item. Only what is present is kept (anything else in `flags` is dropped),
+     * so an item from the three older lists keeps exactly the flags it had.
+     *
+     * @param  array<string, mixed>  $flags
+     * @return array<string, mixed>
+     */
+    private function printedFlags(array $flags): array
+    {
+        $kept = [];
+        foreach (['location_text', 'qualifier_text', 'color_band'] as $name) {
+            $text = $this->text($flags[$name] ?? null, $name === 'color_band' ? 60 : self::TEXT_FLAG_LENGTH);
+            if ($text !== null) {
+                $kept[$name] = $text;
+            }
+        }
+        $cadence = $this->cadence($flags['cadence'] ?? null);
+        if ($cadence !== null) {
+            $kept['cadence'] = $cadence;
+        }
+        $terms = [];
+        foreach ((array) ($flags['search_terms'] ?? []) as $term) {
+            $text = $this->text($term, self::SEARCH_TERM_LENGTH);
+            if ($text !== null && ! in_array($text, $terms, true)) {
+                $terms[] = $text;
+            }
+        }
+        if ($terms !== []) {
+            $kept['search_terms'] = array_slice($terms, 0, self::SEARCH_TERMS_MAX);
+        }
+
+        return $kept;
+    }
+
+    /**
      * @param  array<string, mixed>  $section
      * @param  array<string, mixed>  $item
      */
@@ -199,6 +300,7 @@ final class SourceImporter
             $normalizedFlags['fill_if_text'] = trim((string) $flags['fill_if_text']);
             $normalizedFlags['fill_if_qty'] = isset($flags['fill_if_qty']) ? (int) $flags['fill_if_qty'] : null;
         }
+        $normalizedFlags += $this->printedFlags($flags);
         $catalogRef = self::reference($item, 'catalog');
         $catalog = $catalogRef !== null
             ? $this->catalogItem($catalogRef, (string) $item['label'], (string) ($section['label'] ?? ''), $normalizedFlags, null)
@@ -379,7 +481,7 @@ final class SourceImporter
      * when the extraction asserted the same catalog_key. Later sources add search aliases and
      * widen the safety flags (refrigerated / controlled); they never rename the item.
      *
-     * @param  array<string, bool>  $flags
+     * @param  array<string, mixed>  $flags
      */
     private function catalogItem(string $key, string $name, ?string $category, array $flags, ?bool $hasExpiration, ?string $alias = null): CatalogItem
     {

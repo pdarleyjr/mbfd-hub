@@ -1,7 +1,7 @@
 import { TriangleAlert } from 'lucide-react';
 import { HINT, NumberInput } from '../shared';
 import ItemPicker from './ItemPicker';
-import { onBooksText, takeText, type ItemTake, type LineInput, type Resolution } from './logic';
+import { onBooksText, previewFamilyShort, takeText, type ItemTake, type LineInput, type Resolution } from './logic';
 import type { MasterItem, PreviewForm } from './types';
 
 export type InputPatch = (lineId: number, patch: Partial<LineInput>) => void;
@@ -16,7 +16,7 @@ function lineName(resolution: Resolution): string {
 function requestedText(resolution: Resolution): string {
   const { line } = resolution;
   const unit = line.unit && line.unit.trim().toLowerCase() !== 'each' ? ` ${line.unit}` : '';
-  return `${line.target_label} · asked for ${line.quantity}${unit}`;
+  return `${line.target_label} · ${previewFamilyShort(line)} · asked for ${line.quantity}${unit}`;
 }
 
 const flagClass = (flagged: boolean) => (flagged ? 'border-hub-danger bg-hub-danger-bg' : 'border-hub-border bg-hub-well');
@@ -26,7 +26,7 @@ export function FormsList({ forms }: { forms: readonly PreviewForm[] }) {
     <ul className="space-y-1" aria-label="Forms being reconciled" data-testid="ems-reconcile-forms">
       {forms.map((form) => (
         <li key={form.id} className="break-words text-sm text-hub-ink">
-          <strong>{form.target_label}</strong> <span className={HINT}>{form.submitter_name} · {form.number}</span>
+          <strong>{form.target_label}</strong> <span className={HINT} data-testid="ems-reconcile-form-family">{previewFamilyShort(form)} · {form.submitter_name} · {form.number}</span>
         </li>
       ))}
     </ul>

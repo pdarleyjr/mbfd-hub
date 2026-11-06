@@ -5,13 +5,14 @@ import {
 import { AlertTriangle, ArrowLeft, ChevronRight, Download, Eye, FilePlus2, LoaderCircle, RefreshCw, Send } from 'lucide-react';
 import { EmsApiError, type EmsApi } from './emsApi';
 import {
-    eventDetail, eventLabel, formatEastern, itemsLabel, needsCorrection, newSubmissionId, requestedText, returnInfo, returnReason, statusLabel, statusTone,
+    bagName, eventDetail, eventLabel, formatEastern, itemsLabel, needsCorrection, newSubmissionId, requestFamilyShort, requestFamilyTitle, requestedText,
+    returnInfo, returnReason, statusLabel, statusTone,
 } from './emsLogic.js';
+import type { EmsNewFormChoice } from './EmsApp';
 import type { EmsOutboxEntry, EmsRequestDetail, EmsRequestLine, EmsRequestSummary } from './emsTypes';
 import { PendingRequests } from './PendingRequests';
 import type { EmsOutbox } from './useEmsOutbox';
 
-const BAG_NAMES: Record<string, string> = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag/Box', 'als-transport-vehicle': 'ALS Transport Vehicle' };
 const MESSAGE_MAX = 2000;
 const CANCEL_REASON_MAX = 255;
 
@@ -38,9 +39,9 @@ function problemText(error: unknown, fallback: string) {
 
 // ---------------------------------------------------------------- list
 
-export function MyRequestsList({ api, outbox, goForm, goDetail, goForms, editEntry, onFix }: {
-    api: EmsApi; outbox: EmsOutbox; goForm: () => void; goDetail: (id: string) => void; goForms: () => void; editEntry: (entry: EmsOutboxEntry) => void;
-    onFix: (id: string) => void;
+export function MyRequestsList({ api, outbox, newForms, goForm, goDetail, goForms, editEntry, onFix }: {
+    api: EmsApi; outbox: EmsOutbox; newForms: EmsNewFormChoice[]; goForm: (family?: string) => void; goDetail: (id: string) => void; goForms: () => void; editEntry: (entry: EmsOutboxEntry) => void;
+    onFix: (id: string, family?: string) => void;
 }) {
     const [requests, setRequests] = useState<EmsRequestSummary[] | null>(null);
     const [page, setPage] = useState(1);
@@ -72,9 +73,16 @@ export function MyRequestsList({ api, outbox, goForm, goDetail, goForms, editEnt
         <header className="ems-head">
             <p className="of-eyebrow">Captain 5 EMS supply</p>
             <h1>My medical requests</h1>
-            <p>Every Medical Inventory Request you have sent, newest first.</p>
+            <p>Every medical inventory form you have sent, newest first.</p>
         </header>
-        <div className="ems-head-actions"><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={goForm}>New request</Button></div>
+        {newForms.length > 1
+            ? <div className="ems-new-forms">
+                <p id="ems-new-label" className="ems-label">Start a new request</p>
+                <div className="ems-new-grid" role="group" aria-labelledby="ems-new-label">
+                    {newForms.map((choice) => <Button key={choice.family} icon={<FilePlus2 size={17} />} aria-label={`New request: ${choice.title}`} onClick={() => goForm(choice.family)}>{choice.short}</Button>)}
+                </div>
+            </div>
+            : <div className="ems-head-actions"><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={() => goForm()}>New request</Button></div>}
         <PendingRequests outbox={outbox} openRequest={goDetail} editEntry={editEntry} />
         {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
         {requests === null && loading && <div className="ems-loading"><Spinner label="Loading your requests" /></div>}
@@ -86,9 +94,9 @@ export function MyRequestsList({ api, outbox, goForm, goDetail, goForms, editEnt
             {requests.map((request) => {
                 const attention = needsCorrection(request);
                 return <li key={request.id} className={attention ? 'ems-request-item is-attention' : 'ems-request-item'}>
-                <button type="button" className="ems-request-row" onClick={() => goDetail(request.id)} aria-label={`${request.number}, ${statusLabel(request.status, request.status_label)}, ${request.target_label}.${attention ? ' Needs your correction.' : ''} Open request`}>
+                <button type="button" className="ems-request-row" onClick={() => goDetail(request.id)} aria-label={`${request.number}, ${statusLabel(request.status, request.status_label)}, ${requestFamilyShort(request)}, ${request.target_label}.${attention ? ' Needs your correction.' : ''} Open request`}>
                     <span className="ems-request-main">
-                        <span className="ems-request-top"><strong className="ems-request-number">{request.number}</strong><StatusTag status={request.status} label={request.status_label} /></span>
+                        <span className="ems-request-top"><strong className="ems-request-number">{request.number}</strong><StatusTag status={request.status} label={request.status_label} /><span className="ems-family-tag">{requestFamilyShort(request)}</span></span>
                         <span className="ems-request-unit">{request.target_label}{request.event_assignment ? `, ${request.event_assignment}` : ''}</span>
                         <span className="ems-request-meta">
                             {formatEastern(request.submitted_at)}
@@ -100,7 +108,7 @@ export function MyRequestsList({ api, outbox, goForm, goDetail, goForms, editEnt
                 </button>
                 {attention && <div className="ems-attention-strip">
                     <p className="ems-attention-text"><strong>Needs your correction.</strong> {returnReason(request) ? `Captain 5 said: ${returnReason(request)}` : 'Captain 5 sent this back.'}</p>
-                    <Button appearance="primary" onClick={() => onFix(request.id)}>Fix and resend</Button>
+                    <Button appearance="primary" onClick={() => onFix(request.id, request.form_family ?? undefined)}>Fix and resend</Button>
                 </div>}
             </li>;
             })}
@@ -117,7 +125,7 @@ function LineRow({ line }: { line: EmsRequestLine }) {
         <div className="ems-line-text">
             <span className="ems-item-label">{line.label}</span>
             <span className="ems-item-meta">
-                {line.bag_key && <span className="ems-min">{BAG_NAMES[line.bag_key] ?? line.bag_key}</span>}
+                {line.bag_key && <span className="ems-min">{bagName(line.bag_key)}</span>}
                 {line.section_label && <span className="ems-min">{line.section_label}</span>}
                 {line.refrigerated && <span className="ems-tag">Refrigerated</span>}
                 {line.controlled_substance && <span className="ems-tag">Controlled</span>}
@@ -133,8 +141,8 @@ function LineRow({ line }: { line: EmsRequestLine }) {
 }
 
 export function RequestDetail({ api, id, goMine, goForm, goForms, goDetail, openPdf, outbox, editEntry, onFix }: {
-    api: EmsApi; id: string; goMine: () => void; goForm: () => void; goForms: () => void; goDetail: (id: string) => void;
-    openPdf: (url: string, name: string) => void; outbox: EmsOutbox; editEntry: (entry: EmsOutboxEntry) => void; onFix: (id: string) => void;
+    api: EmsApi; id: string; goMine: () => void; goForm: (family?: string) => void; goForms: () => void; goDetail: (id: string) => void;
+    openPdf: (url: string, name: string) => void; outbox: EmsOutbox; editEntry: (entry: EmsOutboxEntry) => void; onFix: (id: string, family?: string) => void;
 }) {
     const [detail, setDetail] = useState<EmsRequestDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -203,7 +211,7 @@ export function RequestDetail({ api, id, goMine, goForm, goForms, goDetail, open
             <div className="ems-empty">
                 <p><strong>{notFound ? 'That request is not in your list.' : 'This request could not be loaded.'}</strong></p>
                 <p>{notFound ? 'It may have been sent from a different account. Your own requests are under My medical requests.' : error}</p>
-                <div className="ems-result-actions"><Button appearance="primary" onClick={goMine}>My medical requests</Button><Button onClick={goForm}>New request</Button><Button appearance="subtle" onClick={goForms}>Back to Forms</Button></div>
+                <div className="ems-result-actions"><Button appearance="primary" onClick={goMine}>My medical requests</Button><Button onClick={() => goForm()}>New request</Button><Button appearance="subtle" onClick={goForms}>Back to Forms</Button></div>
             </div>
         </div>;
     }
@@ -218,9 +226,10 @@ export function RequestDetail({ api, id, goMine, goForm, goForms, goDetail, open
         <PendingRequests outbox={outbox} openRequest={goDetail} editEntry={editEntry} />
         {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
         <header className="ems-head">
-            <p className="of-eyebrow">Medical Inventory Request</p>
+            <p className="of-eyebrow">{requestFamilyTitle(detail)}</p>
             <h1 className="ems-detail-title">{detail.number} <StatusTag status={detail.status} label={detail.status_label} /></h1>
             <dl className="ems-review-facts">
+                <div><dt>Form</dt><dd>{requestFamilyShort(detail)}</dd></div>
                 <div><dt>For</dt><dd>{detail.target_label}{detail.event_assignment ? `, ${detail.event_assignment}` : ''}</dd></div>
                 <div><dt>Sent</dt><dd>{formatEastern(detail.submitted_at)}</dd></div>
                 <div><dt>Items</dt><dd>{itemsLabel(detail.lines.length)}</dd></div>
@@ -237,7 +246,7 @@ export function RequestDetail({ api, id, goMine, goForm, goForms, goDetail, open
             <p className="ems-attention-by">Returned{returned.by ? ` by ${returned.by}` : ' by Captain 5'}{returned.at ? ` on ${formatEastern(returned.at)}` : ''}.</p>
             <p className="ems-return-reason"><span>Captain 5 said:</span> {reason || 'No reason was given.'}</p>
             <p className="ems-hint">Your fix starts from what you sent. When you send it, it replaces this form.</p>
-            <div><Button appearance="primary" size="large" onClick={() => onFix(detail.id)}>Fix and resend</Button></div>
+            <div><Button appearance="primary" size="large" onClick={() => onFix(detail.id, detail.form_family ?? undefined)}>Fix and resend</Button></div>
         </section>}
 
         <section className="ems-card" aria-labelledby="ems-copy-title">

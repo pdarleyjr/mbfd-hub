@@ -64,6 +64,10 @@ final class StatisticsView
             (int) $row['qty_requested'], (int) $row['qty_issued'],
         ])->all();
 
+        $byFamily = collect((array) ($report['by_family'] ?? []))->map(fn (array $row): array => [
+            (string) ($row['title'] ?? $row['family'] ?? 'Form'), (int) ($row['requests'] ?? 0), (int) ($row['qty_requested'] ?? 0), (int) ($row['qty_issued'] ?? 0),
+        ])->all();
+
         $detail = (array) $report['detail_special_event'];
         $detailRows = [
             ['Detail / Special Event requests counted', (int) ($detail['requests'] ?? 0)],
@@ -76,6 +80,8 @@ final class StatisticsView
             new ReportSection('Monthly trend', ['Month', 'Requests', 'Quantity requested', 'Quantity issued'], $monthly, [1, 2, 3], (string) ($definitions['monthly_trend'] ?? ''), [14, 12, 16, 16]),
             new ReportSection('Requests by unit', ['Unit', 'Requests', 'Requests per week', 'Quantity requested', 'Quantity issued'], $byUnit, [1, 2, 3, 4],
                 trim(($definitions['by_unit'] ?? '').' Requests per week is the unit\'s requests divided by the weeks in the date range.'), [32, 12, 16, 16, 16]),
+            new ReportSection('By form', ['Form', 'Requests', 'Quantity requested', 'Quantity issued'], $byFamily, [1, 2, 3],
+                'Requests sent on each medical inventory form, and the quantities asked for and issued. These are requests, not supplies used on calls.', [40, 12, 16, 16]),
             new ReportSection('Detail and special events', ['Measure', 'Count'], $detailRows, [1], (string) ($definitions['detail_special_event'] ?? ''), [48, 12]),
         ];
         if ($events !== []) {

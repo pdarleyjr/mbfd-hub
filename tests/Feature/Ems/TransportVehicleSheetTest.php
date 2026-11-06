@@ -331,11 +331,11 @@ SHEET;
         $this->assertSame(['2', '2'], [$byLabel['ET Tube 7.5']->min_text, $byLabel['ET Tube 7.5']->flags['fill_if_text']]);
     }
 
-    public function test_the_form_definition_lists_three_forms_with_par_and_fill_if(): void
+    public function test_the_form_definition_lists_the_als_transport_lists_with_par_and_fill_if(): void
     {
         $forms = collect(app(RequestFormDefinition::class)->definition()['forms']);
 
-        $this->assertSame(['airway-bag', 'als-med-bag', 'als-transport-vehicle'], $forms->pluck('key')->all());
+        $this->assertSame(['airway-bag', 'als-med-bag', 'als-transport-vehicle', 'handtevy'], $forms->pluck('key')->all());
         $vehicle = $forms->firstWhere('key', 'als-transport-vehicle');
         $this->assertSame(array_keys(self::SECTIONS), collect($vehicle['sections'])->pluck('key')->all());
         $first = $vehicle['sections'][0]['items'][0];
@@ -427,11 +427,18 @@ SHEET;
         $this->assertSame(0, InventoryRequest::query()->count(), 'nothing is stored, not even the valid line');
     }
 
-    public function test_the_line_cap_covers_every_item_on_the_three_lists(): void
+    public function test_the_line_cap_covers_every_item_on_each_forms_lists(): void
     {
         $this->assertGreaterThanOrEqual(
             SourceFormItem::query()->whereIn('source_form_id', SourceForm::query()->whereIn('key', RequestFormDefinition::BAGS)->where('active', true)->pluck('id'))->count(),
             RequestFormDefinition::MAX_LINES,
         );
+        foreach (\App\Services\Ems\FormFamilies::all() as $family) {
+            $this->assertGreaterThanOrEqual(
+                SourceFormItem::query()->whereIn('source_form_id', SourceForm::query()->whereIn('key', $family['bag_keys'])->where('active', true)->pluck('id'))->count(),
+                RequestFormDefinition::MAX_LINES,
+                $family['title'],
+            );
+        }
     }
 }

@@ -76,7 +76,10 @@ export function createEmsApi(endpoints: EmsEndpoints, csrfToken: string) {
     });
 
     return {
-        form: async () => (await call<EmsFormDefinition>(endpoints.form)).data,
+        /** One form's lists, sections and items: GET form?family=<key>. Without a family the server answers for ALS Transport. */
+        form: async (family?: string) => (await call<EmsFormDefinition>(
+            family ? `${endpoints.form}${endpoints.form.includes('?') ? '&' : '?'}family=${encodeURIComponent(family)}` : endpoints.form,
+        )).data,
 
         list: async (page = 1) => {
             const result = await call<EmsRequestSummary[]>(`${endpoints.requests}?per_page=25&page=${page}`);

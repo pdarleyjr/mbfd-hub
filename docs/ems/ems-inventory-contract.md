@@ -15,6 +15,10 @@ Owner: EMS / Captain 5. This file is the source of truth for the data model and 
    preview, reorder advisories and "order placed" records.
 4. **Medical Supply Data** (Admin → EMS; formerly Medical Data / Statistics). Two sections: Supply data (every figure from `SupplyDataReport`, see `supply-data-contract.md`) and Requests (request analytics from the transactional tables, labeled as requests, not consumption).
 
+Since the November 2026 release the single Medical Inventory Request is four forms (ALS Transport, ALS Non Transport, Fire Boat 6,
+BLS Detail) on this same request engine. `docs/ems/four-inventory-forms.md` defines the families, their lists and the API additions; everything below
+still holds, and a request with no family is ALS Transport.
+
 ## 2. Source documents and provenance
 
 Tracked extractions live in `database/data/ems/` (see `EXTRACTION_VALIDATION.md` there):
@@ -305,6 +309,24 @@ queue pattern as `Captain5Notifier`. Recipients of a new request: the on-duty Ca
 seat holders, only people who still pass `Captain5Access`, plus EMS Admins (direct `admin.ems.manage` or super administrator, active account).
 The actor is never notified. `redeliver()` is ready; `inspections:retry-notifications` must route keys starting with `ems:` to it (one line in
 `RetryInspectionNotifications`, which is outside this branch's scope).
+
+### 9.6 Four forms (as built, branch feat/four-ems-forms-20261102)
+
+Implemented as `docs/ems/four-inventory-forms.md` describes: `App\Services\Ems\FormFamilies` is the table, `ems_inventory_requests.form_family` (migration
+`2026_11_05_140000_add_form_family_to_ems_inventory_requests`) stores it, and the snapshot adds `form_family` and `form_family_title`. Details the contract
+leaves open:
+
+- `GET /form` with no `family` answers for ALS Transport (its lists are the imported ones of airway-bag, als-med-bag, als-transport-vehicle, handtevy). A
+  family whose lists are not imported yet answers 200 with `forms: []`; submitting on it is 503 `forms_unavailable`.
+- `family.default_target` for Fire Boat 6 is `unit:<id>` only when exactly one apparatus resolves to the Fire Boat 6 checklist template AND that unit is in the
+  unit directory (an out-of-service boat is not a unit choice, so it is not preselected).
+- A line from a list outside the request's family is 422 `unknown_item`; a list that is on no family at all is the ordinary 422 `validation_failed`.
+  A correction (`revises`) takes the returned request's family (only the sender's own request is consulted; anyone else's is still `cannot_revise`).
+- `GET /requests?family=` and `GET /statistics?family=` accept only the four keys (422 `validation_failed` otherwise). `by_family` lists all four forms in
+  order (zero rows included) from the counted requests, so a correction counts once and a returned or replaced form never does.
+- Notification titles and bodies name the family title; event keys and links are unchanged.
+- The Files record title is taken from the snapshot (`<form_family_title> MIR-000123 · <unit>`, "Medical Inventory Request" when the snapshot has none).
+  Regenerating never renames a record.
 
 ## 10. Admin -> EMS screens (as built, branch feat/ems-admin-ui)
 

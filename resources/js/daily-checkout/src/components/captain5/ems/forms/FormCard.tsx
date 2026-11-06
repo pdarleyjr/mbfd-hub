@@ -4,7 +4,7 @@ import Tag from '../../../ui/Tag';
 import { etDateTime, memberText, targetText } from '../logic';
 import { HINT } from '../shared';
 import FormActionButtons from './FormActionButtons';
-import { ackText, archiveText, FORM_STATUS_TONE, isReturned, itemSummary, returnedText, revisionTag, selectionControl } from './logic';
+import { ackText, archiveText, familyShort, FORM_STATUS_TONE, isReturned, itemSummary, returnedText, revisionTag, selectionControl } from './logic';
 import type { FormDetail, FormSummary, FormView } from './types';
 
 interface Props {
@@ -86,6 +86,7 @@ export default function FormCard({ form, view, canAct, selected, onToggle, onOpe
             <span className="flex min-w-0 flex-1 flex-col gap-1.5">
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <strong id={`${id}-title`} className="break-words font-heading text-lg font-bold leading-6 text-hub-ink">{targetText(form)}</strong>
+                <span data-testid="ems-form-family"><Tag>{familyShort(form)}</Tag></span>
                 {revision && <Tag tone="info">{revision}</Tag>}
                 {(view === 'archived' || isReturned(form)) && <Tag tone={FORM_STATUS_TONE[form.status] ?? 'neutral'}>{form.status_label}</Tag>}
               </span>

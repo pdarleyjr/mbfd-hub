@@ -203,6 +203,87 @@ trait BuildsEmsWorld
 
     // ---------------------------------------------------------------- fixtures
 
+    /**
+     * Imports small fixtures of the four lists the other forms use (handtevy, als-non-transport, fire-boat-6-als,
+     * bls-detail-bag) through the real importer. The tape, gauze and stethoscope catalog identities are shared with the
+     * ALS Transport lists and the supply room fixture, so one request line can be deducted from the same shelf item
+     * whichever form it came from.
+     *
+     * @return array<string, int|string> the importer's counts
+     */
+    protected function importFamilyLists(): array
+    {
+        $dir = sys_get_temp_dir().DIRECTORY_SEPARATOR.'ems-families-'.bin2hex(random_bytes(4));
+        File::makeDirectory($dir);
+        $this->emsTempDirs[] = $dir;
+        file_put_contents($dir.'/handtevy_inventory.json', json_encode($this->listFixture('handtevy', 'HANDTEVY', 'd', [
+            ['key' => 'hv-bvm', 'label' => 'BVMs', 'note' => 'Check each size against the Handtevy tape.', 'cadence' => null, 'items' => [
+                $this->listItem('hv.grey.bvm', 'bvm-pediatric', 'BVM Grey', '1', 1, 'quantity', ['location_text' => 'In Handtevy', 'color_band' => 'Grey', 'search_terms' => ['pedi bag valve', 'infant bvm']]),
+                $this->listItem('hv.tape', 'tape-1in', 'Tape 1"', '2 EACH', 2, 'quantity', ['qualifier_text' => 'Detail Airway Bags Only']),
+            ]],
+            ['key' => 'hv-monthly', 'label' => 'Monthly check', 'note' => null, 'cadence' => 'monthly_first_tuesday', 'items' => [
+                $this->listItem('hv.expiry', 'handtevy-expiry', 'Expiration dates checked', 'Y / N', null, 'yes_no', ['cadence' => 'monthly_first_tuesday', 'surprise' => 'dropped']),
+            ]],
+        ], 'HANDTEVY INVENTORY', 'rev 3')));
+        file_put_contents($dir.'/als_non_transport_inventory.json', json_encode($this->listFixture('als-non-transport', 'ALS NON TRANSPORT', 'e', [
+            ['key' => 'nt-main', 'label' => 'Main', 'note' => null, 'cadence' => null, 'items' => [
+                $this->listItem('nt.gauze', 'gauze-4x4', 'Gauze 4x4', '10 EACH', 10),
+                $this->listItem('nt.narcs', 'narcs-box', 'Narcs Box', 'Y / N', null, 'yes_no', ['controlled_substance' => true]),
+            ]],
+        ])));
+        file_put_contents($dir.'/fire_boat_6_als_inventory.json', json_encode($this->listFixture('fire-boat-6-als', 'FIRE BOAT 6 ALS', 'f', [
+            ['key' => 'fb-main', 'label' => 'Main', 'note' => null, 'cadence' => null, 'items' => [
+                $this->listItem('fb.oxygen', 'oxygen-d', 'Oxygen D cylinder', '2', 2),
+                $this->listItem('fb.gauze', 'gauze-4x4', 'Gauze 4x4', '10 EACH', 10),
+            ]],
+        ])));
+        file_put_contents($dir.'/bls_detail_bag_inventory.json', json_encode($this->listFixture('bls-detail-bag', 'BLS DETAIL BAG', '1', [
+            ['key' => 'bls-main', 'label' => 'Main', 'note' => null, 'cadence' => null, 'items' => [
+                $this->listItem('bls.tape', 'tape-1in', 'Tape 1"', '2 EACH', 2),
+                $this->listItem('bls.gloves', 'gloves-bls', 'Gloves', '2 PAIRS', 2),
+            ]],
+        ])));
+
+        return app(SourceImporter::class)->import($dir)['counts'];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $sections
+     * @return array<string, mixed>
+     */
+    private function listFixture(string $key, string $title, string $shaChar, array $sections, ?string $header = null, ?string $version = '1/2026'): array
+    {
+        return [
+            'schema' => 'mbfd.ems.source_form.v1',
+            'source' => ['key' => $key, 'title' => $title, 'version_label' => $version, 'file_name' => $key.'.pdf', 'sha256' => str_repeat($shaChar, 64), 'pages' => 1, 'notes' => ['fixture'], 'printed_header' => $header, 'review_notes' => $header !== null ? ['Fixture provenance note.'] : []],
+            'sections' => array_map(static fn (array $section, int $index): array => $section + ['source_label' => strtoupper($section['label']), 'kind' => 'category', 'parent_key' => null, 'sort' => ($index + 1) * 10], $sections, array_keys($sections)),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $flags
+     * @return array<string, mixed>
+     */
+    private function listItem(string $key, string $catalog, string $label, string $min, ?int $qty, string $type = 'quantity', array $flags = []): array
+    {
+        return [
+            'item_ref' => $key, 'catalog_ref' => $catalog, 'label' => $label, 'source_label' => strtoupper($label), 'min_text' => $min, 'min_qty' => $qty,
+            'min_unit' => null, 'min_applies_to' => 'item', 'variant_group' => null, 'variant_label' => null, 'response_type' => $type,
+            'flags' => $flags + ['detail_airway_bag_only' => false, 'rescue_only' => false, 'refrigerated' => false, 'controlled_substance' => false],
+            'notes' => null, 'needs_review' => false, 'review_reason' => null, 'source_ref' => ['page' => 1, 'column' => 'left', 'row' => 3],
+        ];
+    }
+
+    /** A Fire Boat 6 that the Daily Checkout resolver recognizes, and the unit directory lists. */
+    protected function fireBoat6(string $status = 'In Service', string $unitId = 'FB6'): \App\Models\Apparatus
+    {
+        return \App\Models\Apparatus::query()->create([
+            'station_id' => $this->rescue2->station_id, 'vin' => 'VIN-FB6-'.bin2hex(random_bytes(2)), 'assignment' => 'Station 6', 'unit_id' => $unitId, 'designation' => $unitId,
+            'name' => 'Fire Boat '.preg_replace('/\D/', '', $unitId), 'type' => 'Other', 'vehicle_number' => 'V-FB6-'.bin2hex(random_bytes(2)), 'status' => $status,
+            'daily_checkout_requirement' => 'required', 'daily_checkout_template' => 'fireboat6',
+        ]);
+    }
+
     /** @return array<string, mixed> */
     private function airwayFixture(): array
     {

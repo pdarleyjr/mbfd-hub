@@ -131,6 +131,8 @@ export interface LibraryLink {
     href: string;
     action_label: string;
     in_app?: boolean;
+    /** For a medical inventory card: which of the four forms it opens (a family key or its form key). The link's `?form=` says the same. */
+    family?: string;
     secondary?: { label: string; href: string };
 }
 

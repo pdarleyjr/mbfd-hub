@@ -4,10 +4,12 @@ import { EmptyState, LoadError, SkeletonRows } from '../../../ui/StateViews';
 import { ChoiceChips, FIELD, HINT, LABEL, LiveNote, Pager, BTN_SECONDARY, useEmsLoad } from '../shared';
 import type { EmsMeta } from '../types';
 import { fetchForms } from './api';
+import FamilyFilter from './FamilyFilter';
 import FormCard from './FormCard';
 import FormDetailSheet from './FormDetailSheet';
 import {
-  ACTIVE_PER_PAGE, ARCHIVED_PER_PAGE, listKey, mergeSummary, pruneSelection, readyIds, reconcileDoneText, toggleId,
+  ACTIVE_PER_PAGE, ALL_FAMILIES, ARCHIVED_PER_PAGE, familyOptions, familyShort, isFamilyFilter, listKey, matchesFamily, mergeSummary, pruneSelection, readyIds,
+  reconcileDoneText, toggleId,
 } from './logic';
 import ReconcileSheet from './ReconcileSheet';
 import RejectSheet, { type RejectTarget } from './RejectSheet';
@@ -41,6 +43,7 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
+  const [familyChoice, setFamilyChoice] = useState<string>(ALL_FAMILIES);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [rejecting, setRejecting] = useState<RejectTarget | null>(null);
   const [reconcileIds, setReconcileIds] = useState<readonly string[] | null>(null);
@@ -53,24 +56,29 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
     return () => clearTimeout(timer);
   }, [search]);
 
+  const families = useMemo(() => familyOptions(meta.families), [meta.families]);
+  // A choice the list no longer offers (the families changed under an open page) reads as All.
+  const family = isFamilyFilter(familyChoice, families) ? familyChoice : ALL_FAMILIES;
   const perPage = view === 'active' ? ACTIVE_PER_PAGE : ARCHIVED_PER_PAGE;
   const query = view === 'archived' ? q : '';
   // The answer remembers which view it is for, so switching chips never shows the old view's forms under the new heading.
   const { data: loaded, error, loading, reload, setData } = useEmsLoad(
-    async () => ({ ...(await fetchForms(view, { q: query, page, perPage })), view }),
-    listKey(view, query, page),
+    async () => ({ ...(await fetchForms(view, { q: query, page, perPage, family })), view, family }),
+    listKey(view, query, page, family),
     { tick, onForbidden },
   );
-  const data = loaded !== null && loaded.view === view ? loaded : null;
+  const data = loaded !== null && loaded.view === view && loaded.family === family ? loaded : null;
 
   useEffect(() => { if (data) setSelected((current) => pruneSelection(current, data.forms)); }, [data]);
 
-  const forms = useMemo(() => data?.forms ?? [], [data]);
+  // The server filters by family; keeping only matching rows as well means an older answer that ignored the filter never shows the wrong form.
+  const forms = useMemo(() => (data?.forms ?? []).filter((row) => matchesFamily(row, family)), [data, family]);
   const ready = useMemo(() => readyIds(forms, canAct), [forms, canAct]);
   /** The page's own refresh (it bumps `tick`) brings the list, the badge and any open form up to date. */
   const refresh = onChanged;
 
   const change = (next: FormView) => { setView(next); setPage(1); setDone(null); };
+  const changeFamily = (next: string) => { setFamilyChoice(next); setPage(1); setDone(null); };
 
   const apply = (detail: FormDetail) => {
     setData((current) => (current ? { ...current, forms: current.forms.map((row) => (row.id === detail.id ? mergeSummary(row, detail) : row)) } : current));
@@ -101,6 +109,7 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
   };
 
   const narrowed = view === 'archived' && q.trim() !== '';
+  const familyName = family === ALL_FAMILIES ? null : familyShort({ form_family: family }, families);
   const openCard = (form: FormSummary) => (
     <FormCard key={form.id} form={form} view={view} canAct={canAct} selected={selected.has(form.id)}
       onToggle={(id) => setSelected((current) => toggleId(current, id))} onOpen={onOpenRequest} onAcknowledged={acknowledged}
@@ -109,8 +118,9 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
 
   return (
     <div className="space-y-4" data-testid="ems-forms-tab">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <ChoiceChips<FormView> label="Show forms" testId="ems-forms-views" value={view} options={VIEWS} onChange={change} />
+        <FamilyFilter options={families} value={family} onChange={changeFamily} />
         {view === 'active' && ready.length > 0 && (
           <button type="button" data-testid="ems-select-all-ready" className="hub-btn hub-btn--tertiary !min-h-11" onClick={() => setSelected(new Set(ready))}>
             Select all ready ({ready.length})
@@ -134,7 +144,7 @@ export default function SubmittedFormsTab({ meta, requestId, onOpenRequest, onCl
       {data && forms.length === 0 && !error && (
         <EmptyState
           icon={<ClipboardList className="hub-empty__icon" aria-hidden="true" />}
-          title={view === 'active' ? 'No forms waiting' : narrowed ? 'No archived forms match this search' : 'No archived forms yet'}
+          title={view === 'active' ? (familyName ? `No ${familyName} forms waiting` : 'No forms waiting') : narrowed ? 'No archived forms match this search' : familyName ? `No archived ${familyName} forms yet` : 'No archived forms yet'}
           body={view === 'active' ? 'When an apparatus submits a medical inventory form it appears here for you to acknowledge and reconcile.' : narrowed ? 'Try a different number, member or unit.' : 'Reconciled forms and older records are kept here.'}
           action={view === 'archived' && narrowed ? <button type="button" className={BTN_SECONDARY} onClick={() => setSearch('')}>Clear search</button> : undefined}
         />

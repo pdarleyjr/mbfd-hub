@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Support\Ems;
 
+use App\Services\Ems\FormFamilies;
+
 /**
  * Where a notification opens. The pages are built on the JSON API; these are the one
  * place to repoint a link when the final routes are chosen.
  *
- * The member links open the Employee Portal Forms app (OperationalForms page): `form=medical-inventory-request`
- * opens a new Medical Inventory Request (add `view=mine` for the member's own list) and `ems_request=<uuid>`
- * opens one request. `OperationalForms::emsDeepLink()` is the server side that accepts these parameters.
+ * The member links open the Employee Portal Forms app (OperationalForms page): `form=<form_key>` opens a new request on
+ * one of the four medical inventory forms (App\Services\Ems\FormFamilies; add `view=mine` for the member's own list), the
+ * old `form=medical-inventory-request` still opens ALS Transport, and `ems_request=<uuid>` opens one request (which opens
+ * in its own form). `OperationalForms::emsDeepLink()` is the server side that accepts these parameters.
  */
 final class EmsLinks
 {
@@ -37,10 +40,15 @@ final class EmsLinks
         return self::MEMBER_FORMS.'?ems_request='.$uuid;
     }
 
-    /** A new Medical Inventory Request in the member's Forms app. */
-    public static function memberForm(): string
+    /**
+     * A new request in the member's Forms app. With a family key (FormFamilies::*) it opens that form; with none, or one this
+     * release does not know, it is the original link (ALS Transport), which every older notification and bookmark uses.
+     */
+    public static function memberForm(?string $family = null): string
     {
-        return self::MEMBER_FORMS.'?form='.self::MEMBER_FORM_KEY;
+        $formKey = FormFamilies::find($family)['form_key'] ?? self::MEMBER_FORM_KEY;
+
+        return self::MEMBER_FORMS.'?form='.$formKey;
     }
 
     /** The member's own list of medical inventory requests. */

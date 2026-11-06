@@ -36,7 +36,7 @@ async function signIn(page: Page) {
   await page.getByLabel('Employee ID').fill(employeeId);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page.getByRole('heading', { name: 'Medical Inventory Request', level: 1 })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'ALS Transport Inventory Form', level: 1 })).toBeVisible({ timeout: 30_000 });
 }
 
 async function ownerOf(page: Page): Promise<string> {
@@ -233,7 +233,7 @@ test('Fix and resend opens with the exact earlier values; editing and sending po
   await expect(await glovesInput(page)).toHaveValue('3');
   await expect(page.locator('#ems-note')).toHaveValue(NOTE);
   const chooser = page.getByRole('navigation', { name: 'Choose a list' });
-  await expect(chooser.getByRole('button', { name: /ALS Med Bag/ })).toContainText('1 needed');
+  await expect(chooser.getByRole('button', { name: /ALS Med Bag/ })).toContainText('1 entered');
 
   // The item that is no longer on the form is kept, named, and not part of what is sent.
   await expect(page.getByText('1 saved entry is for items that are no longer on this form')).toBeVisible();
@@ -290,11 +290,12 @@ test('the member\'s own saved request is untouched while fixing, and is still th
   await sheet.getByRole('button', { name: 'Send corrected form' }).click();
   await expect(page.getByRole('heading', { name: 'Corrected form sent' })).toBeVisible({ timeout: 30_000 });
   expect(mock.posts).toHaveLength(1);
+  expect(mock.posts[0].family, 'a returned form from before the four forms is ALS Transport and is resent as such').toBe('als-transport');
   expect(await storedDraft(page, `${owner}:revise:${RETURNED_ID}`)).toBeNull();
 
   // A new request opens the member's own saved request again.
   await page.getByRole('button', { name: 'New request' }).click();
-  await expect(page.getByRole('heading', { name: 'Medical Inventory Request', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ALS Transport Inventory Form', level: 1 })).toBeVisible();
   await expect(page.locator('.ems-revision-banner')).toHaveCount(0);
   await expect(page.getByText('Your unfinished request was restored')).toBeVisible();
   await expect(await glovesInput(page)).toHaveValue('6');

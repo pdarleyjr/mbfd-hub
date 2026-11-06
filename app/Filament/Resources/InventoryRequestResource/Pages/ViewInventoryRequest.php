@@ -9,6 +9,7 @@ use App\Filament\Resources\InventoryRequestResource;
 use App\Filament\Support\EmsLabels;
 use App\Models\Ems\InventoryRequest;
 use App\Models\Ems\SupplyItem;
+use App\Services\Ems\FormFamilies;
 use App\Services\Ems\RequestMessageService;
 use App\Services\Ems\RequestPresenter;
 use App\Services\Ems\RequestWorkflowService;
@@ -47,6 +48,12 @@ class ViewInventoryRequest extends ViewRecord
         return 'Request '.$this->getRecord()->getAttribute('number');
     }
 
+    /** The form this request came from, under the heading. No family stored means ALS Transport. */
+    public function getSubheading(): ?string
+    {
+        return FormFamilies::resolve($this->getRecord()->getAttribute('form_family'))['title'];
+    }
+
     /** Runs on every Livewire request, so an open page loses its actions when access is withdrawn. */
     public function hydrate(): void
     {
@@ -75,6 +82,7 @@ class ViewInventoryRequest extends ViewRecord
             'messages' => array_map(fn (array $m): array => $m + ['at' => EmsLabels::et($m['created_at'])], $detail['messages']),
             'canAct' => $this->emsCan('act'),
             'open' => $this->isWorkable($request),
+            'familyTitle' => FormFamilies::resolve($request->form_family)['title'],
             'statusLabel' => EmsLabels::status($request->status),
             'statusColor' => EmsLabels::STATUS_COLOR[$request->status] ?? 'gray',
             'submittedAt' => EmsLabels::et($request->submitted_at),

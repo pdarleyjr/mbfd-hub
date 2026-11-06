@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * One imported version of a bag inventory form (airway-bag, als-med-bag or als-transport-vehicle).
+ * One imported version of a bag inventory list (airway-bag, als-med-bag, als-transport-vehicle, handtevy,
+ * als-non-transport, fire-boat-6-als or bls-detail-bag).
  *
  * @property int $id
  * @property string $key
@@ -29,6 +30,14 @@ class SourceForm extends Model
     public const ALS = 'als-med-bag';
 
     public const TRANSPORT = 'als-transport-vehicle';
+
+    public const HANDTEVY = 'handtevy';
+
+    public const ALS_NON_TRANSPORT = 'als-non-transport';
+
+    public const FIRE_BOAT_6_ALS = 'fire-boat-6-als';
+
+    public const BLS_DETAIL_BAG = 'bls-detail-bag';
 
     protected $table = 'ems_source_forms';
 

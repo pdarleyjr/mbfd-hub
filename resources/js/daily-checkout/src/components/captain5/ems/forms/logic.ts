@@ -8,6 +8,7 @@ import type { HistoryEvent } from '../types.ts';
 import type { FormDetail, FormStatus, FormSummary, MasterItem, ReconcileResult } from './types.ts';
 
 export * from './reconcileMath.ts';
+export * from './families.ts';
 
 export const ACTIVE_PER_PAGE = 50;
 export const ARCHIVED_PER_PAGE = 25;
@@ -35,8 +36,8 @@ export const isOlderRecord = (form: Pick<FormSummary, 'status'>): boolean => for
 
 // ------------------------------------------------------------------ list
 
-export function listKey(view: string, q: string, page: number): string {
-  return `${view}|${q.trim()}|${page}`;
+export function listKey(view: string, q: string, page: number, family = 'all'): string {
+  return `${view}|${q.trim()}|${page}${family === 'all' ? '' : `|${family}`}`;
 }
 
 export const ackText = (form: Pick<FormSummary, 'acknowledged' | 'acknowledged_at' | 'acknowledged_by'>): string => {
