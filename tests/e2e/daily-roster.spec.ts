@@ -140,13 +140,15 @@ test('the roster starts right under the last update', async ({ page }) => {
   expect(footerTop).toBeGreaterThanOrEqual(lastSectionBottom);
 });
 
-test('a name opens the member card, which clears when it closes', async ({ page }) => {
+test("an administrator's name click opens the profile; Shift-click opens the member card, which clears when it closes", async ({ page }) => {
   await openRoster(page);
   const dialog = page.getByRole('dialog', { name: 'Member details' });
-  const name = page.getByRole('button', { name: 'TRIAL, HANA' });
+  // The seeded viewer is an administrator, so the name is a link to the profile by the verified Employee ID.
+  const name = page.getByRole('link', { name: 'TRIAL, HANA' });
+  await expect(name).toHaveAttribute('href', /\/admin\/personnel\/by-employee-id\/90009$/);
   await expect(page.locator('.roster-row--vacant [data-roster-member]')).toHaveCount(0);
 
-  await name.click();
+  await name.click({ modifiers: ['Shift'] });
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('[data-roster-card]')).toContainText('TRIAL, HANA');
   await expect(dialog.locator('[data-roster-card]')).toContainText('Engine 1');
@@ -161,7 +163,7 @@ test('a name opens the member card, which clears when it closes', async ({ page 
   await expect(name).toBeFocused();
 
   // Inside the card nothing closes it; only the button, Escape or a click outside does.
-  await name.click();
+  await name.click({ modifiers: ['Shift'] });
   await expect(dialog.locator('[data-roster-card]')).toBeVisible();
   await dialog.locator('.roster-card-dialog__inner').click({ position: { x: 4, y: 4 } });
   await expect(dialog).toBeVisible();
@@ -169,7 +171,7 @@ test('a name opens the member card, which clears when it closes', async ({ page 
   await expect(dialog).toBeHidden();
 
   // If a roster update replaced the name while the card was open, focus still returns to that member.
-  await name.click();
+  await name.click({ modifiers: ['Shift'] });
   await expect(dialog.locator('[data-roster-card]')).toBeVisible();
   await page.locator('[data-roster-member="90009"]').evaluate(element => { element.replaceWith(element.cloneNode(true)); });
   await page.keyboard.press('Escape');
@@ -178,7 +180,7 @@ test('a name opens the member card, which clears when it closes', async ({ page 
   // A session that ended takes the card with it, and never shows the login page inside it.
   await page.route('**/daily-roster/members/**', route => route.fulfill({ status: 401, body: '' }));
   const login = page.waitForRequest(request => new URL(request.url()).pathname === '/login');
-  await name.click();
+  await name.click({ modifiers: ['Shift'] });
   await login;
 });
 
@@ -485,9 +487,10 @@ test('works from the keyboard', async ({ page }, testInfo) => {
   await page.keyboard.press('Tab');
   await expect(page.locator('.hub-skip-link')).toBeFocused();
 
-  const name = page.getByRole('button', { name: 'TRIAL, HANA' });
+  // For an administrator the name is the profile link; Shift+Enter opens the member card from the keyboard.
+  const name = page.getByRole('link', { name: 'TRIAL, HANA' });
   await name.focus();
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('Shift+Enter');
   await expect(page.getByRole('dialog', { name: 'Member details' }).locator('[data-roster-card]')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(name).toBeFocused();

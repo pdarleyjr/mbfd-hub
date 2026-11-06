@@ -8,8 +8,10 @@
     $compact = $compact ?? false;
     $isRequest = $row['lane'] === \App\Services\Dashboards\DashboardSnapshot::LANE_REQUESTS;
     $isNotice = (bool) ($row['notice'] ?? false);
+    // An accident report: a red alert row (summary only; the report itself is restricted).
+    $isAccident = str_starts_with((string) $row['ref'], 'accident_report:');
 @endphp
-<li class="mbfd-dash-row" wire:key="row-{{ $scope ?? 'list' }}-{{ $row['ref'] }}" @if ($isRequest) data-request-row @endif @if ($isNotice) data-notice-row @endif>
+<li class="mbfd-dash-row" wire:key="row-{{ $scope ?? 'list' }}-{{ $row['ref'] }}" @if ($isRequest) data-request-row @endif @if ($isNotice) data-notice-row @endif @if ($isAccident) data-accident-row data-accident-open="{{ $row['stage'] === 'resolved' ? '0' : '1' }}" @endif>
     @if (filled($row['href'] ?? null))
         <a href="{{ $row['href'] }}" class="mbfd-dash-row__button @if ($compact) is-compact @endif" data-group-key="{{ $row['ref'] }}">
     @else
@@ -18,7 +20,11 @@
             aria-haspopup="dialog"
             x-on:click="$dispatch('dashboard-issue-open', { ref: $el.dataset.issueRef })">
     @endif
-        @if (($row['lane'] === 'messages' || $isRequest) && $row['image'] === null && $row['initials'] !== null)
+        @if ($isAccident)
+            <span class="mbfd-dash-thumb mbfd-dash-thumb--icon mbfd-dash-thumb--accident" aria-hidden="true">
+                <x-filament::icon icon="heroicon-o-exclamation-triangle" class="mbfd-dash-thumb__icon" />
+            </span>
+        @elseif (($row['lane'] === 'messages' || $isRequest) && $row['image'] === null && $row['initials'] !== null)
             <span class="mbfd-dash-thumb mbfd-dash-thumb--avatar" aria-hidden="true">{{ $row['initials'] }}</span>
         @elseif ($row['image'] !== null)
             <span class="mbfd-dash-thumb mbfd-dash-thumb--{{ $row['imageKind'] }}">

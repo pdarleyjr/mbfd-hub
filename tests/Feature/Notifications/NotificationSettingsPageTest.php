@@ -77,8 +77,8 @@ final class NotificationSettingsPageTest extends TestCase
         $this->assertFalse($registry->get('command_communications')->senderWired);
         $this->assertTrue($registry->get('captain5_ems')->senderWired);
         $this->assertSame('Captain 5 EMS alerts', $registry->get('captain5_ems')->label);
-        // An officer rank qualifies for Captain 5; approving acting requests is a separate, narrower rule.
-        $this->assertSame($this->sorted([...self::EVERYONE, 'captain5_ems']), $this->visibleKeys($captain));
+        // An officer rank qualifies for Captain 5 and for completing a driver's accident report as supervisor.
+        $this->assertSame($this->sorted([...self::EVERYONE, 'captain5_ems', 'accident_supervisor_requests']), $this->visibleKeys($captain));
     }
 
     public function test_captain_5_alerts_appear_and_disappear_with_captain_5_access(): void

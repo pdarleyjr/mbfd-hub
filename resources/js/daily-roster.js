@@ -403,6 +403,15 @@ function initDailyRoster(page) {
             closeCard();
             return;
         }
+        // A name that opens the profile is a plain link; Shift-click keeps the roster card reachable.
+        const profileLink = event.target.closest('a[data-roster-profile]');
+        if (profileLink) {
+            if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                event.preventDefault();
+                openCard(profileLink);
+            }
+            return;
+        }
         const control = event.target.closest('button');
         if (!control) {
             return;

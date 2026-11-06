@@ -378,3 +378,4 @@
     .of-record-table .of-empty { display: block; }
     .of-record-table .of-empty::before { display: none; }
 }
+.of-awaiting-card { border-left: 4px solid rgb(var(--hub-blue)); }

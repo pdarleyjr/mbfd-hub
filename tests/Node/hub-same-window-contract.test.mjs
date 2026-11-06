@@ -28,6 +28,9 @@ const ALLOWED = {
 
   // User-written content: only links to other sites open apart; links to the Hub stay in the window.
   'app/Support/SafeLinkifier.php': 'user text: outside links only (Hub hosts stay in the window)',
+  'app/Filament/Concerns/InteractsWithPersonnelTracking.php': 'admin-entered Link field on the personnel directory: outside http(s) addresses only',
+  'app/Livewire/Personnel/EmployeeProfileFieldsPanel.php': 'admin-entered Link field on a profile: outside http(s) addresses only',
+  'resources/views/filament/pages/partials/personnel-table-member-details.blade.php': 'admin-entered Link field in the directory details view: outside http(s) addresses only',
   'resources/js/daily-checkout/src/components/command-communications/PostItem.tsx': 'user text: outside links only (Hub origin and its www/apex sibling stay in the window)',
   'resources/views/updates/_card.blade.php': 'department update button: outside links only (DepartmentUpdate::hasExternalCta treats Hub hosts as internal)',
 
@@ -45,6 +48,8 @@ const ALLOWED = {
   'resources/views/filament/resources/operational-form-record/view.blade.php': VIEWER_FALLBACK,
   'resources/views/filament/employee/pages/resource-library.blade.php': VIEWER_FALLBACK,
   'resources/views/filament/employee/pages/taskbooks.blade.php': VIEWER_FALLBACK,
+  'resources/views/filament/employee/pages/my-documents.blade.php': VIEWER_FALLBACK,
+  'resources/views/components/employee-messages/thread.blade.php': VIEWER_FALLBACK,
   'resources/views/filament/resources/inventory-correction-resource/pages/view-inventory-correction.blade.php': VIEWER_FALLBACK,
   'resources/views/filament/resources/inspection-resource/pages/view-inspection.blade.php': VIEWER_FALLBACK,
   'resources/views/filament/employee/pages/my-vehicle-inspection-view.blade.php': VIEWER_FALLBACK,

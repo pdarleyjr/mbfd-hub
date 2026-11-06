@@ -19,6 +19,7 @@ final class StationRosterPresenter
         private readonly DailyRosterPagePresenter $page,
         private readonly RosterFreshnessResolver $freshness,
         private readonly DutyCalendar $calendar,
+        private readonly RosterProfileLinks $profileLinks,
     ) {}
 
     /** @return array<string, mixed> */
@@ -118,6 +119,8 @@ final class StationRosterPresenter
             'is_vacant' => $row['isVacant'],
             'rank' => $row['rank'],
             'employee_id' => $row['employeeId'],
+            // The member's profile for a viewer who may open profiles; null for a vacant row, a row without an ID, or anyone else.
+            'profile_url' => $row['isVacant'] ? null : $this->profileLinks->url((string) $row['employeeId']),
             'name' => $row['name'],
             'source_marker' => $row['sourceMarker'],
             'certifications' => $row['certifications'],

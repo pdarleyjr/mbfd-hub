@@ -77,6 +77,9 @@ require __DIR__.'/daily-roster.php';
 require __DIR__.'/unit-status.php';
 require __DIR__.'/vehicle-documents.php';
 require __DIR__.'/mail.php';
+require __DIR__.'/personnel-forms.php';
+require __DIR__.'/fuel-ids.php';
+require __DIR__.'/station-cleaning.php';
 
 Route::get('/', HomeController::class)->middleware('auth:web');
 

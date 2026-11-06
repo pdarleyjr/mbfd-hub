@@ -56,7 +56,11 @@ class EmployeeWorkspaceTest extends TestCase
         $bootstrap = json_decode($matches[1], true, flags: JSON_THROW_ON_ERROR);
 
         // The Medical Inventory Request opens inside this app; the take-home inspection keeps its own app.
-        self::assertSame(['medical-inventory-request', 'take-home-vehicle-inspection', 'narcotics-check'], array_column($bootstrap['library_links'], 'key'));
+        // A firefighter gets the Vehicle Accident Report and the memorandum, not the supervisor-only report.
+        self::assertSame(['medical-inventory-request', 'take-home-vehicle-inspection', 'narcotics-check', 'accident-report', 'memorandum'], array_column($bootstrap['library_links'], 'key'));
+        self::assertSame(['can_supervise' => false, 'awaiting_supervisor' => 0], $bootstrap['personnel']);
+        self::assertSame('__ULID__', $bootstrap['endpoints']['personnel']['placeholder']);
+        self::assertSame(['view' => null, 'report' => null], $bootstrap['personnel_deep_link']);
         self::assertSame([
             'key' => 'take-home-vehicle-inspection',
             'title' => 'Take Home Vehicle Inspection',

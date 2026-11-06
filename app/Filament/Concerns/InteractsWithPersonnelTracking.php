@@ -44,9 +44,26 @@ trait InteractsWithPersonnelTracking
         $this->personnelTrackingWritable = null;
     }
 
+    /**
+     * Tracking columns this viewer may see. A column limited to personnel managers is left out of the table,
+     * filters, sort choices and Details for everyone else, so it is never rendered or exported for them.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function visibleTrackingColumns(PersonnelTable $table): array
+    {
+        if (! auth()->user() instanceof User) {
+            return [];
+        }
+
+        // Only a table that limits a column needs the manager check.
+        return array_values(array_filter($table->columns ?? [], fn (array $column): bool => ($column['view_access'] ?? 'directory') !== 'personnel_managers'
+            || $this->canEditPersonnelTracking()));
+    }
+
     protected function trackingColumns(PersonnelTable $table): array
     {
-        return collect($table->columns ?? [])->map(function (array $definition) use ($table) {
+        return collect($this->visibleTrackingColumns($table))->map(function (array $definition) use ($table) {
             $id = $definition['id'];
             $name = 'tracking_'.$id;
             $state = fn (Employee $record) => $this->trackingEntry($record)?->values[$id] ?? ($definition['type'] === 'checkbox' ? false : null);
@@ -64,6 +81,9 @@ trait InteractsWithPersonnelTracking
                 'select', 'status' => Tables\Columns\SelectColumn::make($name)->getStateUsing($state)
                     ->options(array_combine($definition['options'], $definition['options']) ?: [])
                     ->disabled($editable)->updateStateUsing($save),
+                'link' => Tables\Columns\TextColumn::make($name)->getStateUsing($state)
+                    ->url(fn (Employee $record): ?string => PersonnelTableService::safeLink($state($record)), shouldOpenInNewTab: true)
+                    ->color('primary')->limit(60)->wrap(),
                 default => Tables\Columns\TextColumn::make($name)->getStateUsing($state)
                     ->formatStateUsing(fn ($state): string => is_array($state) ? implode(', ', $state) : (string) $state)
                     ->limit(80)->wrap(),
@@ -110,7 +130,7 @@ trait InteractsWithPersonnelTracking
             })
             ->form(fn (): array => [
                 Forms\Hidden::make('entry_version')->required()->rules(['integer']),
-                ...collect($this->personnelTable()->columns ?? [])->map(fn (array $column) => PersonnelTableSchema::trackingInput($column))->all(),
+                ...collect($this->personnelTable()->columns ?? [])->map(fn (array $column) => self::trackingFormInput($column))->all(),
                 Forms\Select::make('highlight')->label('Row highlight')->options(PersonnelTableSchema::colors()),
             ])
             ->action(function (Employee $record, array $data): void {
@@ -133,7 +153,7 @@ trait InteractsWithPersonnelTracking
 
     protected function trackingFilters(PersonnelTable $table): array
     {
-        return collect($table->columns ?? [])->map(function (array $column) use ($table) {
+        return collect($this->visibleTrackingColumns($table))->map(function (array $column) use ($table) {
             $id = $column['id'];
             $type = $column['type'];
             $input = match ($type) {
@@ -214,7 +234,7 @@ trait InteractsWithPersonnelTracking
             Action::make('configureColumns')->label('Columns')->icon('heroicon-o-view-columns')
                 ->visible(fn (): bool => $this->canEditPersonnelTracking())
                 ->fillForm(fn (): array => ['source_columns' => $this->personnelTable()->source_columns, 'columns' => $this->personnelTable()->columns])
-                ->form([PersonnelTableSchema::sourceColumnsForm(), PersonnelTableSchema::columnsForm()])
+                ->form(fn (): array => [PersonnelTableSchema::sourceColumnsForm(), $this->trackingColumnsForm()])
                 ->action(function (array $data): void {
                     $updated = app(PersonnelTableService::class)->update(auth()->user(), $this->personnelTable(), $data, $this->personnelMetadataVersion);
                     $this->initializePersonnelTracking($updated);
@@ -280,7 +300,7 @@ trait InteractsWithPersonnelTracking
 
     protected function trackingSortOptions(PersonnelTable $table): array
     {
-        return collect($table->columns ?? [])->pluck('label', 'id')->all();
+        return collect($this->visibleTrackingColumns($table))->pluck('label', 'id')->all();
     }
 
     protected function orderTrackingColumn(Builder $query, PersonnelTable $table, string $id, string $direction): Builder
@@ -324,5 +344,43 @@ trait InteractsWithPersonnelTracking
     {
         return in_array($color, ['gray', 'info', 'success', 'warning', 'danger'], true)
             ? ['class' => 'personnel-cell-highlight-'.$color] : [];
+    }
+
+    /** The column editor: the shared tracking-column fields plus the Link type and, on the master directory, profile placement. */
+    protected function trackingColumnsForm(): Forms\Repeater
+    {
+        $repeater = PersonnelTableSchema::columnsForm();
+        $fields = $repeater->getChildComponents();
+        foreach ($fields as $field) {
+            if ($field instanceof Forms\Select && $field->getName() === 'type') {
+                $field->options([...PersonnelTableSchema::columnTypes(), 'link' => 'Link (web address)']);
+            }
+        }
+        $isMaster = fn (): bool => $this->personnelTable()->directory_key === 'master';
+
+        return $repeater->schema([
+            ...$fields,
+            Forms\Select::make('view_access')->label('Who can see this column')
+                ->options(['directory' => 'Everyone with directory access', 'personnel_managers' => 'Personnel directory editors only'])
+                ->default('directory')->selectablePlaceholder(false),
+            Forms\Fieldset::make('Member profile')->schema([
+                Forms\TextInput::make('profile_section')->label('Profile section')->maxLength(60)
+                    ->helperText('Enter a section name to also show this field on member profiles under Additional details. Leave blank to keep it in the directory only.'),
+                Forms\TextInput::make('profile_order')->label('Order on profile')->integer()->minValue(0)->maxValue(9999),
+                Forms\Toggle::make('required')->label('Required when edited on a profile')->default(false)
+                    ->helperText('A profile save is refused while this field is blank. Checkboxes are never required.'),
+            ])->columns(2)->visible($isMaster),
+        ]);
+    }
+
+    /** Tracking input for the Tracking & notes dialog. Links must be http or https addresses. */
+    protected static function trackingFormInput(array $column): Forms\Component
+    {
+        if ($column['type'] === 'link') {
+            return Forms\TextInput::make('values.'.$column['id'])->label($column['label'])->url()->maxLength(2000)
+                ->rule('url:http,https')->placeholder('https://');
+        }
+
+        return PersonnelTableSchema::trackingInput($column);
     }
 }

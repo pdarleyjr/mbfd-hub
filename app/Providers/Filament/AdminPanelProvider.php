@@ -126,6 +126,7 @@ class AdminPanelProvider extends PanelProvider
                 Settings::class,
                 WorkgroupAdministration::class,
                 \App\Filament\Pages\MasterPersonnelDirectory::class,
+                \App\Filament\Pages\FuelIdNumbers::class,
                 \App\Filament\Pages\CustomPersonnelTables::class,
                 \App\Filament\Pages\PersonnelTableEditor::class,
                 \App\Filament\Pages\PersonnelReconciliation::class,

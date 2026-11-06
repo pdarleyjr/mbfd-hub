@@ -41,9 +41,19 @@ class EmployeeLogisticsMessage extends Model
         'author_user_id' => 'integer',
     ];
 
+    /** @return BelongsTo<EmployeeLogisticsThread, $this> */
     public function thread(): BelongsTo
     {
         return $this->belongsTo(EmployeeLogisticsThread::class, 'thread_id');
+    }
+
+    /** A memorandum sent to Support Services from the Hub keeps its PDF here (one stored personnel document).
+     *
+     * @return BelongsTo<\App\Models\PersonnelDocument, $this>
+     */
+    public function personnelDocument(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PersonnelDocument::class, 'personnel_document_id');
     }
 
     public function author(): BelongsTo

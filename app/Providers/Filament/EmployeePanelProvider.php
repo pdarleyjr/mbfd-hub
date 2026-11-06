@@ -70,6 +70,7 @@ class EmployeePanelProvider extends PanelProvider
                 OperationalForms::class,
                 \App\Filament\Employee\Pages\ResourceLibrary::class,
                 \App\Filament\Employee\Pages\Taskbooks::class,
+                \App\Filament\Employee\Pages\MyDocuments::class,
                 \App\Filament\Employee\Pages\MyMessages::class,
                 VideoConferencing::class,
                 MyEquipmentPage::class,

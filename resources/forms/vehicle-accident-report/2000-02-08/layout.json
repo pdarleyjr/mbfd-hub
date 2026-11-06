@@ -1,0 +1,726 @@
+{
+ "schema": "mbfd-overlay-layout",
+ "schema_version": "1.0",
+ "coordinate_origin": "top-left points",
+ "min_size": 6.5,
+ "fields": [
+  {
+   "key": "date_of_report",
+   "label": "Date of report",
+   "page": 1,
+   "type": "text",
+   "x": 126,
+   "baseline": 126.5,
+   "width": 170,
+   "size": 10
+  },
+  {
+   "key": "driver_years_with_city",
+   "label": "Length of time driver with the City (years)",
+   "page": 1,
+   "type": "text",
+   "x": 316,
+   "baseline": 148.5,
+   "width": 86,
+   "size": 10
+  },
+  {
+   "key": "vehicle_type_experience_years",
+   "label": "Experience with this type of vehicle (years)",
+   "page": 1,
+   "type": "text",
+   "x": 316,
+   "baseline": 170.5,
+   "width": 86,
+   "size": 10
+  },
+  {
+   "key": "injury_notice_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 463,
+   "baseline": 192,
+   "size": 11
+  },
+  {
+   "key": "injury_notice_no",
+   "page": 1,
+   "type": "mark",
+   "x": 525,
+   "baseline": 192,
+   "size": 11
+  },
+  {
+   "key": "hours_on_duty",
+   "label": "Total hours on duty at time of accident",
+   "page": 1,
+   "type": "text",
+   "x": 250,
+   "baseline": 213.5,
+   "width": 183,
+   "size": 10
+  },
+  {
+   "key": "vehicle_condition_form_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 326,
+   "baseline": 234.5,
+   "size": 11
+  },
+  {
+   "key": "vehicle_condition_form_no",
+   "page": 1,
+   "type": "mark",
+   "x": 436,
+   "baseline": 234.5,
+   "size": 11
+  },
+  {
+   "key": "reasonable_observation_form_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 332,
+   "baseline": 256.5,
+   "size": 11
+  },
+  {
+   "key": "reasonable_observation_form_no",
+   "page": 1,
+   "type": "mark",
+   "x": 436,
+   "baseline": 256.5,
+   "size": 11
+  },
+  {
+   "key": "cdl_drug_test_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 331,
+   "baseline": 278,
+   "size": 11
+  },
+  {
+   "key": "cdl_drug_test_no",
+   "page": 1,
+   "type": "mark",
+   "x": 436,
+   "baseline": 278,
+   "size": 11
+  },
+  {
+   "key": "excessive_hours_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 169,
+   "baseline": 320,
+   "size": 11
+  },
+  {
+   "key": "excessive_hours_no",
+   "page": 1,
+   "type": "mark",
+   "x": 224,
+   "baseline": 320,
+   "size": 11
+  },
+  {
+   "key": "speeding_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 342,
+   "baseline": 320.5,
+   "size": 11
+  },
+  {
+   "key": "speeding_no",
+   "page": 1,
+   "type": "mark",
+   "x": 392,
+   "baseline": 320.5,
+   "size": 11
+  },
+  {
+   "key": "sickness_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 500,
+   "baseline": 321,
+   "size": 11
+  },
+  {
+   "key": "sickness_no",
+   "page": 1,
+   "type": "mark",
+   "x": 552,
+   "baseline": 321,
+   "size": 11
+  },
+  {
+   "key": "physical_defect_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 169,
+   "baseline": 341.5,
+   "size": 11
+  },
+  {
+   "key": "physical_defect_no",
+   "page": 1,
+   "type": "mark",
+   "x": 224,
+   "baseline": 341.5,
+   "size": 11
+  },
+  {
+   "key": "alcohol_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 342,
+   "baseline": 342,
+   "size": 11
+  },
+  {
+   "key": "alcohol_no",
+   "page": 1,
+   "type": "mark",
+   "x": 392,
+   "baseline": 342,
+   "size": 11
+  },
+  {
+   "key": "drugs_yes",
+   "page": 1,
+   "type": "mark",
+   "x": 502,
+   "baseline": 342.5,
+   "size": 11
+  },
+  {
+   "key": "drugs_no",
+   "page": 1,
+   "type": "mark",
+   "x": 552,
+   "baseline": 342.5,
+   "size": 11
+  },
+  {
+   "key": "accidents_past_18_months",
+   "label": "Number of accidents in the past 18 months",
+   "page": 1,
+   "type": "text",
+   "x": 246,
+   "baseline": 363.5,
+   "width": 105,
+   "size": 10
+  },
+  {
+   "key": "other_factors",
+   "label": "Other contributing factors (explain)",
+   "page": 1,
+   "type": "lines",
+   "size": 10,
+   "lines": [
+    {
+     "x": 110,
+     "baseline": 385.5,
+     "width": 462
+    },
+    {
+     "x": 33,
+     "baseline": 407,
+     "width": 542
+    },
+    {
+     "x": 33,
+     "baseline": 428.5,
+     "width": 542
+    }
+   ]
+  },
+  {
+   "key": "supervisor_comments",
+   "label": "Supervisor comments",
+   "page": 1,
+   "type": "lines",
+   "size": 10,
+   "lines": [
+    {
+     "x": 88,
+     "baseline": 470.5,
+     "width": 485
+    },
+    {
+     "x": 33,
+     "baseline": 492,
+     "width": 541
+    },
+    {
+     "x": 33,
+     "baseline": 514,
+     "width": 541
+    },
+    {
+     "x": 33,
+     "baseline": 535,
+     "width": 541
+    },
+    {
+     "x": 33,
+     "baseline": 556.5,
+     "width": 541
+    }
+   ]
+  },
+  {
+   "key": "supervisor_date",
+   "label": "Supervisor date",
+   "page": 1,
+   "type": "text",
+   "x": 74,
+   "baseline": 618.5,
+   "width": 80,
+   "size": 10
+  },
+  {
+   "key": "supervisor_signature",
+   "page": 1,
+   "type": "image",
+   "x": 340,
+   "bottom": 620,
+   "width": 152,
+   "height": 19
+  },
+  {
+   "key": "department_head_date",
+   "label": "Department head date",
+   "page": 1,
+   "type": "text",
+   "x": 57,
+   "baseline": 640.5,
+   "width": 80,
+   "size": 10
+  },
+  {
+   "key": "department_head_name",
+   "label": "Department head",
+   "page": 1,
+   "type": "text",
+   "x": 338,
+   "baseline": 642,
+   "width": 156,
+   "size": 10
+  },
+  {
+   "key": "supervisor_esign_note",
+   "label": "Supervisor electronic signature record",
+   "page": 1,
+   "type": "lines",
+   "size": 7,
+   "lines": [
+    {
+     "x": 300,
+     "baseline": 700,
+     "width": 280
+    },
+    {
+     "x": 300,
+     "baseline": 709,
+     "width": 280
+    },
+    {
+     "x": 300,
+     "baseline": 718,
+     "width": 280
+    }
+   ]
+  },
+  {
+   "key": "employee_name",
+   "label": "Employee's name",
+   "page": 2,
+   "type": "text",
+   "x": 140,
+   "baseline": 188.5,
+   "width": 415,
+   "size": 10
+  },
+  {
+   "key": "dept_div",
+   "label": "Dept./Div.",
+   "page": 2,
+   "type": "text",
+   "x": 99,
+   "baseline": 210.5,
+   "width": 178,
+   "size": 10
+  },
+  {
+   "key": "job_classification",
+   "label": "Job classification",
+   "page": 2,
+   "type": "text",
+   "x": 379,
+   "baseline": 210.5,
+   "width": 185,
+   "size": 10
+  },
+  {
+   "key": "city_vehicle_number",
+   "label": "City vehicle #",
+   "page": 2,
+   "type": "text",
+   "x": 121,
+   "baseline": 231.5,
+   "width": 140,
+   "size": 10
+  },
+  {
+   "key": "vehicle_type",
+   "label": "Type of vehicle",
+   "page": 2,
+   "type": "text",
+   "x": 357,
+   "baseline": 231.5,
+   "width": 206,
+   "size": 10
+  },
+  {
+   "key": "make_and_license",
+   "label": "Make & license tag of vehicle",
+   "page": 2,
+   "type": "text",
+   "x": 206,
+   "baseline": 253,
+   "width": 358,
+   "size": 10
+  },
+  {
+   "key": "accident_date",
+   "label": "Date of accident",
+   "page": 2,
+   "type": "text",
+   "x": 132,
+   "baseline": 312.5,
+   "width": 158,
+   "size": 10
+  },
+  {
+   "key": "accident_time",
+   "label": "Time",
+   "page": 2,
+   "type": "text",
+   "x": 334,
+   "baseline": 312.5,
+   "width": 230,
+   "size": 10
+  },
+  {
+   "key": "location",
+   "label": "Location of accident",
+   "page": 2,
+   "type": "text",
+   "x": 152,
+   "baseline": 334,
+   "width": 412,
+   "size": 10
+  },
+  {
+   "key": "passengers",
+   "label": "List of passengers",
+   "page": 2,
+   "type": "text",
+   "x": 141,
+   "baseline": 355.5,
+   "width": 424,
+   "size": 10
+  },
+  {
+   "key": "other_party_name",
+   "label": "Name of other party involved",
+   "page": 2,
+   "type": "text",
+   "x": 192,
+   "baseline": 377.5,
+   "width": 370,
+   "size": 10
+  },
+  {
+   "key": "other_party_address",
+   "label": "Address of other party",
+   "page": 2,
+   "type": "text",
+   "x": 158,
+   "baseline": 398.5,
+   "width": 220,
+   "size": 10
+  },
+  {
+   "key": "other_party_phone",
+   "label": "Other party phone",
+   "page": 2,
+   "type": "text",
+   "x": 423,
+   "baseline": 398.5,
+   "width": 140,
+   "size": 10
+  },
+  {
+   "key": "other_insurance",
+   "label": "Name of other insurance company / agent",
+   "page": 2,
+   "type": "text",
+   "x": 218,
+   "baseline": 420,
+   "width": 346,
+   "size": 10
+  },
+  {
+   "key": "injuries",
+   "label": "Was anyone injured? Explain",
+   "page": 2,
+   "type": "lines",
+   "size": 10,
+   "lines": [
+    {
+     "x": 191,
+     "baseline": 441.5,
+     "width": 362
+    },
+    {
+     "x": 46,
+     "baseline": 462.5,
+     "width": 518
+    }
+   ]
+  },
+  {
+   "key": "other_vehicle_year",
+   "label": "Other vehicle year",
+   "page": 2,
+   "type": "text",
+   "x": 143,
+   "baseline": 484.5,
+   "width": 110,
+   "size": 10
+  },
+  {
+   "key": "other_vehicle_make_tag",
+   "label": "Other vehicle make & tag #",
+   "page": 2,
+   "type": "text",
+   "x": 335,
+   "baseline": 484.5,
+   "width": 227,
+   "size": 10
+  },
+  {
+   "key": "supervisor_notified_yes",
+   "page": 2,
+   "type": "mark",
+   "x": 331,
+   "baseline": 505.5,
+   "size": 11
+  },
+  {
+   "key": "supervisor_notified_no",
+   "page": 2,
+   "type": "mark",
+   "x": 486,
+   "baseline": 505.5,
+   "size": 11
+  },
+  {
+   "key": "police_on_scene",
+   "label": "Were police on the scene?",
+   "page": 2,
+   "type": "text",
+   "x": 176,
+   "baseline": 527,
+   "width": 38,
+   "size": 10
+  },
+  {
+   "key": "fl_report_made",
+   "label": "Was FL traffic accident report made?",
+   "page": 2,
+   "type": "text",
+   "x": 413,
+   "baseline": 527,
+   "width": 37,
+   "size": 10
+  },
+  {
+   "key": "photos_taken",
+   "label": "Photos taken?",
+   "page": 2,
+   "type": "text",
+   "x": 526,
+   "baseline": 527,
+   "width": 37,
+   "size": 10
+  },
+  {
+   "key": "person_charged",
+   "label": "Person charged by police",
+   "page": 2,
+   "type": "text",
+   "x": 171,
+   "baseline": 548,
+   "width": 143,
+   "size": 10
+  },
+  {
+   "key": "charge",
+   "label": "Charge",
+   "page": 2,
+   "type": "text",
+   "x": 360,
+   "baseline": 548,
+   "width": 202,
+   "size": 10
+  },
+  {
+   "key": "witness1_name",
+   "label": "Witness 1 name",
+   "page": 2,
+   "type": "text",
+   "x": 132,
+   "baseline": 569.5,
+   "width": 98,
+   "size": 10
+  },
+  {
+   "key": "witness1_address",
+   "label": "Witness 1 address",
+   "page": 2,
+   "type": "text",
+   "x": 279,
+   "baseline": 569.5,
+   "width": 124,
+   "size": 10
+  },
+  {
+   "key": "witness1_phone",
+   "label": "Witness 1 phone",
+   "page": 2,
+   "type": "text",
+   "x": 446,
+   "baseline": 569.5,
+   "width": 115,
+   "size": 10
+  },
+  {
+   "key": "witness2_name",
+   "label": "Witness 2 name",
+   "page": 2,
+   "type": "text",
+   "x": 132,
+   "baseline": 590.5,
+   "width": 98,
+   "size": 10
+  },
+  {
+   "key": "witness2_address",
+   "label": "Witness 2 address",
+   "page": 2,
+   "type": "text",
+   "x": 279,
+   "baseline": 590.5,
+   "width": 124,
+   "size": 10
+  },
+  {
+   "key": "witness2_phone",
+   "label": "Witness 2 phone",
+   "page": 2,
+   "type": "text",
+   "x": 446,
+   "baseline": 590.5,
+   "width": 115,
+   "size": 10
+  },
+  {
+   "key": "damage_other",
+   "label": "Damage to other vehicle / property",
+   "page": 2,
+   "type": "text",
+   "x": 213,
+   "baseline": 612,
+   "width": 348,
+   "size": 10
+  },
+  {
+   "key": "driver_description",
+   "label": "Driver's description of accident",
+   "page": 2,
+   "type": "lines",
+   "size": 10,
+   "lines": [
+    {
+     "x": 202,
+     "baseline": 633.5,
+     "width": 360
+    },
+    {
+     "x": 46,
+     "baseline": 654.5,
+     "width": 517
+    },
+    {
+     "x": 46,
+     "baseline": 675.5,
+     "width": 517
+    },
+    {
+     "x": 46,
+     "baseline": 697,
+     "width": 517
+    },
+    {
+     "x": 46,
+     "baseline": 718.5,
+     "width": 517
+    }
+   ]
+  },
+  {
+   "key": "driver_date",
+   "label": "Driver date",
+   "page": 2,
+   "type": "text",
+   "x": 74,
+   "baseline": 739.5,
+   "width": 143,
+   "size": 10
+  },
+  {
+   "key": "driver_signature",
+   "page": 2,
+   "type": "image",
+   "x": 381,
+   "bottom": 740,
+   "width": 175,
+   "height": 19
+  },
+  {
+   "key": "driver_esign_note",
+   "label": "Driver electronic signature record",
+   "page": 2,
+   "type": "lines",
+   "size": 6.5,
+   "lines": [
+    {
+     "x": 46,
+     "baseline": 776,
+     "width": 520
+    },
+    {
+     "x": 46,
+     "baseline": 784.5,
+     "width": 520
+    }
+   ]
+  }
+ ]
+}
