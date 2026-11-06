@@ -41,6 +41,7 @@ class StationRequestApiTest extends TestCase
         parent::setUp();
 
         Storage::fake('public');
+        Storage::fake('local');
 
         $this->station = $this->makeStation(1);
         $this->otherStation = $this->makeStation(2);
@@ -145,9 +146,9 @@ class StationRequestApiTest extends TestCase
         $this->assertCount(2, $request->items);
         $this->assertSame(2, $request->items[1]->quantity);
         $this->assertNotNull($request->items[0]->photo_path);
-        Storage::disk('public')->assertExists($request->items[0]->photo_path);
-        Storage::disk('public')->assertExists($request->metadata['signatures']['member']);
-        Storage::disk('public')->assertExists($request->metadata['signatures']['officer']);
+        Storage::disk('local')->assertExists($request->items[0]->photo_path);
+        Storage::disk('local')->assertExists($request->metadata['signatures']['member']);
+        Storage::disk('local')->assertExists($request->metadata['signatures']['officer']);
         $this->assertStringNotContainsString('data:image', json_encode($request->getAttributes(), JSON_THROW_ON_ERROR));
     }
 
@@ -571,7 +572,7 @@ class StationRequestApiTest extends TestCase
             $this->getJson("/api/public/stations/{$this->station->id}/requests?scope=all")
                 ->assertOk()->assertSee($request->request_number)->assertDontSee('Private QA archive reason.');
             foreach ($signatures as $signature) {
-                Storage::disk('public')->assertExists($signature);
+                Storage::disk('local')->assertExists($signature);
             }
             $archival->restore($request, $manager);
             $this->getJson("/api/public/stations/{$this->station->id}/requests")

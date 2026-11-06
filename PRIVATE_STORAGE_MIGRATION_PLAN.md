@@ -17,9 +17,13 @@ through authorized controller routes.
 | `database/migrations/*` (8 files) | Guarded Postgres-only raw DDL with `if (DB::connection()->getDriverName() !== 'pgsql') return;` so the suite (and `RefreshDatabase`) runs on SQLite. Behaviour on Postgres is unchanged. |
 
 ### Files that were NOT moved (genuinely public — left on the `public` disk)
-- Filament image uploads / previews for Apparatus defects, Capital projects,
-  Under-25k projects, Todos, Training todos (admin-panel image thumbnails served
-  via `asset('storage/...')`).
+- Filament image uploads / previews for Capital projects, Under-25k projects,
+  Todos, Training todos (admin-panel image thumbnails served via
+  `asset('storage/...')`).
+- Member photos and signatures (`defects/`, `signatures/`, `station-requests/`,
+  `station-inspections/`, `trt-inventory/`) were moved later (2026-11-06) by a
+  separate change: `App\Support\Media\MemberMedia` and the
+  `photos:make-private` command. They are no longer public.
 - `WorkgroupFile` uploads already use Filament `FileUpload` with
   `->visibility('private')` + the `workgroup-files` directory and are served
   through the auth-gated `workgroup.file.download`/`preview` routes.

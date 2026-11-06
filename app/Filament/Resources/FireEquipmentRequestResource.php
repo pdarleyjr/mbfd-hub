@@ -6,6 +6,7 @@ use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\FireEquipmentRequestResource\Pages;
 use App\Models\FireEquipmentRequest;
+use App\Support\Media\MemberMedia;
 use App\Support\Security\Base64Image;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -248,6 +249,11 @@ class FireEquipmentRequestResource extends Resource
                 return null;
             }
             $url = $state;
+        } elseif (MemberMedia::safePath($state) !== null) {
+            $url = MemberMedia::url($state); // private member image: signed for this viewer
+            if ($url === null) {
+                return null;
+            }
         } elseif (! str_contains($state, '://') && ! str_starts_with($state, '//')) {
             $url = Storage::disk('public')->url(ltrim($state, '/'));
         } else {

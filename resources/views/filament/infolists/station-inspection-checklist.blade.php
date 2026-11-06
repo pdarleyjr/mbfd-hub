@@ -24,14 +24,15 @@
                             $notes = is_string($item['failNotes'] ?? null) ? $item['failNotes'] : '';
                             $imagePath = is_string($item['failImage'] ?? null) ? $item['failImage'] : '';
                             $hasStoredImage = $status === 'fail' && preg_match('~^station-inspections/[a-zA-Z0-9/_-]+\.(?:png|jpe?g|webp|gif)$~D', $imagePath) === 1;
+                            $imageUrl = $hasStoredImage ? \App\Support\Media\MemberMedia::url($imagePath) : null;
                         @endphp
                         <div>
                             <span>{{ $statusIcons[$status] ?? '⬜' }} {{ is_scalar($label) ? $label : 'Checklist item' }}</span>
                             @if ($status === 'fail' && $notes !== '')
                                 <p class="ml-6 whitespace-pre-wrap text-sm text-danger-600">Notes: {{ $notes }}</p>
                             @endif
-                            @if ($hasStoredImage)
-                                <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($imagePath) }}" alt="Fail photo" class="ml-6 mt-2 max-h-48 max-w-xs rounded border border-danger-200" />
+                            @if ($imageUrl !== null)
+                                <img src="{{ $imageUrl }}" alt="Fail photo" class="ml-6 mt-2 max-h-48 max-w-xs rounded border border-danger-200" />
                             @endif
                         </div>
                     @endforeach

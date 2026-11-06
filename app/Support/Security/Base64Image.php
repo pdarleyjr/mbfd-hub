@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Security;
 
+use App\Support\Media\MemberMedia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -13,15 +14,17 @@ final class Base64Image
 
     /**
      * Decode, magic-byte validate, and store a base64 image. Returns null when
-     * the payload is absent or invalid.
+     * the payload is absent or invalid. Member images go to the private disk
+     * (MemberMedia::disk()) unless a caller names another one.
      */
     public static function store(
         string $payload,
         string $directory,
         string $prefix,
-        string $disk = 'public',
+        ?string $disk = null,
         int $maxBytes = self::DEFAULT_MAX_BYTES
     ): ?string {
+        $disk ??= MemberMedia::disk();
         $image = self::decode($payload, $maxBytes);
         if ($image === null) {
             return null;
@@ -37,7 +40,7 @@ final class Base64Image
             $image['extension']
         );
 
-        $path = trim($directory, '/') . '/' . $filename;
+        $path = trim($directory, '/').'/'.$filename;
         Storage::disk($disk)->put($path, $image['bytes']);
 
         return $path;

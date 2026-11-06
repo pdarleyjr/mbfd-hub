@@ -42,6 +42,7 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         Notification::fake();
         Queue::fake();
         Storage::fake('public', ['root' => storage_path('framework/testing/disks/automatic-inspection-'.getmypid())]);
+        Storage::fake('local', ['root' => storage_path('framework/testing/disks/automatic-inspection-local-'.getmypid())]);
         config()->set('google_sheets.apparatus_sync_enabled', false);
         $this->member = $this->actingAsCanonicalFixture('AUTO-001', 'Canonical Inspector', 'Firefighter');
         $this->apparatus = Apparatus::query()->create([
@@ -72,14 +73,14 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         $this->assertSame(array_column($payload['field_values'], 'value'), array_column($inspection->checklist_evidence, 'value'));
         $this->assertNull($inspection->pending_effects);
         $this->assertNull(ApparatusInspectionReviewEvent::sole()->changed_by_user_id);
-        Storage::disk('public')->assertExists($inspection->officer_signature);
-        $paths = Storage::disk('public')->allFiles();
+        Storage::disk('local')->assertExists($inspection->officer_signature);
+        $paths = Storage::disk('local')->allFiles();
 
         $this->postJson($this->url(), $payload)->assertOk()->assertJsonPath('id', $inspection->id);
         $this->assertDatabaseCount('apparatus_inspections', 1);
         $this->assertDatabaseCount('apparatus_inspection_review_events', 1);
         $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
-        $this->assertSame($paths, Storage::disk('public')->allFiles());
+        $this->assertSame($paths, Storage::disk('local')->allFiles());
         $changed = $payload;
         $this->setField($changed, 'scba_5', '0013-A');
         $this->postJson($this->url(), $changed)->assertConflict()->assertJsonPath('code', 'DAILY_CHECKOUT_SUBMISSION_REPLAY_CONFLICT');
@@ -225,7 +226,7 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         $this->postJson($this->url(), $payload)->assertUnprocessable()->assertJsonValidationErrors($error);
         $this->assertDatabaseCount('apparatus_inspections', 0);
         $this->assertDatabaseCount('apparatus_inspection_review_events', 0);
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertSame([], Storage::disk('local')->allFiles());
         $this->assertSame('400.0', $this->apparatus->fresh()->current_engine_hours);
         $this->assertSame(1000, $this->apparatus->fresh()->current_miles);
     }
@@ -324,8 +325,8 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         $photos = array_column(array_slice($inspection->results[0]['items'], 0, 2), 'photo_path');
         $this->assertCount(2, $photos);
         $this->assertSame($photos, $observations->pluck('photo_path')->all());
-        Storage::disk('public')->assertExists([$inspection->officer_signature, ...$photos]);
-        $this->assertCount(3, Storage::disk('public')->allFiles());
+        Storage::disk('local')->assertExists([$inspection->officer_signature, ...$photos]);
+        $this->assertCount(3, Storage::disk('local')->allFiles());
         $event = ApparatusInspectionReviewEvent::sole();
         $this->assertSame($photos[0], $event->metadata['submitted_effects']['defects'][0]['photo_path']);
         $persisted = json_encode([$inspection->getAttributes(), $event->getAttributes(), $observations->toArray(), ApparatusDefect::all()->toArray()], JSON_THROW_ON_ERROR);
@@ -392,7 +393,7 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         $reachedProcessing = false;
         ApparatusInspectionReviewEvent::creating(function () use (&$reachedProcessing): never {
             $reachedProcessing = true;
-            $this->assertCount(3, Storage::disk('public')->allFiles());
+            $this->assertCount(3, Storage::disk('local')->allFiles());
             $this->assertDatabaseCount('apparatus_defect_observations', 2);
             $this->assertSame('401.2', $this->apparatus->fresh()->current_engine_hours);
             throw new RuntimeException('Forced processing failure after image and database writes.');
@@ -405,7 +406,7 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
             $this->assertSame('Forced processing failure after image and database writes.', $exception->getMessage());
         }
         $this->assertTrue($reachedProcessing);
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertSame([], Storage::disk('local')->allFiles());
         $this->assertDatabaseCount('apparatus_inspections', 0);
         $this->assertDatabaseCount('apparatus_inspection_review_events', 0);
         $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);

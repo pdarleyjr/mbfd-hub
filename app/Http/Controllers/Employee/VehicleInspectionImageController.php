@@ -8,8 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Models\ApparatusInspection;
 use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
+use App\Support\Media\MemberMedia;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -38,10 +38,9 @@ class VehicleInspectionImageController extends Controller
         $path = $history->resolveImagePath($inspection, $key);
         abort_if($path === null, 404);
 
-        $disk = Storage::disk('public');
-        abort_unless($disk->exists($path), 404);
-
-        $bytes = (string) $disk->get($path);
+        // Private disk first, then a public copy photos:make-private has not moved yet.
+        $bytes = MemberMedia::get($path);
+        abort_if($bytes === null || $bytes === '', 404);
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
         abort_unless(in_array($mime, self::ALLOWED_MIME, true), 404);
 
