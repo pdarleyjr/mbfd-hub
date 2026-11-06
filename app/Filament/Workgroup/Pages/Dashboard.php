@@ -106,14 +106,10 @@ class Dashboard extends BaseDashboard
             ->orderByDesc('created_at')->get();
     }
 
+    /** The workgroup and selected session are shown in the page's context row, so the header needs no subheading. */
     public function getSubheading(): ?string
     {
-        $session = $this->getSelectedAccessibleSession();
-        if ($session) {
-            return "Viewing: {$session->name} — Switch sessions using the buttons below.";
-        }
-
-        return 'Overview of your current workgroup, evaluations, and shared resources.';
+        return null;
     }
 
     public function getColumns(): int|string|array

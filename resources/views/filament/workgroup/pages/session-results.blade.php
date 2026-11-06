@@ -21,7 +21,7 @@
 
     {{-- Session Progress Stats --}}
     @if($progress)
-    <div class="wg-stats-row">
+    <dl class="wg-overview-stats wg-overview-stats--counts sr-progress" aria-label="Session progress">
         @php
             $pStats = [
                 ['label' => 'Products',    'val' => $progress['total_products']],
@@ -33,12 +33,12 @@
             ];
         @endphp
         @foreach($pStats as $s)
-        <div class="wg-stat-card">
-            <p class="wg-stat-label">{{ $s['label'] }}</p>
-            <p class="wg-stat-value">{{ $s['val'] }}</p>
+        <div class="wg-overview-stat">
+            <dt class="wg-overview-stat__label">{{ $s['label'] }}</dt>
+            <dd class="wg-overview-stat__value">{{ $s['val'] }}</dd>
         </div>
         @endforeach
-    </div>
+    </dl>
     @endif
 
     {{-- AI generation is an explicit manager-only action. --}}
@@ -299,7 +299,7 @@
                         @endif
                         <span class="sr-pill">{{ $brandRank['tool_count'] }} tools</span>
                         @if($brandRank['rank'] === 1 && $brandRank['overall_avg'] !== null)
-                        <span class="wg-best-package">🥇 Top Brand</span>
+                        <span class="wg-best-package"><x-heroicon-m-trophy class="inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" /> Top Brand</span>
                         @endif
                     </div>
                 </div>
@@ -473,13 +473,13 @@
                             <td class="sr-center">
                                 @if($item['advance_yes'] > 0 || $item['advance_no'] > 0)
                                 <span class="sr-adv">
-                                    <span class="sr-adv__yes">{{ $item['advance_yes'] }}✓</span>
+                                    <span class="sr-adv__yes">{{ $item['advance_yes'] }}<x-heroicon-m-check class="inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" /><span class="sr-only"> to advance</span></span>
                                     @if($item['advance_no'] > 0)
-                                    <span class="sr-adv__no">{{ $item['advance_no'] }}✕</span>
+                                    <span class="sr-adv__no">{{ $item['advance_no'] }}<x-heroicon-m-x-mark class="inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" /><span class="sr-only"> not to advance</span></span>
                                     @endif
                                 </span>
                                 @if($item['deal_breakers'] > 0)
-                                <span class="sr-adv__flag" title="{{ $item['deal_breakers'] }} deal-breaker(s)">⚠️</span>
+                                <span class="sr-adv__flag" title="{{ $item['deal_breakers'] }} deal-breaker(s)"><x-heroicon-m-exclamation-triangle class="inline h-4 w-4 align-[-3px]" aria-hidden="true" /><span class="sr-only">{{ $item['deal_breakers'] }} deal-breaker(s)</span></span>
                                 @endif
                                 @else
                                 <span class="sr-dash sr-caption">—</span>
@@ -599,7 +599,7 @@
                         <span class="wg-brand-composite">{{ number_format($brandData['composite_score'], 1) }}</span>
                         @endif
                         @if($rank === 0 && $brandData['composite_score'] !== null)
-                        <span class="wg-best-package">✓ Best Complete Package</span>
+                        <span class="wg-best-package"><x-heroicon-m-check class="inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" /> Best Complete Package</span>
                         @endif
                     </div>
                     <div class="sr-ps-grid">
@@ -658,7 +658,7 @@
                 <div class="sr-iso__meta">
                     <span>{{ $iso['response_count'] }} responses</span>
                     @if($iso['meets_threshold'])
-                    <span class="sr-tone--good">✓ Meets threshold</span>
+                    <span class="sr-tone--good"><x-heroicon-m-check class="inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" /> Meets threshold</span>
                     @else
                     <span class="sr-tone--mid">Below threshold</span>
                     @endif

@@ -91,43 +91,26 @@
 
 /* Summary cards */
 
+/* One glass strip of four readouts divided by hairlines (two by two on a phone). */
 [data-hub-ui="2"] .roster-summary {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
     margin: 0 0 12px;
     padding: 0;
+    overflow: hidden;
     list-style: none;
 }
 
 @media (min-width: 1024px) {
-    [data-hub-ui="2"] .roster-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    [data-hub-ui="2"] .roster-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 [data-hub-ui="2"] .roster-summary__card {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-}
-
-[data-hub-ui="2"] .roster-summary__card > div { min-width: 0; }
-
-[data-hub-ui="2"] .roster-summary__icon {
-    display: none;
-    flex: none;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    border-radius: var(--hub-radius-pill);
-    background: rgb(var(--hub2-action-tint));
-    color: rgb(var(--hub2-action));
-}
-
-[data-hub-ui="2"] .roster-summary__icon svg { width: 22px; height: 22px; }
-
-@media (min-width: 420px) {
-    [data-hub-ui="2"] .roster-summary__icon { display: grid; }
+    min-width: 0;
+    margin: -1px 0 0 -1px;
+    padding: 10px 16px;
+    border-top: 1px solid rgb(var(--hub-glass-border));
+    border-left: 1px solid rgb(var(--hub-glass-border));
 }
 
 [data-hub-ui="2"] .roster-summary__label { margin: 0; color: rgb(var(--hub2-n-600)); font-size: 13px; line-height: 18px; }
@@ -478,12 +461,13 @@
         background: rgb(var(--hub-well));
     }
 
+    /* Name and certifications on top; status, from, through and hours as one compact readout line under it. */
     [data-hub-ui="2"] .roster-row {
         position: relative;
         display: grid;
-        grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
-        gap: 8px 4px;
-        padding: 10px 12px;
+        grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr));
+        gap: 6px 8px;
+        padding: 8px 12px;
     }
 
     [data-hub-ui="2"] .roster-cell { display: block; padding: 0; min-width: 0; }
@@ -514,21 +498,21 @@
 
     [data-hub-ui="2"] .roster-cell__label {
         display: block;
-        margin-bottom: 2px;
         color: rgb(var(--hub2-n-600));
         font-size: 12px;
         line-height: 16px;
     }
 
+    /* Plain readouts on the white well, divided by hairlines: no boxes inside the card. */
     [data-hub-ui="2"] .roster-cell--status,
     [data-hub-ui="2"] .roster-cell--time {
-        padding: 6px 4px;
-        border-radius: var(--hub-radius-tag);
-        background: rgb(var(--hub2-n-50));
-        text-align: center;
+        padding: 4px 0 0;
+        border-top: 1px solid rgb(var(--hub2-n-100));
+        text-align: left;
     }
 
-    [data-hub-ui="2"] .roster-cell--time { font-weight: 600; }
+    [data-hub-ui="2"] .roster-cell--status .roster-pill { min-height: 22px; margin-top: 1px; }
+    [data-hub-ui="2"] .roster-cell--time { font-weight: 600; line-height: 20px; }
 }
 
 @media (max-width: 639.98px) {

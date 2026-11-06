@@ -10,7 +10,7 @@
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/session-results" back-label="Back to Session Results" max-width="max-w-7xl" /></div>
     <div class="print-controls">
         <button class="print-btn print-btn--primary" onclick="window.print()">
-            🖨️ Print Report
+            <x-heroicon-o-printer class="inline h-4 w-4 align-[-3px]" aria-hidden="true" /> Print Report
         </button>
     </div>
 

@@ -14,11 +14,6 @@ class Dashboard extends BaseDashboard
 
     protected static string $routePath = '/';
 
-    public function getSubheading(): ?string
-    {
-        return 'Current training work queue and division tools.';
-    }
-
     public function getColumns(): int|string|array
     {
         return [
