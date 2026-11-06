@@ -5,6 +5,7 @@ import { mountAlertSoundSettings } from './pwa/alert-sound';
 import { startDocumentViewer } from './pwa/document-viewer';
 import { startSiblingLinks } from './pwa/sibling-links';
 import { startOfflineLinks } from './pwa/offline-links';
+import { startBottomBarPin } from './pwa/bottom-bar-pin';
 // The Home install card; install-ui mounts only where its markup is rendered.
 import './pwa/install-ui';
 
@@ -103,6 +104,7 @@ startDocumentViewer({ loadPdfRenderer: () => import('./pwa/document-viewer-pdf')
 // With no connection a tap on a Hub link stays on this page and the offline strip says why, instead of the
 // browser's error page, which an installed app cannot back out of. Daily has its own offline shell.
 startOfflineLinks();
+startBottomBarPin();
 
 // Home page visits on the Admin Overview reads its own numbers when opened; no other page loads this.
 if (document.querySelector('[data-home-activity]')) import('./home-activity.js');
