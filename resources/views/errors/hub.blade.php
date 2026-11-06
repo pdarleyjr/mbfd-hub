@@ -23,18 +23,27 @@
         .hub-error__code { margin: 0 0 8px; color: rgb(var(--hub-n-600)); font-size: 14px; font-weight: 700; letter-spacing: .08em; }
         .hub-error h1 { margin: 0; color: rgb(var(--hub-header)); font-size: clamp(28px, 6vw, 40px); line-height: 1.2; letter-spacing: -.025em; }
         .hub-error__message { margin: 20px 0 28px; color: rgb(var(--hub-n-600)); line-height: 1.6; }
+        .hub-error__note { margin: -12px 0 24px; padding: 14px 16px; color: rgb(var(--hub-n-900)); line-height: 1.5; }
         .hub-error__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
         .hub-error__footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid rgb(var(--hub-glass-border)); color: rgb(var(--hub-n-600)); font-size: 13px; }
     </style>
 </head>
 <body class="hub-error">
     <main class="hub-panel hub-error__card">
-        <div class="hub-error__identity"><img src="/images/mbfd_logo-256.png" alt="" width="48" height="48">MBFD Hub</div>
+        <div class="hub-error__identity"><img src="/images/mbfd-official-seal-256.png" alt="" width="48" height="48">MBFD Hub</div>
         <p class="hub-error__code">{{ $eyebrow ?? 'ERROR '.$code }}</p>
         <h1>{{ $title }}</h1>
         <p class="hub-error__message">{{ $message }}</p>
+        @isset($note)
+            <p class="hub-well hub-error__note">{{ $note }}</p>
+        @endisset
         @if($code !== 404)
             <p class="hub-callout hub-callout--warning p-4">If this is an active incident, contact the duty officer directly.</p>
+        @endif
+        @if(! empty($retry))
+            <div class="hub-error__actions">
+                <a class="hub-btn hub-btn--primary" href="{{ url()->current() }}">Try again</a>
+            </div>
         @endif
         @unless(isset($eyebrow))
             <div class="hub-error__actions">
