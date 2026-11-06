@@ -583,6 +583,49 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
     .mbfd-dash-row__cta { min-width: 0; min-height: 1.75rem; padding-inline: .625rem; font-size: .75rem; }
 }
 
+/*
+ * Lane-width rows (Admin Overview lanes beside an open sidebar, about 240-340px). The desktop row
+ * (thumbnail | text | time | button) left the text ~100px, so names, titles and tags were cut to
+ * stubs. Here a row is a stacked list item instead: who/what and its tags, a two-line title, then a
+ * footer line with the time, how long it has waited and the action. The whole row stays one button.
+ */
+@container mbfd-card (max-width: 339.98px) {
+    .mbfd-dash-card__head { gap: .5rem; padding: .625rem .75rem; }
+    .mbfd-dash-card__head > .mbfd-dash-card__icon { display: none; }
+    .mbfd-dash-card__head .mbfd-dash-card__note { display: none; }
+    .mbfd-dash-card__link { padding-inline: .375rem; font-size: .8125rem; }
+
+    .mbfd-dash-row__button,
+    .mbfd-dash-row__button.is-compact {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "main main" "meta cta";
+        gap: .375rem .5rem;
+        padding: .625rem .75rem;
+    }
+    .mbfd-dash-row__button > .mbfd-dash-thumb { display: none; }
+    .mbfd-dash-row__subject { white-space: normal; overflow-wrap: anywhere; }
+    .mbfd-dash-row__title {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        font-size: .875rem;
+    }
+    .mbfd-dash-row__meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        align-self: center;
+        justify-self: start;
+        gap: .125rem .5rem;
+        color: var(--dash-muted);
+    }
+    .mbfd-dash-row__age { font-size: .75rem; }
+    .mbfd-dash-row__cta { align-self: center; min-height: 2rem; }
+}
+
 .mbfd-dash-row__button.is-compact { padding-block: .375rem; }
 .mbfd-dash-row__button.is-compact > .mbfd-dash-thumb { width: 4rem; height: 2.5rem; }
 .mbfd-dash-row__button.is-compact > .mbfd-dash-thumb--avatar { width: 2.25rem; height: 2.25rem; margin-inline: .875rem; }
