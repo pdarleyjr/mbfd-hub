@@ -94,6 +94,8 @@ class AdminCriticalSurfaceSmokeTest extends TestCase
             '/admin/apparatuses',
             '/admin/apparatuses/create',
             '/admin/inspections',
+            '/admin/checklist-templates',
+            '/admin/checklist-templates/engine',
             '/admin/station-requests',
             "/admin/station-requests/{$stationRequest->id}",
             '/admin/room-assets',
