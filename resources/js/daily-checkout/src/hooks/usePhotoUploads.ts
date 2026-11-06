@@ -5,10 +5,11 @@ import {
   onPhotoUploadsChanged,
   photoProgress,
   photoUploadSummary,
+  queuedPhotoBlob,
   type PhotoUploadSummary,
 } from '../utils/photoUploadQueue';
 
-const EMPTY: PhotoUploadSummary = { total: 0, sent: 0, pending: 0, rejected: 0 };
+const EMPTY: PhotoUploadSummary = { total: 0, sent: 0, pending: 0, rejected: 0, failed: 0 };
 
 /** Live counts for the photos one checkout names ("3 of 4 photos sent"). */
 export function usePhotoUploadSummary(ids: string[]): PhotoUploadSummary {
@@ -51,7 +52,7 @@ export function useQueuedPhoto(id: string | undefined): QueuedPhotoView {
     let url: string | null = null;
     const refresh = (record: QueuedPhoto | undefined) => {
       if (!active) return;
-      if (record && url === null) url = URL.createObjectURL(record.blob);
+      if (record && url === null) url = URL.createObjectURL(queuedPhotoBlob(record));
       setView({ url, status: record?.status ?? 'unknown', progress: photoProgress(id), lastError: record?.lastError });
     };
     const load = () => { void getQueuedPhoto(id).then(refresh).catch(() => undefined); };

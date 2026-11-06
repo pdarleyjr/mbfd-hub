@@ -33,10 +33,24 @@ final class PhotoNormalizer
     /** Above this, a non-HEIC original is decoded (and shrunk) by Imagick instead of a full GD canvas. */
     private const GD_MAX_PIXELS = 24_000_000;
 
+    /** ImageMagick decoder per detected type: never left to guess from the content. */
+    private const IMAGICK_CODERS = ['jpeg' => 'JPEG', 'png' => 'PNG', 'webp' => 'WEBP', 'gif' => 'GIF', 'heic' => 'HEIC'];
+
+    private const IMAGICK_MEMORY_BYTES = 268_435_456;
+
+    private const IMAGICK_MAP_BYTES = 536_870_912;
+
+    private const IMAGICK_DISK_BYTES = 1_073_741_824;
+
+    private const IMAGICK_MAX_SIDE = 20_000;
+
     public const JPEG_QUALITY = 82;
 
     /** @var array<string, string> */
     public const EXTENSIONS = ['jpeg' => 'jpg', 'png' => 'png', 'webp' => 'webp', 'gif' => 'gif', 'heic' => 'heic'];
+
+    /** @param  int  $gdMaxPixels  above this, a non-HEIC original is decoded by Imagick (tests lower it) */
+    public function __construct(private readonly int $gdMaxPixels = self::GD_MAX_PIXELS) {}
 
     /** jpeg | png | webp | gif | heic, or null when the bytes are not a supported photo. */
     public function detectType(string $bytes): ?string
@@ -157,7 +171,7 @@ final class PhotoNormalizer
             throw new PhotoUnreadable('That file is not a supported photo.');
         }
 
-        $image = $type === 'heic' ? $this->decodeWithImagick($bytes) : $this->decodeWithGd($bytes, $type);
+        $image = $type === 'heic' ? $this->decodeWithImagick($bytes, 'heic') : $this->decodeWithGd($bytes, $type);
         if ($type === 'jpeg') {
             $image = $this->orient($image, $bytes);
         }
@@ -169,7 +183,6 @@ final class PhotoNormalizer
         $jpeg = (string) ob_get_clean();
         $width = imagesx($image);
         $height = imagesy($image);
-        imagedestroy($image);
         if (! $encoded || $jpeg === '') {
             throw new PhotoUnreadable('The photo could not be encoded.');
         }
@@ -183,9 +196,9 @@ final class PhotoNormalizer
         if ($size === null || ($size[0] * $size[1]) > self::MAX_SOURCE_PIXELS) {
             throw new PhotoUnreadable('The photo could not be read or is too large.');
         }
-        if (($size[0] * $size[1]) > self::GD_MAX_PIXELS && class_exists(\Imagick::class)) {
+        if (($size[0] * $size[1]) > $this->gdMaxPixels && class_exists(\Imagick::class)) {
             // A 50-200 MP original would need ~0.2-0.8 GB as a GD canvas; Imagick shrinks it while decoding.
-            return $this->decodeWithImagick($bytes);
+            return $this->decodeWithImagick($bytes, $type);
         }
         $image = @imagecreatefromstring($bytes);
         if (! $image instanceof \GdImage) {
@@ -196,23 +209,47 @@ final class PhotoNormalizer
         return $type === 'jpeg' ? $image : $this->flatten($image);
     }
 
-    /** iPhone HEIC/HEIF originals, converted with Imagick (libheif) when the server has it. */
-    private function decodeWithImagick(string $bytes): \GdImage
+    /**
+     * iPhone HEIC/HEIF originals, and non-HEIC originals too large for a GD canvas, converted
+     * with Imagick (libheif) when the server has it. Only the first frame is ever decoded (an
+     * animated GIF or WebP becomes its first frame), the decoder is forced to the detected
+     * type, and ImageMagick's own memory, map, disk and pixel-area limits cap a hostile file.
+     */
+    private function decodeWithImagick(string $bytes, string $type): \GdImage
     {
         if (! class_exists(\Imagick::class)) {
             throw new PhotoUnreadable('HEIC photos cannot be converted on this server.');
         }
 
+        $file = null;
         try {
+            self::limitImagick();
             $imagick = new \Imagick;
             $imagick->pingImageBlob($bytes);
+            $imagick->setFirstIterator();
             if (($imagick->getImageWidth() * $imagick->getImageHeight()) > self::MAX_SOURCE_PIXELS) {
                 throw new PhotoUnreadable('The photo is too large.');
             }
             $imagick->clear();
+
+            // "[0]" on a file name makes ImageMagick decode the first frame only; a blob has no such switch.
+            $file = tempnam(sys_get_temp_dir(), 'mbfd-photo-');
+            if ($file === false || file_put_contents($file, $bytes) !== strlen($bytes)) {
+                throw new PhotoUnreadable('The photo could not be staged for conversion.');
+            }
             $imagick = new \Imagick;
-            $imagick->readImageBlob($bytes);
-            $imagick->autoOrient();
+            if ($type === 'jpeg') {
+                // Lets libjpeg decode a huge original at a reduced scale instead of at full size.
+                $imagick->setOption('jpeg:size', (self::MAX_EDGE * 2).'x'.(self::MAX_EDGE * 2));
+            }
+            $imagick->readImage(self::IMAGICK_CODERS[$type].':'.$file.'[0]');
+            if ($imagick->getNumberImages() > 1) {
+                throw new PhotoUnreadable('Only the first frame of the photo may be decoded.');
+            }
+            if ($type !== 'jpeg') {
+                // A JPEG is oriented afterwards from its own EXIF by orient(); rotating here too would turn it twice.
+                $imagick->autoOrient();
+            }
             $longest = max($imagick->getImageWidth(), $imagick->getImageHeight());
             if ($longest > self::MAX_EDGE) {
                 // Shrink before handing the pixels to GD: a 48 MP original would otherwise need ~200 MB.
@@ -224,16 +261,34 @@ final class PhotoNormalizer
         } catch (PhotoUnreadable $exception) {
             throw $exception;
         } catch (Throwable $exception) {
-            Log::warning('A HEIC photo could not be converted.', ['error' => $exception->getMessage()]);
-            throw new PhotoUnreadable('The HEIC photo could not be converted.');
+            Log::warning('A photo could not be converted with Imagick.', ['type' => $type, 'error' => $exception->getMessage()]);
+            throw new PhotoUnreadable('The photo could not be converted.');
+        } finally {
+            if (is_string($file)) {
+                @unlink($file);
+            }
         }
 
         $image = @imagecreatefromstring($png);
         if (! $image instanceof \GdImage) {
-            throw new PhotoUnreadable('The HEIC photo could not be converted.');
+            throw new PhotoUnreadable('The photo could not be converted.');
         }
 
         return $this->flatten($image);
+    }
+
+    /** Process-wide ImageMagick ceilings; anything over them fails instead of exhausting the worker. */
+    private static function limitImagick(): void
+    {
+        \Imagick::setResourceLimit(\Imagick::RESOURCETYPE_MEMORY, self::IMAGICK_MEMORY_BYTES);
+        \Imagick::setResourceLimit(\Imagick::RESOURCETYPE_MAP, self::IMAGICK_MAP_BYTES);
+        \Imagick::setResourceLimit(\Imagick::RESOURCETYPE_DISK, self::IMAGICK_DISK_BYTES);
+        \Imagick::setResourceLimit(\Imagick::RESOURCETYPE_AREA, self::MAX_SOURCE_PIXELS);
+        foreach (['RESOURCETYPE_WIDTH', 'RESOURCETYPE_HEIGHT'] as $constant) {
+            if (defined(\Imagick::class.'::'.$constant)) {
+                \Imagick::setResourceLimit((int) constant(\Imagick::class.'::'.$constant), self::IMAGICK_MAX_SIDE);
+            }
+        }
     }
 
     /** Apply the camera's EXIF orientation (HEIC is oriented by Imagick). */
@@ -258,7 +313,6 @@ final class PhotoNormalizer
             default => null,
         };
         if ($rotated instanceof \GdImage) {
-            imagedestroy($image);
 
             return $rotated;
         }
@@ -279,7 +333,6 @@ final class PhotoNormalizer
         if (! $resized instanceof \GdImage) {
             return $image;
         }
-        imagedestroy($image);
 
         return $resized;
     }
@@ -292,7 +345,6 @@ final class PhotoNormalizer
         $canvas = imagecreatetruecolor($width, $height);
         imagefill($canvas, 0, 0, (int) imagecolorallocate($canvas, 255, 255, 255));
         imagecopy($canvas, $image, 0, 0, 0, 0, $width, $height);
-        imagedestroy($image);
 
         return $canvas;
     }

@@ -15,6 +15,7 @@ interface Props {
 export function queuedPhotoStatus(view: QueuedPhotoView, offline: boolean): string {
   if (view.status === 'sent') return 'Photo sent.';
   if (view.status === 'rejected') return view.lastError ?? 'The Hub could not use this photo. Take it again.';
+  if (view.status === 'failed') return view.lastError ?? 'This photo could not be sent. Take it again if it is needed.';
   if (view.status === 'pending') {
     if (view.progress !== undefined) return `Sending photo… ${view.progress}%`;
     if (offline) return 'Saved on this device. It sends when you are back online; you can keep going.';
@@ -35,7 +36,7 @@ export default function QueuedPhotoPreview({ photoId, legacySrc, alt, removeLabe
 
   return <div className="inspection-photo-preview">
     {src && <img src={src} alt={alt} className="inspection-photo" />}
-    {!legacySrc && <p className={`inspection-muted ${view.status === 'rejected' ? 'is-invalid' : ''}`} role="status" aria-live="polite" data-photo-status={view.status}>{queuedPhotoStatus(view, offline)}</p>}
+    {!legacySrc && <p className={`inspection-muted ${view.status === 'rejected' || view.status === 'failed' ? 'is-invalid' : ''}`} role="status" aria-live="polite" data-photo-status={view.status}>{queuedPhotoStatus(view, offline)}</p>}
     <button type="button" className="hub-btn hub-btn--destructive" aria-label={removeLabel} onClick={onRemove}>Remove photo</button>
   </div>;
 }

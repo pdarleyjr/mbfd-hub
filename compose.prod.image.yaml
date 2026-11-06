@@ -25,6 +25,11 @@ services:
       # 8 workers instead of one; the php-fpm image ignores it.
       PHP_CLI_SERVER_WORKERS: "${HUB_PHP_CLI_SERVER_WORKERS:-8}"
       XDEBUG_MODE: "off"
+      # "1" only when HUB_STORAGE_APP_PATH is set: the entrypoint (and deploy, before
+      # activation) then refuses to start unless storage/app holds .mbfd-storage-sentinel,
+      # because an unmounted array still leaves its empty mountpoint directory on the
+      # root disk. Unset: empty, no check. See docker/production/check-storage-mount.
+      HUB_STORAGE_APP_SENTINEL_REQUIRED: "${HUB_STORAGE_APP_PATH:+1}"
     volumes:
       - "${HUB_APP_ENV_FILE:?HUB_APP_ENV_FILE must point to the host-managed Laravel environment file}:/var/www/html/.env:ro"
       - "${HUB_STORAGE_PATH:?HUB_STORAGE_PATH must be the existing writable Hub storage directory}:/var/www/html/storage"
@@ -32,7 +37,8 @@ services:
       # live on the large array while framework cache, sessions and logs stay on
       # HUB_STORAGE_PATH. Unset, it is HUB_STORAGE_PATH/app itself (no change).
       # A missing source fails the start instead of silently creating an empty,
-      # root-owned directory (e.g. when the array is not mounted).
+      # root-owned directory; a present but empty mountpoint (array not mounted)
+      # fails the sentinel check above.
       # Runbook: docs/ops/storage-on-mbfd-storage.md
       - type: bind
         source: "${HUB_STORAGE_APP_PATH:-${HUB_STORAGE_PATH}/app}"

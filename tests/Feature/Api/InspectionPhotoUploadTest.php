@@ -18,8 +18,10 @@ use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Inspections\InspectionPhotoUploads;
 use App\Services\Photos\PhotoNormalizer;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -194,6 +196,65 @@ final class InspectionPhotoUploadTest extends TestCase
         $this->get("/api/public/apparatus-issues/{$defect->id}/photo")->assertOk();
     }
 
+    public function test_a_checkout_that_lands_between_the_uploads_read_and_write_still_gets_the_converted_photo(): void
+    {
+        Queue::fake();
+        $photoId = (string) Str::uuid();
+        $payload = $this->payload();
+        $this->damage($payload, $photoId, withDefectPhoto: true);
+        $this->submit($payload)->assertCreated();
+        $race = $this->checkoutWinsTheRaceFor($photoId);
+
+        $this->upload($photoId, UploadedFile::fake()->image('scan.png', 900, 600))
+            ->assertCreated()->assertJsonPath('status', InspectionPhotoUpload::STATUS_PROCESSING);
+
+        $this->assertTrue($race->raced);
+        $row = InspectionPhotoUpload::query()->sole();
+        $this->assertSame(InspectionPhotoUpload::STATUS_PROCESSING, $row->status);
+        $this->assertSame(ApparatusInspection::query()->sole()->id, $row->apparatus_inspection_id);
+        Storage::disk('local')->assertExists((string) $row->source_path);
+        Queue::assertPushed(ProcessInspectionPhotoUpload::class, fn (ProcessInspectionPhotoUpload $job): bool => $job->uuid === $photoId);
+
+        (new ProcessInspectionPhotoUpload($photoId))->handle(app(PhotoNormalizer::class));
+
+        $defect = ApparatusDefect::query()->sole();
+        $this->assertSame(InspectionPhotoUpload::STATUS_STORED, $row->fresh()?->status);
+        $this->assertSame($defect->photo_path, $defect->availablePhotoPath());
+        $this->get("/api/public/apparatus-issues/{$defect->id}/photo")->assertOk();
+    }
+
+    public function test_a_clean_jpeg_racing_a_checkout_fills_the_placeholder(): void
+    {
+        $photoId = (string) Str::uuid();
+        $payload = $this->payload();
+        $this->damage($payload, $photoId, withDefectPhoto: true);
+        $this->submit($payload)->assertCreated();
+        $race = $this->checkoutWinsTheRaceFor($photoId);
+
+        $this->upload($photoId)->assertCreated()->assertJsonPath('status', InspectionPhotoUpload::STATUS_STORED);
+
+        $this->assertTrue($race->raced);
+        $row = InspectionPhotoUpload::query()->sole();
+        $this->assertSame(InspectionPhotoUpload::STATUS_STORED, $row->status);
+        $this->assertNotNull($row->sha256);
+        $this->assertSame(ApparatusInspection::query()->sole()->id, $row->apparatus_inspection_id);
+        $this->assertSame(ApparatusDefect::query()->sole()->photo_path, ApparatusDefect::query()->sole()->availablePhotoPath());
+    }
+
+    public function test_a_retry_of_a_photo_that_failed_conversion_is_accepted_again(): void
+    {
+        Queue::fake();
+        $photoId = (string) Str::uuid();
+        $this->upload($photoId, UploadedFile::fake()->image('scan.png', 400, 300))->assertCreated();
+        InspectionPhotoUpload::query()->where('uuid', $photoId)->update(['status' => InspectionPhotoUpload::STATUS_FAILED, 'source_path' => 'inspection-photo-uploads/incoming/'.$photoId.'.webp']);
+        Storage::disk('local')->put('inspection-photo-uploads/incoming/'.$photoId.'.webp', 'stale');
+
+        $this->upload($photoId)->assertCreated()->assertJsonPath('status', InspectionPhotoUpload::STATUS_STORED);
+
+        Storage::disk('local')->assertMissing('inspection-photo-uploads/incoming/'.$photoId.'.webp');
+        $this->assertDatabaseCount('inspection_photo_uploads', 1);
+    }
+
     public function test_the_same_photo_sent_twice_for_one_checkout_is_kept_once(): void
     {
         $first = (string) Str::uuid();
@@ -281,6 +342,27 @@ final class InspectionPhotoUploadTest extends TestCase
 
         Queue::assertPushed(ProcessInspectionPhotoUpload::class, fn (ProcessInspectionPhotoUpload $job): bool => $job->uuid === $stalled);
         $this->assertDatabaseHas('inspection_photo_uploads', ['uuid' => $attached]);
+    }
+
+    /**
+     * Take the checkout's placeholder away, then put it back at the exact moment the upload
+     * has read "no row yet" and is about to write: the checkout won the race.
+     */
+    private function checkoutWinsTheRaceFor(string $photoId): \stdClass
+    {
+        $placeholder = (array) DB::table('inspection_photo_uploads')->where('uuid', $photoId)->first();
+        DB::table('inspection_photo_uploads')->where('uuid', $photoId)->delete();
+        $race = new \stdClass;
+        $race->raced = false;
+        DB::listen(function (QueryExecuted $query) use ($race, $placeholder): void {
+            if ($race->raced || ! str_starts_with(strtolower(ltrim($query->sql)), 'select') || ! str_contains($query->sql, 'inspection_photo_uploads')) {
+                return;
+            }
+            $race->raced = true;
+            DB::table('inspection_photo_uploads')->insert($placeholder);
+        });
+
+        return $race;
     }
 
     private function upload(string $id, ?UploadedFile $file = null): \Illuminate\Testing\TestResponse

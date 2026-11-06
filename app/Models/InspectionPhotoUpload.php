@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $source_path
  * @property int|null $bytes
  * @property string|null $sha256
+ * @property int $conversion_attempts
  */
 class InspectionPhotoUpload extends Model
 {
@@ -49,6 +50,7 @@ class InspectionPhotoUpload extends Model
         'attached_at',
         'stored_at',
         'failure',
+        'conversion_attempts',
     ];
 
     protected $casts = [
@@ -57,6 +59,7 @@ class InspectionPhotoUpload extends Model
         'bytes' => 'integer',
         'width' => 'integer',
         'height' => 'integer',
+        'conversion_attempts' => 'integer',
         'attached_at' => 'datetime',
         'stored_at' => 'datetime',
     ];

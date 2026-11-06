@@ -16,9 +16,18 @@ The PostgreSQL database is not touched by this runbook.
 Container paths do not change, so no application code or `config/filesystems.php`
 change is needed: `compose.prod.image.yaml` mounts `HUB_STORAGE_APP_PATH` over
 `/var/www/html/storage/app`. When `HUB_STORAGE_APP_PATH` is unset the mount
-source is `HUB_STORAGE_PATH/app`, i.e. exactly today's layout. The mount uses
-`create_host_path: false`, so if the array is not mounted the container refuses
-to start instead of writing uploads into an empty directory on the root disk.
+source is `HUB_STORAGE_PATH/app`, i.e. exactly today's layout, and nothing below
+applies. When it is set, two guards keep uploads off the root disk:
+
+- The mount uses `create_host_path: false`, so a missing source directory stops
+  the start.
+- An unmounted array usually still leaves the directory itself on the root disk
+  (empty), which the mount would accept. So with `HUB_STORAGE_APP_PATH` set,
+  compose sets `HUB_STORAGE_APP_SENTINEL_REQUIRED=1` and
+  `docker/production/check-storage-mount` refuses to start unless the file
+  `.mbfd-storage-sentinel` is at the top of the mounted `storage/app`. It runs in
+  the container entrypoint and in `deploy.yml` before activation, so a deploy
+  stops while the running release is still serving. Step 4 creates the file.
 
 `public/storage` in the image is the relative symlink `../storage/app/public`;
 it resolves through the new mount, so `/storage/...` URLs keep working. The
@@ -126,6 +135,19 @@ sudo stat -c '%u:%g %a %n' "$DST" "$DST/private" "$DST/public"                  
 
 ## 4. Switch the mount
 
+Create the sentinel only now, after the last `rsync --delete` (which would remove
+it, since the NVMe copy has none). Without it the container refuses to start once
+`HUB_STORAGE_APP_PATH` is set:
+
+```bash
+mountpoint -q /mnt/mbfd-storage   # the array really is mounted
+sudo install -o 1000 -g 1000 -m 0644 /dev/null "$DST/.mbfd-storage-sentinel"
+sudo stat -c '%u:%g %a %n' "$DST/.mbfd-storage-sentinel"   # 1000:1000 644
+```
+
+Never create the sentinel in the bare mountpoint directory on the root disk
+(e.g. while the array is unmounted): that would defeat the check.
+
 ```bash
 sudo cp -a "$RUNTIME_ENV" "$RUNTIME_ENV.pre-storage-array-$(date -u +%Y%m%dT%H%M%SZ)"
 echo "HUB_STORAGE_APP_PATH=$DST" | sudo tee -a "$RUNTIME_ENV"
@@ -158,6 +180,7 @@ docker inspect --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}
 docker exec -u sail $APP sh -ec '
   cd /var/www/html
   findmnt -no SOURCE,TARGET storage/app
+  test -f storage/app/.mbfd-storage-sentinel && test "$HUB_STORAGE_APP_SENTINEL_REQUIRED" = 1
   stat -c "%u:%g %n" storage/app/private storage/app/public
   find storage/app -type f | wc -l
   touch storage/app/private/.write-probe && rm storage/app/private/.write-probe
@@ -223,3 +246,11 @@ made on the array to apply to the NVMe copy.
   PHP files in the web pool).
 - `livewire-tmp` (temporary uploads) moves with the rest; it is small and safe
   to exclude from backups.
+- If the Hub will not start and `docker logs mbfd-hub-laravel` says
+  `.mbfd-storage-sentinel is missing`, the array is not mounted (or
+  `HUB_STORAGE_APP_PATH` points at the wrong directory). Mount it
+  (`mountpoint -q /mnt/mbfd-storage`, `ls -la "$DST"` shows the files and the
+  sentinel), then start the container again. Do not create the sentinel to get
+  past the error. To run from NVMe instead, follow Rollback.
+- Restoring storage/app from a backup onto the array: check the sentinel is still
+  there afterwards (`--delete` restores from an NVMe-era copy remove it).

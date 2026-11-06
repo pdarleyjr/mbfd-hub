@@ -7,7 +7,6 @@ namespace App\Services\Inspections;
 use App\Jobs\Photos\ProcessInspectionPhotoUpload;
 use App\Models\InspectionPhotoUpload;
 use App\Services\Photos\PhotoNormalizer;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -38,6 +37,9 @@ final class InspectionPhotoUploads
 
     /** Uploaded photos no checkout ever named are removed after this many days. */
     public const UNATTACHED_RETENTION_DAYS = 30;
+
+    /** Originals awaiting conversion, on the private disk. */
+    public const INCOMING_DIRECTORY = 'inspection-photo-uploads/incoming';
 
     public function __construct(private readonly PhotoNormalizer $photos) {}
 
@@ -76,7 +78,7 @@ final class InspectionPhotoUploads
 
         $path = self::pathFor($uuid);
         $fast = $this->photos->isFastPath($bytes, $type);
-        $source = $fast ? null : 'inspection-photo-uploads/incoming/'.$uuid.'.'.PhotoNormalizer::EXTENSIONS[$type];
+        $source = $fast ? null : self::INCOMING_DIRECTORY.'/'.$uuid.'.'.PhotoNormalizer::EXTENSIONS[$type];
         $written = $fast
             ? Storage::disk(self::DISK)->put($path, $bytes)
             : Storage::disk(self::privateDisk())->put((string) $source, $bytes, ['visibility' => 'private']);
@@ -84,6 +86,7 @@ final class InspectionPhotoUploads
             throw $this->fail('The photo could not be saved. It stays on this device and will be sent again.');
         }
 
+        $now = now();
         $attributes = [
             'status' => $fast ? InspectionPhotoUpload::STATUS_STORED : InspectionPhotoUpload::STATUS_PROCESSING,
             'disk' => self::DISK,
@@ -93,33 +96,71 @@ final class InspectionPhotoUploads
             'width' => $size[0] ?? null,
             'height' => $size[1] ?? null,
             'sha256' => hash('sha256', $bytes),
-            'stored_at' => $fast ? now() : null,
+            'stored_at' => $fast ? $now : null,
             'failure' => null,
+            'conversion_attempts' => 0,
+            'updated_at' => $now,
         ];
 
-        if ($existing !== null) {
-            // Named by a checkout before it arrived (or an earlier unreadable copy): fill in the same row.
-            $existing->forceFill($attributes)->save();
-            $upload = $existing;
-        } else {
-            try {
-                $upload = InspectionPhotoUpload::query()->create(['uuid' => $uuid, 'user_id' => $userId, ...$attributes]);
-            } catch (UniqueConstraintViolationException) {
-                // A concurrent copy of the same retry won; it wrote the same bytes to the same place.
-                $winner = $this->owned($uuid, $userId);
-                if ($winner === null) {
-                    throw $this->fail('The photo could not be saved. It stays on this device and will be sent again.');
-                }
+        if (! $this->claim($uuid, $userId, $attributes, $now)) {
+            // Somebody else filled this row first (a concurrent copy of the same retry).
+            return ['upload' => $this->alreadyDelivered($uuid, $userId, $source), 'created' => false];
+        }
 
-                return ['upload' => $winner, 'created' => false];
-            }
+        $previousSource = $existing?->source_path;
+        if (is_string($previousSource) && $previousSource !== $source) {
+            // An earlier failed copy held its original under another extension.
+            Storage::disk(self::privateDisk())->delete($previousSource);
         }
 
         if (! $fast) {
             ProcessInspectionPhotoUpload::dispatch($uuid);
         }
 
-        return ['upload' => $upload, 'created' => true];
+        return ['upload' => InspectionPhotoUpload::query()->where('uuid', $uuid)->firstOrFail(), 'created' => true];
+    }
+
+    /**
+     * Write this upload into its row in two race-free steps: insert the row when there is
+     * none, otherwise fill it only while it is still waiting for bytes. A checkout's
+     * attach() may insert the awaiting_upload placeholder at any moment between this
+     * request's first read and its write; the guarded UPDATE then fills that placeholder
+     * instead of losing the photo.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function claim(string $uuid, int $userId, array $attributes, \DateTimeInterface $now): bool
+    {
+        $inserted = InspectionPhotoUpload::query()->insertOrIgnore([
+            'uuid' => $uuid,
+            'user_id' => $userId,
+            ...$attributes,
+            'created_at' => $now,
+        ]);
+        if ($inserted > 0) {
+            return true;
+        }
+
+        return InspectionPhotoUpload::query()
+            ->where('uuid', $uuid)
+            ->where('user_id', $userId)
+            ->whereIn('status', [InspectionPhotoUpload::STATUS_AWAITING_UPLOAD, InspectionPhotoUpload::STATUS_FAILED])
+            ->update($attributes) > 0;
+    }
+
+    /** The row another request filled. Reports "already stored" only when it really holds bytes. */
+    private function alreadyDelivered(string $uuid, int $userId, ?string $source): InspectionPhotoUpload
+    {
+        $winner = $this->owned($uuid, $userId);
+        if ($winner === null || ! $winner->hasBytes()) {
+            throw $this->fail('The photo could not be saved. It stays on this device and will be sent again.');
+        }
+        if (is_string($source) && $winner->source_path !== $source) {
+            // The winner already converted (or holds its original elsewhere): this copy is spare.
+            Storage::disk(self::privateDisk())->delete($source);
+        }
+
+        return $winner;
     }
 
     /**

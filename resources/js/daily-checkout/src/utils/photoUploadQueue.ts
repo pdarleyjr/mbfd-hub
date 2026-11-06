@@ -24,18 +24,39 @@ import {
 
 export const PHOTO_UPLOADS_CHANGED_EVENT = 'mbfd:photo-uploads-changed';
 const UPLOAD_URL = '/api/public/inspection-photos';
-const SENT_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
-const REJECTED_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SENT_RETENTION_MS = 3 * DAY_MS;
+const REJECTED_RETENTION_MS = 14 * DAY_MS;
+/** A photo still not sent after this long (its member never signed in again, for example) is given up on. */
+export const PENDING_RETENTION_MS = 14 * DAY_MS;
+/** A photo given up on stays visible to its member this long, then leaves the device. */
+const FAILED_RETENTION_MS = 14 * DAY_MS;
 const SIGN_IN_WAIT_MS = 60_000;
+/** 404/405: the upload route is missing for a moment (a release or rollback under way). Wait, never give up on that alone. */
+export const ROUTE_MISSING_RETRY_MS = 15 * 60 * 1000;
+/** Server errors (5xx) one photo may meet before it is given up on and shown to its member as not sent. */
+export const MAX_SERVER_ERROR_ATTEMPTS = 30;
+
+const NOT_SENT_SUFFIX = 'The inspection was still sent; take the photo again if it is needed.';
+export const SERVER_GAVE_UP_MESSAGE = `The Hub could not take this photo after many tries. ${NOT_SENT_SUFFIX}`;
+export const EXPIRED_MESSAGE = `This photo was not sent within 14 days. ${NOT_SENT_SUFFIX}`;
 
 export type PhotoSendOutcome =
   | { kind: 'sent' }
-  | { kind: 'retry'; delayMs: number; message: string }
+  | { kind: 'retry'; delayMs: number; message: string; serverError?: boolean }
   | { kind: 'rejected'; message: string }
+  | { kind: 'failed'; message: string }
   | { kind: 'sign_in' };
 
-/** What one attempt means for the photo. Pure. */
-export function photoSendOutcome(result: PhotoUploadResponse | PhotoUploadNetworkError, attempts: number): PhotoSendOutcome {
+/**
+ * What one attempt means for the photo. Pure.
+ *  - 401/403/419: the member must sign in again; the photo is kept.
+ *  - 404/405: the route is missing during a release or rollback; tried again after a long wait.
+ *  - 408/425/429/5xx and lost connections: tried again with backoff; after
+ *    MAX_SERVER_ERROR_ATTEMPTS server errors the photo is given up on ("failed").
+ *  - 409/413/415/422 and any other answer: the Hub cannot use this photo ("rejected").
+ */
+export function photoSendOutcome(result: PhotoUploadResponse | PhotoUploadNetworkError, attempts: number, serverErrors = 0): PhotoSendOutcome {
   if (result instanceof PhotoUploadNetworkError) {
     return {
       kind: 'retry',
@@ -45,13 +66,37 @@ export function photoSendOutcome(result: PhotoUploadResponse | PhotoUploadNetwor
   }
   const { status, json } = result;
   if (status === 200 || status === 201) return { kind: 'sent' };
-  if (status === 401 || status === 419) return { kind: 'sign_in' };
+  if (json.offline === true) {
+    // The service worker's own answer when the network failed: a lost connection, not a server error.
+    return { kind: 'retry', delayMs: photoRetryDelayMs(attempts), message: 'The connection dropped during the upload.' };
+  }
+  if (status === 401 || status === 403 || status === 419) return { kind: 'sign_in' };
+  if (status === 404 || status === 405) {
+    return { kind: 'retry', delayMs: Math.max(ROUTE_MISSING_RETRY_MS, photoRetryDelayMs(attempts, result.retryAfterMs)), message: 'The Hub is being updated. The photo will be sent again later.' };
+  }
+  if (status >= 500 && serverErrors + 1 >= MAX_SERVER_ERROR_ATTEMPTS) return { kind: 'failed', message: SERVER_GAVE_UP_MESSAGE };
   if (isRetryablePhotoStatus(status)) {
-    return { kind: 'retry', delayMs: photoRetryDelayMs(attempts, result.retryAfterMs), message: 'The Hub is busy. The photo will be sent again shortly.' };
+    return { kind: 'retry', delayMs: photoRetryDelayMs(attempts, result.retryAfterMs), message: 'The Hub is busy. The photo will be sent again shortly.', serverError: status >= 500 };
   }
   if (status === 413) return { kind: 'rejected', message: 'This photo is too large to send. Take it again with the camera.' };
 
   return { kind: 'rejected', message: firstErrorMessage(json) ?? 'The Hub could not use this photo. Take it again.' };
+}
+
+/** What housekeeping does with one saved photo record. Pure. */
+export function photoRecordFate(record: Pick<QueuedPhoto, 'status' | 'createdAt' | 'sentAt' | 'failedAt'>, now: number): 'keep' | 'expire' | 'delete' {
+  switch (record.status) {
+    case 'pending':
+      return now - record.createdAt > PENDING_RETENTION_MS ? 'expire' : 'keep';
+    case 'sent':
+      return now - (record.sentAt ?? record.createdAt) > SENT_RETENTION_MS ? 'delete' : 'keep';
+    case 'rejected':
+      return now - record.createdAt > REJECTED_RETENTION_MS ? 'delete' : 'keep';
+    case 'failed':
+      return now - (record.failedAt ?? record.createdAt) > FAILED_RETENTION_MS ? 'delete' : 'keep';
+    default:
+      return 'keep';
+  }
 }
 
 export interface PhotoUploadSummary {
@@ -59,6 +104,8 @@ export interface PhotoUploadSummary {
   sent: number;
   pending: number;
   rejected: number;
+  /** Given up on after many server errors or 14 days unsent. */
+  failed: number;
 }
 
 /** Counts for the photos one checkout names. Pure. */
@@ -73,6 +120,7 @@ export function summarizePhotos(records: Array<Pick<QueuedPhoto, 'id' | 'status'
     sent: statuses.filter(status => status === 'sent').length,
     pending: statuses.filter(status => status === 'pending').length,
     rejected: statuses.filter(status => status === 'rejected').length,
+    failed: statuses.filter(status => status === 'failed').length,
   };
 }
 
@@ -93,7 +141,7 @@ export function photoIdsOf(submission: {
 
 /** "3 of 4 photos sent", plus what happens to the rest. Null when nothing is outstanding. */
 export function photoSummaryLine(summary: PhotoUploadSummary, online: boolean): string | null {
-  if (summary.total === 0 || (summary.pending === 0 && summary.rejected === 0)) return null;
+  if (summary.total === 0 || (summary.pending === 0 && summary.rejected === 0 && summary.failed === 0)) return null;
   const noun = summary.total === 1 ? 'photo' : 'photos';
   const parts = [`${summary.sent} of ${summary.total} ${noun} sent.`];
   if (summary.pending > 0) {
@@ -103,6 +151,7 @@ export function photoSummaryLine(summary: PhotoUploadSummary, online: boolean): 
       : (one ? 'The other photo will send when this device is back online.' : `The other ${summary.pending} photos will send when this device is back online.`));
   }
   if (summary.rejected > 0) parts.push(`${summary.rejected} could not be used by the Hub; the inspection was still sent.`);
+  if (summary.failed > 0) parts.push(`${summary.failed} could not be sent; the inspection was still sent.`);
 
   return parts.join(' ');
 }
@@ -139,13 +188,20 @@ export async function queuePhoto(file: File): Promise<string> {
   if (!identity) throw new Error('Sign in online once before adding photos.');
   const prepared = await preparePhoto(file);
   const id = createClientSubmissionId();
+  let data: ArrayBuffer;
+  try {
+    data = await prepared.blob.arrayBuffer();
+  } catch {
+    throw new Error('The image could not be read. Choose it again.');
+  }
   try {
     await db.photoUploads.add({
       id,
       ownerUserId: identity.userId,
-      blob: prepared.blob,
+      data,
+      type: prepared.blob.type || 'image/jpeg',
       filename: prepared.filename,
-      bytes: prepared.blob.size,
+      bytes: data.byteLength,
       status: 'pending',
       attempts: 0,
       createdAt: Date.now(),
@@ -171,6 +227,9 @@ export async function discardQueuedPhoto(id: string | undefined): Promise<void> 
 
 export const getQueuedPhoto = (id: string): Promise<QueuedPhoto | undefined> => db.photoUploads.get(id);
 
+/** The saved photo as a Blob again (for a preview or the upload). */
+export const queuedPhotoBlob = (record: Pick<QueuedPhoto, 'data' | 'type'>): Blob => new Blob([record.data], { type: record.type });
+
 export async function photoUploadSummary(ids: string[]): Promise<PhotoUploadSummary> {
   const unique = [...new Set(ids)];
 
@@ -180,12 +239,26 @@ export async function photoUploadSummary(ids: string[]): Promise<PhotoUploadSumm
 /** Photos on this device that have not reached the Hub yet. */
 export const pendingPhotoCount = (): Promise<number> => db.photoUploads.where('status').equals('pending').count();
 
-const pruneOldRecords = async (): Promise<void> => {
+/** This member's photos that were given up on, for the connection bar. */
+export async function failedPhotoCount(): Promise<number> {
+  const identity = await cachedOfflineIdentity();
+  if (!identity) return 0;
+
+  return db.photoUploads.where('status').equals('failed').filter(record => record.ownerUserId === identity.userId).count();
+}
+
+/**
+ * Keeps this device's photo store bounded: a photo still unsent after 14 days (any member's)
+ * is given up on and shown to its member as not sent; sent, rejected and given-up photos
+ * leave the device after their retention.
+ */
+const expireAndPruneRecords = async (): Promise<void> => {
   const now = Date.now();
-  await db.photoUploads
-    .filter(record => (record.status === 'sent' && now - (record.sentAt ?? record.createdAt) > SENT_RETENTION_MS)
-      || (record.status === 'rejected' && now - record.createdAt > REJECTED_RETENTION_MS))
-    .delete();
+  const expired = await db.photoUploads
+    .filter(record => photoRecordFate(record, now) === 'expire')
+    .modify({ status: 'failed', failedAt: now, nextAttemptAt: undefined, lastError: EXPIRED_MESSAGE });
+  const deleted = await db.photoUploads.filter(record => photoRecordFate(record, now) === 'delete').delete();
+  if (expired > 0 || deleted > 0) notify();
 };
 
 const scheduleNextDrain = async (): Promise<void> => {
@@ -200,7 +273,7 @@ const scheduleNextDrain = async (): Promise<void> => {
 const sendOne = async (record: QueuedPhoto): Promise<PhotoSendOutcome> => {
   const form = new FormData();
   form.append('client_photo_id', record.id);
-  form.append('photo', record.blob, record.filename);
+  form.append('photo', queuedPhotoBlob(record), record.filename);
   progress.set(record.id, 0);
   notify();
   let result: PhotoUploadResponse | PhotoUploadNetworkError;
@@ -215,14 +288,17 @@ const sendOne = async (record: QueuedPhoto): Promise<PhotoSendOutcome> => {
     progress.delete(record.id);
   }
 
-  const outcome = photoSendOutcome(result, record.attempts);
+  const serverErrors = record.serverErrors ?? 0;
+  const outcome = photoSendOutcome(result, record.attempts, serverErrors);
   const now = Date.now();
   if (outcome.kind === 'sent') {
     await db.photoUploads.update(record.id, { status: 'sent', sentAt: now, lastError: undefined, nextAttemptAt: undefined });
   } else if (outcome.kind === 'rejected') {
     await db.photoUploads.update(record.id, { status: 'rejected', lastError: outcome.message, attempts: record.attempts + 1 });
+  } else if (outcome.kind === 'failed') {
+    await db.photoUploads.update(record.id, { status: 'failed', failedAt: now, lastError: outcome.message, attempts: record.attempts + 1, serverErrors: serverErrors + 1, nextAttemptAt: undefined });
   } else if (outcome.kind === 'retry') {
-    await db.photoUploads.update(record.id, { attempts: record.attempts + 1, nextAttemptAt: now + outcome.delayMs, lastError: outcome.message });
+    await db.photoUploads.update(record.id, { attempts: record.attempts + 1, serverErrors: serverErrors + (outcome.serverError ? 1 : 0), nextAttemptAt: now + outcome.delayMs, lastError: outcome.message });
   } else {
     await db.photoUploads.update(record.id, { nextAttemptAt: now + SIGN_IN_WAIT_MS, lastError: 'Sign in again to send this photo.' });
   }
@@ -238,7 +314,7 @@ const sendOne = async (record: QueuedPhoto): Promise<PhotoSendOutcome> => {
 export function drainPhotoUploads(): Promise<void> {
   if (draining) return draining;
   draining = (async () => {
-    await pruneOldRecords();
+    await expireAndPruneRecords();
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     const pending = await db.photoUploads.where('status').equals('pending').sortBy('createdAt');
     if (pending.length === 0) return;

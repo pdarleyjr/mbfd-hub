@@ -346,6 +346,8 @@ jobs:
           HUB_IMAGE_REF="$IMAGE_REF" docker compose --env-file "$HUB_IMAGE_RUNTIME_ENV" -f compose.prod.image.yaml run --interactive=false --rm --no-deps --pull never \
             --volume "$HUB_BACKUP_DIR:/evidence" --entrypoint bash laravel.test -lc '
               set -euo pipefail
+              # Before the running release is replaced: storage/app on the array must really be mounted.
+              /usr/local/bin/check-storage-mount
               php artisan identity:provision-universal-accounts --format=json > "/evidence/$1"
               php artisan identity:established-account-integrity --write="/evidence/$2" --no-interaction
             ' bash "$INVENTORY_NAME" "$SNAPSHOT_NAME"

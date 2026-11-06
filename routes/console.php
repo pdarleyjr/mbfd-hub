@@ -105,7 +105,7 @@ Schedule::command('fleet:prune-take-home-uploads')
     ->withoutOverlapping()
     ->onOneServer();
 
-// Member photo uploads: abandoned Daily Checkout uploads, stalled conversions, old Livewire temporary files.
+// Member photo uploads: abandoned Daily Checkout uploads, stalled conversions, spent originals, old Livewire temporary files.
 Schedule::command('photos:maintain')
     ->hourlyAt(25)
     ->withoutOverlapping()

@@ -59,6 +59,73 @@ class ProductionWebRuntimeConfigTest extends TestCase
         $this->assertGreaterThan((int) $terminate[1], (int) $read[1]);
     }
 
+    public function test_access_log_never_writes_a_token_from_the_path_or_query(): void
+    {
+        $nginx = $this->read('docker/production/nginx.conf');
+
+        $this->assertStringContainsString('"path":"$hub_log_path_safe"', $nginx);
+        $this->assertStringNotContainsString('"path":"$hub_log_path"', $nginx);
+        $this->assertStringNotContainsString('$http_referer', $nginx, 'a Referer can carry a token link');
+        $this->assertStringNotContainsString('$args', $nginx);
+
+        $token = str_repeat('a1b2c3d4', 8);
+        $redacted = [
+            "/reset-password/{$token}" => '/reset-password/[redacted]',
+            "/reset-password/{$token}?email=member%40example.test" => '/reset-password/[redacted]',
+            "//Reset-Password/{$token}" => '/reset-password/[redacted]',
+            "/account/city-email/verify/{$token}" => '/account/city-email/verify/[redacted]',
+            "/supply-kiosk/pair/{$token}" => '/supply-kiosk/pair/[redacted]',
+            "/some/future/{$token}/route" => '/some/future/[redacted]/route',
+            "/signed/{$token}" => '/signed/[redacted]',
+        ];
+        foreach ($redacted as $requestUri => $logged) {
+            $this->assertSame($logged, $this->loggedPath($nginx, $requestUri), $requestUri);
+        }
+
+        // Ordinary paths, hashed assets and record ids stay readable; a query string never reaches the log.
+        foreach ([
+            '/daily/vehicle-inspections/engine-2',
+            '/daily/assets/index-Bx7d9Kp2.js',
+            '/api/public/inspection-photos',
+            '/take-home-inspections/photos/0f8fad5b-d9cb-469f-a165-70867728950e',
+            '/employee/activity/open/inspection:42',
+            '/supply-kiosk/pair-code',
+        ] as $path) {
+            $this->assertSame($path, $this->loggedPath($nginx, $path.'?token=secret'), $path);
+        }
+    }
+
+    /**
+     * What the access log writes for one request URI, by applying the two nginx maps
+     * ($request_uri -> $hub_log_path -> $hub_log_path_safe) with PCRE, as nginx does.
+     */
+    private function loggedPath(string $nginx, string $requestUri): string
+    {
+        return $this->applyMap($nginx, 'map $hub_log_path $hub_log_path_safe', $this->applyMap($nginx, 'map $request_uri $hub_log_path', $requestUri));
+    }
+
+    private function applyMap(string $nginx, string $header, string $input): string
+    {
+        $start = strpos($nginx, $header.' {');
+        $this->assertNotFalse($start, "{$header} must exist");
+        $end = strpos($nginx, "\n    }", $start);
+        $block = substr($nginx, $start, (int) $end - $start);
+        preg_match_all('/^\s+"(~\*?)([^"]+)"\s+("[^"]*"|\$\w+);$/m', $block, $entries, PREG_SET_ORDER);
+        $this->assertNotEmpty($entries, "{$header} has regex entries");
+        foreach ($entries as [, $operator, $pattern, $value]) {
+            $flags = $operator === '~*' ? 'i' : '';
+            if (preg_match('#'.str_replace('#', '\#', $pattern).'#'.$flags, $input, $match) !== 1) {
+                continue;
+            }
+
+            return (string) preg_replace_callback('/\$\{?(\w+)\}?/', static fn (array $name): string => $match[$name[1]] ?? '', trim($value, '"'));
+        }
+        preg_match('/^\s+default\s+("[^"]*"|\$\w+);$/m', $block, $default);
+        $this->assertNotEmpty($default, "{$header} has a default");
+
+        return $default[1] === '$hub_log_path' ? $input : trim($default[1], '"');
+    }
+
     public function test_php_fpm_pool_is_non_root_inherits_the_environment_and_is_sized(): void
     {
         $fpm = $this->read('docker/production/php-fpm.conf');
@@ -108,5 +175,42 @@ class ProductionWebRuntimeConfigTest extends TestCase
         );
         $this->assertStringContainsString('"${HUB_STORAGE_PATH:?HUB_STORAGE_PATH must be the existing writable Hub storage directory}:/var/www/html/storage"', $compose);
         $this->assertFileExists(dirname(__DIR__, 2).'/docs/ops/storage-on-mbfd-storage.md');
+    }
+
+    public function test_an_unmounted_storage_array_never_starts_the_hub_and_unset_changes_nothing(): void
+    {
+        $compose = $this->read('compose.prod.image.yaml');
+        $check = $this->read('docker/production/check-storage-mount');
+        $entrypoint = $this->read('docker/production/start-production-container');
+        $dockerfile = $this->read('docker/production/Dockerfile');
+        $deploy = $this->read('.github/workflows/deploy.yml');
+        $runbook = $this->read('docs/ops/storage-on-mbfd-storage.md');
+
+        // Required only when storage/app comes from HUB_STORAGE_APP_PATH (":+" is empty when it is unset).
+        $this->assertStringContainsString('HUB_STORAGE_APP_SENTINEL_REQUIRED: "${HUB_STORAGE_APP_PATH:+1}"', $compose);
+        $this->assertStringContainsString('STORAGE_SENTINEL=/var/www/html/storage/app/.mbfd-storage-sentinel', $check);
+        $this->assertMatchesRegularExpression('/if \[ "\$\{HUB_STORAGE_APP_SENTINEL_REQUIRED:-\}" = \'1\' \] && \[ ! -f "\$STORAGE_SENTINEL" \]; then\s+echo .*>&2\s+exit 1\s+fi/', $check);
+        $this->assertStringStartsWith("#!/usr/bin/env bash\n", $check);
+        $this->assertStringContainsString('set -euo pipefail', $check);
+
+        // Checked by the entrypoint before anything starts, and by deploy before the running release is replaced.
+        $this->assertMatchesRegularExpression('/\/usr\/local\/bin\/check-storage-mount\s+exec \/usr\/bin\/supervisord/', $entrypoint);
+        $this->assertStringContainsString('COPY docker/production/check-storage-mount /usr/local/bin/check-storage-mount', $dockerfile);
+        $this->assertMatchesRegularExpression('/chmod 0755 [^;]*\/usr\/local\/bin\/check-storage-mount/', $dockerfile);
+        $inventory = strpos($deploy, 'identity:provision-universal-accounts');
+        $guard = strpos($deploy, '/usr/local/bin/check-storage-mount');
+        $activation = strpos($deploy, 'up -d --pull never --no-build --no-deps --force-recreate laravel.test');
+        $this->assertNotFalse($guard);
+        $this->assertNotFalse($activation);
+        $this->assertLessThan($inventory, $guard);
+        $this->assertLessThan($activation, $guard);
+
+        // The runbook creates the sentinel after the last delete-sync, on the mounted array.
+        $create = strpos($runbook, 'sudo install -o 1000 -g 1000 -m 0644 /dev/null "$DST/.mbfd-storage-sentinel"');
+        $lastDeleteSync = strrpos(substr($runbook, 0, (int) strpos($runbook, '## 4. Switch the mount')), 'rsync -aHAX --numeric-ids --delete');
+        $this->assertNotFalse($create);
+        $this->assertNotFalse($lastDeleteSync);
+        $this->assertGreaterThan($lastDeleteSync, $create);
+        $this->assertLessThan(strpos($runbook, 'echo "HUB_STORAGE_APP_PATH=$DST"'), $create);
     }
 }

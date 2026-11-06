@@ -536,6 +536,9 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(productionDockerfile, /USER sail/);
   assert.doesNotMatch(productionEntrypoint, /\b(?:user|group)mod\b|\bchown\b/);
   assert.match(productionEntrypoint, /baked non-root sail identity/);
+  // storage/app on the array: an unmounted array (empty mountpoint) never starts the Hub.
+  assert.match(productionEntrypoint, /\/usr\/local\/bin\/check-storage-mount\s+exec \/usr\/bin\/supervisord/);
+  assert.match(imageCompose, /HUB_STORAGE_APP_SENTINEL_REQUIRED: "\$\{HUB_STORAGE_APP_PATH:\+1\}"/);
 
   const aggregate = workflowJob(gates, "release-gates");
   assert.doesNotMatch(aggregate, /if:\s*\$\{\{\s*always\(\)\s*\}\}/);

@@ -79,7 +79,7 @@ final class ProcessInspectionPhotoUpload implements ShouldQueue
         $private->delete($source);
     }
 
-    /** Out of attempts: stop re-queueing. The original stays on the private disk for a manual retry. */
+    /** Out of attempts: stop re-queueing. The original stays on the private disk for a manual retry until photos:maintain deletes it (7 days). */
     public function failed(?\Throwable $exception): void
     {
         InspectionPhotoUpload::query()

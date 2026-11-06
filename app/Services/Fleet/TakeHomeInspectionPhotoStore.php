@@ -33,6 +33,9 @@ final class TakeHomeInspectionPhotoStore
 {
     public const MAX_UPLOAD_KB = 30720;
 
+    /** Originals awaiting conversion, on the private disk. */
+    public const INCOMING_DIRECTORY = 'take-home-inspections/incoming';
+
     private const MIN_EDGE = 240;
 
     public function __construct(private readonly PhotoNormalizer $photos) {}
@@ -72,7 +75,7 @@ final class TakeHomeInspectionPhotoStore
         $disk = Storage::disk(self::disk());
         $path = 'take-home-inspections/photos/'.now()->format('Y/m').'/'.$uuid.'.jpg';
         $fast = $this->photos->isFastPath($bytes, $type);
-        $written = $fast ? $path : 'take-home-inspections/incoming/'.$uuid.'.'.PhotoNormalizer::EXTENSIONS[$type];
+        $written = $fast ? $path : self::INCOMING_DIRECTORY.'/'.$uuid.'.'.PhotoNormalizer::EXTENSIONS[$type];
         if (! $disk->put($written, $bytes, ['visibility' => 'private'])) {
             throw $this->fail('The photo could not be saved. Please try again.');
         }

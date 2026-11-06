@@ -144,13 +144,14 @@ COPY docker/production/php-fpm.ini /etc/php/8.5/fpm/conf.d/99-mbfd-web.ini
 COPY docker/production/php-fpm.conf /etc/php/8.5/fpm/php-fpm-hub.conf
 COPY docker/production/nginx.conf /etc/nginx/hub/nginx.conf
 COPY docker/production/start-production-container /usr/local/bin/start-production-container
+COPY docker/production/check-storage-mount /usr/local/bin/check-storage-mount
 
 # The web tier (nginx + php-fpm) runs as sail, so its sockets, pid files and
 # request/response spool directories live in one sail-owned tree. The web pool
 # must load exactly the CLI's extensions (pcntl is CLI-only; cgi-fcgi is the
 # FPM SAPI itself).
 RUN set -eu; \
-    chmod 0755 /usr/local/bin/start-production-container; \
+    chmod 0755 /usr/local/bin/start-production-container /usr/local/bin/check-storage-mount; \
     install -d -o sail -g sail -m 0700 /var/lib/hub-web /var/lib/hub-web/run /var/lib/hub-web/tmp; \
     for spool in client-body proxy fastcgi uwsgi scgi; do \
         install -d -o sail -g sail -m 0700 "/var/lib/hub-web/tmp/$spool"; \

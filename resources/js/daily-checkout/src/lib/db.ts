@@ -61,17 +61,25 @@ export interface QueuedPhoto {
   /** The photo id the server keys on (idempotency key for every attempt). */
   id: string;
   ownerUserId: number;
-  /** The shrunken JPEG (or the original when the phone could not convert it). */
-  blob: Blob;
+  /**
+   * The shrunken JPEG (or the original when the phone could not convert it), as bytes plus type:
+   * WebKit cannot store a Blob in IndexedDB in every context (private browsing), an ArrayBuffer it always can.
+   */
+  data: ArrayBuffer;
+  type: string;
   filename: string;
   bytes: number;
-  status: 'pending' | 'sent' | 'rejected';
+  /** failed: given up on (many server errors, or 14 days unsent); shown to its member as not sent. */
+  status: 'pending' | 'sent' | 'rejected' | 'failed';
   attempts: number;
+  /** Server errors (5xx) met so far; the photo is given up on at MAX_SERVER_ERROR_ATTEMPTS. */
+  serverErrors?: number;
   /** Epoch ms before which no automatic attempt is made. */
   nextAttemptAt?: number;
   lastError?: string;
   createdAt: number;
   sentAt?: number;
+  failedAt?: number;
 }
 
 class MBFDDatabase extends Dexie {

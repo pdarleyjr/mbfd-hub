@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A privately stored, re-encoded inspection photo. Uploaded before submission
  * (unattached) and attached to exactly one inspection on submit.
+ *
+ * @property int $conversion_attempts times photos:maintain queued a stalled conversion again
  */
 class TakeHomeVehicleInspectionPhoto extends Model
 {
@@ -27,12 +29,14 @@ class TakeHomeVehicleInspectionPhoto extends Model
         'height',
         'bytes',
         'sha256',
+        'conversion_attempts',
     ];
 
     protected $casts = [
         'width' => 'integer',
         'height' => 'integer',
         'bytes' => 'integer',
+        'conversion_attempts' => 'integer',
     ];
 
     /** @return BelongsTo<TakeHomeVehicleInspection, $this> */
