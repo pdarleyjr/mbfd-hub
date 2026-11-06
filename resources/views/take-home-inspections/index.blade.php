@@ -63,10 +63,15 @@
                                     @endif
                                     @if($inspection->has_issues)<span class="hub-tag hub-tag--danger">Issues</span>@endif
                                     @if($inspection->has_not_checked)<span class="hub-tag hub-tag--warning">Not checked</span>@endif
+                                    @if($inspection->isEdited())<span class="hub-tag">Edited</span>@endif
+                                    @if($inspection->isArchived())<span class="hub-tag">Cleared by Fleet</span>@endif
                                 </div>
                                 <div class="thvi-history__actions">
                                     <a class="hub-btn hub-btn--secondary hub-btn--compact" href="{{ route('take-home-inspections.show', $inspection) }}">View</a>
                                     <a class="hub-btn hub-btn--secondary hub-btn--compact" href="{{ route('take-home-inspections.pdf', $inspection) }}">PDF</a>
+                                    @unless($inspection->isArchived())
+                                        <a class="hub-btn hub-btn--secondary hub-btn--compact" href="{{ route('take-home-inspections.edit', $inspection) }}">Edit</a>
+                                    @endunless
                                 </div>
                             </li>
                         @endforeach

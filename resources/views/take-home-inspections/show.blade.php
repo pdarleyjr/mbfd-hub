@@ -19,10 +19,27 @@
     <main id="main" class="hub-page__main thvi-main mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <x-hub.page-header title="Take Home Vehicle Inspection" :description="$inspection->reference.' · Submitted '.$inspection->submittedAtLocal().' by '.$inspection->inspector_name">
             <a href="{{ route('take-home-inspections.pdf', $inspection) }}" class="hub-btn hub-btn--primary">Download PDF</a>
+            @if($canEdit)
+                <a href="{{ route('take-home-inspections.edit', $inspection) }}" class="hub-btn hub-btn--secondary" data-thvi-edit>Edit inspection</a>
+            @endif
             @if($isOwn)
                 <a href="{{ route('take-home-inspections.create') }}" class="hub-btn hub-btn--secondary">New inspection</a>
             @endif
         </x-hub.page-header>
+
+        @if($revisedNumber)
+            <div class="hub-callout" role="status"><p class="font-bold">Your changes were saved. The report below shows them.</p></div>
+        @elseif($unchanged)
+            <div class="hub-callout" role="status"><p class="font-bold">Nothing was changed, so nothing new was recorded.</p></div>
+        @endif
+
+        @if($original->isArchived())
+            <div class="hub-callout" role="note" data-thvi-cleared>
+                <p class="font-bold">Cleared by Fleet {{ $original->archived_at->clone()->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}@if($original->archivedBy) by {{ $original->archivedBy->display_name ?: $original->archivedBy->name }}@endif.</p>
+                @if(filled($original->archive_reason))<p class="mt-1 whitespace-pre-line text-sm">{{ $original->archive_reason }}</p>@endif
+                @if($isOwn)<p class="mt-1 text-sm">This inspection has been handled and can no longer be edited.</p>@endif
+            </div>
+        @endif
 
         @if($inspection->acceptable_for_use === false)
             <div class="hub-callout hub-callout--warning" role="note"><p class="font-bold">Reported not acceptable for use.</p></div>
@@ -30,6 +47,36 @@
             <div class="hub-callout hub-callout--warning" role="note"><p class="font-bold">Acceptability for use was not answered.</p></div>
         @elseif($inspection->has_issues || $inspection->has_not_checked)
             <div class="hub-callout hub-callout--warning" role="note"><p class="font-bold">Acceptable for use, with {{ $inspection->has_issues ? 'issues found' : 'items not checked' }}{{ $inspection->has_issues && $inspection->has_not_checked ? ' and items not checked' : '' }}.</p></div>
+        @endif
+
+        @if($original->revisions->isNotEmpty())
+            @php($latest = $original->revisions->last())
+            <section class="hub-panel" aria-labelledby="changes-heading" data-thvi-revisions>
+                <div class="hub-panel__header">
+                    <h2 id="changes-heading" class="text-lg font-bold">Edited by {{ $latest->revised_by_name }} on {{ $latest->createdAtLocal() }}</h2>
+                    <span class="hub-tag">{{ $original->revisions->count() === 1 ? '1 edit' : $original->revisions->count().' edits' }}</span>
+                </div>
+                <div class="p-4">
+                    <p class="text-sm">This report shows the corrected answers. The answers as signed on {{ $original->submittedAtLocal() }} are kept.</p>
+                    <details class="thvi-disclosure mt-2">
+                        <summary>View original and changes</summary>
+                        <ol class="grid gap-3">
+                            @foreach($original->revisions as $revision)
+                                <li class="hub-well p-3" data-thvi-revision="{{ $revision->revision_number }}">
+                                    <p class="font-bold">Edit {{ $revision->revision_number }} · {{ $revision->revised_by_name }} · {{ $revision->createdAtLocal() }}</p>
+                                    @if(filled($revision->reason))<p class="mt-1 whitespace-pre-line text-sm">Reason: {{ $revision->reason }}</p>@endif
+                                    <ul class="thvi-changes">
+                                        @foreach($revision->changeLines() as $line)
+                                            <li><span class="font-semibold">{{ $line['label'] }}:</span> <del>{{ $line['from'] }}</del> → <ins>{{ $line['to'] }}</ins></li>
+                                        @endforeach
+                                    </ul>
+                                </li>
+                            @endforeach
+                        </ol>
+                        <p class="mt-2 text-sm text-hub-muted">In each edit, the first value is what the report said before and the second is the correction. Edit 1 starts from the original as signed.</p>
+                    </details>
+                </div>
+            </section>
         @endif
 
         <section class="hub-panel overflow-hidden" aria-labelledby="vehicle-heading">

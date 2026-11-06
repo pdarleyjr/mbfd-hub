@@ -167,3 +167,26 @@
 [data-hub-ui="2"] .thvi-photo__actions .hub-btn:focus-within,
 [data-hub-ui="2"] .thvi-check .hub-btn:focus-within { outline: 2px solid rgb(var(--hub2-focus)); outline-offset: 2px; }
 
+
+/* Edit (correction) form: native radios styled like the submit form's segments, so it works without scripts. */
+[data-hub-ui="2"] .thvi-choices { display: grid; grid-template-columns: repeat(var(--thvi-options, 3), minmax(0, 1fr)); gap: 6px; }
+[data-hub-ui="2"] .thvi-choices--two { --thvi-options: 2; }
+[data-hub-ui="2"] .thvi-choice {
+    position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 4px 6px; text-align: center;
+    border: 1px solid rgb(var(--hub2-n-400)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-well));
+    color: rgb(var(--hub2-n-900)); font-size: 14px; font-weight: 700; cursor: pointer;
+}
+[data-hub-ui="2"] .thvi-choice input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+[data-hub-ui="2"] .thvi-choice:has(input:focus-visible) { outline: 2px solid rgb(var(--hub2-focus)); outline-offset: 2px; }
+[data-hub-ui="2"] .thvi-choice:has(input:checked)::before { content: '\2713\00a0'; }
+[data-hub-ui="2"] .thvi-choice[data-value="good"]:has(input:checked),
+[data-hub-ui="2"] .thvi-choice[data-value="yes"]:has(input:checked) { border-color: rgb(var(--hub2-success)); background: rgb(var(--hub2-success-bg)); color: rgb(var(--hub2-success)); }
+[data-hub-ui="2"] .thvi-choice[data-value="issue"]:has(input:checked),
+[data-hub-ui="2"] .thvi-choice[data-value="no"]:has(input:checked) { border-color: rgb(var(--hub2-danger)); background: rgb(var(--hub2-danger-bg)); color: rgb(var(--hub2-danger)); }
+[data-hub-ui="2"] .thvi-choice[data-value="not_checked"]:has(input:checked) { border-color: rgb(var(--hub2-warning)); background: rgb(var(--hub2-warning-bg)); color: rgb(var(--hub2-warning)); }
+
+/* Report: correction history (before and after for each changed answer). */
+[data-hub-ui="2"] .thvi-changes { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 14px; }
+[data-hub-ui="2"] .thvi-changes del { color: rgb(var(--hub2-n-600)); }
+[data-hub-ui="2"] .thvi-changes ins { text-decoration: none; font-weight: 700; }
+[data-hub-ui="2"] .thvi-disclosure summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; }
