@@ -26,7 +26,7 @@
                         <td class="is-end">
                             <a href="{{ \App\Filament\Resources\AccidentReportResource::getUrl('view', ['record' => $report]) }}" class="text-primary-600 underline-offset-2 hover:underline dark:text-primary-400">Open report</a>
                             @if ($report->document)
-                                · <a href="{{ route('personnel-documents.view', $report->document) }}" target="_blank" rel="noopener" class="text-primary-600 underline-offset-2 hover:underline dark:text-primary-400">PDF</a>
+                                · <a href="{{ route('personnel-documents.view', $report->document) }}" data-hub-viewer="pdf" data-hub-viewer-title="{{ $report->typeLabel() }} {{ $report->reference }}" data-hub-viewer-download="{{ route('personnel-documents.download', $report->document) }}" class="text-primary-600 underline-offset-2 hover:underline dark:text-primary-400">PDF</a>
                             @endif
                         </td>
                     </tr>

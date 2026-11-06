@@ -22,8 +22,8 @@
                 @endforeach
             </dl>
             @if ($stagedSummary['exceptions'] !== [])
-                <div class="mt-4 overflow-x-auto">
-                    <table class="w-full text-left text-sm">
+                <div class="mt-4">
+                    <table data-hub-table class="w-full text-left text-sm">
                         <thead><tr class="border-b border-gray-200 dark:border-white/10"><th class="py-2 pe-4">Row</th><th class="py-2 pe-4">Employee ID</th><th class="py-2 pe-4">Name on list</th><th class="py-2 pe-4">Issue</th><th class="py-2">Fuel PIN</th></tr></thead>
                         <tbody>
                             @foreach ($stagedSummary['exceptions'] as $row)
@@ -72,8 +72,8 @@
         <label class="block max-w-md text-sm">Search
             <x-filament::input.wrapper><x-filament::input type="search" wire:model.live.debounce.350ms="search" placeholder="Name or employee ID" /></x-filament::input.wrapper>
         </label>
-        <div class="mt-4 overflow-x-auto">
-            <table class="w-full text-left text-sm">
+        <div class="mt-4">
+            <table data-hub-table class="w-full text-left text-sm">
                 <thead>
                     <tr class="border-b border-gray-200 dark:border-white/10">
                         <th class="py-2 pe-4">Employee</th><th class="py-2 pe-4">Name on list</th><th class="py-2 pe-4">Department</th><th class="py-2 pe-4">Record</th><th class="py-2 pe-4">Fuel PIN</th><th class="py-2"><span class="sr-only">Actions</span></th>
@@ -119,8 +119,8 @@
         @if ($exceptions->isEmpty())
             <p class="text-sm">No rows need review.</p>
         @else
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
+            <div>
+                <table data-hub-table class="w-full text-left text-sm">
                     <thead>
                         <tr class="border-b border-gray-200 dark:border-white/10">
                             <th class="py-2 pe-4">Employee ID</th><th class="py-2 pe-4">Name on list</th><th class="py-2 pe-4">Department</th><th class="py-2 pe-4">Issue</th><th class="py-2 pe-4">Hub record</th><th class="py-2 pe-4">Fuel PIN</th><th class="py-2"><span class="sr-only">Actions</span></th>

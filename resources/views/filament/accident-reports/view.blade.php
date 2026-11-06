@@ -56,7 +56,7 @@
             @if ($document)
                 <div class="mb-3 flex flex-wrap items-center gap-3 text-sm">
                     <x-filament::button tag="a" href="{{ route('personnel-documents.download', $document) }}" icon="heroicon-o-arrow-down-tray" size="sm">Download PDF</x-filament::button>
-                    <x-filament::button tag="a" href="{{ route('personnel-documents.view', $document) }}" target="_blank" rel="noopener" color="gray" size="sm">Open in a new tab</x-filament::button>
+                    <x-filament::button tag="a" href="{{ route('personnel-documents.view', $document) }}" data-hub-viewer="pdf" data-hub-viewer-title="{{ $report->typeLabel() }} {{ $report->reference }}" data-hub-viewer-download="{{ route('personnel-documents.download', $document) }}" color="gray" size="sm">Open full screen</x-filament::button>
                     <span class="text-gray-500">Version {{ $document->version }} · produced {{ $fmt($document->created_at) }}</span>
                 </div>
                 <iframe src="{{ route('personnel-documents.view', $document) }}" title="{{ $report->typeLabel() }} {{ $report->reference }}" class="h-[75vh] w-full rounded-lg border border-gray-200 dark:border-white/10" loading="lazy"></iframe>

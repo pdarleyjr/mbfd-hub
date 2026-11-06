@@ -48,7 +48,7 @@
                             @else
                                 <x-filament::badge color="gray">Not visible to member</x-filament::badge>
                             @endif
-                            <x-filament::link :href="route('personnel-documents.view', $document)" target="_blank" rel="noopener">View</x-filament::link>
+                            <a href="{{ route('personnel-documents.view', $document) }}" class="fi-link text-sm font-semibold text-primary-600 hover:underline dark:text-primary-400" @if ($document->isPdf()) data-hub-viewer="pdf" data-hub-viewer-title="{{ $document->title }}" data-hub-viewer-download="{{ route('personnel-documents.download', $document) }}" @endif>View</a>
                             <x-filament::link :href="route('personnel-documents.download', $document)">Download</x-filament::link>
                             @if ($canManageDocuments && $document->access_level === \App\Models\PersonnelDocument::ACCESS_PERSONNEL)
                                 @if ($document->visible_to_employee)
