@@ -176,7 +176,8 @@ final class FormFamiliesDefinitionTest extends TestCase
     public function test_two_fire_boats_leave_the_choice_to_the_member(): void
     {
         $this->fireBoat6();
-        $this->fireBoat6('In Service', 'FB-6');
+        // The unit identity guard now keeps FB6 on one truck; a second FB6 can only be a record saved before the guard.
+        Apparatus::withoutEvents(fn () => $this->fireBoat6('In Service', 'FB-6'));
 
         $this->assertNull($this->boatTarget());
     }

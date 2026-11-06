@@ -279,7 +279,7 @@ trait BuildsEmsWorld
     {
         return \App\Models\Apparatus::query()->create([
             'station_id' => $this->rescue2->station_id, 'vin' => 'VIN-FB6-'.bin2hex(random_bytes(2)), 'assignment' => 'Station 6', 'unit_id' => $unitId, 'designation' => $unitId,
-            'name' => 'Fire Boat 6', 'type' => 'Other', 'vehicle_number' => 'V-FB6-'.bin2hex(random_bytes(2)), 'status' => $status,
+            'name' => 'Fire Boat '.preg_replace('/\D/', '', $unitId), 'type' => 'Other', 'vehicle_number' => 'V-FB6-'.bin2hex(random_bytes(2)), 'status' => $status,
             'daily_checkout_requirement' => 'required', 'daily_checkout_template' => 'fireboat6',
         ]);
     }
