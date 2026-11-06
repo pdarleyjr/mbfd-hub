@@ -27,7 +27,10 @@ export function etDate(iso: string | null | undefined): string {
 
 // -------------------------------------------------------------- request wording
 
-const BAG_LABELS: Record<string, string> = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag or Box', 'als-transport-vehicle': 'ALS Transport Vehicle' };
+const BAG_LABELS: Record<string, string> = {
+  'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag or Box', 'als-transport-vehicle': 'ALS Transport Vehicle',
+  handtevy: 'Handtevy', 'als-non-transport': 'ALS Non Transport Bag', 'fire-boat-6-als': 'Fire Boat 6 ALS', 'bls-detail-bag': 'BLS Detail Bag',
+};
 
 export function targetText(request: Pick<RequestSummary, 'target_kind' | 'target_label' | 'event_assignment'>): string {
   if (request.target_kind !== 'detail_event') return request.target_label;

@@ -24,6 +24,8 @@ export interface EmsMeta {
   target_kinds: TargetKind[];
   units: EmsUnitOption[];
   close_reasons: string[];
+  /** The four form families (GET /meta, docs/ems/four-inventory-forms.md section 4). Absent before that release: the tab falls back to the four known keys. */
+  families?: Array<{ key: string; title: string; short_title: string }>;
 }
 
 export interface PageMeta { page: number; per_page: number; total: number; last_page: number }

@@ -35,9 +35,23 @@ final class MemberCopyService
         return $formType === self::FORM_TYPE;
     }
 
+    /** What a request with no family in its snapshot (sent before the four forms) was called, and still is. */
+    public const LEGACY_TITLE = 'Medical Inventory Request';
+
+    /**
+     * "<Family title> MIR-000123 · <unit>". The family title is the one the snapshot recorded at submission, so a regenerated
+     * record never changes its name; a snapshot from before the four forms keeps "Medical Inventory Request".
+     */
     public function title(InventoryRequest $request): string
     {
-        return "Medical Inventory Request {$request->number} · {$request->target_label}";
+        return self::formTitle($request).' '.$request->number.' · '.$request->target_label;
+    }
+
+    public static function formTitle(InventoryRequest $request): string
+    {
+        $title = trim((string) (((array) $request->snapshot)['form_family_title'] ?? ''));
+
+        return $title !== '' ? $title : self::LEGACY_TITLE;
     }
 
     /** Whether the record and its file are both in place. */
@@ -85,6 +99,7 @@ final class MemberCopyService
                         'request_id' => $request->uuid, 'number' => $request->number, 'target_label' => $request->target_label,
                         'submitted_at' => $request->submitted_at->toIso8601String(), 'line_count' => count((array) ($request->snapshot['lines'] ?? [])),
                         'snapshot_sha256' => $request->snapshot_sha256,
+                        'form_family' => $request->family()['key'],
                     ],
                 ];
                 if ($record === null) {

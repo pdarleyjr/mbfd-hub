@@ -61,39 +61,46 @@ final class MemberFormPageTest extends TestCase
         $this->assertSame(url('/employee/forms/api/ems/requests/__UUID__/cancel'), $ems['cancel']);
 
         $links = collect($bootstrap['library_links'])->keyBy('key');
-        $this->assertSame(['medical-inventory-request', 'take-home-vehicle-inspection', 'narcotics-check', 'accident-report', 'memorandum'], $links->keys()->all());
-        $entry = $links['medical-inventory-request'];
-        $this->assertSame('Medical Inventory Request', $entry['title']);
+        $this->assertSame(['als-transport-inventory', 'als-non-transport-inventory', 'fire-boat-6-medical-inventory', 'bls-detail-medical-inventory', 'take-home-vehicle-inspection', 'narcotics-check', 'accident-report', 'memorandum'], $links->keys()->all());
+        $entry = $links['als-transport-inventory'];
+        $this->assertSame('ALS Transport Inventory Form', $entry['title']);
         $this->assertTrue($entry['in_app']);
-        $this->assertSame(url('/employee/forms?form=medical-inventory-request'), $entry['href']);
-        $this->assertSame(url('/employee/forms?form=medical-inventory-request&view=mine'), $entry['secondary']['href']);
+        $this->assertSame('Open form', $entry['action_label']);
+        $this->assertSame(url('/employee/forms?form=als-transport-inventory'), $entry['href']);
+        $this->assertSame(['label' => 'My medical forms', 'href' => url('/employee/forms?form=medical-inventory-request&view=mine')], $entry['secondary']);
         $this->assertArrayNotHasKey('in_app', $links['take-home-vehicle-inspection'], 'The take-home inspection still opens its own app.');
 
         // The in-app forms and their record endpoints are untouched.
         $this->assertSame(route('employee.forms.api.records.index'), $bootstrap['endpoints']['records']);
-        $this->assertSame(['view' => null, 'request' => null], $bootstrap['deep_link']);
+        $this->assertSame(['view' => null, 'request' => null, 'family' => null], $bootstrap['deep_link']);
         $this->assertArrayNotHasKey('quantities', $bootstrap, 'The page never carries request data.');
     }
 
-    /** @return iterable<string, array{string, array{view: string|null, request: string|null}}> */
+    /** @return iterable<string, array{string, array{view: string|null, request: string|null, family: string|null}}> */
     public static function deepLinks(): iterable
     {
         $uuid = '0f8fad5b-d9cb-469f-a165-70867728950e';
 
-        yield 'new request' => ['?form=medical-inventory-request', ['view' => 'form', 'request' => null]];
-        yield 'my requests' => ['?form=medical-inventory-request&view=mine', ['view' => 'mine', 'request' => null]];
-        yield 'one request' => ['?ems_request='.$uuid, ['view' => 'detail', 'request' => $uuid]];
-        yield 'upper case uuid' => ['?ems_request='.strtoupper($uuid), ['view' => 'detail', 'request' => $uuid]];
-        yield 'request wins over form' => ['?form=medical-inventory-request&ems_request='.$uuid, ['view' => 'detail', 'request' => $uuid]];
-        yield 'not a uuid' => ['?ems_request=not-a-uuid', ['view' => null, 'request' => null]];
-        yield 'another form' => ['?form=something-else', ['view' => null, 'request' => null]];
-        yield 'unknown view' => ['?form=medical-inventory-request&view=x', ['view' => 'form', 'request' => null]];
+        yield 'new request (the old link opens ALS Transport)' => ['?form=medical-inventory-request', ['view' => 'form', 'request' => null, 'family' => 'als-transport']];
+        yield 'my requests' => ['?form=medical-inventory-request&view=mine', ['view' => 'mine', 'request' => null, 'family' => 'als-transport']];
+        yield 'als transport' => ['?form=als-transport-inventory', ['view' => 'form', 'request' => null, 'family' => 'als-transport']];
+        yield 'als non transport' => ['?form=als-non-transport-inventory', ['view' => 'form', 'request' => null, 'family' => 'als-non-transport']];
+        yield 'fire boat 6' => ['?form=fire-boat-6-medical-inventory', ['view' => 'form', 'request' => null, 'family' => 'fire-boat-6']];
+        yield 'bls detail' => ['?form=bls-detail-medical-inventory', ['view' => 'form', 'request' => null, 'family' => 'bls-detail']];
+        yield 'fire boat 6 list' => ['?form=fire-boat-6-medical-inventory&view=mine', ['view' => 'mine', 'request' => null, 'family' => 'fire-boat-6']];
+        yield 'one request' => ['?ems_request='.$uuid, ['view' => 'detail', 'request' => $uuid, 'family' => null]];
+        yield 'upper case uuid' => ['?ems_request='.strtoupper($uuid), ['view' => 'detail', 'request' => $uuid, 'family' => null]];
+        yield 'request wins over form' => ['?form=fire-boat-6-medical-inventory&ems_request='.$uuid, ['view' => 'detail', 'request' => $uuid, 'family' => null]];
+        yield 'not a uuid' => ['?ems_request=not-a-uuid', ['view' => null, 'request' => null, 'family' => null]];
+        yield 'another form' => ['?form=something-else', ['view' => null, 'request' => null, 'family' => null]];
+        yield 'a family key is not a form key' => ['?form=bls-detail', ['view' => null, 'request' => null, 'family' => null]];
+        yield 'unknown view' => ['?form=medical-inventory-request&view=x', ['view' => 'form', 'request' => null, 'family' => 'als-transport']];
     }
 
     /**
      * @dataProvider deepLinks
      *
-     * @param  array{view: string|null, request: string|null}  $expected
+     * @param  array{view: string|null, request: string|null, family: string|null}  $expected
      */
     public function test_the_deep_link_parameters_are_accepted(string $query, array $expected): void
     {
@@ -105,10 +112,12 @@ final class MemberFormPageTest extends TestCase
         $uuid = (string) Str::uuid();
 
         $this->assertSame('/employee/forms?ems_request='.$uuid, EmsLinks::member($uuid));
-        $this->assertSame('/employee/forms?form=medical-inventory-request', EmsLinks::memberForm());
+        $this->assertSame('/employee/forms?form=medical-inventory-request', EmsLinks::memberForm(), 'No family keeps the original link.');
+        $this->assertSame('/employee/forms?form=medical-inventory-request', EmsLinks::memberForm('not-a-family'));
+        $this->assertSame('/employee/forms?form=bls-detail-medical-inventory', EmsLinks::memberForm('bls-detail'));
         $this->assertSame('/employee/forms?form=medical-inventory-request&view=mine', EmsLinks::memberRequests());
 
-        $this->assertSame(['view' => 'detail', 'request' => $uuid], $this->bootstrap(substr(EmsLinks::member($uuid), strlen('/employee/forms')))['deep_link']);
+        $this->assertSame(['view' => 'detail', 'request' => $uuid, 'family' => null], $this->bootstrap(substr(EmsLinks::member($uuid), strlen('/employee/forms')))['deep_link']);
         $this->assertSame('form', $this->bootstrap(substr(EmsLinks::memberForm(), strlen('/employee/forms')))['deep_link']['view']);
         $this->assertSame('mine', $this->bootstrap(substr(EmsLinks::memberRequests(), strlen('/employee/forms')))['deep_link']['view']);
     }
@@ -147,7 +156,7 @@ final class MemberFormPageTest extends TestCase
         $record = $list->json('records.0');
         $this->assertSame('medical_inventory_request', $record['form_type']);
         $this->assertSame('completed', $record['status']);
-        $this->assertSame("Medical Inventory Request {$request->number} · Rescue 2", $record['title']);
+        $this->assertSame("ALS Transport Inventory Form {$request->number} · Rescue 2", $record['title'], 'A new record is named for its form.');
         $this->assertCount(1, $record['documents']);
         $this->assertSame('application/pdf', $record['documents'][0]['mime_type']);
         $this->assertNotEmpty($record['documents'][0]['preview_url']);

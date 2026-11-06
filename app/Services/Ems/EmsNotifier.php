@@ -52,9 +52,11 @@ final class EmsNotifier
         $this->guard('requestSubmitted', function () use ($request): void {
             $submitter = $request->submitted_by_user_id !== null ? User::query()->find($request->submitted_by_user_id) : null;
             $count = $request->lines()->count();
+            $familyTitle = $request->family()['title'];
             $body = sprintf(
-                '%s sent %s for %s with %d item%s.',
+                '%s sent %s %s for %s with %d item%s.',
                 $request->submitter_name,
+                $familyTitle,
                 $request->number,
                 $request->target_label,
                 $count,
@@ -69,7 +71,7 @@ final class EmsNotifier
                 self::KIND_SUBMITTED,
                 $this->recipients->staff(),
                 fn (User $recipient): array => [
-                    'title' => $request->revision_of_request_id !== null ? "{$request->number}: corrected medical inventory form" : "{$request->number}: new medical inventory request",
+                    'title' => $request->revision_of_request_id !== null ? "{$request->number}: corrected {$familyTitle}" : "{$request->number}: new {$familyTitle}",
                     'body' => $body,
                     'url' => $this->staffUrl($recipient, $request),
                 ],
@@ -119,14 +121,15 @@ final class EmsNotifier
         $this->guard('statusChanged', function () use ($request, $event): void {
             $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
             $reason = (string) (($event->payload ?? [])['reason'] ?? $request->return_reason ?? '');
+            $familyTitle = $request->family()['title'];
             $body = match ($event->to_status) {
-                InventoryRequest::ISSUED => "{$request->number} for {$request->target_label} was issued.",
-                InventoryRequest::RETURNED => "Captain 5 sent back {$request->number} for {$request->target_label}. ".$this->excerpt($reason),
-                default => "{$request->number} for {$request->target_label} was closed.".($request->close_reason ? ' '.$this->excerpt((string) $request->close_reason) : ''),
+                InventoryRequest::ISSUED => "{$familyTitle} {$request->number} for {$request->target_label} was issued.",
+                InventoryRequest::RETURNED => "Captain 5 sent back {$familyTitle} {$request->number} for {$request->target_label}. ".$this->excerpt($reason),
+                default => "{$familyTitle} {$request->number} for {$request->target_label} was closed.".($request->close_reason ? ' '.$this->excerpt((string) $request->close_reason) : ''),
             };
             $title = match ($event->to_status) {
                 InventoryRequest::ISSUED => "{$request->number}: supplies issued",
-                InventoryRequest::RETURNED => "{$request->number}: please correct and resend",
+                InventoryRequest::RETURNED => "{$request->number}: please correct and resend the {$familyTitle}",
                 default => "{$request->number}: request closed",
             };
 

@@ -289,7 +289,7 @@ final class RequestSubmissionTest extends TestCase
         $this->assertSame('medical_inventory_request', $record->form_type);
         $this->assertSame('completed', $record->status);
         $this->assertSame($member->employee_profile_id, $record->employee_id);
-        $this->assertSame("Medical Inventory Request {$request->number} · Rescue 2", $record->title);
+        $this->assertSame("ALS Transport Inventory Form {$request->number} · Rescue 2", $record->title);
         $document = $record->documents()->sole();
         $this->assertSame('application/pdf', $document->mime_type);
         $this->assertSame('ems-mir-dompdf', $document->generator_version);

@@ -1,4 +1,5 @@
 import { call, send } from '../../../../utils/emsApi';
+import { ALL_FAMILIES } from './families.ts';
 import type { FormDetail, FormSummary, FormsPage, FormsPreview, FormView, MasterItem, ReconcileRequest, ReconcileResult } from './types.ts';
 
 /**
@@ -19,10 +20,11 @@ const normalizeForm = (raw: FormDetail): FormDetail => ({
   items_preview: Array.isArray(raw.items_preview) ? raw.items_preview : [],
 });
 
-export async function fetchForms(view: FormView, params: { q?: string; page?: number; perPage?: number }): Promise<FormsPage> {
+export async function fetchForms(view: FormView, params: { q?: string; page?: number; perPage?: number; family?: string }): Promise<FormsPage> {
   const query = new URLSearchParams({ state: view, page: String(params.page ?? 1), per_page: String(params.perPage ?? 25) });
   const q = (params.q ?? '').trim();
   if (q !== '') query.set('q', q);
+  if (params.family && params.family !== ALL_FAMILIES) query.set('family', params.family);
   const result = await call<FormSummary[]>(`/requests?${query.toString()}`);
   const meta = result.meta as Partial<FormsPage['meta']>;
   const rows = Array.isArray(result.data) ? result.data : [];

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ $number }} - Medical Inventory Request</title>
+    <title>{{ $number }} - {{ $formTitle }}</title>
     <style>
         @page { margin: 92px 36px 56px 36px; }
         * { box-sizing: border-box; }
@@ -39,7 +39,7 @@
             @if($logo)<td class="logo"><img src="{{ $logo }}" alt="MBFD"></td>@endif
             <td>
                 <div class="dept">Miami Beach Fire Department</div>
-                <div class="sub">EMS Division - Medical Inventory Request</div>
+                <div class="sub">EMS Division - {{ $formTitle }}</div>
             </td>
             <td class="ref">
                 <div>{{ $number }}</div>
@@ -52,7 +52,7 @@
     {{ $number }} - Record of the request as submitted on {{ $submittedAt }}. Quantities issued are tracked by the EMS supply room, not on this copy. Snapshot {{ substr($snapshotSha, 0, 12) }}.
 </div>
 
-<h1>Medical Inventory Request</h1>
+<h1>{{ $formTitle }}</h1>
 <div class="muted">Submitted {{ $submittedAt }}</div>
 
 <h2>Request</h2>

@@ -1,0 +1,1372 @@
+{
+  "schema": "mbfd.ems.source_form.v1",
+  "source": {
+    "key": "bls-detail-bag",
+    "title": "BLS DETAIL BAG",
+    "version_label": "REV 2020",
+    "file_name": "bls_detail_bag_medical_inventory.pdf",
+    "sha256": "7dba064af14b43d107d4c5d00fae6341346ba2167a5f52db5611983b542cbbc4",
+    "pages": 1,
+    "columns": [
+      "ITEM",
+      "(quantity; no heading is printed)"
+    ],
+    "notes": [
+      "Transcribed from the one-page PDF bls_detail_bag_medical_inventory.pdf (sha256 above). Two printed columns of ITEM and one unlabeled quantity cell each; the left column is read top to bottom, then the right column.",
+      "Left column: FRONT POUCH, LEFT SIDE (6), RIGHT SIDE (5), POUCH 4, POUCH 3, POUCH 2. Right column: COMPARTMENT 1, MAIN COMPARTMENT. The (6) and (5) are part of the printed headings and are kept in the section labels; the sheet does not say what they mean.",
+      "The sheet prints one quantity per item and no \"Fill if <\" and no NEED column. The quantity is the par (min_text / min_qty / min_unit); the member types what is needed. \"1 BOX\" is kept exactly as printed (min_unit box).",
+      "source_label is the printed text including its capital letters and its misspellings (TRAMUA SHEARS, ORAL GLUCTOSE, TYVEX SLEEVES, STETHESCOPE, BAND AIDES, MADDETT). label corrects only an obvious spelling of the same product; the misspelled form is kept as a search term.",
+      "Two empty table rows (under ADULT PADS and under BURN GEL 4X4) carry no text and no number."
+    ],
+    "printed_header": "BLS DETAIL BAG REV 2020",
+    "review_notes": [
+      "\"LEFT SIDE (6)\" and \"RIGHT SIDE (5)\" print a number in brackets that is not a count of the rows under them (4 and 4). It may be a pouch number. Kept in the printed heading.",
+      "\"OPAS 2 ADULT\", \"OPAS 1 CHILD\" and \"OPAS 1 INF\" print no OPA sizes; the quantities 2, 1 and 1 equal the numbers in the labels."
+    ]
+  },
+  "sections": [
+    {
+      "key": "bls-front-pouch",
+      "label": "Front Pouch",
+      "source_label": "FRONT POUCH",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 10,
+      "items": [
+        {
+          "item_ref": "bls.front-pouch.aed",
+          "catalog_ref": "aed",
+          "label": "AED",
+          "source_label": "AED",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 2,
+            "sheet_order": 1
+          }
+        },
+        {
+          "item_ref": "bls.front-pouch.pedi-pads",
+          "catalog_ref": "aed-pads-pedi",
+          "label": "Pedi pads",
+          "source_label": "PEDI PADS",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 3,
+            "sheet_order": 2
+          }
+        },
+        {
+          "item_ref": "bls.front-pouch.adult-pads",
+          "catalog_ref": "aed-pads-adult",
+          "label": "Adult pads",
+          "source_label": "ADULT PADS",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 4,
+            "sheet_order": 3
+          }
+        }
+      ]
+    },
+    {
+      "key": "bls-left-side",
+      "label": "Left Side (6)",
+      "source_label": "LEFT SIDE (6)",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 20,
+      "items": [
+        {
+          "item_ref": "bls.left-side.ice-packs",
+          "catalog_ref": "ice-pack",
+          "label": "Ice packs",
+          "source_label": "ICE PACKS",
+          "min_text": "4",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 7,
+            "sheet_order": 4
+          }
+        },
+        {
+          "item_ref": "bls.left-side.band-aids-1x3",
+          "catalog_ref": "tv-band-aids-1-x-3",
+          "label": "Band aids 1x3\"",
+          "source_label": "BAND AIDES 1X3\"",
+          "min_text": "1 BOX",
+          "min_qty": 1,
+          "min_unit": "box",
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "band aides",
+              "bandaids"
+            ]
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 8,
+            "sheet_order": 5
+          }
+        },
+        {
+          "item_ref": "bls.left-side.band-aids-2x3",
+          "catalog_ref": "band-aids-2x3",
+          "label": "Band aids 2x3\"",
+          "source_label": "BAND AIDES 2X3\"",
+          "min_text": "10",
+          "min_qty": 10,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "band aides",
+              "bandaids"
+            ]
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 9,
+            "sheet_order": 6
+          }
+        },
+        {
+          "item_ref": "bls.left-side.vomex-bag",
+          "catalog_ref": "vomex-bag",
+          "label": "Vomex bag",
+          "source_label": "VOMEX BAG",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "vomit bag",
+              "emesis bag"
+            ]
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 10,
+            "sheet_order": 7
+          }
+        }
+      ]
+    },
+    {
+      "key": "bls-right-side",
+      "label": "Right Side (5)",
+      "source_label": "RIGHT SIDE (5)",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 30,
+      "items": [
+        {
+          "item_ref": "bls.right-side.gloves",
+          "catalog_ref": "gloves-bls-detail-bag",
+          "label": "Gloves",
+          "source_label": "GLOVES",
+          "min_text": "5",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 12,
+            "sheet_order": 8
+          }
+        },
+        {
+          "item_ref": "bls.right-side.n95-masks",
+          "catalog_ref": "n95-respirator",
+          "label": "N95 masks",
+          "source_label": "N95 MASKS",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 13,
+            "sheet_order": 9
+          }
+        },
+        {
+          "item_ref": "bls.right-side.goggles",
+          "catalog_ref": "goggles",
+          "label": "Goggles",
+          "source_label": "GOGGLES",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 14,
+            "sheet_order": 10
+          }
+        },
+        {
+          "item_ref": "bls.right-side.tyvek-sleeves",
+          "catalog_ref": "tv-tyvek-sleeves",
+          "label": "Tyvek sleeves",
+          "source_label": "TYVEX SLEEVES",
+          "min_text": "4",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "tyvex sleeves"
+            ]
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 15,
+            "sheet_order": 11
+          }
+        }
+      ]
+    },
+    {
+      "key": "bls-pouch-4",
+      "label": "Pouch 4",
+      "source_label": "POUCH 4",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 40,
+      "items": [
+        {
+          "item_ref": "bls.pouch-4.ace-bandage-4",
+          "catalog_ref": "ace-bandage-4in",
+          "label": "Ace bandage 4\"",
+          "source_label": "ACE BANDAGE 4\"",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 17,
+            "sheet_order": 12
+          }
+        },
+        {
+          "item_ref": "bls.pouch-4.ace-bandage-6",
+          "catalog_ref": "ace-bandage-6in",
+          "label": "Ace bandage 6\"",
+          "source_label": "ACE BANDAGE 6\"",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 18,
+            "sheet_order": 13
+          }
+        },
+        {
+          "item_ref": "bls.pouch-4.kling-6",
+          "catalog_ref": "kling-6in",
+          "label": "Kling 6\"",
+          "source_label": "KLING 6\"",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 19,
+            "sheet_order": 14
+          }
+        },
+        {
+          "item_ref": "bls.pouch-4.kling-4",
+          "catalog_ref": "kling-4in",
+          "label": "Kling 4\"",
+          "source_label": "KLING 4\"",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 20,
+            "sheet_order": 15
+          }
+        },
+        {
+          "item_ref": "bls.pouch-4.kling-2",
+          "catalog_ref": "kling-2in",
+          "label": "Kling 2\"",
+          "source_label": "KLING 2\"",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 21,
+            "sheet_order": 16
+          }
+        },
+        {
+          "item_ref": "bls.pouch-4.combi-pad-5x9",
+          "catalog_ref": "combi-pad-5x9",
+          "label": "Combi pad 5x9\"",
+          "source_label": "COMBI PAD 5X9\"",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 22,
+            "sheet_order": 17
+          }
+        },
+        {
+          "item_ref": "bls.pouch-4.triangle-bandage",
+          "catalog_ref": "triangle-bandage",
+          "label": "Triangle bandage",
+          "source_label": "TRIANGLE BANDAGE",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 23,
+            "sheet_order": 18
+          }
+        },
+        {
+          "item_ref": "bls.pouch-4.gauze-4x4",
+          "catalog_ref": "gauze-4x4",
+          "label": "Gauze 4x4\"",
+          "source_label": "GAUZE 4X4\"",
+          "min_text": "8",
+          "min_qty": 8,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 24,
+            "sheet_order": 19
+          }
+        }
+      ]
+    },
+    {
+      "key": "bls-pouch-3",
+      "label": "Pouch 3",
+      "source_label": "POUCH 3",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 50,
+      "items": [
+        {
+          "item_ref": "bls.pouch-3.burn-gel-small",
+          "catalog_ref": "burn-gel-small",
+          "label": "Burn gel small",
+          "source_label": "BURN GEL SMALL",
+          "min_text": "4",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 26,
+            "sheet_order": 20
+          }
+        },
+        {
+          "item_ref": "bls.pouch-3.burn-gel-2x6",
+          "catalog_ref": "tv-burn-gel-2-x-6-dressing",
+          "label": "Burn gel 2x6\"",
+          "source_label": "BURN GEL 2X6\"",
+          "min_text": "4",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 27,
+            "sheet_order": 21
+          }
+        },
+        {
+          "item_ref": "bls.pouch-3.burn-gel-4x4",
+          "catalog_ref": "tv-burn-gel-4-x-4-dressing",
+          "label": "Burn gel 4x4",
+          "source_label": "BURN GEL 4X4",
+          "min_text": "4",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 28,
+            "sheet_order": 22
+          }
+        }
+      ]
+    },
+    {
+      "key": "bls-pouch-2",
+      "label": "Pouch 2",
+      "source_label": "POUCH 2",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 60,
+      "items": [
+        {
+          "item_ref": "bls.pouch-2.bvm-adult",
+          "catalog_ref": "bvm-adult",
+          "label": "BVM adult",
+          "source_label": "BVM ADULT",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 31,
+            "sheet_order": 23
+          }
+        },
+        {
+          "item_ref": "bls.pouch-2.bvm-pedi",
+          "catalog_ref": "tv-bvm-pedi",
+          "label": "BVM pedi",
+          "source_label": "BVM PEDI",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 32,
+            "sheet_order": 24
+          }
+        },
+        {
+          "item_ref": "bls.pouch-2.opas-2-adult",
+          "catalog_ref": "opas-adult",
+          "label": "OPAs 2 adult",
+          "source_label": "OPAS 2 ADULT",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 33,
+            "sheet_order": 25
+          }
+        },
+        {
+          "item_ref": "bls.pouch-2.opas-1-child",
+          "catalog_ref": "opas-child",
+          "label": "OPAs 1 child",
+          "source_label": "OPAS 1 CHILD",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 34,
+            "sheet_order": 26
+          }
+        },
+        {
+          "item_ref": "bls.pouch-2.opas-1-infant",
+          "catalog_ref": "opas-infant",
+          "label": "OPAs 1 infant",
+          "source_label": "OPAS 1 INF",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 35,
+            "sheet_order": 27
+          }
+        }
+      ]
+    },
+    {
+      "key": "bls-compartment-1",
+      "label": "Compartment 1",
+      "source_label": "COMPARTMENT 1",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 70,
+      "items": [
+        {
+          "item_ref": "bls.compartment-1.cat-tourniquet",
+          "catalog_ref": "cat-tourniquet",
+          "label": "CAT tourniquet",
+          "source_label": "CAT TOURNIQUET",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 2,
+            "sheet_order": 28
+          }
+        },
+        {
+          "item_ref": "bls.compartment-1.trauma-shears",
+          "catalog_ref": "trauma-shears",
+          "label": "Trauma shears",
+          "source_label": "TRAMUA SHEARS",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "tramua shears"
+            ]
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 3,
+            "sheet_order": 29
+          }
+        },
+        {
+          "item_ref": "bls.compartment-1.pen-light",
+          "catalog_ref": "pen-light",
+          "label": "Pen light",
+          "source_label": "PEN LIGHT",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 4,
+            "sheet_order": 30
+          }
+        },
+        {
+          "item_ref": "bls.compartment-1.peroxide",
+          "catalog_ref": "peroxide",
+          "label": "Peroxide",
+          "source_label": "PEROXIDE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 5,
+            "sheet_order": 31
+          }
+        },
+        {
+          "item_ref": "bls.compartment-1.tape-1",
+          "catalog_ref": "tape-1in",
+          "label": "Tape 1\"",
+          "source_label": "TAPE 1\"",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 6,
+            "sheet_order": 32
+          }
+        },
+        {
+          "item_ref": "bls.compartment-1.tape-3",
+          "catalog_ref": "tape-3in",
+          "label": "Tape 3\"",
+          "source_label": "TAPE 3\"",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 7,
+            "sheet_order": 33
+          }
+        },
+        {
+          "item_ref": "bls.compartment-1.asherman-chest-seals",
+          "catalog_ref": "asherman-chest-seal",
+          "label": "Asherman chest seals",
+          "source_label": "ASHERMAN CHEST SEALS",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "ascherman"
+            ]
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 8,
+            "sheet_order": 34
+          }
+        },
+        {
+          "item_ref": "bls.compartment-1.oral-glucose",
+          "catalog_ref": "oral-glucose",
+          "label": "Oral glucose",
+          "source_label": "ORAL GLUCTOSE",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "gluctose",
+              "glucose gel"
+            ]
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 9,
+            "sheet_order": 35
+          }
+        },
+        {
+          "item_ref": "bls.compartment-1.quick-clot",
+          "catalog_ref": "quikclot-gauze",
+          "label": "Quick clot",
+          "source_label": "QUICK CLOT",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 10,
+            "sheet_order": 36
+          }
+        }
+      ]
+    },
+    {
+      "key": "bls-main-compartment",
+      "label": "Main Compartment",
+      "source_label": "MAIN COMPARTMENT",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 80,
+      "items": [
+        {
+          "item_ref": "bls.main-compartment.arm-board-long",
+          "catalog_ref": "arm-board-long",
+          "label": "Arm board long",
+          "source_label": "ARM BOARD LONG",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 12,
+            "sheet_order": 37
+          }
+        },
+        {
+          "item_ref": "bls.main-compartment.arm-board-short",
+          "catalog_ref": "arm-board-short",
+          "label": "Arm board short",
+          "source_label": "ARM BOARD SHORT",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 13,
+            "sheet_order": 38
+          }
+        },
+        {
+          "item_ref": "bls.main-compartment.bp-cuff",
+          "catalog_ref": "bp-cuff",
+          "label": "BP cuff",
+          "source_label": "BP CUFF",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 14,
+            "sheet_order": 39
+          }
+        },
+        {
+          "item_ref": "bls.main-compartment.stethoscope",
+          "catalog_ref": "stethoscope",
+          "label": "Stethoscope",
+          "source_label": "STETHESCOPE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "stethescope"
+            ]
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 15,
+            "sheet_order": 40
+          }
+        },
+        {
+          "item_ref": "bls.main-compartment.red-bag",
+          "catalog_ref": "red-bag-als-bag",
+          "label": "Red bag",
+          "source_label": "RED BAG",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 16,
+            "sheet_order": 41
+          }
+        },
+        {
+          "item_ref": "bls.main-compartment.glucometer",
+          "catalog_ref": "glucometer",
+          "label": "Glucometer",
+          "source_label": "GLUCOMETER",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 17,
+            "sheet_order": 42
+          }
+        },
+        {
+          "item_ref": "bls.main-compartment.narcan",
+          "catalog_ref": "narcan",
+          "label": "Narcan",
+          "source_label": "NARCAN",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 18,
+            "sheet_order": 43
+          }
+        },
+        {
+          "item_ref": "bls.main-compartment.maddett",
+          "catalog_ref": "maddett",
+          "label": "Maddett",
+          "source_label": "MADDETT",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false,
+            "search_terms": [
+              "madett"
+            ]
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 19,
+            "sheet_order": 44
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,13 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, MessageBar, MessageBarBody, Spinner } from '@fluentui/react-components';
 import './ems.css';
-import { EmsApiError, type EmsApi } from './emsApi';
-import { draftFromPayload, revisesFromSearch } from './emsLogic.js';
-import type { EmsDraft, EmsFormDefinition, EmsOutboxEntry, EmsView } from './emsTypes';
+import { type EmsApi } from './emsApi';
+import { draftFromPayload, familyOfPayload, familyOfView, familyTitle, revisesFromSearch } from './emsLogic.js';
+import type { EmsDraft, EmsOutboxEntry, EmsView } from './emsTypes';
 import { FixAndResend } from './FixAndResend';
 import { MedicalRequestForm } from './MedicalRequestForm';
 import { MyRequestsList, RequestDetail } from './MyRequests';
+import { useEmsDefinitions, useWantFamily } from './useEmsDefinitions';
 import type { EmsOutbox } from './useEmsOutbox';
+
+export interface EmsNewFormChoice {
+    family: string;
+    title: string;
+    /** "ALS Transport": the title without "Inventory Form", for a button. */
+    short: string;
+}
 
 export interface EmsAppProps {
     api: EmsApi;
@@ -22,27 +30,23 @@ export interface EmsAppProps {
     editEntry: (entry: EmsOutboxEntry) => void;
     openPdf: (url: string, name: string) => void;
     onSubmitted: () => void;
+    /** The forms the Forms library offers (from the page's library cards), so "New request" can name them. */
+    newForms?: EmsNewFormChoice[];
 }
 
-/** The Medical Inventory Request views inside the Forms app: the form, the member's own list, and one request. */
-export function EmsApp({ api, owner, view, outbox, edit, onEditConsumed, navigate, goForms, editEntry, openPdf, onSubmitted }: EmsAppProps) {
-    const [definition, setDefinition] = useState<EmsFormDefinition | null>(null);
-    const [loadError, setLoadError] = useState('');
-    const [loading, setLoading] = useState(false);
+/** The Medical Inventory views inside the Forms app: one of the four forms, the member's own list, and one request. */
+export function EmsApp({ api, owner, view, outbox, edit, onEditConsumed, navigate, goForms, editEntry, openPdf, onSubmitted, newForms = [] }: EmsAppProps) {
+    const definitions = useEmsDefinitions(api);
     const [startFrom, setStartFrom] = useState<EmsDraft | null>(null);
 
-    const needsDefinition = view.name === 'form' || edit !== null;
-
-    const loadDefinition = useCallback(async () => {
-        setLoading(true); setLoadError('');
-        try {
-            setDefinition(await api.form());
-        } catch (caught) {
-            setLoadError(caught instanceof EmsApiError ? caught.message : 'The request form could not be loaded.');
-        } finally { setLoading(false); }
-    }, [api]);
-
-    useEffect(() => { if (needsDefinition && !definition && !loading && !loadError) void loadDefinition(); }, [needsDefinition, definition, loading, loadError, loadDefinition]);
+    const revisesId = view.name === 'form' ? (view.revises ?? revisesFromSearch(window.location.search)) : null;
+    const fixing = revisesId !== null && edit === null && startFrom === null;
+    // Which form's lists this view needs: a queued request being edited opens in its own form; "Fix and resend" works out its own.
+    const family = edit ? familyOfPayload(edit.payload) : familyOfView(view);
+    const wantsForm = !fixing && (view.name === 'form' || edit !== null);
+    useWantFamily(wantsForm ? family : null, definitions);
+    const definition = definitions.definitions[family] ?? null;
+    const loadError = definitions.errors[family] ?? '';
 
     // "Edit and resend": turn the unsent payload back into a draft, then take it off the queue.
     useEffect(() => {
@@ -53,39 +57,40 @@ export function EmsApp({ api, owner, view, outbox, edit, onEditConsumed, navigat
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [edit, definition]);
 
-    const goForm = () => navigate({ name: 'form' });
+    const goForm = (target?: string) => navigate({ name: 'form', family: target ?? family });
     const goMine = () => navigate({ name: 'mine' });
     const goDetail = (id: string) => navigate({ name: 'detail', id });
     // "Fix and resend": the page address carries the returned request, so a refresh or a reopened tab comes back to the correction.
-    const fix = (id: string) => navigate({ name: 'form', revises: id });
-    const revisesId = view.name === 'form' ? (view.revises ?? revisesFromSearch(window.location.search)) : null;
+    // The correction opens in the request's own form; the address only has to name something that opens the form app.
+    const fix = (id: string, target?: string) => navigate({ name: 'form', family: target, revises: id });
 
     let content;
     if (view.name === 'mine') {
-        content = <MyRequestsList api={api} outbox={outbox} goForm={goForm} goDetail={goDetail} goForms={goForms} editEntry={editEntry} onFix={fix} />;
+        content = <MyRequestsList api={api} outbox={outbox} newForms={newForms} goForm={goForm} goDetail={goDetail} goForms={goForms} editEntry={editEntry} onFix={fix} />;
     } else if (view.name === 'detail') {
         content = <RequestDetail key={view.id} api={api} id={view.id} goMine={goMine} goForm={goForm} goForms={goForms} goDetail={goDetail} openPdf={openPdf} outbox={outbox} editEntry={editEntry} onFix={fix} />;
+    } else if (fixing && revisesId) {
+        content = <FixAndResend
+            key={revisesId} api={api} owner={owner} loadDefinition={definitions.load} requestId={revisesId} outbox={outbox}
+            goForm={goForm} goForms={goForms} goMine={goMine} goDetail={goDetail} editEntry={editEntry} onSubmitted={onSubmitted}
+        />;
     } else if (loadError) {
         content = <div className="ems-app">
             <MessageBar intent="error"><MessageBarBody>{loadError}</MessageBarBody></MessageBar>
-            <div className="ems-result-actions"><Button appearance="primary" onClick={() => void loadDefinition()}>Try again</Button><Button appearance="subtle" onClick={goForms}>Back to Forms</Button></div>
+            <div className="ems-result-actions"><Button appearance="primary" onClick={() => void definitions.load(family).catch(() => undefined)}>Try again</Button><Button appearance="subtle" onClick={goForms}>Back to Forms</Button></div>
         </div>;
     } else if (!definition || (edit !== null && startFrom === null)) {
-        content = <div className="ems-app"><div className="ems-loading"><Spinner label="Opening the Medical Inventory Request" /></div></div>;
+        content = <div className="ems-app"><div className="ems-loading"><Spinner label="Opening the form" /></div></div>;
     } else if (definition.forms.length === 0) {
         content = <div className="ems-app"><div className="ems-empty">
-            <p><strong>The medical inventory forms are not available yet.</strong></p>
+            <p><strong>{familyTitle(definition)} is not available yet.</strong></p>
             <p>Contact the EMS office if this keeps happening.</p>
             <Button appearance="subtle" onClick={goForms}>Back to Forms</Button>
         </div></div>;
-    } else if (revisesId && edit === null && startFrom === null) {
-        content = <FixAndResend
-            key={revisesId} api={api} owner={owner} definition={definition} requestId={revisesId} outbox={outbox}
-            goForm={goForm} goForms={goForms} goMine={goMine} goDetail={goDetail} editEntry={editEntry} onSubmitted={onSubmitted}
-        />;
     } else {
+        // One form instance per family, so a draft, a search or a half-typed quantity can never carry over into another form.
         content = <MedicalRequestForm
-            api={api} owner={owner} definition={definition} outbox={outbox} startFrom={startFrom} onStartConsumed={() => setStartFrom(null)}
+            key={family} api={api} owner={owner} definition={definition} outbox={outbox} startFrom={startFrom} onStartConsumed={() => setStartFrom(null)}
             goForm={goForm} goForms={goForms} goMine={goMine} goDetail={goDetail} editEntry={editEntry} onSubmitted={onSubmitted}
         />;
     }

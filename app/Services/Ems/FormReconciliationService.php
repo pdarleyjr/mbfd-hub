@@ -56,8 +56,9 @@ final class FormReconciliationService
 
         foreach ($requests as $request) {
             $blocker = $this->blocker($request);
+            $familyShort = $request->family()['short_title'];
             $forms[] = [
-                'id' => $request->uuid, 'number' => $request->number, 'target_label' => $request->target_label,
+                'id' => $request->uuid, 'number' => $request->number, 'form_family_short' => $familyShort, 'target_label' => $request->target_label,
                 'submitter_name' => $request->submitter_name, 'submitted_at' => $request->submitted_at->toIso8601String(),
                 'eligible' => $blocker === null, 'ineligible_reason' => $blocker?->getMessage(),
             ];
@@ -71,7 +72,7 @@ final class FormReconciliationService
                 $plan = $this->plan($line, null);
                 $plans[] = $plan;
                 $lines[] = [
-                    'line_id' => $line->getKey(), 'request_id' => $request->uuid, 'number' => $request->number, 'target_label' => $request->target_label,
+                    'line_id' => $line->getKey(), 'request_id' => $request->uuid, 'number' => $request->number, 'form_family_short' => $familyShort, 'target_label' => $request->target_label,
                     'label' => $line->label, 'variant_label' => $line->variant_label, 'requested_qty' => $line->requested_qty, 'unit' => $line->unit,
                     'quantity' => $plan['quantity'], 'quantity_base' => $plan['quantity_base'],
                     'state' => $plan['state'], 'message' => $plan['note'],

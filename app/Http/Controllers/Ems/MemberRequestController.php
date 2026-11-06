@@ -39,9 +39,14 @@ final class MemberRequestController extends Controller
         private readonly MemberCopyService $copies,
     ) {}
 
-    public function form(): JsonResponse
+    /** `?family=` picks one of the four forms; none sent answers for ALS Transport, as the single form always did. */
+    public function form(Request $request): JsonResponse
     {
-        return $this->guarded(fn (): JsonResponse => $this->ok($this->form->definition()));
+        return $this->guarded(function () use ($request): JsonResponse {
+            $f = EmsValidator::validate($request->query(), ['family' => ['nullable', 'string', 'max:40']], ['family.max' => 'That form is not available. Reload the page and try again.']);
+
+            return $this->ok($this->form->definition($f['family'] ?? null));
+        });
     }
 
     public function submit(Request $request): JsonResponse

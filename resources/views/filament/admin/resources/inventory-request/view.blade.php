@@ -6,6 +6,7 @@
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
                     <h2 class="text-lg font-semibold text-gray-950 dark:text-white">{{ $request->number }}</h2>
+                    <p class="mt-0.5 text-sm font-medium text-gray-950 dark:text-white" data-testid="request-family">{{ $familyTitle }}</p>
                     <p class="mt-0.5 text-sm text-gray-700 dark:text-gray-300">
                         {{ $request->target_label }}@if (filled($request->event_assignment)): {{ $request->event_assignment }}@endif
                     </p>

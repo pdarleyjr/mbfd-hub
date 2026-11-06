@@ -297,3 +297,69 @@ test('a 422 names the lines to fix', () => {
   assert.deepEqual(logic.correctionLineIds({ lines: 'Lines 12, 99 need an item.' }, data), [12]);
   assert.deepEqual(logic.correctionLineIds({}, data), []);
 });
+
+// ------------------------------------------------------------------ form families
+
+test('a form with no family stored reads as ALS Transport', () => {
+  for (const missing of [undefined, null, '', '   ']) {
+    const row = form({ form_family: missing });
+    assert.equal(logic.familyKey(row), 'als-transport');
+    assert.equal(logic.familyShort(row), 'ALS Transport');
+    assert.equal(logic.familyTitle(row), 'ALS Transport Inventory Form');
+  }
+  assert.equal(logic.familyShort(form()), 'ALS Transport');
+});
+
+test('the server wording wins, then the family list, then the key', () => {
+  const boat = form({ form_family: 'fire-boat-6', form_family_title: 'Fire Boat 6 Medical Inventory Form', form_family_short: 'Fire Boat 6' });
+  assert.equal(logic.familyShort(boat), 'Fire Boat 6');
+  assert.equal(logic.familyTitle(boat), 'Fire Boat 6 Medical Inventory Form');
+  // Only the key arrived: the known table fills the words in.
+  assert.equal(logic.familyShort(form({ form_family: 'bls-detail' })), 'BLS Detail');
+  assert.equal(logic.familyTitle(form({ form_family: 'als-non-transport' })), 'ALS Non Transport Inventory Form');
+  // A family this page has never heard of still gets a label, not a blank.
+  assert.equal(logic.familyShort(form({ form_family: 'new-family' })), 'new-family');
+  assert.equal(logic.familyShort(form({ form_family: 'new-family' }), [{ key: 'new-family', title: 'New Form', short_title: 'New' }]), 'New');
+  // Reconcile rows carry only the short name.
+  assert.equal(logic.previewFamilyShort({ form_family_short: 'Fire Boat 6' }), 'Fire Boat 6');
+  assert.equal(logic.previewFamilyShort({}), 'ALS Transport');
+  assert.equal(logic.previewFamilyShort({ form_family_short: null }), 'ALS Transport');
+});
+
+test('the family filter offers the four forms from /meta, or the known four when /meta has none', () => {
+  const fromMeta = logic.familyOptions([
+    { key: 'als-transport', title: 'ALS Transport Inventory Form', short_title: 'ALS Transport' },
+    { key: 'fire-boat-6', title: 'Fire Boat 6 Medical Inventory Form', short_title: 'Fire Boat 6' },
+  ]);
+  assert.deepEqual(fromMeta.map((option) => option.key), ['als-transport', 'fire-boat-6']);
+  for (const nothing of [undefined, null, [], 'x', [{ title: 'no key' }], [null]]) {
+    assert.deepEqual(logic.familyOptions(nothing).map((option) => option.key), ['als-transport', 'als-non-transport', 'fire-boat-6', 'bls-detail']);
+  }
+  const options = logic.familyOptions(undefined);
+  assert.equal(logic.isFamilyFilter('all', options), true);
+  assert.equal(logic.isFamilyFilter('fire-boat-6', options), true);
+  assert.equal(logic.isFamilyFilter('boats', options), false);
+});
+
+test('the family filter keeps one family, and null rows belong to ALS Transport', () => {
+  const rows = [form({ id: 'a' }), form({ id: 'b', form_family: 'als-transport' }), form({ id: 'c', form_family: 'fire-boat-6' }), form({ id: 'd', form_family: 'bls-detail' })];
+  const ids = (filter) => rows.filter((row) => logic.matchesFamily(row, filter)).map((row) => row.id);
+  assert.deepEqual(ids('all'), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(ids('als-transport'), ['a', 'b']);
+  assert.deepEqual(ids('fire-boat-6'), ['c']);
+  assert.deepEqual(ids('als-non-transport'), []);
+});
+
+test('the list key changes with the family and stays as it was for All', () => {
+  assert.equal(logic.listKey('active', ' ', 1), 'active||1');
+  assert.equal(logic.listKey('active', '', 1, 'all'), 'active||1');
+  assert.notEqual(logic.listKey('active', '', 1, 'fire-boat-6'), logic.listKey('active', '', 1));
+  assert.notEqual(logic.listKey('archived', 'r2', 1, 'fire-boat-6'), logic.listKey('archived', 'r2', 1, 'bls-detail'));
+});
+
+test('selection still mixes families', () => {
+  const rows = [form({ id: 'a', can_reconcile: true, acknowledged: true }), form({ id: 'b', form_family: 'fire-boat-6', can_reconcile: true, acknowledged: true })];
+  assert.deepEqual(logic.readyIds(rows), ['a', 'b']);
+  const picked = logic.toggleId(logic.toggleId(new Set(), 'a'), 'b');
+  assert.deepEqual([...picked], ['a', 'b']);
+});

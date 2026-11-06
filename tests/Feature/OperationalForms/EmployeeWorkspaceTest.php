@@ -55,9 +55,9 @@ class EmployeeWorkspaceTest extends TestCase
         self::assertSame(1, preg_match("/data-bootstrap='([^']*)'/", $html, $matches));
         $bootstrap = json_decode($matches[1], true, flags: JSON_THROW_ON_ERROR);
 
-        // The Medical Inventory Request opens inside this app; the take-home inspection keeps its own app.
+        // The four medical inventory forms open inside this app; the take-home inspection keeps its own app.
         // A firefighter gets the Vehicle Accident Report and the memorandum, not the supervisor-only report.
-        self::assertSame(['medical-inventory-request', 'take-home-vehicle-inspection', 'narcotics-check', 'accident-report', 'memorandum'], array_column($bootstrap['library_links'], 'key'));
+        self::assertSame(['als-transport-inventory', 'als-non-transport-inventory', 'fire-boat-6-medical-inventory', 'bls-detail-medical-inventory', 'take-home-vehicle-inspection', 'narcotics-check', 'accident-report', 'memorandum'], array_column($bootstrap['library_links'], 'key'));
         self::assertSame(['can_supervise' => false, 'awaiting_supervisor' => 0], $bootstrap['personnel']);
         self::assertSame('__ULID__', $bootstrap['endpoints']['personnel']['placeholder']);
         self::assertSame(['view' => null, 'report' => null], $bootstrap['personnel_deep_link']);
@@ -67,7 +67,7 @@ class EmployeeWorkspaceTest extends TestCase
             'description' => 'Complete a take-home vehicle inspection with photos and review your submitted reports.',
             'href' => route('take-home-inspections.index'),
             'action_label' => 'Open inspections',
-        ], $bootstrap['library_links'][1]);
+        ], $bootstrap['library_links'][4]);
         // The in-app forms and their record endpoints are untouched.
         self::assertSame(route('employee.forms.api.form-types'), $bootstrap['endpoints']['form_types']);
         self::assertSame(route('employee.forms.api.records.index'), $bootstrap['endpoints']['records']);

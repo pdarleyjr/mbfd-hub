@@ -122,6 +122,7 @@ test('the payload lists only touched items, never a 0, and never identity or tim
   const payload = buildPayload(draft, definition);
   assert.deepEqual(payload, {
     client_submission_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    family: 'als-transport', // a server without families (this fixture) is ALS Transport
     target: { kind: 'rescue_unit', apparatus_id: 7, label_seen: 'Rescue 2' },
     lines: [
       { form: 'airway-bag', item_key: 'airway.top.gloves', quantity: 2 },
@@ -164,7 +165,8 @@ test('the stored draft holds quantities, answers, the unit choice and the submis
   draft = setQuantity(draft, GLOVES, 4);
   draft = setAnswer(draft, NARCS, false);
   const stored = serializeDraft(draft, '2026-10-23T12:00:00.000Z');
-  assert.deepEqual(Object.keys(stored).sort(), ['answers', 'clientSubmissionId', 'quantities', 'savedAt', 'targetChoice', 'v']);
+  assert.deepEqual(Object.keys(stored).sort(), ['answers', 'clientSubmissionId', 'family', 'quantities', 'savedAt', 'targetChoice', 'v']);
+  assert.equal(stored.v, 1, 'the stored version stays 1');
   assert.deepEqual(stored.quantities, { [GLOVES]: 4 });
   const text = JSON.stringify(stored);
   assert.equal(text.includes('Pat Medic'), false);
