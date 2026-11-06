@@ -108,12 +108,16 @@ class EmployeeResource extends Resource
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('station')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->placeholder('Not assigned')->searchable(),
-                Tables\Columns\TextColumn::make('roster_status')->extraHeaderAttributes(['data-hub-priority' => 3])->label('Employment')->badge()->placeholder('Not recorded'),
+                Tables\Columns\TextColumn::make('roster_status')->extraHeaderAttributes(['data-hub-priority' => 3])->label('Employment')->badge()->placeholder('Not recorded')
+                    ->formatStateUsing(fn ($state): string => ucfirst(str_replace('_', ' ', (string) $state)))
+                    ->color(fn ($state): string => (string) $state === 'active' ? 'success' : 'gray'),
                 Tables\Columns\TextColumn::make('user.account_status')->visibleFrom('md')->extraHeaderAttributes(['data-hub-priority' => 4])->label('Login')->badge()->placeholder('Awaiting account')
-                    ->formatStateUsing(fn ($state): string => ucfirst(str_replace('_', ' ', $state instanceof \BackedEnum ? $state->value : (string) $state))),
+                    ->formatStateUsing(fn ($state): string => ucfirst(str_replace('_', ' ', $state instanceof \BackedEnum ? $state->value : (string) $state)))
+                    ->color(fn ($state): string => match ($state instanceof \BackedEnum ? $state->value : (string) $state) { 'active' => 'success', 'pending_activation' => 'warning', 'disabled', 'locked', 'suspended' => 'danger', default => 'gray' }),
                 Tables\Columns\TextColumn::make('invitation_delivery')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Invitation email')->badge()
                     ->state(fn (Employee $record): string => $record->user?->memberOnboardingInvitation?->emailDeliveryLabel() ?? 'Invitation not sent'),
                 Tables\Columns\TextColumn::make('invitation_status')->extraHeaderAttributes(['data-hub-priority' => 2])->label('Account activation')->badge()
+                    ->color(fn (string $state): string => match (true) { $state === 'Account activated' => 'success', str_starts_with($state, 'Expired') => 'danger', in_array($state, ['Awaiting activation', 'Opened / redeemed'], true) => 'warning', default => 'gray' })
                     ->state(function (Employee $record): string {
                         $status = $record->user?->getRawOriginal('account_status');
                         if ($status === 'active') {

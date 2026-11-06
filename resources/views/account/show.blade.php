@@ -65,11 +65,14 @@
                 @foreach($applications as $key => $application)
                     @php($state = $applicationStates[$key])
                     <li class="flex items-start justify-between gap-3 px-4 py-3">
-                        <div class="min-w-0"><h3 class="text-[15px] font-semibold leading-snug">{{ $application['label'] }}</h3><p class="mt-0.5 text-sm leading-snug text-hub-ink-secondary">{{ $state['status'] }}</p></div>
+                        <div class="min-w-0"><h3 class="text-[15px] font-semibold leading-snug">{{ $application['label'] }}</h3><p class="{{ $state['allowed'] ? 'mt-0.5 text-sm leading-snug text-hub-ink-secondary' : 'sr-only' }}">{{ $state['status'] }}</p></div>
                         <span class="hub-tag flex-none {{ $state['allowed'] ? 'hub-tag--success' : '' }}">{{ $state['allowed'] ? 'Available' : 'Unavailable' }}</span>
                     </li>
                 @endforeach
             </ul>
+            @if(collect($applicationStates)->contains(fn ($state) => ! $state['allowed']))
+                <p class="border-t border-hub-border-soft px-4 py-3 text-sm text-hub-ink-secondary">Unavailable applications are not set up for your account. Ask an administrator if you need access.</p>
+            @endif
         </section>
     </main>
     @include('components.hub-support-widget')

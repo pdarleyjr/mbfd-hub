@@ -863,7 +863,7 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
  * Markup, render hooks and every accessible name are unchanged: the section and header dissolve
  * (display: contents) into the page grid. A full-bleed page opts out with data-hub-page-frame="bleed".
  */
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav {
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav {
     display: inline-flex;
     flex-wrap: nowrap;
     gap: 0;
@@ -875,7 +875,7 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
     box-shadow: var(--hub-shadow-card);
 }
 
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav > .fi-btn {
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav > .fi-btn {
     min-height: 2.75rem;
     border-radius: 0;
     background: transparent;
@@ -885,27 +885,27 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
     font-weight: 600;
 }
 
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav > .fi-btn + .fi-btn {
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav > .fi-btn + .fi-btn {
     border-inline-start: 1px solid rgb(var(--hub-glass-border));
 }
 
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav > .fi-btn:first-child { border-start-start-radius: inherit; border-end-start-radius: inherit; }
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav > .fi-btn:last-child { border-start-end-radius: inherit; border-end-end-radius: inherit; }
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav > .fi-btn:hover { background: rgb(var(--hub-n-50)); }
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav > .fi-btn:active { background: rgb(var(--hub-n-100)); }
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav > .fi-btn:focus-visible { outline-offset: -2px; }
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav > .fi-btn .fi-btn-icon { color: rgb(var(--hub-n-600)); }
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav > .fi-btn:first-child { border-start-start-radius: inherit; border-end-start-radius: inherit; }
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav > .fi-btn:last-child { border-start-end-radius: inherit; border-end-end-radius: inherit; }
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav > .fi-btn:hover { background: rgb(var(--hub-n-50)); }
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav > .fi-btn:active { background: rgb(var(--hub-n-100)); }
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav > .fi-btn:focus-visible { outline-offset: -2px; }
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav > .fi-btn .fi-btn-icon { color: rgb(var(--hub-n-600)); }
 
 /* Admin Home and Hub Home are icons (their aria-label keeps the name) until the bar has room for words. */
 @media (max-width: 1279.98px) {
-    .fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav > .hub-page-nav__home { padding-inline: .75rem; }
-    .fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav .hub-page-nav__label { display: none; }
+    :is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav > .hub-page-nav__home { padding-inline: .75rem; }
+    :is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav .hub-page-nav__label { display: none; }
 }
 
 /* Other Admin pages keep their own layout under the control; only Filament's 32px section padding and gaps
    tighten to the page rhythm tokens so the title does not float a band below the navigation. */
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page, [class*="fi-resource-"], [data-hub-page-frame="bleed"]):has(> .hub-page-nav) > .hub-page-nav { margin-block: var(--hub-page-pad-top) 0; }
-.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page, [class*="fi-resource-"], [data-hub-page-frame="bleed"]):has(> .hub-page-nav) > section {
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page, [class*="fi-resource-"], [data-hub-page-frame="bleed"]), :is(.fi-panel-training, .fi-panel-workgroups) .fi-page:not([data-hub-page-frame="bleed"])):has(> .hub-page-nav) > .hub-page-nav { margin-block: var(--hub-page-pad-top) 0; }
+:is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page, [class*="fi-resource-"], [data-hub-page-frame="bleed"]), :is(.fi-panel-training, .fi-panel-workgroups) .fi-page:not([data-hub-page-frame="bleed"])):has(> .hub-page-nav) > section {
     padding-block: var(--hub-page-gap) var(--hub-page-pad-bottom);
     row-gap: var(--hub-page-gap);
 }
@@ -1001,7 +1001,7 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
     .fi-panel-admin .fi-page[class*="fi-resource-"] .fi-header-heading { font-size: 22px; line-height: 28px; }
     .fi-panel-admin .fi-page[class*="fi-resource-"] .fi-header-subheading { font-size: 13px; line-height: 20px; }
 
-    .fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page) > .hub-page-nav > * { flex: none; padding-inline: .75rem; }
+    :is(.fi-panel-admin .fi-page:not(.fi-dashboard-page, .mbfd-dash-page), :is(.fi-panel-employee, .fi-panel-training, .fi-panel-workgroups) .fi-page) > .hub-page-nav > * { flex: none; padding-inline: .75rem; }
 }
 
 /*

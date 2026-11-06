@@ -208,11 +208,42 @@ table[data-hub-mode="cards"] > tbody > tr > td[data-hub-title] :is(.fi-ta-text-d
   font-size: 0.8125rem;
   font-weight: 400;
 }
+/* One label column width on every table, so values start at the same x on every card and page;
+   a label only wraps when it is longer than the column ("Account activation" fits). */
 table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden]):not([data-hub-title]) {
-  grid-template-columns: minmax(5rem, 30%) minmax(0, 1fr);
+  grid-template-columns: 8.25rem minmax(0, 1fr);
+  justify-items: start;
   padding-block: 0;
+  text-align: start;
 }
 table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden]):not([data-hub-title])::before { font-weight: 500; }
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden]):not([data-hub-title]) > * { justify-self: start; text-align: start; }
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"] :is(.fi-ta-text, .fi-ta-icon, .fi-ta-col-wrp) { justify-content: flex-start; align-items: flex-start; text-align: start; }
+
+/*
+ * Row actions: a single "Actions" menu is a 44px icon button (its label stays for screen readers)
+ * at every width, so the data, not eleven identical outlined buttons, carries the table.
+ */
+@supports selector(:has(*)) {
+  .fi-ta-cell .fi-ta-actions > .fi-dropdown:only-child .fi-btn:has(.fi-btn-icon) {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding-inline: 0;
+    justify-content: center;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+  .fi-ta-cell .fi-ta-actions > .fi-dropdown:only-child .fi-btn:has(.fi-btn-icon):hover { background: rgb(var(--hub-n-50)); }
+  .fi-ta-cell .fi-ta-actions > .fi-dropdown:only-child .fi-btn:has(.fi-btn-icon) .fi-btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
 
 /*
  * One "Actions" menu per row moves into the row header as a 44px icon button beside the details
