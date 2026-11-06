@@ -31,6 +31,12 @@ export const isWorkingStatus = (status: FormStatus): boolean => status === 'subm
 
 export const isReturned = (form: Pick<FormSummary, 'status'>): boolean => form.status === 'returned';
 
+/** Closed with nothing issued: Captain 5 cleared it (supplies handed over), and Restore can bring it back. */
+export const isCleared = (form: Pick<FormSummary, 'status' | 'can_restore'>): boolean => form.status === 'closed' && form.can_restore === true;
+
+/** The status tag: a cleared form says Cleared, everything else keeps the server's label. */
+export const formStatusLabel = (form: Pick<FormSummary, 'status' | 'status_label' | 'can_restore'>): string => (isCleared(form) ? 'Cleared' : form.status_label);
+
 /** Forms made before this workflow: issued by hand, kept as records. */
 export const isOlderRecord = (form: Pick<FormSummary, 'status'>): boolean => form.status === 'issued' || form.status === 'partially_issued' || form.status === 'closed';
 
@@ -51,10 +57,16 @@ export const returnedText = (form: Pick<FormSummary, 'submitter_name' | 'return_
 );
 
 /** What an archived card says in place of the acknowledgment line. */
-export function archiveText(form: Pick<FormSummary, 'status' | 'status_label' | 'reconciled_at' | 'reconciled_by' | 'last_activity_at' | 'closed_at'>): string {
+export function archiveText(form: Pick<FormSummary, 'status' | 'status_label' | 'reconciled_at' | 'reconciled_by' | 'last_activity_at' | 'closed_at' | 'can_restore' | 'closed_by' | 'close_reason'>): string {
   if (form.status === 'reconciled') {
     const who = form.reconciled_by ? ` by ${form.reconciled_by}` : '';
     return `Reconciled${who}${form.reconciled_at ? `, ${etDateTime(form.reconciled_at)}` : ''}`;
+  }
+  if (isCleared(form)) {
+    const who = form.closed_by ? ` by ${form.closed_by}` : '';
+    const when = form.closed_at ? `, ${etDateTime(form.closed_at)}` : '';
+    const why = form.close_reason ? `: ${form.close_reason}` : '';
+    return `Cleared${who}${when}${why}`;
   }
   if (form.status === 'superseded') return 'Replaced by a corrected form';
   if (isOlderRecord(form)) return `Older record: ${form.status_label}`;
@@ -109,9 +121,30 @@ export function pruneSelection(selected: ReadonlySet<string>, forms: readonly Fo
 
 /** The list row after an action: the server's fresh answer for that form, the rest as it was. */
 export function mergeSummary(row: FormSummary, detail: FormDetail): FormSummary {
-  const { lines: _lines, history: _history, messages: _messages, member_note: _note, close_reason: _close, cancel_reason: _cancel, revisions: _revisions, ...summary } = detail;
-  void _lines; void _history; void _messages; void _note; void _close; void _cancel; void _revisions;
+  const { lines: _lines, history: _history, messages: _messages, member_note: _note, cancel_reason: _cancel, revisions: _revisions, ...summary } = detail;
+  void _lines; void _history; void _messages; void _note; void _cancel; void _revisions;
   return { ...row, ...summary };
+}
+
+// ------------------------------------------------------------------ clear and restore
+
+/** The reason a one-tap Clear records. Captain 5 can add a note; it follows the default words. */
+export const CLEAR_REASON = 'Supplies provided';
+export const RESTORE_REASON = 'Restored to Active by Captain 5';
+/** The server keeps at most 255 characters of a close reason. */
+export const CLEAR_NOTE_MAX = 200;
+
+export function clearReason(note = ''): string {
+  const extra = note.trim().replace(/\s+/g, ' ').slice(0, CLEAR_NOTE_MAX);
+  return extra === '' ? CLEAR_REASON : `${CLEAR_REASON}. ${extra}`;
+}
+
+/** What the page says after a Clear, single or several. Failures are named so nothing is silently skipped. */
+export function clearDoneText(cleared: number, failed: number, firstError: string | null = null): string {
+  const done = cleared > 0 ? `Cleared ${plural(cleared, 'form')} and moved ${cleared === 1 ? 'it' : 'them'} to Archived. Stock did not change.` : '';
+  if (failed === 0) return done;
+  const miss = `${plural(failed, 'form')} could not be cleared${firstError ? `: ${firstError}` : '.'}`;
+  return done === '' ? miss : `${done} ${miss}`;
 }
 
 // ------------------------------------------------------------------ reject
@@ -164,6 +197,8 @@ export function formEventSentence(event: HistoryEvent): string {
     case 'reconciled': return 'Reconciled the form. Its items came off the supply room shelf.';
     case 'revised': return 'Sent a corrected form.';
     case 'superseded': return 'Replaced by a corrected form.';
+    case 'closed': return `Cleared the form and moved it to Archived. Stock did not change.${reason}`;
+    case 'reopened': return `Restored the form to Active.${reason}`;
     default: return eventSentence(event);
   }
 }

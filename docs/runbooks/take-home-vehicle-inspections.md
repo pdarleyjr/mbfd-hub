@@ -14,11 +14,21 @@
   3. Photos: six required angles (front, rear, driver side, passenger side, interior, dashboard).
   4. Keys present, acceptable for use, comments, acknowledgment and handwritten signature.
 - After submission the member returns to their own history with View and PDF links.
+- **Edit** (`/take-home-vehicle-inspections/{reference}/edit`, the submitting member only, until
+  Fleet clears it): correct the driver, odometer, the six checks, keys, acceptability and
+  comments. The vehicle, photos and signature stay as submitted. The report and PDF then show
+  the corrected answers with "Edited by NAME on DATE" and a before/after list of every change.
 
 ## Data rules
 
 - Each submission is an immutable `take_home_vehicle_inspections` row with a vehicle snapshot;
-  the model refuses updates and deletes. Photos are re-encoded JPEGs (no EXIF/GPS) on the
+  the model refuses deletes and any update other than the clear (archive) columns. A member's
+  correction is a new `take_home_vehicle_inspection_revisions` row (changed fields with before
+  and after, full corrected answers, who, when, optional reason; idempotent on
+  `client_revision_id`). `TakeHomeVehicleInspection::effective()` lays the latest revision over
+  the original for display. A correction that adds a new problem (new Issue found, newly not
+  acceptable, newly flagged odometer) shows the dashboard notice again for 24 hours; other
+  corrections never do. Photos are re-encoded JPEGs (no EXIF/GPS) on the
   private disk, served only through `/take-home-vehicle-inspections/photos/{uuid}`.
 - Vehicle details edited during an inspection: blank master fields are filled (audited as
   `applied`); changes to existing values, and any plate/VIN already on another vehicle, are
@@ -29,6 +39,11 @@
   `fleet:prune-take-home-uploads`.
 
 ## Fleet administration
+
+- **Clear** a handled inspection from `/admin/take-home-vehicle-inspections` (row action) or
+  from its dashboard notice. Fleet viewers may clear. A cleared inspection leaves the active
+  list and the dashboards, is listed under Visibility: Archived, can be restored there, and can
+  no longer be edited by the member. Clears and restores are logged in `archive_history`.
 
 - `/admin/unit-master-vehicles`: Export Excel / Export PDF (current filters and search, or all
   records), vehicle profile page with the last take-home inspection, history, proposed

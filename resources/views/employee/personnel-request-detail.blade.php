@@ -38,7 +38,12 @@
 
             <div class="grid gap-7 px-5 py-6 sm:px-7 lg:grid-cols-[1fr_0.8fr]">
                 <section>
-                    <h2 class="text-lg font-semibold">Requested items</h2>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <h2 class="text-lg font-semibold">Requested items</h2>
+                        @if($canEditOrder ?? false)
+                            <a class="hub-btn hub-btn--secondary hub-btn--field" href="/employee/request-equipment?edit={{ urlencode($request->public_id) }}" data-edit-order>Edit order</a>
+                        @endif
+                    </div>
                     <div class="hub-well mt-3 divide-y divide-hub-border">
                         @foreach($request->items as $item)
                             @php
@@ -130,15 +135,23 @@
                             @continue($update->event === 'items_fulfilled' && !filled($update->employee_visible_note))
                             <li class="relative pb-6 before:absolute before:-left-[1.62rem] before:top-1 before:h-3 before:w-3 before:rounded-full before:bg-hub-blue">
                                 @php $historyItem = $request->items->firstWhere('id', (int) data_get($update->metadata, 'item_id')); @endphp
-                                <p class="font-bold">{{ $historyItem ? str($update->event)->replace('_', ' ')->title() : $update->status->label() }}</p>
+                                @php $isAmendment = $update->event === \App\Support\PersonnelRequests\UniformOrderAmendment::EVENT; @endphp
+                                <p class="font-bold" @if($isAmendment) data-history-edited @endif>{{ $isAmendment ? 'Edited' : ($historyItem ? str($update->event)->replace('_', ' ')->title() : $update->status->label()) }}</p>
                                 @if($historyItem)<p class="text-sm font-semibold text-hub-ink-secondary">{{ $historyItem->item_name }}</p>@endif
                                 @if($update->employee_visible_note)
                                     @php
                                         $fromViewer = $update->changed_by_employee_id !== null && (int) $update->changed_by_employee_id === (int) ($viewerEmployeeId ?? 0);
-                                        $fromMember = $update->event === 'employee_responded' && $update->changed_by_employee_id !== null;
+                                        $fromMember = in_array($update->event, ['employee_responded', \App\Support\PersonnelRequests\UniformOrderAmendment::EVENT], true) && $update->changed_by_employee_id !== null;
                                     @endphp
                                     <p class="mt-1 text-xs font-semibold text-hub-ink" data-update-author>{{ $fromViewer ? 'You' : ($fromMember ? ((int) $update->changed_by_employee_id === (int) $request->beneficiary_employee_id ? $request->beneficiary_name : $request->requester_name) : 'Support Services') }}</p>
                                     <p class="mt-1 whitespace-pre-wrap text-sm leading-6 text-hub-ink-secondary">{{ $update->employee_visible_note }}</p>
+                                @endif
+                                @if($isAmendment && filled(data_get($update->metadata, 'changes')))
+                                    <ul class="mt-1 list-disc pl-5 text-sm leading-6 text-hub-ink-secondary" data-history-changes>
+                                        @foreach((array) data_get($update->metadata, 'changes') as $change)
+                                            <li>{{ $change }}</li>
+                                        @endforeach
+                                    </ul>
                                 @endif
                                 <time class="mt-1 block text-xs text-hub-ink-secondary">{{ $update->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y · g:i A') }}</time>
                             </li>

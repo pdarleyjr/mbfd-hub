@@ -21,6 +21,13 @@ export interface FormSummary extends Omit<RequestSummary, 'status'> {
   can_reconcile: boolean;
   can_reject: boolean;
   can_acknowledge: boolean;
+  /** Clear: close and archive without touching stock. Absent from an answer sent before Clear existed. */
+  can_clear?: boolean;
+  /** Restore: a cleared form can go back to Active. */
+  can_restore?: boolean;
+  /** Who cleared (closed) the form, as history recorded it, and why. */
+  closed_by?: string | null;
+  close_reason?: string | null;
   return_reason: string | null;
   returned_at: string | null;
   returned_by?: string | null;
@@ -49,7 +56,8 @@ export interface RevisionLink {
   is_current: boolean;
 }
 
-export interface FormDetail extends Omit<RequestDetail, 'status'>, FormSummary {
+export interface FormDetail extends Omit<RequestDetail, 'status' | 'close_reason'>, FormSummary {
+  close_reason: string | null;
   revisions: RevisionLink[];
 }
 

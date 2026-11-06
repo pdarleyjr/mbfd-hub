@@ -37,6 +37,11 @@ Route::prefix('take-home-vehicle-inspections')
 
         Route::get('/{inspection:reference}', [TakeHomeInspectionController::class, 'show'])
             ->where('inspection', 'THI-[0-9]{6}-[A-Z0-9]{6}')->name('show');
+        // The submitting member corrects their own inspection; each save is a logged revision.
+        Route::get('/{inspection:reference}/edit', [TakeHomeInspectionController::class, 'edit'])
+            ->where('inspection', 'THI-[0-9]{6}-[A-Z0-9]{6}')->name('edit');
+        Route::put('/{inspection:reference}', [TakeHomeInspectionController::class, 'update'])
+            ->middleware('throttle:20,1')->where('inspection', 'THI-[0-9]{6}-[A-Z0-9]{6}')->name('update');
         Route::get('/{inspection:reference}/pdf', [TakeHomeInspectionFileController::class, 'pdf'])
             ->middleware('throttle:30,1')->where('inspection', 'THI-[0-9]{6}-[A-Z0-9]{6}')->name('pdf');
         Route::get('/{inspection:reference}/signature', [TakeHomeInspectionFileController::class, 'signature'])

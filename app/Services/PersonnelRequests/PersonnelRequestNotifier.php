@@ -62,6 +62,13 @@ final class PersonnelRequestNotifier
         $this->notifyAdmins($request, $title, $body);
     }
 
+    /** @param list<string> $changes */
+    public function memberAmended(PersonnelRequest $request, array $changes = []): void
+    {
+        $summary = $changes === [] ? 'Review the updated items.' : implode(' ', array_slice($changes, 0, 3)).(count($changes) > 3 ? ' More changes in the history.' : '');
+        $this->notifyAdmins($request, 'Member edited a uniform order', "{$request->request_number} for {$request->beneficiary_name}: {$summary}");
+    }
+
     private function notifyAdmins(PersonnelRequest $request, string $title, string $body): void
     {
         $this->guarded(fn () => $this->queueAdminAlert($request, $title, $body));

@@ -10,6 +10,7 @@ use App\Models\ApparatusInspection;
 use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\User;
 use App\Services\Captain5\Captain5HandoffService;
+use App\Services\Captain5\Captain5InspectionClearing;
 use App\Services\Captain5\Captain5InspectionView;
 use App\Services\Captain5\Captain5IssueActions;
 use App\Services\Captain5\Captain5IssuePresenter;
@@ -162,6 +163,31 @@ final class Captain5Controller extends Controller
         }
 
         return $this->json(['inspection' => $payload]);
+    }
+
+    /** Rescue checkouts Captain 5 cleared (newest first, last 90 days): the Cleared view, where Restore lives. */
+    public function clearedInspections(Captain5InspectionClearing $clearing): JsonResponse
+    {
+        return $this->json(['inspections' => $clearing->presentCleared($clearing->cleared())]);
+    }
+
+    /** Clear a handled Rescue checkout from the Captain 5 list. Needs `act`; a repeat changes nothing. */
+    public function clearInspection(Request $request, Captain5InspectionClearing $clearing, int $inspection): JsonResponse
+    {
+        $user = $this->user($request);
+        $valid = $request->validate(['note' => ['nullable', 'string', 'max:'.Captain5InspectionClearing::NOTE_MAX]]);
+        $model = $clearing->clear($user, $this->access()->decide($user), $inspection, $valid['note'] ?? null);
+
+        return $this->json(['inspection_id' => (int) $model->getKey(), ...$clearing->clearFields($model)]);
+    }
+
+    /** Put a cleared Rescue checkout back on the Captain 5 list. Needs `act`; a repeat changes nothing. */
+    public function restoreInspection(Request $request, Captain5InspectionClearing $clearing, int $inspection): JsonResponse
+    {
+        $user = $this->user($request);
+        $model = $clearing->restore($user, $this->access()->decide($user), $inspection);
+
+        return $this->json(['inspection_id' => (int) $model->getKey(), ...$clearing->clearFields($model)]);
     }
 
     public function clarification(Request $request, IssueMessageService $messages, Captain5InspectionView $view, int $inspection): JsonResponse
