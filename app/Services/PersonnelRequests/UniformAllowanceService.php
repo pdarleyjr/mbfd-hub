@@ -52,16 +52,18 @@ final class UniformAllowanceService
     }
 
     /**
-     * Quantity already requested this allowance year, by allowance group.
+     * Quantity already requested this allowance year, by allowance group. When a member edits an
+     * order, that order's own items are left out so they are not counted twice.
      *
      * @return array<string, int>
      */
-    public function usedByGroup(Employee $employee, ?CarbonImmutable $at = null): array
+    public function usedByGroup(Employee $employee, ?CarbonImmutable $at = null, ?int $excludeRequestId = null): array
     {
         $period = $this->period($at);
         $products = $this->catalog->products();
         $used = [];
         $items = PersonnelRequestItem::query()
+            ->when($excludeRequestId !== null, fn (Builder $query): Builder => $query->where('personnel_request_id', '!=', $excludeRequestId))
             ->whereHas('request', function (Builder $requests) use ($employee, $period): Builder {
                 /** @var Builder<PersonnelRequest> $requests */
                 return $requests->withTrashed()

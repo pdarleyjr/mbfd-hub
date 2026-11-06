@@ -6,6 +6,8 @@ namespace App\Services\PersonnelRequests;
 
 final class UniformOrderCatalog
 {
+    private const RETIRED_FROM_SELF_SERVICE = ['uniform_shirt', 'work_boots', 'class_a_coat'];
+
     /** @return array<string, array<string, mixed>> */
     public function products(): array
     {
@@ -23,6 +25,17 @@ final class UniformOrderCatalog
         }
 
         return $products;
+    }
+
+    /**
+     * Products a member may order (or change) in the uniform order builder. Retired products
+     * stay in the catalog so older requests still render; Support Services handles them.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function selfServiceProducts(): array
+    {
+        return array_diff_key($this->products(), array_flip(self::RETIRED_FROM_SELF_SERVICE));
     }
 
     public function product(string $code): ?array

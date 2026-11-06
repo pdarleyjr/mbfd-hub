@@ -21,12 +21,16 @@ final class UniformEntitlementService
 {
     public function __construct(private readonly UniformOrderCatalog $catalog) {}
 
-    /** The jacket allowance is measured from an actual recorded issue. */
-    public function jacketEligibility(Employee $employee): array
+    /**
+     * The jacket allowance is measured from an actual recorded issue. When a member edits an
+     * order, that order's own jacket line does not count as another pending jacket request.
+     */
+    public function jacketEligibility(Employee $employee, ?int $excludeRequestId = null): array
     {
         // Check outstanding requests before issues so a concurrently completed issue
         // cannot disappear between checking its request and checking its issue date.
         $pending = $employee->personnelRequests()->withTrashed()->where('type', PersonnelRequestType::Uniform)
+            ->when($excludeRequestId !== null, fn ($query) => $query->whereKeyNot($excludeRequestId))
             ->whereNotIn('status', [PersonnelRequestStatus::Denied, PersonnelRequestStatus::Cancelled])
             ->whereHas('items', fn (Builder $query) => $query->where('item_code', 'jacket'))
             ->where(fn (Builder $query) => $query->where('status', '!=', PersonnelRequestStatus::Completed)
