@@ -93,3 +93,9 @@ function isIntegrationEnvironmentVariable(name: string): boolean
     || name === 'QUEUE_CONNECTION'
     || name === 'SESSION_DRIVER';
 }
+
+/**
+ * Origin of the isolated protected-UI test server. 8127 everywhere by default (CI); a workstation
+ * whose OS reserves that port (Windows Hyper-V excluded ranges) sets PROTECTED_UI_E2E_ORIGIN.
+ */
+export const protectedUiOrigin = loopbackBaseUrl('PROTECTED_UI_E2E_ORIGIN', 'http://127.0.0.1:8127');

@@ -10,7 +10,7 @@
     <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub-header back-label="Hub home" />
     <main id="main" class="hub-page__main thvi-main mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-        <x-hub.page-header title="Take Home Vehicle Inspections" eyebrow="Fleet" description="Inspect a take-home vehicle in four short steps. Your completed inspections are listed here.">
+        <x-hub.page-header title="Take Home Vehicle Inspections" description="Inspect a take-home vehicle in four short steps. Your completed inspections are listed here.">
             <a href="{{ route('take-home-inspections.create') }}" class="hub-btn hub-btn--primary hub-btn--field">New inspection</a>
         </x-hub.page-header>
 

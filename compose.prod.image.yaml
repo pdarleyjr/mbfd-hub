@@ -46,6 +46,12 @@ services:
         bind:
           create_host_path: false
       - "${HUB_GOOGLE_SA_PATH:-/dev/null}:/run/secrets/google_service_account.json:ro"
+      # Hashed build/daily assets of recently replaced releases, kept by deploy.yml
+      # before each image switch (72 h, 500 MB). nginx serves one only when this image
+      # lacks that file, so a page still open across a deploy can lazy-load its chunks.
+      # Read-only; short syntax creates an empty root-owned directory if it is missing.
+      # Runbook: docs/ops/retained-assets.md
+      - "/var/lib/mbfd-hub/retained-assets:/var/www/retained:ro"
     networks:
       - mbfd-net
       - policy-scanner

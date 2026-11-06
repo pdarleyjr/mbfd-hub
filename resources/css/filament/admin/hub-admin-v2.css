@@ -161,6 +161,31 @@
     text-transform: none;
 }
 
+/*
+ * Admin groups all start closed, so their headers are the navigation itself, not captions over
+ * open lists: dark 14px semibold labels, and 8px between groups instead of Filament's 28px
+ * (twelve closed groups took 72px each and pushed System below a laptop fold).
+ */
+.fi-panel-admin .fi-sidebar-nav-groups { row-gap: .5rem; }
+
+.fi-panel-admin .fi-sidebar-group-label {
+    color: rgb(var(--hub-n-800));
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 600;
+}
+
+.fi-panel-admin .fi-sidebar-group-button {
+    min-height: 2.5rem;
+    border-radius: var(--hub-radius-control);
+}
+
+.fi-panel-admin .fi-sidebar-group-button.cursor-pointer:hover { background-color: rgb(var(--hub-well) / .7); }
+
+@media (pointer: coarse) {
+    .fi-panel-admin .fi-sidebar-group-button { min-height: 2.75rem; }
+}
+
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-group-button .fi-sidebar-group-icon,
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-icon {
     color: rgb(var(--hub-n-600));
