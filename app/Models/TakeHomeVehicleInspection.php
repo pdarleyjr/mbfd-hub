@@ -4,18 +4,57 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 /**
  * An immutable Take Home Vehicle Inspection. Separate from Daily apparatus
- * checkouts. Rows are written once on submission and never updated.
+ * checkouts. Rows are written once on submission and their answers are never
+ * updated: a member's correction is a new TakeHomeVehicleInspectionRevision, and
+ * effective() lays the latest one over the signed original for display. The only
+ * columns that may change afterwards are the Fleet clear (archive) columns.
  */
 class TakeHomeVehicleInspection extends Model
 {
+    use HasArchive;
+
     public const TYPE_LABEL = 'Take Home Vehicle Inspection';
+
+    /** Columns Fleet may change on a submitted inspection: clearing and restoring it. */
+    public const ARCHIVE_COLUMNS = ['archived_at', 'archived_by', 'archive_reason', 'archive_history', 'updated_at'];
+
+    /** Answers a member may correct after submitting, plus the values derived from them. */
+    public const REVISABLE_FIELDS = [
+        'driver_employee_id',
+        'driver_name',
+        'driver_employee_number',
+        'driver_verified',
+        'odometer',
+        'odometer_exception',
+        'odometer_flagged',
+        'odometer_note',
+        'checks',
+        'has_issues',
+        'has_not_checked',
+        'keys_present',
+        'acceptable_for_use',
+        'comments',
+    ];
+
+    /** Plain labels for the answers a revision can change (check fields are labelled per check). */
+    public const REVISABLE_LABELS = [
+        'driver_name' => 'Assigned driver',
+        'driver_employee_number' => 'Driver employee ID',
+        'odometer' => 'Odometer',
+        'odometer_exception' => 'No working odometer',
+        'keys_present' => 'Keys present',
+        'acceptable_for_use' => 'Acceptable for use',
+        'comments' => 'Additional comments',
+    ];
 
     public const STATUS_GOOD = 'good';
 
@@ -99,12 +138,17 @@ class TakeHomeVehicleInspection extends Model
         'acknowledged_at' => 'datetime',
         'started_at' => 'datetime',
         'submitted_at' => 'datetime',
+        'archived_at' => 'datetime',
+        'archive_history' => 'array',
     ];
 
     protected static function booted(): void
     {
-        static::updating(function (): never {
-            throw new LogicException('Take Home Vehicle Inspections are immutable once submitted.');
+        static::updating(function (self $inspection): void {
+            // Only Fleet's clear/restore columns may change; every answer stays as signed.
+            if (array_diff(array_keys($inspection->getDirty()), self::ARCHIVE_COLUMNS) !== []) {
+                throw new LogicException('Take Home Vehicle Inspections are immutable once submitted.');
+            }
         });
         static::deleting(function (): never {
             throw new LogicException('Take Home Vehicle Inspections cannot be deleted.');
@@ -139,6 +183,88 @@ class TakeHomeVehicleInspection extends Model
     public function vehicleChanges(): HasMany
     {
         return $this->hasMany(UnitMasterVehicleChange::class);
+    }
+
+    /** @return HasMany<TakeHomeVehicleInspectionRevision, $this> oldest first */
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(TakeHomeVehicleInspectionRevision::class)->orderBy('revision_number');
+    }
+
+    /** @return HasOne<TakeHomeVehicleInspectionRevision, $this> */
+    public function latestRevision(): HasOne
+    {
+        return $this->hasOne(TakeHomeVehicleInspectionRevision::class)->latestOfMany('revision_number');
+    }
+
+    public function isEdited(): bool
+    {
+        return $this->latestRevision !== null;
+    }
+
+    /**
+     * The inspection as it reads now: the latest member correction laid over the
+     * signed original, in memory only. The returned copy is never saved (its answers
+     * are dirty, so the update guard refuses it); the stored row is untouched.
+     */
+    public function effective(): static
+    {
+        $revision = $this->latestRevision;
+        if ($revision === null) {
+            return $this;
+        }
+
+        $copy = clone $this;
+        $copy->forceFill(array_intersect_key((array) $revision->answers, array_flip(self::REVISABLE_FIELDS)));
+        $copy->setRelation('latestRevision', $revision);
+
+        return $copy;
+    }
+
+    /**
+     * The revisable answers as currently held by this instance (the original row, or
+     * an effective() copy).
+     *
+     * @return array<string, mixed>
+     */
+    public function answers(): array
+    {
+        $answers = [];
+        foreach (self::REVISABLE_FIELDS as $field) {
+            $answers[$field] = $this->getAttribute($field);
+        }
+
+        return $answers;
+    }
+
+    /** "Exterior body: result" for a check field, otherwise the plain label. */
+    public static function revisableFieldLabel(string $field): string
+    {
+        if (preg_match('/^checks\.([a-z_]+)\.(status|issue_description|notes)$/', $field, $match) === 1) {
+            $check = self::CHECKS[$match[1]][0] ?? $match[1];
+
+            return $check.': '.match ($match[2]) {
+                'status' => 'result',
+                'issue_description' => 'issue description',
+                default => 'notes',
+            };
+        }
+
+        return self::REVISABLE_LABELS[$field] ?? str_replace('_', ' ', ucfirst($field));
+    }
+
+    public static function revisableValueLabel(string $field, mixed $value): string
+    {
+        if (str_ends_with($field, '.status')) {
+            return self::statusLabel(is_string($value) ? $value : null);
+        }
+
+        return match ($field) {
+            'keys_present', 'acceptable_for_use' => self::answerLabel($value === null ? null : (bool) $value),
+            'odometer' => $value === null ? 'Not recorded' : number_format((int) $value).' mi',
+            'odometer_exception' => self::ODOMETER_EXCEPTIONS[(string) $value] ?? 'No',
+            default => filled($value) ? (string) $value : 'Blank',
+        };
     }
 
     /** Standard photos keyed by angle, in the canonical order. */
