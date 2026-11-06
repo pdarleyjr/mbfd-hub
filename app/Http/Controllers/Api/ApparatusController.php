@@ -34,6 +34,7 @@ use App\Support\Database\TransientDatabaseFailure;
 use App\Support\Fleet\FleetVehicleCatalog;
 use App\Support\Fleet\VehicleIdentificationFields;
 use App\Support\Fleet\VehicleNumber;
+use App\Support\Media\MemberMedia;
 use App\Support\Security\Base64Image;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -43,7 +44,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -1375,7 +1375,7 @@ class ApparatusController extends Controller
     private function deleteStoredPaths(array $paths): void
     {
         foreach (array_unique($paths) as $path) {
-            Storage::disk('public')->delete($path);
+            MemberMedia::delete($path);
         }
     }
 

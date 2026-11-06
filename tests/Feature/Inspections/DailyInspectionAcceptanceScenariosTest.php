@@ -1037,11 +1037,11 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
         $this->markItem($payload, 0, 0, 'Missing', ['notes' => 'Photographed.', 'photo' => self::SIGNATURE_PNG]);
         $payload['defects'][0]['photo'] = self::SIGNATURE_PNG;
         $inspection = ApparatusInspection::query()->findOrFail($this->submit($payload)->assertCreated()->json('id'));
-        $this->assertNotEmpty(Storage::disk('public')->allFiles());
+        $this->assertNotEmpty(Storage::disk('local')->allFiles());
 
         // Files vanish from disk (cleanup, restore from a partial backup).
-        foreach (Storage::disk('public')->allFiles() as $file) {
-            Storage::disk('public')->delete($file);
+        foreach (Storage::disk('local')->allFiles() as $file) {
+            Storage::disk('local')->delete($file);
         }
 
         $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk();

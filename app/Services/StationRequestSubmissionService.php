@@ -8,11 +8,11 @@ use App\Data\StationRequestSubmissionResult;
 use App\Models\Room;
 use App\Models\StationRequest;
 use App\Services\Identity\AuthenticatedActor;
+use App\Support\Media\MemberMedia;
 use App\Support\Security\Base64Image;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -187,7 +187,7 @@ class StationRequestSubmissionService
     private function deleteStoredPaths(array $paths): void
     {
         foreach ($paths as $path) {
-            Storage::disk('public')->delete($path);
+            MemberMedia::delete($path);
         }
     }
 

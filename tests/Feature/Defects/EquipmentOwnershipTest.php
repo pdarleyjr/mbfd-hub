@@ -242,6 +242,7 @@ final class EquipmentOwnershipTest extends TestCase
     public function test_a_standalone_stretcher_report_is_captain5s_issue_without_an_inspection(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         $ems = $this->officer('Captain', 'EMS Captain');
         $this->seat($ems, 'EMS', 'D Shift');
         $inspections = ApparatusInspection::query()->count();
@@ -260,7 +261,7 @@ final class EquipmentOwnershipTest extends TestCase
             [$defect->compartment_key, $defect->item_key, $defect->responsible_owner, $defect->owner_basis]);
         self::assertNull($defect->apparatus_inspection_id);
         self::assertSame($inspections, ApparatusInspection::query()->count(), 'No inspection is created');
-        Storage::disk('public')->assertExists((string) $defect->photo_path);
+        Storage::disk('local')->assertExists((string) $defect->photo_path);
         $report = StretcherIssueReport::query()->sole();
         self::assertDatabaseHas('inspection_notification_deliveries', ['event_key' => 'captain5:stretcher:'.$report->id.':reported', 'recipient_user_id' => $this->captain->id]);
         self::assertDatabaseMissing('inspection_notification_deliveries', ['event_key' => 'captain5:stretcher:'.$report->id.':unusable']);

@@ -10,6 +10,7 @@ use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\StationRequestResource\Pages;
 use App\Filament\Support\ArchiveFilter;
+use App\Filament\Support\MemberMediaFields;
 use App\Models\Station;
 use App\Models\StationRequest;
 use Filament\Infolists;
@@ -192,7 +193,7 @@ class StationRequestResource extends Resource
                             Infolists\Components\TextEntry::make('pd_case_number')->label('PD Case #')->placeholder('—'),
                             Infolists\Components\ImageEntry::make('photo_path')
                                 ->label('Photo')
-                                ->disk('public')
+                                ->getStateUsing(fn (Model $record): ?string => MemberMediaFields::imageSource($record->getAttribute('photo_path')))
                                 ->height(120)
                                 ->placeholder('No photo'),
                         ])->columns(4),
@@ -201,11 +202,11 @@ class StationRequestResource extends Resource
                 ->schema([
                     Infolists\Components\ImageEntry::make('metadata.signatures.member')
                         ->label('Member Signature')
-                        ->disk('public')
+                        ->getStateUsing(fn (StationRequest $record): ?string => MemberMediaFields::imageSource(data_get($record->metadata, 'signatures.member')))
                         ->height(140),
                     Infolists\Components\ImageEntry::make('metadata.signatures.officer')
                         ->label('Officer Signature')
-                        ->disk('public')
+                        ->getStateUsing(fn (StationRequest $record): ?string => MemberMediaFields::imageSource(data_get($record->metadata, 'signatures.officer')))
                         ->height(140),
                 ])
                 ->columns(2)

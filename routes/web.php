@@ -319,6 +319,20 @@ Route::get('employee/inventory-corrections/{correction}/photo', \App\Http\Contro
     ->whereNumber('correction')
     ->name('inventory-corrections.photo');
 
+// Member photos and signatures (App\Support\Media\MemberMedia): a short-lived address signed for
+// one signed-in viewer by a page that already authorized the record.
+Route::get('member-media/{path}', \App\Http\Controllers\MemberMediaController::class)
+    ->middleware(['auth:web', 'signed:relative', 'throttle:600,1'])
+    ->where('path', '[A-Za-z0-9._/-]+')
+    ->name(\App\Support\Media\MemberMedia::ROUTE);
+
+// Member images are never served from the public disk, even a copy photos:make-private has not
+// moved yet (nginx answers these paths with 404 first; this covers `artisan serve` and tests).
+Route::get('storage/{directory}/{path?}', fn () => abort(404))
+    ->whereIn('directory', \App\Support\Media\MemberMedia::DIRECTORIES)
+    ->where('path', '.*')
+    ->name('member-media.public-gone');
+
 // Daily Checkout history exports. Authenticated users only (not employee-only,
 // so Fleet administrators without an employee profile can print any record);
 // the controllers authorize the submitting user or the inspection `view` policy.

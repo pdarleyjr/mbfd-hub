@@ -10,6 +10,7 @@ use App\Models\InspectionPhotoUpload;
 use App\Models\TakeHomeVehicleInspectionPhoto;
 use App\Services\Fleet\TakeHomeInspectionPhotoStore;
 use App\Services\Inspections\InspectionPhotoUploads;
+use App\Support\Media\MemberMedia;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
@@ -70,13 +71,12 @@ final class MaintainMemberPhotoUploads extends Command
     private function removeAbandonedDailyUploads(): int
     {
         $removed = 0;
-        $public = Storage::disk(InspectionPhotoUploads::DISK);
         $private = $this->privateDisk();
         InspectionPhotoUpload::query()
             ->whereNull('apparatus_inspection_id')
             ->where('created_at', '<', now()->subDays(InspectionPhotoUploads::UNATTACHED_RETENTION_DAYS))
             ->orderBy('id')
-            ->chunkById(200, function ($uploads) use ($public, $private, &$removed): void {
+            ->chunkById(200, function ($uploads) use ($private, &$removed): void {
                 foreach ($uploads as $upload) {
                     $removed++;
                     if ($this->dryRun) {
@@ -84,7 +84,7 @@ final class MaintainMemberPhotoUploads extends Command
                     }
                     // Another row may point at the same file only through resolve()'s duplicate mapping, which
                     // always keeps the attached row's own path; an unattached row's file is its own.
-                    $public->delete($upload->path);
+                    MemberMedia::delete($upload->path); // private disk, and a public copy not moved yet
                     $this->deleteOriginal($private, $upload->source_path, $upload->path);
                     $upload->delete();
                 }

@@ -27,6 +27,7 @@ class TrtTrailerInventoryTest extends TestCase
     public function test_missing_historical_photo_is_reported_without_requesting_a_broken_url(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         Role::create(['name' => 'logistics_admin', 'guard_name' => 'web']);
         $admin = User::factory()->create();
         $admin->assignRole('logistics_admin');
@@ -59,6 +60,7 @@ class TrtTrailerInventoryTest extends TestCase
     public function test_member_submission_reaches_admin_detail_and_remains_discoverable_after_archive_restore(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         $this->travelTo(now()->subDay());
         $member = $this->actingAsCanonicalFixture('QA-TRT-ACTOR', '[QA TEST] TRT Actor');
         $catalogItem = TrtInventoryCatalogItem::create([
@@ -78,8 +80,8 @@ class TrtTrailerInventoryTest extends TestCase
         $entry = $session->entries()->sole();
         self::assertSame($member->id, $entry->user_id);
         self::assertSame(2, $entry->actual_quantity);
-        Storage::disk('public')->assertExists($entry->image_path);
-        $photoBytes = Storage::disk('public')->get($entry->image_path);
+        Storage::disk('local')->assertExists($entry->image_path);
+        $photoBytes = Storage::disk('local')->get($entry->image_path);
         $this->travelBack();
 
         $admin = $this->equipmentAdmin(manage: true);
@@ -90,7 +92,8 @@ class TrtTrailerInventoryTest extends TestCase
         Livewire::test(TrtTrailerInventory::class)
             ->assertSet('selectedSessionId', $session->id)
             ->assertSee('[QA TEST] Rescue Tool')
-            ->assertSee('/storage/'.$entry->image_path, false)
+            ->assertSeeHtml('/member-media/'.$entry->image_path.'?')
+            ->assertDontSeeHtml('/storage/'.$entry->image_path)
             ->call('showItemDetail', $catalogItem->id)
             ->assertSee('[QA TEST] TRT Actor')
             ->assertSee('good')
@@ -127,8 +130,8 @@ class TrtTrailerInventoryTest extends TestCase
         self::assertSame(2, $entry->fresh()->actual_quantity);
         self::assertSame('good', $entry->fresh()->condition);
         self::assertSame('keep', $entry->fresh()->action);
-        Storage::disk('public')->assertExists($entry->image_path);
-        self::assertSame($photoBytes, Storage::disk('public')->get($entry->image_path));
+        Storage::disk('local')->assertExists($entry->image_path);
+        self::assertSame($photoBytes, Storage::disk('local')->get($entry->image_path));
     }
 
     public function test_today_shared_session_cannot_be_archived_and_viewers_have_no_lifecycle_actions(): void
