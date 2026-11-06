@@ -69,20 +69,32 @@ final class ChecklistTemplateRepository
     public function published(string $type, ?string $connection = null): ?Version
     {
         $connection ??= DB::getDefaultConnection();
+        if (! $this->hasTable($connection)) {
+            return null;
+        }
+
+        // Inside a transaction the row is read fresh every time: callers resolve, wait for row locks,
+        // then resolve again under the lock (inspection submit, inventory-correction apply), and that
+        // second read must see a publish that committed while they waited.
+        $inTransaction = DB::connection($connection)->transactionLevel() > 0;
         $key = $connection.'|'.$type;
-        if (array_key_exists($key, $this->published)) {
+        if (! $inTransaction && array_key_exists($key, $this->published)) {
             return $this->published[$key];
         }
 
-        if (! $this->hasTable($connection)) {
-            return $this->published[$key] = null;
-        }
-
-        return $this->published[$key] = Version::on($connection)
+        $published = Version::on($connection)
             ->where('checklist_type', $type)
             ->where('status', Version::STATUS_PUBLISHED)
             ->orderByDesc('id')
             ->first();
+        if ($inTransaction) {
+            // Never let a value read inside a transaction (possibly rolled back) outlive it.
+            unset($this->published[$key]);
+
+            return $published;
+        }
+
+        return $this->published[$key] = $published;
     }
 
     /**

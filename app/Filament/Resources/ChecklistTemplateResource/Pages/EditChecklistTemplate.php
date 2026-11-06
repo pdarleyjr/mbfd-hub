@@ -25,6 +25,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -90,6 +91,13 @@ class EditChecklistTemplate extends Page
     #[Locked]
     public array $summary = [];
 
+    /**
+     * The repeater key of the one compartment whose items are open. Rendering every item of a 200-item
+     * checklist on each request took seconds, so items are edited one compartment at a time; the closed
+     * compartments keep their state (Filament hydrates hidden components) and are saved with the rest.
+     */
+    public ?string $openCompartment = null;
+
     /** @var array<string, mixed>|null the publish preview the admin is confirming (its fingerprint is sent back) */
     #[Locked]
     public ?array $publishPreview = null;
@@ -149,10 +157,22 @@ class EditChecklistTemplate extends Page
                     ->reorderable()
                     ->reorderableWithButtons()
                     ->collapsible()
-                    ->collapsed()
                     ->cloneable(false)
                     ->defaultItems(0)
                     ->itemLabel(fn (array $state): string => self::compartmentLabel($state))
+                    ->extraItemActions([
+                        Forms\Components\Actions\Action::make('toggleItems')
+                            ->label(fn (array $arguments): string => $this->openCompartment === ($arguments['item'] ?? null) ? 'Close items' : 'Edit items')
+                            ->icon(fn (array $arguments): string => $this->openCompartment === ($arguments['item'] ?? null) ? 'heroicon-m-chevron-up' : 'heroicon-m-pencil-square')
+                            ->color('primary')
+                            ->button()
+                            ->size('sm')
+                            ->disabled(false)
+                            ->action(function (array $arguments): void {
+                                $key = is_string($arguments['item'] ?? null) ? $arguments['item'] : null;
+                                $this->openCompartment = $this->openCompartment === $key ? null : $key;
+                            }),
+                    ])
                     // Deleting a compartment takes its items with it: confirm first. Nothing reaches members
                     // until the draft is published, and the publish preview lists every removed item.
                     ->deleteAction(fn (Forms\Components\Actions\Action $action): Forms\Components\Actions\Action => $action
@@ -166,8 +186,13 @@ class EditChecklistTemplate extends Page
                             ->label('Compartment name')
                             ->required()
                             ->maxLength(120),
+                        Forms\Components\Placeholder::make('itemsClosed')
+                            ->hiddenLabel()
+                            ->content('Choose Edit items to change this compartment\'s items.')
+                            ->visible(fn (Forms\Components\Placeholder $component): bool => ! $this->isOpenCompartment($component)),
                         Forms\Components\Repeater::make('items')
                             ->label('Items')
+                            ->visible(fn (Forms\Components\Repeater $component): bool => $this->isOpenCompartment($component))
                             ->addActionLabel('Add item')
                             ->reorderable()
                             ->reorderableWithButtons()
@@ -559,19 +584,28 @@ class EditChecklistTemplate extends Page
 
                     return false;
                 }
-                $lockVersion = $this->lockVersion;
+                $saved = $this->editor()->saveDraft($draft, $payload, $user, $this->lockVersion);
             } else {
-                $draft = $this->editor()->startDraft($this->type, $user);
-                if (! $draft->wasRecentlyCreated && (int) $draft->created_by_user_id !== (int) $user->getKey()) {
-                    Notification::make()->danger()->title('Someone else started a draft of this checklist')
-                        ->body('Nothing was saved, so their draft is not overwritten. Reload the page to see their draft.')
+                // Starting the draft and saving into it is one transaction: a first save the server refuses
+                // (for example an invalid item in a closed compartment) leaves no draft behind.
+                $saved = DB::transaction(function () use ($user, $payload): ?Version {
+                    $draft = $this->editor()->startDraft($this->type, $user);
+                    // This page showed the live checklist, so a draft that already existed (someone else's, or
+                    // yours from another tab) holds edits this form never saw: never overwrite it.
+                    if (! $draft->wasRecentlyCreated) {
+                        return null;
+                    }
+
+                    return $this->editor()->saveDraft($draft, $payload, $user, (int) $draft->lock_version);
+                });
+                if ($saved === null) {
+                    Notification::make()->danger()->title('A draft of this checklist was started elsewhere')
+                        ->body('Nothing was saved, so that draft is not overwritten. Reload the page to see it; copy any edits you want to keep first.')
                         ->persistent()->send();
 
                     return false;
                 }
-                $lockVersion = (int) $draft->lock_version;
             }
-            $saved = $this->editor()->saveDraft($draft, $payload, $user, $lockVersion);
         } catch (ValidationException $exception) {
             $this->reportServerErrors($exception, $raw, $payload);
 
@@ -586,7 +620,15 @@ class EditChecklistTemplate extends Page
             return false;
         }
 
+        // Keep the same compartment open after the save (the form is refilled, so its key changes; the saved
+        // draft keeps the form's compartment order).
+        $openPosition = $this->openCompartment !== null
+            ? array_search($this->openCompartment, array_map('strval', array_keys((array) ($raw['compartments'] ?? []))), true)
+            : false;
         $this->showDraft($saved);
+        if ($openPosition !== false) {
+            $this->openCompartment = array_map('strval', array_keys((array) ($this->data['compartments'] ?? [])))[$openPosition] ?? null;
+        }
         $this->summary = $this->summaryFor($this->type);
 
         return true;
@@ -673,6 +715,7 @@ class EditChecklistTemplate extends Page
             ->mapWithKeys(fn (array $compartment): array => [(string) $compartment['id'] => (string) $compartment['name']])
             ->all();
         $this->form->fill($form);
+        $this->openCompartment = null; // repeater keys are new after a fill
         $this->savedFormHash = $this->formHash();
     }
 
@@ -727,6 +770,7 @@ class EditChecklistTemplate extends Page
     {
         $compartmentKeys = array_keys((array) ($raw['compartments'] ?? []));
         $messages = [];
+        $opened = null;
         foreach ($exception->errors() as $key => $errors) {
             $message = (string) (collect($errors)->first() ?? 'Check this value.');
             $where = null;
@@ -743,6 +787,8 @@ class EditChecklistTemplate extends Page
                     $itemName = (string) ($payload['compartments'][$c]['items'][$i]['name'] ?? '');
                     $where .= ' › item '.($i + 1).($itemName !== '' ? ' ('.$itemName.')' : '');
                     if ($compartmentKey !== null && isset($itemKeys[$i])) {
+                        // Show the first problem: open its compartment's items.
+                        $opened ??= $this->openCompartment = (string) $compartmentKey;
                         $this->addError('data.compartments.'.$compartmentKey.'.items.'.$itemKeys[$i].'.'.$field, $message);
                     }
                 } elseif ($compartmentKey !== null) {
@@ -873,6 +919,13 @@ class EditChecklistTemplate extends Page
             ->where('checklist_type', $this->type)
             ->where('status', 'draft')
             ->find($this->draftId);
+    }
+
+    /** Whether a component sits inside the compartment whose items are open. */
+    private function isOpenCompartment(Forms\Components\Component $component): bool
+    {
+        return $this->openCompartment !== null
+            && $component->getContainer()->getStatePath() === 'data.compartments.'.$this->openCompartment;
     }
 
     /** Compartment header: "Front Cab · 6 items". */

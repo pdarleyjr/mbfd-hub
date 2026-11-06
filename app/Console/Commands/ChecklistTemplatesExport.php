@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Services\Captain5\MedicalScope;
 use App\Services\ChecklistTemplates\ChecklistTemplateEditor;
 use App\Services\ChecklistTemplates\ChecklistTemplateException;
 use App\Services\DailyCheckoutChecklistResolver;
@@ -47,6 +48,14 @@ final class ChecklistTemplatesExport extends Command
             return self::SUCCESS;
         }
 
+        // The repository file is deploy-managed: rewriting it on a running server would be lost on the next
+        // deploy and would silently move Captain 5's reviewed medical baseline. Commit it from a checkout.
+        if (app()->environment('production')) {
+            $this->error('--write is refused in production. Run it in a development checkout and commit the file.');
+
+            return self::FAILURE;
+        }
+
         $path = $resolver->templatePath($type);
         if (file_put_contents($path, $json) === false) {
             $this->error("Could not write {$path}.");
@@ -57,6 +66,12 @@ final class ChecklistTemplatesExport extends Command
             ? 'published version v'.$live['version']->version_number
             : 'the repository file';
         $this->info("Wrote {$path} from {$source} (checklist hash {$live['hash']}).");
+        $reviewed = (string) config("captain5_medical_scope.{$type}.reviewed_version", '');
+        if (in_array($type, MedicalScope::MEDICAL_ONLY_TYPES, true) && $reviewed !== ''
+            && ! hash_equals($reviewed, MedicalScope::canonicalVersion($live['checklist']))) {
+            $this->warn("Captain 5 medical scope was reviewed against the previous {$type} file. Re-review it and update "
+                ."captain5_medical_scope.{$type}.reviewed_version before committing (tests/Unit/Captain5/MedicalScopeMappingTest fails until then).");
+        }
 
         return self::SUCCESS;
     }

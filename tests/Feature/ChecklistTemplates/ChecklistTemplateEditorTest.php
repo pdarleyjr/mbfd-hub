@@ -108,6 +108,97 @@ final class ChecklistTemplateEditorTest extends TestCase
         }
     }
 
+    public function test_a_publish_committed_while_a_caller_waits_for_locks_is_seen_inside_its_transaction(): void
+    {
+        $fileVersion = $this->resolved('E1')['checklist_version']; // memoizes "no published version"
+
+        // Another administrator's publish commits (written directly: the memo is not flushed).
+        $draft = $this->editor()->startDraft('engine', $this->manager);
+        $checklist = $draft->checklist;
+        $checklist['compartments'][0]['items'][0]['manufacturer'] = 'Published elsewhere';
+        $hash = app(DailyCheckoutChecklistResolver::class)->versionOf($checklist);
+        $draft->forceFill(['status' => Version::STATUS_PUBLISHED, 'version_number' => 1, 'checklist' => $checklist, 'checklist_hash' => $hash])->save();
+
+        // Lock-then-resolve callers (inspection submit, inventory-correction apply) resolve inside a transaction.
+        $inside = \Illuminate\Support\Facades\DB::transaction(fn (): array => $this->resolved('E1'));
+        $this->assertNotSame($fileVersion, $inside['checklist_version']);
+        $this->assertSame('Published elsewhere', $inside['checklist']['compartments'][0]['items'][0]['manufacturer']);
+        // The read inside the transaction also dropped the stale memo for later reads.
+        $this->assertSame($inside['checklist_version'], $this->resolved('E1')['checklist_version']);
+    }
+
+    public function test_import_may_not_reuse_a_removed_compartment_id(): void
+    {
+        $draft = $this->editor()->startDraft('engine', $this->manager);
+        $form = $this->editor()->toForm($draft->checklist);
+        $removed = array_pop($form['compartments']);
+        $form['compartments'][0]['items'] = [...$form['compartments'][0]['items'], ...array_map(
+            static fn (array $item): array => [...$item, 'compartment_id' => $form['compartments'][0]['id']],
+            array_values(array_filter($removed['items'], static fn (array $item): bool => ! in_array(mb_strtolower($item['name']), array_map(static fn (array $kept): string => mb_strtolower($kept['name']), $form['compartments'][0]['items']), true))),
+        )];
+        $draft = $this->editor()->saveDraft($draft, $form, $this->manager, $draft->lock_version);
+        $this->publish($draft, 'Remove the last compartment');
+
+        $import = $this->editor()->live('engine')['checklist'];
+        $import['compartments'][] = ['id' => $removed['id'], 'title' => 'Totally different bin', 'items' => [['name' => 'Bin item', 'inputType' => 'checkbox']]];
+        $this->assertThrows(
+            fn () => $this->editor()->importIntoDraft('engine', json_encode($import), $this->manager),
+            ValidationException::class,
+        );
+        $import['compartments'][array_key_last($import['compartments'])]['id'] = 'bad id!';
+        $this->assertThrows(fn () => $this->editor()->importIntoDraft('engine', json_encode($import), $this->manager), ValidationException::class);
+    }
+
+    public function test_a_renamed_item_and_a_new_item_with_its_old_name_cannot_be_published_together(): void
+    {
+        $draft = $this->editor()->startDraft('engine', $this->manager);
+        $form = $this->editor()->toForm($draft->checklist);
+        [$ci, $ii] = $this->position($form, 'Passports');
+        $form['compartments'][$ci]['items'][$ii]['name'] = 'Passports (old)';
+        $form['compartments'][$ci]['items'][] = [
+            'id' => '', 'name' => 'Passports', 'expectedQuantity' => null, 'manufacturer' => null, 'model' => null,
+            'description' => null, 'note' => null, 'compartment_id' => $form['compartments'][$ci]['id'],
+        ];
+        $draft = $this->editor()->saveDraft($draft, $form, $this->manager, $draft->lock_version);
+
+        $preview = $this->editor()->preview($draft);
+        $this->assertFalse($preview['publishable']);
+        $this->assertStringContainsString('same equipment', implode(' ', $preview['errors']));
+    }
+
+    public function test_export_write_is_refused_in_production_and_a_committed_export_is_not_drift(): void
+    {
+        $draft = $this->editor()->startDraft('default', $this->manager);
+        $form = $this->editor()->toForm($draft->checklist);
+        $form['compartments'][0]['items'][0]['note'] = 'Exported note';
+        $draft = $this->editor()->saveDraft($draft, $form, $this->manager, $draft->lock_version);
+        $published = $this->publish($draft, 'Note for members');
+
+        $directory = sys_get_temp_dir().'/mbfd-template-drift-'.uniqid('', true);
+        mkdir($directory);
+        try {
+            // The repository file now equals the published version (an export committed back): not drift.
+            file_put_contents("{$directory}/default_checklist.json", $this->editor()->exportJson($published->checklist));
+            $this->app->instance(DailyCheckoutChecklistResolver::class, new DailyCheckoutChecklistResolver($directory));
+            $row = collect($this->editor()->overview())->firstWhere('type', 'default');
+            $this->assertFalse($row['file_drift']);
+
+            file_put_contents("{$directory}/default_checklist.json", (string) file_get_contents(base_path('storage/checklists/default_checklist.json')).' ');
+            $edited = json_decode((string) file_get_contents("{$directory}/default_checklist.json"), true);
+            $edited['compartments'][0]['items'][0]['name'] .= ' (edited in the repository)';
+            file_put_contents("{$directory}/default_checklist.json", json_encode($edited));
+            $this->assertTrue(collect($this->editor()->overview())->firstWhere('type', 'default')['file_drift']);
+
+            $this->app->detectEnvironment(fn (): string => 'production');
+            $this->artisan('checklist-templates:export', ['type' => 'default', '--write' => true])->assertFailed();
+            $this->assertSame(json_encode($edited), file_get_contents("{$directory}/default_checklist.json"));
+        } finally {
+            $this->app->detectEnvironment(fn (): string => 'testing');
+            @unlink("{$directory}/default_checklist.json");
+            @rmdir($directory);
+        }
+    }
+
     public function test_resolve_with_template_runs_the_same_steps_with_a_supplied_baseline(): void
     {
         $resolver = app(DailyCheckoutChecklistResolver::class);

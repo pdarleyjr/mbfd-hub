@@ -76,6 +76,27 @@ final class ChecklistTemplateEditorPageTest extends TestCase
         $this->get(ChecklistTemplateResource::getUrl('index').'/pending')->assertNotFound();
     }
 
+    public function test_a_stale_tab_never_overwrites_a_draft_started_elsewhere_even_by_the_same_user(): void
+    {
+        // Tab 1 opens while there is no draft: it shows the live checklist.
+        $page = $this->page();
+        $itemPath = $this->itemPath($page, 'front_cab', 'Passports');
+
+        // Tab 2 (same administrator) starts and saves a draft.
+        $draft = $this->editor()->startDraft('engine', $this->manager);
+        $form = $this->editor()->toForm($draft->checklist);
+        $form['compartments'][0]['items'][0]['manufacturer'] = 'Saved in tab 2';
+        $saved = $this->editor()->saveDraft($draft, $form, $this->manager, $draft->lock_version);
+
+        $page->set($itemPath.'.name', 'Edited in tab 1')
+            ->callAction('saveDraft')
+            ->assertNotified('A draft of this checklist was started elsewhere');
+
+        $after = $saved->fresh();
+        $this->assertSame($saved->lock_version, $after->lock_version);
+        $this->assertSame('Saved in tab 2', $after->checklist['compartments'][0]['items'][0]['manufacturer']);
+    }
+
     public function test_a_manager_saves_a_draft_previews_it_and_publishes_it(): void
     {
         $page = $this->page();
@@ -161,6 +182,36 @@ final class ChecklistTemplateEditorPageTest extends TestCase
             ->assertHasErrors([$itemPath.'.name', $itemPath.'.expectedQuantity']);
 
         $this->assertNull($this->editor()->draft('engine'));
+        // The refused row's compartment is opened so its errors are visible.
+        $this->assertSame(explode('.', $itemPath)[2], $page->get('openCompartment'));
+
+        // Correcting the row and saving again works: the refused first save left no draft behind.
+        $page->set($itemPath.'.name', 'Passports')
+            ->set($itemPath.'.expectedQuantity', '2')
+            ->callAction('saveDraft')
+            ->assertHasNoErrors()
+            ->assertNotified('Draft saved');
+        $this->assertNotNull($this->editor()->draft('engine'));
+    }
+
+    public function test_items_are_edited_one_compartment_at_a_time_and_closed_edits_are_kept(): void
+    {
+        $page = $this->page();
+        $keys = array_keys((array) $page->get('data.compartments'));
+        $this->assertNull($page->get('openCompartment'));
+
+        $page->callFormComponentAction('compartments', 'toggleItems', arguments: ['item' => $keys[0]]);
+        $this->assertSame($keys[0], $page->get('openCompartment'));
+        $page->callFormComponentAction('compartments', 'toggleItems', arguments: ['item' => $keys[1]]);
+        $this->assertSame($keys[1], $page->get('openCompartment'));
+
+        // An edit in a compartment that is not open is still saved.
+        $itemPath = $this->itemPath($page, 'front_cab', 'Passports');
+        $page->set($itemPath.'.manufacturer', 'Saved while closed')->callAction('saveDraft')->assertNotified('Draft saved');
+        $this->assertContains('Saved while closed', array_column(array_merge(...array_column($this->editor()->draft('engine')->checklist['compartments'], 'items')), 'manufacturer'));
+
+        // The open compartment stays open across the save.
+        $this->assertSame(array_keys((array) $page->get('data.compartments'))[1], $page->get('openCompartment'));
     }
 
     public function test_export_downloads_the_checklist_shown_as_json(): void

@@ -74,7 +74,7 @@
 
         <section aria-labelledby="tpl-form-title" data-section="editor">
             <h2 class="hub-insp-section__title" id="tpl-form-title">Compartments and items</h2>
-            <p class="hub-insp-note">Open a compartment to edit its items. Drag or use the arrows to change the order. Deleting a compartment also removes its items, so move any you want to keep first.</p>
+            <p class="hub-insp-note">Choose Edit items on a compartment to change its items (one compartment at a time; your edits in others are kept). Drag or use the arrows to change the order. Deleting a compartment also removes its items, so move any you want to keep first.</p>
             <x-filament-panels::form id="checklist-template-form" wire:submit="saveDraft">
                 {{ $this->form }}
             </x-filament-panels::form>

@@ -169,7 +169,11 @@ final class ChecklistTemplateEditor
                 'compartment_count' => is_array($checklist['compartments'] ?? null) ? count($checklist['compartments']) : 0,
                 'item_count' => $this->itemCount($checklist),
                 'units' => $usage[$type] ?? [],
-                'file_drift' => $published !== null && ($fileHash === null || $published->source_file_hash === null || ! hash_equals($published->source_file_hash, $fileHash)),
+                // The file changed since the version was drafted, unless it now equals the published
+                // version itself (checklist-templates:export --write committed back).
+                'file_drift' => $published !== null && ($fileHash === null
+                    || (($published->source_file_hash === null || ! hash_equals($published->source_file_hash, $fileHash))
+                        && ! hash_equals((string) $published->checklist_hash, $fileHash))),
                 'file_error' => $fileError,
             ];
         }
@@ -1187,9 +1191,11 @@ final class ChecklistTemplateEditor
         // Ids that may be kept as is: those on the draft or its base. Any other id that was ever used
         // for this type belonged to removed equipment and must not come back meaning something else.
         $ownIds = [];
+        $ownCompartmentIds = [];
         $baseNames = [];
         foreach ([$current, $base] as $checklist) {
             foreach (self::compartmentsOf($checklist) as $compartment) {
+                $ownCompartmentIds[(string) ($compartment['id'] ?? '')] = true;
                 foreach (self::itemsOf($compartment) as $item) {
                     $ownIds[(string) $item['id']] = true;
                 }
@@ -1219,6 +1225,13 @@ final class ChecklistTemplateEditor
                 if (self::nameKeyOf($compartment) === null) {
                     $compartment[$nameKey] = $name;
                 }
+            }
+            if (preg_match('/^[A-Za-z0-9][A-Za-z0-9_\-]{0,79}$/D', $id) !== 1) {
+                $errors[] = "Compartment {$position} has an invalid id. Use letters, digits, '_' or '-', or remove the id to add it as a new compartment.";
+            } elseif (! isset($ownCompartmentIds[$id]) && isset($known['compartments'][$id])) {
+                // Diagrams and history are keyed by compartment id: a removed compartment's id must not
+                // come back naming different storage.
+                $errors[] = "Compartment id {$id} belonged to a compartment that was removed and cannot be reused. Remove the id to add it as a new compartment.";
             }
             if (isset($usedCompartmentIds[$id])) {
                 $errors[] = "Compartment id {$id} is used twice.";
@@ -1472,6 +1485,43 @@ final class ChecklistTemplateEditor
             }
 
             $itemNames = [];
+            // Equipment identity and former names must stay unambiguous inside a compartment: inventory
+            // changes match on the identity, and old issues are matched to items by compartment and name.
+            $identities = [];
+            $formerNames = [];
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $identity = EquipmentIdentity::forItem($item);
+                $identities[$identity][] = self::text($item['name'] ?? null);
+                foreach ((array) ($item['legacyItemNames'] ?? []) as $former) {
+                    if (is_string($former) && trim($former) !== '') {
+                        $formerNames[mb_strtolower(trim($former))][] = self::text($item['name'] ?? null);
+                    }
+                }
+            }
+            foreach ($identities as $names) {
+                if (count($names) > 1) {
+                    $errors[] = sprintf(
+                        '%s: "%s" are the same equipment to the system (one was renamed from the other\'s name). Remove the old item or give the new one a different name.',
+                        $label,
+                        implode('" and "', $names),
+                    );
+                }
+            }
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $name = self::text($item['name'] ?? null);
+                foreach ($formerNames[mb_strtolower($name)] ?? [] as $renamed) {
+                    if ($renamed !== $name) {
+                        $errors[] = "{$label}: \"{$name}\" is the former name of \"{$renamed}\", so old issues could not tell them apart. Remove the old item or give the new one a different name.";
+                    }
+                }
+            }
+
             foreach ($items as $ii => $item) {
                 if (! is_array($item)) {
                     $errors[] = 'Item '.($ii + 1)." in {$label} could not be read.";
