@@ -180,7 +180,7 @@ export default function Captain5Page() {
   const renderPanel = (id: TabId) => {
     switch (id) {
       case 'today':
-        return <TodayTab workspace={data} onFilter={(next) => update({ tab: 'issues', filter: next, kind: null })} onOpenInspection={setInspectionId} onHandoff={(handoff) => ws.patch({ handoff })} />;
+        return <TodayTab workspace={data} onFilter={(next) => update({ tab: 'issues', filter: next, kind: null })} onOpenInspection={setInspectionId} onHandoff={(handoff) => ws.patch({ handoff })} onChanged={() => void changed()} />;
       case 'issues':
         return <IssuesTab workspace={data} queue={queue} kind={kind} targetIssueId={issueId} onFilter={(nextQueue, nextKind) => update({ filter: nextQueue, kind: nextKind })} onOpen={openIssue} onChanged={changed} />;
       case 'trucks':
@@ -279,7 +279,7 @@ export default function Captain5Page() {
       </div>
 
       <IssueSheet issueId={issueId} onClose={closeIssue} onChanged={changed} onOpenInspection={setInspectionId} />
-      <InspectionSheet inspectionId={inspectionId} onClose={() => setInspectionId(null)} />
+      <InspectionSheet inspectionId={inspectionId} canAct={data.access.act} onClose={() => setInspectionId(null)} onChanged={() => void changed()} />
     </div>
   );
 }

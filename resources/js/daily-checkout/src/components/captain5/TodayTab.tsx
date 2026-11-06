@@ -8,9 +8,11 @@ interface Props {
   onFilter: (queue: QueueFilter) => void;
   onOpenInspection: (id: number) => void;
   onHandoff: (handoff: Handoff) => void;
+  /** A Rescue checkout was cleared or restored: reload the workspace. */
+  onChanged: () => void;
 }
 
-export default function TodayTab({ workspace, onFilter, onOpenInspection, onHandoff }: Props) {
+export default function TodayTab({ workspace, onFilter, onOpenInspection, onHandoff, onChanged }: Props) {
   const { counts } = workspace;
   return (
     <div className="space-y-8">
@@ -36,7 +38,8 @@ export default function TodayTab({ workspace, onFilter, onOpenInspection, onHand
           })}
         </ul>
       </section>
-      <RescueDailies dailies={workspace.rescue_dailies} onOpenInspection={onOpenInspection} />
+      <RescueDailies dailies={workspace.rescue_dailies} canAct={workspace.access.act} version={workspace.generated_at}
+        onOpenInspection={onOpenInspection} onChanged={onChanged} />
       <HandoffPanel handoff={workspace.handoff} onChange={onHandoff} />
     </div>
   );

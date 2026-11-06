@@ -142,6 +142,22 @@ export interface RescueDaily {
   submitted_by: string | null;
   needs_approval: boolean;
   open_issues: number;
+  /** Captain 5 cleared today's checkout from this list (it shows under Cleared). Absent from older answers. */
+  cleared_at?: string | null;
+  cleared_by?: string | null;
+  clear_note?: string | null;
+}
+
+/** A Rescue checkout Captain 5 cleared (GET /inspections/cleared), newest clear first. */
+export interface ClearedInspection {
+  inspection_id: number;
+  apparatus_id: number;
+  unit: string;
+  submitted_at: string | null;
+  submitted_by: string | null;
+  cleared_at: string | null;
+  cleared_by: string | null;
+  clear_note: string | null;
 }
 
 /** One Rescue unit and the vehicle number it is on right now. */
@@ -248,6 +264,10 @@ export interface InspectionView {
   acceptance: string;
   scope_note: string | null;
   compartments: InspectionCompartment[];
+  /** Set when Captain 5 cleared this Rescue checkout from his list. */
+  cleared_at?: string | null;
+  cleared_by?: string | null;
+  clear_note?: string | null;
 }
 
 /** Body of POST /issues/{id}/actions apart from the concurrency and idempotency fields. */

@@ -150,14 +150,16 @@ final class Captain5Workspace
             ->whereIn('apparatus_id', $ids)
             ->where('created_at', '>=', $start)->where('created_at', '<', $end)
             ->orderByDesc('id')
-            ->get(['id', 'apparatus_id', 'operator_name', 'rank', 'created_at', 'completed_at', 'processing_status', 'review_status'])
+            ->with('captain5ClearedBy:id,name,display_name')
+            ->get(['id', 'apparatus_id', 'operator_name', 'rank', 'created_at', 'completed_at', 'processing_status', 'review_status', 'captain5_cleared_at', 'captain5_cleared_by_user_id', 'captain5_clear_note'])
             ->unique('apparatus_id')->keyBy('apparatus_id');
+        $clearing = app(Captain5InspectionClearing::class);
         $openCounts = ApparatusDefect::query()->whereIn('apparatus_id', $ids)->where('resolved', false)
             ->where(fn ($owned) => $owned->where('responsible_owner', ApparatusDefect::OWNER_CAPTAIN5)
                 ->orWhere(fn ($unprojected) => $unprojected->whereNull('responsible_owner')->whereNull('captain5_cleared_at')))
             ->selectRaw('apparatus_id, count(*) as open_count')->groupBy('apparatus_id')->pluck('open_count', 'apparatus_id');
 
-        return $rescues->map(function (Apparatus $apparatus) use ($inspections, $openCounts): array {
+        return $rescues->map(function (Apparatus $apparatus) use ($inspections, $openCounts, $clearing): array {
             $inspection = $inspections->get($apparatus->getKey());
 
             return [
@@ -172,6 +174,8 @@ final class Captain5Workspace
                 'submitted_by' => $inspection !== null ? trim($inspection->rank.' '.$inspection->operator_name) : null,
                 'needs_approval' => $inspection?->processing_status === 'held_for_review',
                 'open_issues' => (int) ($openCounts[$apparatus->getKey()] ?? 0),
+                // Captain 5 cleared today's checkout: the page lists it under Cleared, not in the active list.
+                ...$clearing->clearFields($inspection),
             ];
         })->values()->all();
     }
