@@ -95,7 +95,7 @@ final class EmployeeRecordsPanelTest extends TestCase
         $this->actingAsAdminWith(['admin.personnel.view']);
 
         Livewire::test(EmployeeRecordsPanel::class, ['record' => $employee])
-            ->assertDontSee('Upload document')->assertDontSee('Fuel PIN')
+            ->assertDontSee('Upload document')->assertSee('Fuel PIN')
             ->assertSee('Activity')->assertSee('Source:')
             ->assertActionHidden('uploadDocuments');
     }
@@ -109,20 +109,15 @@ final class EmployeeRecordsPanelTest extends TestCase
         Livewire::test(EmployeeRecordsPanel::class, ['record' => $employee])->assertForbidden();
     }
 
-    public function test_fuel_pin_stays_masked_until_revealed_by_an_authorized_administrator(): void
+    public function test_every_administrator_sees_the_fuel_pin_plainly_on_the_profile(): void
     {
         [$employee] = $this->memberWithProfile('61105');
         $this->actingAsSuperAdmin();
-
-        $panel = Livewire::test(EmployeeRecordsPanel::class, ['record' => $employee])
-            ->assertSee('Fuel PIN')->assertSee('Reveal');
-        self::assertFalse($panel->get('fuelPinRevealed'));
-        $panel->call('revealFuelPin')->assertSee('No current Fuel PIN is recorded');
+        Livewire::test(EmployeeRecordsPanel::class, ['record' => $employee])
+            ->assertSee('Fuel PIN')->assertSee('No current Fuel PIN is recorded')->assertDontSee('Reveal');
 
         $this->actingAsAdminWith(['admin.personnel.view']);
-        Livewire::test(EmployeeRecordsPanel::class, ['record' => $employee])
-            ->assertDontSee('Fuel PIN')
-            ->call('revealFuelPin')->assertForbidden();
+        Livewire::test(EmployeeRecordsPanel::class, ['record' => $employee])->assertSee('Fuel PIN')->assertDontSee('Reveal');
     }
 
     /** @return array{0: Employee, 1: User} */

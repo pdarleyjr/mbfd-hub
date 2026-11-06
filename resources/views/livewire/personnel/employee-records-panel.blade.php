@@ -2,19 +2,14 @@
     @if ($showFuelPin)
         <x-filament::section compact>
             <x-slot name="heading">Fuel PIN</x-slot>
-            <x-slot name="description">Source: Fuel ID Numbers. Shown only to people with Fuel ID access.</x-slot>
+            <x-slot name="description">Source: Fuel ID Numbers.</x-slot>
             <div class="flex flex-wrap items-center gap-3">
                 @if (! $fuelPinAvailable)
                     <span class="text-sm text-gray-600 dark:text-gray-400">Fuel ID Numbers are not available yet.</span>
                 @elseif ($fuelPin !== null)
-                    <span class="font-mono text-lg font-semibold tracking-widest text-gray-950 dark:text-white" data-fuel-pin>{{ $fuelPin }}</span>
-                    <x-filament::button size="sm" color="gray" wire:click="hideFuelPin">Hide</x-filament::button>
-                @elseif ($fuelPinRevealed)
-                    <span class="text-sm text-gray-600 dark:text-gray-400">No current Fuel PIN is recorded for this member.</span>
-                    <x-filament::button size="sm" color="gray" wire:click="hideFuelPin">Close</x-filament::button>
+                    <span class="font-mono text-lg font-semibold tracking-widest text-gray-950 dark:text-white" data-fuel-pin translate="no">{{ $fuelPin }}</span>
                 @else
-                    <span class="font-mono text-lg tracking-widest text-gray-700 dark:text-gray-300" aria-label="Fuel PIN hidden">••••</span>
-                    <x-filament::button size="sm" color="gray" icon="heroicon-o-eye" wire:click="revealFuelPin">Reveal</x-filament::button>
+                    <span class="text-sm text-gray-600 dark:text-gray-400">No current Fuel PIN is recorded for this member.</span>
                 @endif
             </div>
         </x-filament::section>

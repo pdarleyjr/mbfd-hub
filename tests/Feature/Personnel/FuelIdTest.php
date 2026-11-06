@@ -18,7 +18,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Symfony\Component\Process\Process;
 use Tests\Feature\Filament\StationAdminFixtures;
@@ -201,18 +200,16 @@ final class FuelIdTest extends TestCase
             ->assertSee('Not on file')->assertDontSee('>0731<', false)->assertDontSee('>8264<', false);
     }
 
-    public function test_admin_without_fuel_permission_is_refused_the_page_and_the_source_stream(): void
+    public function test_every_administrator_opens_the_page_but_a_non_admin_account_does_not(): void
     {
         $source = $this->importWithPdf();
+        // Fuel PINs are department public record (owner, 2026-11-06): any Hub administrator sees them.
         $this->actingAsAdminWith(['personnel.documents.view']);
+        Livewire::test(FuelIdNumbers::class)->assertOk();
+        self::assertTrue(FuelIdNumbers::canAccess());
+        $this->get(route('personnel.fuel-ids.sources.view', $source))->assertOk();
 
-        Livewire::test(FuelIdNumbers::class)->assertForbidden();
-        self::assertFalse(FuelIdNumbers::canAccess());
-        $this->get(route('personnel.fuel-ids.sources.view', $source))->assertForbidden();
-        $this->get(route('personnel.fuel-ids.sources.download', $source))->assertForbidden();
-        self::assertSame(0, FuelIdEvent::query()->whereIn('action', [FuelIdEvent::SOURCE_VIEWED, FuelIdEvent::SOURCE_DOWNLOADED])->count());
-
-        // The fuel permission alone, without Hub administration access, opens nothing.
+        // An account without Hub administration access opens nothing, whatever it holds.
         $member = \App\Models\User::factory()->create(['account_status' => 'active']);
         $member->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('personnel.fuel_ids.view', 'web'));
         $this->actingAs($member);
@@ -235,25 +232,15 @@ final class FuelIdTest extends TestCase
         self::assertSame(1, FuelIdEvent::query()->where('action', FuelIdEvent::SOURCE_VIEWED)->count());
     }
 
-    public function test_pin_is_masked_until_shown_and_each_reveal_is_audited(): void
+    public function test_administrators_see_every_pin_plainly_with_leading_zeros(): void
     {
-        $employee = $this->employee('97001', 'Jamie Cole');
+        $this->employee('97001', 'Jamie Cole');
         app(FuelIdImporter::class)->import($this->jsonFile([$this->row('97001', 'COLE', 'JAMIE', '0465')]), null, 'json');
-        $row = FuelIdRow::query()->sole();
-        $actor = $this->actingAsAdminWith(['personnel.fuel_ids.view']);
+        $this->actingAsAdminWith([]);
 
-        $page = Livewire::test(FuelIdNumbers::class)->assertOk()
-            ->assertSee('Jamie Cole')->assertSee('••••')->assertDontSee('>0465<', false)
+        Livewire::test(FuelIdNumbers::class)->assertOk()
+            ->assertSee('Jamie Cole')->assertSee('0465')->assertDontSee('••••')
             ->assertActionHidden('import');
-        $page->call('reveal', $row->id)->assertSee('0465');
-
-        $event = FuelIdEvent::query()->where('action', FuelIdEvent::REVEALED)->sole();
-        self::assertSame($actor->id, $event->actor_user_id);
-        self::assertSame($employee->id, $event->employee_id);
-        self::assertStringNotContainsString('0465', json_encode($event->metadata, JSON_THROW_ON_ERROR));
-
-        $this->expectException(CannotUpdateLockedPropertyException::class);
-        Livewire::test(FuelIdNumbers::class)->set('revealed', [$row->id => true]);
     }
 
     public function test_manager_resolves_a_conflict_with_a_required_note_and_viewer_cannot(): void

@@ -182,7 +182,7 @@ final class EmployeeRecordsPanel extends Component implements HasActions, HasFor
             'activityTotal' => count($activity['items']),
             'activityMessage' => $activity['message'],
             'showFuelPin' => $this->canViewFuelPin($actor),
-            'fuelPin' => $this->fuelPinRevealed && $this->canViewFuelPin($actor) ? $this->fuelPin() : null,
+            'fuelPin' => $this->canViewFuelPin($actor) ? $this->fuelPin() : null,
             'fuelPinAvailable' => $this->fuelDirectory() !== null,
         ]);
     }

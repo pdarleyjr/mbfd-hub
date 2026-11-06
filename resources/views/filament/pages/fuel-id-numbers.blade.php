@@ -68,7 +68,6 @@
 
     <x-filament::section>
         <x-slot name="heading">Employees and Fuel PINs</x-slot>
-        <x-slot name="description">PINs are hidden. Each Show is recorded.</x-slot>
         <label class="block max-w-md text-sm">Search
             <x-filament::input.wrapper><x-filament::input type="search" wire:model.live.debounce.350ms="search" placeholder="Name or employee ID" /></x-filament::input.wrapper>
         </label>
@@ -76,7 +75,7 @@
             <table data-hub-table class="w-full text-left text-sm">
                 <thead>
                     <tr class="border-b border-gray-200 dark:border-white/10">
-                        <th class="py-2 pe-4">Employee</th><th class="py-2 pe-4">Name on list</th><th class="py-2 pe-4">Department</th><th class="py-2 pe-4">Record</th><th class="py-2 pe-4">Fuel PIN</th><th class="py-2"><span class="sr-only">Actions</span></th>
+                        <th class="py-2 pe-4">Employee</th><th class="py-2 pe-4">Name on list</th><th class="py-2 pe-4">Department</th><th class="py-2 pe-4">Record</th><th class="py-2 pe-4">Fuel PIN</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -89,17 +88,10 @@
                                 <x-filament::badge :color="$row->match_status === 'resolved' ? 'info' : 'success'">{{ $row->match_status === 'resolved' ? 'Resolved' : 'Matched' }}</x-filament::badge>
                                 @if ($row->employee_departed)<x-filament::badge color="warning" class="mt-1">Departed</x-filament::badge>@endif
                             </td>
-                            <td class="py-2 pe-4 font-mono tabular-nums" translate="no">{{ $this->isRevealed($row->id) ? $row->prompt_id : \App\Services\Personnel\FuelIds\FuelPinView::MASK }}</td>
-                            <td class="py-2 text-end">
-                                @if ($this->isRevealed($row->id))
-                                    <x-filament::button size="sm" color="gray" wire:click="hide({{ $row->id }})">Hide</x-filament::button>
-                                @else
-                                    <x-filament::button size="sm" color="gray" wire:click="reveal({{ $row->id }})">Show</x-filament::button>
-                                @endif
-                            </td>
+                            <td class="py-2 pe-4 font-mono tabular-nums" translate="no">{{ $row->prompt_id }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="py-4 text-sm">{{ $search !== '' ? 'No employees match this search.' : 'No Fuel PINs are assigned yet.' }}</td></tr>
+                        <tr><td colspan="5" class="py-4 text-sm">{{ $search !== '' ? 'No employees match this search.' : 'No Fuel PINs are assigned yet.' }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -134,15 +126,9 @@
                                 <td class="py-2 pe-4 tabular-nums">{{ $row->department ?: 'Not listed' }}</td>
                                 <td class="py-2 pe-4"><x-filament::badge color="warning">{{ $issueLabels[$row->match_status][0] ?? $row->match_status }}</x-filament::badge><p class="mt-1 text-gray-600 dark:text-gray-400">{{ $issueLabels[$row->match_status][1] ?? '' }}</p></td>
                                 <td class="py-2 pe-4">{{ $row->candidateEmployee ? $row->candidateEmployee->name.' · ID '.$row->candidateEmployee->employee_id : 'None' }}</td>
-                                <td class="py-2 pe-4 font-mono tabular-nums" translate="no">{{ $this->isRevealed($row->id) ? $row->prompt_id : \App\Services\Personnel\FuelIds\FuelPinView::MASK }}</td>
+                                <td class="py-2 pe-4 font-mono tabular-nums" translate="no">{{ $row->prompt_id }}</td>
                                 <td class="py-2">
-                                    <div class="flex flex-wrap justify-end gap-2">
-                                        @if ($this->isRevealed($row->id))
-                                            <x-filament::button size="sm" color="gray" wire:click="hide({{ $row->id }})">Hide</x-filament::button>
-                                        @else
-                                            <x-filament::button size="sm" color="gray" wire:click="reveal({{ $row->id }})">Show</x-filament::button>
-                                        @endif
-                                        @if ($canManage)
+                                    <div class="flex flex-wrap justify-end gap-2">@if ($canManage)
                                             {{ ($this->resolveAction)(['row' => $row->id]) }}
                                             {{ ($this->dismissAction)(['row' => $row->id]) }}
                                         @endif
