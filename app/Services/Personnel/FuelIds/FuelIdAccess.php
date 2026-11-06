@@ -20,7 +20,9 @@ final class FuelIdAccess
 
     public static function canView(?User $user): bool
     {
-        return ($user instanceof User && $user->isAuthenticationAllowed() && $user->hasCurrentAdminPanelEntitlement())
+        // Uniform-manager-only accounts stay limited to the Personnel Uniforms & Equipment area.
+        return ($user instanceof User && $user->isAuthenticationAllowed() && $user->hasCurrentAdminPanelEntitlement()
+                && ! \App\Services\Security\ApplicationAccessService::isUniformManagerOnly($user))
             || self::has($user, self::VIEW) || self::has($user, self::MANAGE);
     }
 
