@@ -472,6 +472,9 @@ jobs:
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan view:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan event:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan filament:clear-cached-components
+          # php-fpm's OPcache never re-reads PHP files (immutable image); a graceful reload starts a fresh
+          # cache that sees the config/route/view/event caches written above. In-flight requests finish.
+          docker exec "$HUB_APP_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf signal USR2 php-fpm
           # Rows the previous image's workers wrote between the projection and the switch get their owner now.
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan defects:project-ownership --pending --no-interaction
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan defects:project-ownership --verify --no-interaction
@@ -582,7 +585,9 @@ jobs:
             sleep 1
           done
           printf '%s\n' "$SUPERVISOR_STATUS"
-          printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^php +RUNNING '
+          printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^php-fpm +RUNNING '
+          printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^nginx +RUNNING '
+          test "$(docker exec "$HUB_APP_CONTAINER" curl -fsS http://127.0.0.1:8081/fpm-ping)" = 'pong'
           printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING '
           printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^reverb +RUNNING '
           REMOTE

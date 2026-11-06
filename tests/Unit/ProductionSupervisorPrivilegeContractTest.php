@@ -20,7 +20,8 @@ class ProductionSupervisorPrivilegeContractTest extends TestCase
             $dockerfile
         );
         $this->assertDoesNotMatchRegularExpression('/^user\s*=/mi', $supervisor);
-        $this->assertStringContainsString('[program:php]', $supervisor);
+        $this->assertStringContainsString('[program:php-fpm]', $supervisor);
+        $this->assertStringContainsString('[program:nginx]', $supervisor);
         $this->assertStringContainsString('[program:queue-worker]', $supervisor);
         $this->assertStringContainsString('[program:reverb]', $supervisor);
         $this->assertStringContainsString('[program:scheduler]', $supervisor);
