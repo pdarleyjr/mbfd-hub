@@ -4,7 +4,8 @@ import Tag from '../../../ui/Tag';
 import { etDateTime, memberText, targetText } from '../logic';
 import { HINT } from '../shared';
 import FormActionButtons from './FormActionButtons';
-import { ackText, archiveText, FORM_STATUS_TONE, isReturned, itemSummary, returnedText, revisionTag, selectionControl } from './logic';
+import { ackText, archiveText, FORM_STATUS_TONE, formStatusLabel, isCleared, isReturned, itemSummary, returnedText, revisionTag, selectionControl } from './logic';
+import RestoreButton from './RestoreButton';
 import type { FormDetail, FormSummary, FormView } from './types';
 
 interface Props {
@@ -15,6 +16,8 @@ interface Props {
   onToggle: (id: string) => void;
   onOpen: (id: string) => void;
   onAcknowledged: (detail: FormDetail) => void;
+  onCleared: (detail: FormDetail) => void;
+  onRestored: (detail: FormDetail) => void;
   onReject: (form: FormSummary) => void;
   onConflict: () => void;
 }
@@ -57,12 +60,13 @@ function StateLine({ form, view }: { form: FormSummary; view: FormView }) {
 }
 
 /** One submitted form: who sent it, what is on it, whether it has been acknowledged, and the actions that are allowed. */
-export default function FormCard({ form, view, canAct, selected, onToggle, onOpen, onAcknowledged, onReject, onConflict }: Props) {
+export default function FormCard({ form, view, canAct, selected, onToggle, onOpen, onAcknowledged, onCleared, onRestored, onReject, onConflict }: Props) {
   const id = useId();
   const control = view === 'active' ? selectionControl(form, canAct) : 'none';
   const summary = itemSummary(form);
   const revision = revisionTag(form);
   const working = view === 'active' && !isReturned(form);
+  const restorable = view === 'archived' && canAct && isCleared(form);
 
   return (
     <li>
@@ -87,7 +91,7 @@ export default function FormCard({ form, view, canAct, selected, onToggle, onOpe
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <strong id={`${id}-title`} className="break-words font-heading text-lg font-bold leading-6 text-hub-ink">{targetText(form)}</strong>
                 {revision && <Tag tone="info">{revision}</Tag>}
-                {(view === 'archived' || isReturned(form)) && <Tag tone={FORM_STATUS_TONE[form.status] ?? 'neutral'}>{form.status_label}</Tag>}
+                {(view === 'archived' || isReturned(form)) && <Tag tone={FORM_STATUS_TONE[form.status] ?? 'neutral'}>{formStatusLabel(form)}</Tag>}
               </span>
               <span className={`${HINT} break-words`}>{memberText(form)} · Submitted {etDateTime(form.submitted_at)}</span>
               <span className="break-words text-sm text-hub-ink">{summary.list}</span>
@@ -97,9 +101,14 @@ export default function FormCard({ form, view, canAct, selected, onToggle, onOpe
             <ChevronRight className="h-5 w-5 flex-none text-hub-n-500" aria-hidden="true" />
           </button>
         </div>
-        {working && canAct && (form.can_acknowledge || form.can_reject) && (
+        {working && canAct && (form.can_acknowledge || form.can_reject || form.can_clear === true) && (
           <div className="border-t border-hub-border px-3.5 py-2.5">
-            <FormActionButtons form={form} canAct={canAct} onAcknowledged={onAcknowledged} onReject={() => onReject(form)} onConflict={onConflict} testIdPrefix="ems-form" />
+            <FormActionButtons form={form} canAct={canAct} onAcknowledged={onAcknowledged} onCleared={onCleared} onReject={() => onReject(form)} onConflict={onConflict} testIdPrefix="ems-form" />
+          </div>
+        )}
+        {restorable && (
+          <div className="border-t border-hub-border px-3.5 py-2.5">
+            <RestoreButton form={form} onRestored={onRestored} onConflict={onConflict} />
           </div>
         )}
       </article>

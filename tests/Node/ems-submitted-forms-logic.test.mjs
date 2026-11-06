@@ -41,6 +41,34 @@ test('archived cards say what happened to the form', () => {
   assert.equal(logic.archiveText(form({ status: 'cancelled', status_label: 'Cancelled' })), 'Cancelled');
 });
 
+test('a cleared form says who cleared it and why; an older closed record keeps its wording', () => {
+  const cleared = form({ status: 'closed', status_label: 'Closed', can_restore: true, closed_by: 'Cap Tain', closed_at: '2026-11-06T14:00:00Z', close_reason: 'Supplies provided' });
+  assert.match(logic.archiveText(cleared), /^Cleared by Cap Tain, Nov 6, 9:00 AM EST: Supplies provided$/);
+  assert.equal(logic.formStatusLabel(cleared), 'Cleared');
+  assert.equal(logic.isCleared(cleared), true);
+  const older = form({ status: 'closed', status_label: 'Closed', can_restore: false });
+  assert.equal(logic.archiveText(older), 'Older record: Closed');
+  assert.equal(logic.formStatusLabel(older), 'Closed');
+  assert.equal(logic.isCleared(form({ status: 'closed', status_label: 'Closed' })), false, 'An answer without can_restore is never offered Restore.');
+});
+
+test('Clear records "Supplies provided" with an optional note, and says plainly that stock did not change', () => {
+  assert.equal(logic.clearReason(), 'Supplies provided');
+  assert.equal(logic.clearReason('   '), 'Supplies provided');
+  assert.equal(logic.clearReason('  handed over   at Station 2 '), 'Supplies provided. handed over at Station 2');
+  assert.ok(logic.clearReason('x'.repeat(400)).length <= 255);
+  assert.equal(logic.clearDoneText(1, 0), 'Cleared 1 form and moved it to Archived. Stock did not change.');
+  assert.equal(logic.clearDoneText(3, 0), 'Cleared 3 forms and moved them to Archived. Stock did not change.');
+  assert.equal(logic.clearDoneText(2, 1, 'This form was sent back to the member to correct.'), 'Cleared 2 forms and moved them to Archived. Stock did not change. 1 form could not be cleared: This form was sent back to the member to correct.');
+  assert.equal(logic.clearDoneText(0, 2), '2 forms could not be cleared.');
+});
+
+test('history names Clear and Restore in plain words', () => {
+  const event = (action, reason) => ({ id: 1, action, payload: reason ? { reason } : {}, actor_name: 'Cap Tain', actor_rank: null, actor_context: 'captain5', actor_context_label: 'Captain 5', request_line_id: null, from_status: null, to_status: null, created_at: null });
+  assert.equal(logic.formEventSentence(event('closed', 'Supplies provided')), 'Cleared the form and moved it to Archived. Stock did not change. Reason: Supplies provided');
+  assert.equal(logic.formEventSentence(event('reopened', 'Restored to Active by Captain 5')), 'Restored the form to Active. Reason: Restored to Active by Captain 5');
+});
+
 test('the revision tag appears only after the first version', () => {
   assert.equal(logic.revisionTag(form()), null);
   assert.equal(logic.revisionTag(form({ revision_number: 2 })), 'Revision 2');
