@@ -19,7 +19,8 @@ final class EmsLinks
 {
     public const STAFF_WORKSPACE = '/daily/captain-5';
 
-    public const ADMIN_REQUESTS = '/admin/ems/requests';
+    /** The admin record page (InventoryRequestResource, slug rescue-inventory, keyed by uuid). */
+    public const ADMIN_REQUESTS = '/admin/rescue-inventory';
 
     public const MEMBER_FORMS = '/employee/forms';
 
@@ -32,7 +33,7 @@ final class EmsLinks
 
     public static function admin(string $uuid): string
     {
-        return self::ADMIN_REQUESTS.'?request='.$uuid;
+        return self::ADMIN_REQUESTS.'/'.$uuid;
     }
 
     public static function member(string $uuid): string

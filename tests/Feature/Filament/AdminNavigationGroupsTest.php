@@ -14,7 +14,9 @@ use App\Filament\Resources\ApparatusOperationalAlertResource;
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\ApparatusServiceTicketResource;
 use App\Filament\Resources\CapitalProjectResource;
+use App\Filament\Resources\ChecklistTemplateResource;
 use App\Filament\Resources\InspectionResource;
+use App\Filament\Resources\InventoryCorrectionResource;
 use App\Filament\Resources\RoomAssetResource;
 use App\Filament\Resources\StationInspectionResource;
 use App\Filament\Resources\StationRequestResource;
@@ -37,9 +39,12 @@ final class AdminNavigationGroupsTest extends TestCase
             ApparatusServiceTicketResource::class,
             ApparatusOperationalAlertResource::class,
             ApparatusChangeoutResource::class,
+            InventoryCorrectionResource::class,
+            ChecklistTemplateResource::class,
         ] as $item) {
             self::assertSame('Fleet', $item::getNavigationGroup(), $item);
         }
+        self::assertGreaterThan(InventoryCorrectionResource::getNavigationSort(), ChecklistTemplateResource::getNavigationSort(), 'Checklist templates follow Inventory corrections.');
     }
 
     public function test_station_work_and_station_projects_sit_in_stations(): void

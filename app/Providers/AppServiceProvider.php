@@ -65,6 +65,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(\App\Services\Captain5\Captain5IssueScope::class);
         $this->app->scoped(\App\Services\Security\Captain5Access::class);
 
+        // The published checklist template of each type, memoized per request / job (scoped) so a
+        // publish is picked up by the next request and never cached across them
+        // (docs/checklist-template-editor.md section 3).
+        $this->app->scoped(\App\Services\ChecklistTemplates\ChecklistTemplateRepository::class);
+
         $this->app->bind(
             \Filament\Http\Responses\Auth\Contracts\LoginResponse::class,
             \App\Http\Responses\LoginResponse::class,
@@ -305,7 +310,8 @@ class AppServiceProvider extends ServiceProvider
                 'evaluation_submission',
                 'New Evaluation Submitted',
                 "An evaluation for {$productName} has been submitted.",
-                '/admin/evaluation-submissions/'.$submission->id,
+                // EvaluationSubmissionResource lives under the workgroup cluster.
+                '/admin/workgroup/evaluation-submissions/'.$submission->id,
                 $submission->id,
                 event: $revision,
             );

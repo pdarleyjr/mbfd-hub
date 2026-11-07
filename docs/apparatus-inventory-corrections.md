@@ -31,6 +31,11 @@ ordered active approved changes for that apparatus** (a DB overlay). Template fi
 edited at runtime. With no active change the resolver output is byte-identical to before, so
 deploying this feature changes no `checklist_version`.
 
+Since 2026-11-06 the baseline template may also be a version published in the admin checklist
+template editor (`docs/checklist-template-editor.md`): a published version replaces the file as the
+baseline of its checklist type, and this overlay is applied on top of it unchanged. Template files are
+still never written at runtime.
+
 ```
 template JSON --(resolver)--> baseline --(InventoryOverlay: active changes by id)--> effective checklist
                                                                                  \-> checklist_version (sha256)

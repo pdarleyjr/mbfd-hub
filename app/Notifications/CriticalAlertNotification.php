@@ -64,7 +64,8 @@ class CriticalAlertNotification extends Notification
      */
     public function toWebPush(object $notifiable, $notification): WebPushMessage
     {
-        $actionUrl = $this->url ?? ($this->alertId ? url('/admin/alerts/'.$this->alertId) : url('/admin'));
+        // There is no per-alert page: an alert without its own link opens the Admin Overview.
+        $actionUrl = $this->url ?? url('/admin');
 
         return (new WebPushMessage)
             ->title($this->title)

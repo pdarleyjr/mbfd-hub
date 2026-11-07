@@ -90,7 +90,7 @@ final class EmsNotificationsTest extends TestCase
         $this->assertStringContainsString('Rescue 2', $notification->body);
         $this->assertStringContainsString($made['uuid'], $notification->url);
         $adminNotification = Notification::sent($this->emsAdmin, InspectionEventNotification::class)->first();
-        $this->assertStringStartsWith('/admin/ems', $adminNotification->url, 'Admin-only EMS people land on the admin page.');
+        $this->assertStringStartsWith('/admin/rescue-inventory/', $adminNotification->url, 'Admin-only EMS people land on the request in the admin panel.');
     }
 
     public function test_a_retried_submission_and_a_second_run_of_the_notifier_do_not_notify_again(): void

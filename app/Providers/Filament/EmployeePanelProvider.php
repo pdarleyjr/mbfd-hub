@@ -72,6 +72,8 @@ class EmployeePanelProvider extends PanelProvider
                 \App\Filament\Employee\Pages\Taskbooks::class,
                 \App\Filament\Employee\Pages\MyDocuments::class,
                 \App\Filament\Employee\Pages\MyMessages::class,
+                // Opened from 'Support Services replied' notifications and the service-ticket list (never in the menu).
+                \App\Filament\Employee\Pages\MySubmissionConversation::class,
                 VideoConferencing::class,
                 MyEquipmentPage::class,
                 MyRequestsPage::class,

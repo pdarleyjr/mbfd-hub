@@ -342,6 +342,9 @@ final class LatestActivityFeedTest extends TestCase
         $this->assertTrue($events[0]->actionRequired);
         $this->assertTrue($events[1]->actionRequired);
         $this->assertStringContainsString('Size is large', $events[0]->summary);
+        // The link opens the request: the resource's route key is public_id, so a numeric id would 404.
+        $this->assertStringEndsWith('/personnel-requests/'.$request->public_id, (string) $events[0]->url);
+        $this->assertStringNotContainsString('/personnel-requests/'.$request->getKey(), (string) $events[0]->url.'#');
 
         $admin = $this->superAdmin();
         $this->personnelUpdate($request, 'status_changed', ['status' => 'completed', 'changed_by_admin_id' => $admin->id], 2);
