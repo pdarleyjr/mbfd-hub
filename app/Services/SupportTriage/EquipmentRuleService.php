@@ -9,6 +9,7 @@ use App\Models\AiAutomation\AiAutomationSetting;
 use App\Models\SupportTriage\SupportEquipmentRule;
 use App\Models\SupportTriage\SupportEquipmentRuleRevision;
 use App\Models\User;
+use App\Services\ChecklistTemplates\ChecklistTemplateRepository;
 use App\Services\SupportTriage\Contracts\EquipmentClassifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -259,15 +260,15 @@ final class EquipmentRuleService
      */
     private function checklistItemNames(): array
     {
-        $directory = base_path('storage/checklists');
+        // The live baseline of each template: a published editor version, else the repository file
+        // (docs/checklist-template-editor.md section 3).
+        $templates = app(ChecklistTemplateRepository::class);
         $result = [];
         foreach (DailyCheckoutChecklistTemplate::cases() as $template) {
             if (! $template->isConfigured()) {
                 continue;
             }
-            $path = $directory.'/'.$template->value.'_checklist.json';
-            $contents = is_file($path) ? file_get_contents($path) : false;
-            $checklist = $contents === false ? null : json_decode($contents, true);
+            $checklist = $templates->baseline($template->value)['checklist'];
             if (! is_array($checklist)) {
                 continue;
             }
