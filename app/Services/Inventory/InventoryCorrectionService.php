@@ -222,6 +222,10 @@ final class InventoryCorrectionService
                 $survivor = $correction->duplicate_of_correction_id !== null ? 'IC-'.str_pad((string) $correction->duplicate_of_correction_id, 6, '0', STR_PAD_LEFT) : 'the other request';
                 throw ValidationException::withMessages(['body' => "This request was combined with {$survivor}. Write there instead."]);
             }
+            if (! $isReviewer && ! $correction->isOpen()) {
+                // A decided request is in no review queue, so a member message there would go unanswered.
+                throw ValidationException::withMessages(['body' => 'This request is closed ('.mb_strtolower(ApparatusInventoryCorrection::statusLabel($correction->status)).'). If something is still wrong, report it again from a Daily Checkout.']);
+            }
             if (! $isReviewer) {
                 // Per member: several members on one request each get their own allowance.
                 $replies = Event::query()->where('apparatus_inventory_correction_id', $correction->getKey())->where('event_type', Event::MEMBER_REPLIED)->where('actor_user_id', $author->getKey())->count();
@@ -305,6 +309,130 @@ final class InventoryCorrectionService
             $this->notifications->inventoryCorrectionUpdate($correction, $event);
 
             return $correction;
+        });
+    }
+
+    /**
+     * Closes the request with no checklist change because nothing needs changing: the checklist
+     * already matches, another request already did it, or the item is gone. Unlike a rejection the
+     * member is told the request was not refused. The checklist is never touched.
+     */
+    public function closeNoChange(int $correctionId, User $reviewer, ?string $message = null, ?string $internalNote = null, ?int $expectedLock = null, ?string $idempotencyKey = null): ApparatusInventoryCorrection
+    {
+        $message = filled($message) ? $this->messageBody((string) $message) : null;
+        $internalNote = filled($internalNote) ? $this->messageBody((string) $internalNote) : null;
+
+        return DB::transaction(function () use ($correctionId, $reviewer, $message, $internalNote, $expectedLock, $idempotencyKey): ApparatusInventoryCorrection {
+            $correction = $this->lock($correctionId);
+            $this->authorizeReview($reviewer);
+            if ($this->replayedEvent($idempotencyKey, $correction, $reviewer) !== null) {
+                return $correction;
+            }
+            $this->assertDecidable($correction, $expectedLock);
+            $correction->forceFill([
+                'decision_reason' => $message,
+                'decided_by_user_id' => $reviewer->getKey(),
+                'decided_at' => now(),
+            ]);
+            $this->transition($correction, ApparatusInventoryCorrection::STATUS_CLOSED);
+            $event = $this->event($correction, $reviewer, Event::CLOSED, Event::VISIBILITY_MEMBER, $message, null, $idempotencyKey);
+            if ($internalNote !== null) {
+                $this->event($correction, $reviewer, Event::INTERNAL_NOTE, Event::VISIBILITY_INTERNAL, $internalNote);
+            }
+            $this->notifications->inventoryCorrectionUpdate($correction, $event);
+
+            return $correction;
+        });
+    }
+
+    /**
+     * The member who filed an open request takes it back (reported by mistake, or already sorted
+     * out on the truck). Refused once another member has joined the request: it is theirs too,
+     * so it stays with Logistics. The checklist is never touched.
+     */
+    public function withdraw(int $correctionId, User $member, ?string $note = null, ?string $idempotencyKey = null): ApparatusInventoryCorrection
+    {
+        $note = filled($note) ? $this->messageBody((string) $note) : null;
+
+        return DB::transaction(function () use ($correctionId, $member, $note, $idempotencyKey): ApparatusInventoryCorrection {
+            $correction = $this->lock($correctionId);
+            if (! InventoryCorrectionAccess::owns($member, $correction)) {
+                throw new AuthorizationException;
+            }
+            if ($this->replayedEvent($idempotencyKey, $correction, $member) !== null) {
+                return $correction;
+            }
+            $refusal = $this->withdrawRefusal($correction, $member);
+            if ($refusal !== null) {
+                throw ValidationException::withMessages(['withdraw' => $refusal]);
+            }
+            $correction->forceFill(['decided_at' => now()]);
+            $this->transition($correction, ApparatusInventoryCorrection::STATUS_WITHDRAWN);
+            $event = $this->event($correction, $member, Event::WITHDRAWN, Event::VISIBILITY_MEMBER, $note, null, $idempotencyKey, 'member');
+            $this->notifications->inventoryCorrectionReply($correction, $event);
+
+            return $correction;
+        });
+    }
+
+    /** Why this member cannot withdraw this request now, or null when they can. */
+    public function withdrawRefusal(ApparatusInventoryCorrection $correction, User $member): ?string
+    {
+        if (! $correction->isOpen()) {
+            return 'This request is already '.mb_strtolower(ApparatusInventoryCorrection::statusLabel($correction->status)).'.';
+        }
+        if (! InventoryCorrectionAccess::reported($member, $correction)) {
+            return 'Only the member who filed this request can withdraw it. Write to Logistics instead.';
+        }
+        $others = ApparatusInventoryCorrectionParticipant::query()
+            ->where('apparatus_inventory_correction_id', $correction->getKey())
+            ->where('source', '!=', ApparatusInventoryCorrectionParticipant::SOURCE_REPORTER)
+            ->exists();
+
+        return $others ? 'Other members reported the same change, so Logistics will decide it for everyone. Write to Logistics if you no longer think it is needed.' : null;
+    }
+
+    /**
+     * Retires one approved change that no longer applies to its unit's checklist (an overlay
+     * conflict). The resolver already skips it, so retiring changes nothing on the checklist; it
+     * only stops the change counting as "in effect". Refused for a change that still applies:
+     * reverse its correction instead.
+     */
+    public function retireChange(int $changeId, User $reviewer, ?string $note = null, ?string $idempotencyKey = null): ApparatusInventoryChange
+    {
+        $note = filled($note) ? $this->messageBody((string) $note) : null;
+
+        return DB::transaction(function () use ($changeId, $reviewer, $note, $idempotencyKey): ApparatusInventoryChange {
+            $this->authorizeReview($reviewer);
+            $correctionId = (int) ApparatusInventoryChange::query()->whereKey($changeId)->value('apparatus_inventory_correction_id');
+            $correction = $this->lock($correctionId);
+            if (($replayed = $this->replayedEvent($idempotencyKey, $correction, $reviewer)) !== null) {
+                return ApparatusInventoryChange::query()->findOrFail((int) ($replayed->details['change_id'] ?? 0));
+            }
+            $apparatusId = (int) ApparatusInventoryChange::query()->whereKey($changeId)->value('apparatus_id');
+            $apparatus = Apparatus::query()->whereKey($apparatusId)->lockForUpdate()->firstOrFail();
+            $change = ApparatusInventoryChange::query()->whereKey($changeId)->lockForUpdate()->firstOrFail();
+            if ($change->status !== ApparatusInventoryChange::STATUS_ACTIVE) {
+                throw ValidationException::withMessages(['change' => 'This change is no longer in effect. Reload the page.']);
+            }
+            $before = $this->resolver->resolve($apparatus);
+            $conflict = collect($before['overlay_conflicts'])->firstWhere('change_id', (int) $change->getKey());
+            if ($conflict === null) {
+                throw ValidationException::withMessages(['change' => 'This change still applies to the checklist. Reverse its correction instead.']);
+            }
+            $change->forceFill(['status' => ApparatusInventoryChange::STATUS_RETIRED, 'status_changed_at' => now()])->save();
+            $after = $this->resolver->resolve($apparatus);
+            if ($after['usable'] !== true || $after['checklist_version'] !== $before['checklist_version']) {
+                throw ValidationException::withMessages(['change' => "Retiring this change would alter {$apparatus->designation}'s checklist. Nothing was changed."]);
+            }
+            $this->event($correction, $reviewer, Event::CHANGE_RETIRED, Event::VISIBILITY_INTERNAL, $note, [
+                'change_id' => (int) $change->getKey(),
+                'apparatus_id' => $apparatusId,
+                'apparatus' => trim((string) ($apparatus->designation ?: $apparatus->name)),
+                'reason' => (string) $conflict['reason'],
+            ], $idempotencyKey);
+
+            return $change;
         });
     }
 
@@ -471,6 +599,9 @@ final class InventoryCorrectionService
                 $before = $this->resolver->resolve($apparatus);
                 $this->revisions->remember($apparatus, $before, $changeSet->getKey(), retire: true);
                 foreach ($changes->where('apparatus_id', $apparatusId) as $change) {
+                    if ($change->status === ApparatusInventoryChange::STATUS_RETIRED) {
+                        continue; // already retired by Logistics: it has no effect and keeps its own audit status
+                    }
                     $wasActive = $change->status === ApparatusInventoryChange::STATUS_ACTIVE;
                     // What this change had replaced comes back, or stays replaced by whatever replaced this change.
                     ApparatusInventoryChange::query()->where('superseded_by_change_id', $change->getKey())->where('status', ApparatusInventoryChange::STATUS_SUPERSEDED)->get()
@@ -550,8 +681,8 @@ final class InventoryCorrectionService
      */
     private function assertReversible(ApparatusInventoryChange $change, ?Apparatus $apparatus): void
     {
-        if ($change->status === ApparatusInventoryChange::STATUS_SUPERSEDED) {
-            return; // already without effect: a later change replaced every field it set
+        if (in_array($change->status, [ApparatusInventoryChange::STATUS_SUPERSEDED, ApparatusInventoryChange::STATUS_RETIRED], true)) {
+            return; // already without effect: a later change replaced every field it set, or it was retired
         }
         $fields = array_keys((array) $change->payload);
         $dependent = ApparatusInventoryChange::query()
@@ -567,9 +698,13 @@ final class InventoryCorrectionService
                 || array_intersect($fields, array_keys((array) $later->payload)) !== []);
         if ($dependent !== null) {
             $unit = trim((string) ($apparatus?->designation ?: $apparatus?->name));
+            // Every change belongs to a correction: name it, so the reviewer can open it and reverse it first.
+            $owner = (int) $dependent->apparatus_inventory_correction_id;
+            $reference = 'IC-'.str_pad((string) $owner, 6, '0', STR_PAD_LEFT);
             throw new InventoryCorrectionConflict(
                 InventoryCorrectionConflict::DEPENDENT_CHANGE,
-                "A later approved change (#{$dependent->getKey()}".($unit !== '' ? " on {$unit}" : '').') builds on this one. Reverse that change first.',
+                "A later approved change (#{$dependent->getKey()}".($unit !== '' ? " on {$unit}" : '').", from {$reference}) builds on this one. Reverse {$reference} first, then reverse this one.",
+                $owner,
             );
         }
     }
@@ -919,7 +1054,8 @@ final class InventoryCorrectionService
 
             return;
         }
-        if ($event->visibility === Event::VISIBILITY_MEMBER && in_array($event->event_type, [Event::LOGISTICS_REPLIED, Event::CLARIFICATION_REQUESTED, Event::APPROVED, Event::REJECTED, Event::REVERSED], true)) {
+        // A closure or a withdrawal also ends any wait: nothing is left for Logistics to answer.
+        if ($event->visibility === Event::VISIBILITY_MEMBER && in_array($event->event_type, [Event::LOGISTICS_REPLIED, Event::CLARIFICATION_REQUESTED, Event::APPROVED, Event::REJECTED, Event::REVERSED, Event::CLOSED, Event::WITHDRAWN], true)) {
             $ledger->staffReplied(ReplySubject::INVENTORY_CORRECTION, $id, $event->created_at);
         }
     }

@@ -7,6 +7,7 @@ namespace App\Services\Inventory;
 use App\Models\Apparatus;
 use App\Models\ApparatusInventoryChange;
 use Closure;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -83,7 +84,10 @@ final class InventoryOverlay
                 // A template changed under an approved change. The unit keeps a usable
                 // checklist; the change is reported for Logistics instead of breaking checkout.
                 $conflicts[] = ['change_id' => (int) $change->id, 'reason' => $exception->reason];
-                Log::warning('Approved inventory change no longer applies to the checklist.', [
+                // Every checklist read resolves the overlay: log each conflict once an hour, not on every request.
+                // Logistics sees conflicts on the Inventory corrections queue (InventoryOverlayHealth).
+                $logOnce = rescue(static fn (): bool => Cache::add('inventory-overlay-conflict-logged:'.$change->id.':'.$exception->reason, true, 3600), true, report: false);
+                $logOnce && Log::warning('Approved inventory change no longer applies to the checklist.', [
                     'apparatus_id' => $apparatusId,
                     'change_id' => $change->id,
                     'reason' => $exception->reason,

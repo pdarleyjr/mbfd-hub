@@ -9,6 +9,7 @@ import {
   type DailyCheckoutAttentionRecord,
 } from '../utils/dailyCheckoutSubmissionQueue';
 import { db } from '../lib/db';
+import { SERVER_REFUSED_CODE } from '../lib/sync';
 import { failedPhotoCount, onPhotoUploadsChanged, pendingPhotoCount } from '../utils/photoUploadQueue';
 import { identityForQueueCapture } from '../lib/offlineIdentity';
 import { redirectToLoginAfterSessionExpiry } from '../utils/api';
@@ -25,6 +26,9 @@ const attentionGuidance = (errorCode?: string, error?: string): string => {
       return 'This saved work belongs to a different signed-in member and was not submitted. Sign in as the original member or ask an officer for help.';
     case 'OFFLINE_QUEUE_SECURITY_VERSION_MISMATCH':
       return 'The account security context changed after this work was saved. An officer must review it before it can be submitted.';
+    case SERVER_REFUSED_CODE:
+      // The member can act on this one: the form that saved it shows the refusal and a Discard button.
+      return `The server did not accept a form saved on this device${error ? ` (${error.replace(/^HTTP \d{3}:\s*/, '')})` : ''}. Nothing was submitted. Open the form again to review it, send a corrected copy, or discard it.`;
     case 'OFFLINE_QUEUE_OWNER_LEGACY':
       return 'This saved work predates account-bound offline queues. An officer must review it before it can be submitted.';
     default:

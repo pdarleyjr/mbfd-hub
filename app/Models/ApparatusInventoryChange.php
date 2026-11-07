@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Filament\Resources\InventoryCorrectionResource\Pages\ListInventoryCorrections;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
@@ -28,6 +31,23 @@ final class ApparatusInventoryChange extends Model
 
     public const STATUS_REVERSED = 'reversed';
 
+    /**
+     * Retired by Logistics because it no longer applied to its unit's checklist (an overlay
+     * conflict, for example after a template change). Retiring has no effect on the checklist.
+     */
+    public const STATUS_RETIRED = 'retired';
+
+    /** @return array<string, string> */
+    public static function statusLabels(): array
+    {
+        return [
+            self::STATUS_ACTIVE => 'In effect',
+            self::STATUS_SUPERSEDED => 'Replaced by a later change',
+            self::STATUS_REVERSED => 'Reversed',
+            self::STATUS_RETIRED => 'Retired (no longer applied)',
+        ];
+    }
+
     private const MUTABLE = ['status', 'superseded_by_change_id', 'status_changed_at', 'updated_at'];
 
     protected $guarded = ['id'];
@@ -46,6 +66,8 @@ final class ApparatusInventoryChange extends Model
             }
         });
         self::deleting(static fn (): never => throw new LogicException('Inventory changes are never deleted.'));
+        // The queue's "not applying" banner caches fleet conflicts; any change write refreshes it after commit.
+        self::saved(static fn () => DB::afterCommit(static fn () => rescue(static fn () => Cache::forget(ListInventoryCorrections::CONFLICTS_CACHE_KEY), report: false)));
     }
 
     /** @param Builder<self> $query */

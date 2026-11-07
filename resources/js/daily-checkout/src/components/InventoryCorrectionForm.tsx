@@ -2,8 +2,8 @@ import { useRef } from 'react';
 import type { ChecklistItem, Compartment } from '../types';
 import { createClientSubmissionId } from '../lib/sync';
 import {
-  ELSEWHERE, ITEM_REASONS, NOTE_MAX, PHOTO_MAX_BYTES, QUANTITY_MAX, JOINED_TEXT, QUEUED_TEXT, SENT_TEXT,
-  buildCorrectionBody, correctionErrorMessage, emptyCorrectionForm, sendInventoryCorrection, validateCorrection,
+  ELSEWHERE, ITEM_REASONS, NOTE_MAX, PHOTO_MAX_BYTES, PHOTO_TYPES, QUANTITY_MAX, JOINED_TEXT, QUEUED_TEXT, SENT_TEXT,
+  buildCorrectionBody, correctionErrorMessage, correctionLink, emptyCorrectionForm, sendInventoryCorrection, validateCorrection,
   type CorrectionErrors, type CorrectionForm, type CorrectionMode, type InventoryCorrectionContext,
 } from '../utils/inventoryCorrections';
 
@@ -31,7 +31,7 @@ export default function InventoryCorrectionForm({ mode, fieldId, compartment, co
   const sendingRef = useRef(false);
   const isItem = mode === 'item';
   const panelId = `${fieldId}-panel`;
-  const errors: CorrectionErrors = form.showErrors ? validateCorrection(mode, form) : {};
+  const errors: CorrectionErrors = form.showErrors ? validateCorrection(mode, form, item?.expectedQuantity) : {};
   const reason = isItem ? form.reason : 'new_item';
   const otherCompartments = compartments.filter(entry => entry.id !== compartment.id);
   const showPhoto = reason === 'replaced' || reason === 'new_item';
@@ -47,8 +47,13 @@ export default function InventoryCorrectionForm({ mode, fieldId, compartment, co
 
   const attachPhoto = (file?: File) => {
     if (!file) return;
-    if (!file.type.startsWith('image/') || file.size > PHOTO_MAX_BYTES) {
-      onForm({ error: 'Choose an image smaller than 5 MB. What you typed is still here.', photoKey: form.photoKey + 1 });
+    // Same types the server stores; a HEIC or TIFF would otherwise be refused after sending (or silently, offline).
+    if (!PHOTO_TYPES.includes(file.type)) {
+      onForm({ error: 'Choose a JPEG, PNG, WebP or GIF photo. On an iPhone, the camera\'s "Most Compatible" setting saves JPEG. What you typed is still here.', photoKey: form.photoKey + 1 });
+      return;
+    }
+    if (file.size > PHOTO_MAX_BYTES) {
+      onForm({ error: 'Choose a photo smaller than 5 MB. What you typed is still here.', photoKey: form.photoKey + 1 });
       return;
     }
     const reader = new FileReader();
@@ -60,7 +65,7 @@ export default function InventoryCorrectionForm({ mode, fieldId, compartment, co
   const send = async () => {
     // A second tap before React re-renders must not send the report twice.
     if (form.sending || sendingRef.current) return;
-    if (Object.keys(validateCorrection(mode, form)).length > 0) {
+    if (Object.keys(validateCorrection(mode, form, item?.expectedQuantity)).length > 0) {
       onForm({ showErrors: true, error: null });
       requestAnimationFrame(() => panelRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
       return;
@@ -72,9 +77,13 @@ export default function InventoryCorrectionForm({ mode, fieldId, compartment, co
     sendingRef.current = true;
     onForm({ sending: true, error: null, attempt: { id, fingerprint } });
     try {
-      const outcome = await sendInventoryCorrection(context.apparatusId, { client_submission_id: id, ...body });
-      context.onRecorded({ compartmentId: compartment.id, itemId: isItem ? item?.id ?? null : null, kind: 'pending' });
-      onForm({ ...emptyCorrectionForm(item?.expectedQuantity), photoKey: form.photoKey + 1, result: outcome });
+      const { outcome, sentReference } = await sendInventoryCorrection(context.apparatusId, { client_submission_id: id, ...body });
+      // A queued report already shows a marker from the device queue (kept for the session once it is sent);
+      // recording it here as well would count it twice.
+      if (outcome !== 'queued') {
+        context.onRecorded({ compartmentId: compartment.id, itemId: isItem ? item?.id ?? null : null, kind: 'pending', correctionId: sentReference?.id });
+      }
+      onForm({ ...emptyCorrectionForm(item?.expectedQuantity), photoKey: form.photoKey + 1, result: outcome, sentReference });
       requestAnimationFrame(() => toggleRef.current?.focus());
     } catch (error) {
       onForm({ sending: false, error: correctionErrorMessage(error) });
@@ -83,12 +92,18 @@ export default function InventoryCorrectionForm({ mode, fieldId, compartment, co
     }
   };
 
+  // Closing keeps what was typed (the form lives in the workspace); focus goes back to the toggle.
+  const close = () => {
+    onForm({ open: false });
+    requestAnimationFrame(() => toggleRef.current?.focus());
+  };
+
   const text = (key: 'name' | 'manufacturer' | 'model' | 'description', label: string, max: number, error?: keyof CorrectionErrors) => {
     const id = `${fieldId}-${key}`;
     return <>
       <label htmlFor={id}>{label}</label>
-      <input {...(error ? fieldProps(error, id) : { id })} type="text" maxLength={max} autoComplete="off" value={form[key]} onChange={event => onForm({ [key]: event.target.value })} />
-      {error && fieldError(error, id)}
+      <input {...fieldProps(error ?? key, id)} type="text" maxLength={max} autoComplete="off" value={form[key]} onChange={event => onForm({ [key]: event.target.value })} />
+      {fieldError(error ?? key, id)}
     </>;
   };
 
@@ -97,8 +112,13 @@ export default function InventoryCorrectionForm({ mode, fieldId, compartment, co
       onClick={() => onForm({ open: !form.open, ...(form.open ? {} : { result: null }) })}>
       {isItem ? 'Report inventory correction' : 'Report an unlisted item'}
     </button>
-    <p role="status" className="ic-status">{statusText}</p>
-    {form.open && <div id={panelId} ref={panelRef} className="ic-panel" role="group" aria-label={isItem ? `Inventory correction for ${item?.name ?? 'item'}` : `Unlisted item in ${compartment.name}`}>
+    <p role="status" className="ic-status">{statusText}{statusText !== '' && form.sentReference && <>
+      {' '}<a className="ic-link" href={correctionLink({ compartmentId: compartment.id, itemId: item?.id ?? null, kind: 'pending', correctionId: form.sentReference.id })}>View {form.sentReference.reference}</a>
+    </>}</p>
+    {form.open && <div id={panelId} ref={panelRef} className="ic-panel" role="group" aria-label={isItem ? `Inventory correction for ${item?.name ?? 'item'}` : `Unlisted item in ${compartment.name}`}
+      onKeyDown={event => { if (event.key === 'Escape' && !form.sending) { event.stopPropagation(); close(); } }}>
+      {/* Disabled while sending: a change typed now would be wiped when the sent form resets. */}
+      <fieldset className="ic-fields" disabled={form.sending}>
       <p className="ic-hint">{isItem ? HINT : `Tell Logistics about equipment carried in ${compartment.name} that is not on this list.`}</p>
 
       {isItem && <fieldset className="ic-reasons">
@@ -156,13 +176,19 @@ export default function InventoryCorrectionForm({ mode, fieldId, compartment, co
         <input key={form.photoKey} id={`${fieldId}-photo`} type="file" accept="image/*" onChange={event => attachPhoto(event.target.files?.[0])} />
         {form.photo && <div className="inspection-photo-preview">
           <img src={form.photo} alt="Photo for this report" className="inspection-photo" />
-          <button type="button" className="hub-btn hub-btn--destructive" onClick={() => onForm({ photo: undefined, photoKey: form.photoKey + 1 })}>Remove photo</button>
+          <button type="button" className="hub-btn hub-btn--destructive" onClick={() => {
+            onForm({ photo: undefined, photoKey: form.photoKey + 1 });
+            // The button unmounts with the photo: keep keyboard focus on the picker instead of the page body.
+            requestAnimationFrame(() => document.getElementById(`${fieldId}-photo`)?.focus());
+          }}>Remove photo</button>
         </div>}
       </>}
 
+      </fieldset>
       {form.error && <p role="alert" className="inspection-alert ic-failure">{form.error}</p>}
       <div className="ic-actions">
         <button type="button" className="hub-btn hub-btn--primary" disabled={form.sending} onClick={() => { void send(); }}>{form.sending ? 'Sending…' : 'Send to Logistics'}</button>
+        <button type="button" className="hub-btn hub-btn--tertiary" disabled={form.sending} onClick={close}>Cancel</button>
       </div>
     </div>}
   </div>;

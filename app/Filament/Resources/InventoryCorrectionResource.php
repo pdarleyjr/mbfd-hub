@@ -94,7 +94,7 @@ class InventoryCorrectionResource extends Resource
 
     public static function getNavigationBadgeTooltip(): ?string
     {
-        return 'Awaiting a Logistics decision';
+        return 'Open requests: awaiting a Logistics decision or an answer from the member';
     }
 
     public static function table(Table $table): Table
@@ -120,22 +120,20 @@ class InventoryCorrectionResource extends Resource
                     ->formatStateUsing(fn (ApparatusInventoryCorrection $record): string => (string) ($record->reporter?->display_name ?: $record->reporter?->name ?: 'Member')),
                 Tables\Columns\TextColumn::make('status')->label('Status')->badge()
                     ->formatStateUsing(fn (?string $state): string => ApparatusInventoryCorrection::statusLabel($state))
-                    ->color(fn (?string $state): string => match ($state) {
-                        ApparatusInventoryCorrection::STATUS_SUBMITTED => 'warning',
-                        ApparatusInventoryCorrection::STATUS_CLARIFICATION => 'info',
-                        ApparatusInventoryCorrection::STATUS_APPLIED => 'success',
-                        ApparatusInventoryCorrection::STATUS_REJECTED, ApparatusInventoryCorrection::STATUS_REVERSED => 'gray',
-                        default => 'gray',
-                    }),
+                    ->color(fn (?string $state): string => ApparatusInventoryCorrection::statusColor($state))
+                    // How long an open request has waited, so the oldest are visible at a glance.
+                    ->description(fn (ApparatusInventoryCorrection $record): ?string => $record->isOpen() && $record->created_at !== null
+                        ? 'Waiting '.$record->created_at->diffForHumans(now(), ['syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE, 'parts' => 1])
+                        : null),
             ])
             ->filters([
+                // The tabs above the table choose the queue; this filter narrows to one exact status.
                 SelectFilter::make('status')
-                    ->label('Status')
+                    ->label('Exact status')
                     ->options([
                         'open' => 'Needs a decision',
                         ...ApparatusInventoryCorrection::statusLabels(),
                     ])
-                    ->default('open')
                     ->query(function ($query, array $data) {
                         $value = $data['value'] ?? null;
                         if ($value === 'open') {

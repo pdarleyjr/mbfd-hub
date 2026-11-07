@@ -32,8 +32,22 @@ final class ApparatusInventoryCorrection extends Model
     /** Closed because another open request covers the same change; see duplicate_of_correction_id. */
     public const STATUS_MERGED = 'merged';
 
+    /** Closed by Logistics without a checklist change: already done, no longer applies, or nothing to change. */
+    public const STATUS_CLOSED = 'closed';
+
+    /** Withdrawn by the member who filed it, before Logistics decided. */
+    public const STATUS_WITHDRAWN = 'withdrawn';
+
     /** @var list<string> awaiting a Logistics decision */
     public const OPEN_STATUSES = [self::STATUS_SUBMITTED, self::STATUS_CLARIFICATION];
+
+    /**
+     * Every status that ends the request without a checklist change. `applied` is also final
+     * (it can only be reversed), so every request reaches one of these or `applied`/`reversed`.
+     *
+     * @var list<string>
+     */
+    public const CLOSED_WITHOUT_CHANGE_STATUSES = [self::STATUS_REJECTED, self::STATUS_CLOSED, self::STATUS_WITHDRAWN, self::STATUS_MERGED];
 
     protected $guarded = ['id'];
 
@@ -78,7 +92,20 @@ final class ApparatusInventoryCorrection extends Model
             self::STATUS_REJECTED => 'Rejected',
             self::STATUS_REVERSED => 'Reversed',
             self::STATUS_MERGED => 'Combined with another request',
+            self::STATUS_CLOSED => 'Closed, no change needed',
+            self::STATUS_WITHDRAWN => 'Withdrawn by the member',
         ];
+    }
+
+    /** Filament badge colour for a status; one mapping for every admin surface. */
+    public static function statusColor(?string $status): string
+    {
+        return match ($status) {
+            self::STATUS_SUBMITTED => 'warning',
+            self::STATUS_CLARIFICATION => 'info',
+            self::STATUS_APPLIED => 'success',
+            default => 'gray',
+        };
     }
 
     public static function statusLabel(?string $status): string
