@@ -74,7 +74,8 @@ published row ───┘   (published row wins; else file, exactly as before)
 
 Editable item fields: `name` (required, ≤160, unique within its compartment), `expectedQuantity`
 (blank or integer 1–999), `manufacturer` (brand, ≤120), `model` (≤120), `description` (≤500),
-`note` (≤500), location (compartment) and order. Editable compartment fields: display name (the
+`note` (≤500; an internal remark kept with the template, not shown on Daily Checkout, which shows
+brand, model and description under the item), location (compartment) and order. Editable compartment fields: display name (the
 existing `title` or `name` key, whichever the template uses; unique, ≤120) and order.
 
 - Every other key on an item or compartment (`inputType`, `snipeit_match`, `valueRequired`,
@@ -141,7 +142,7 @@ diff also reports `items_reordered` (order changes inside a compartment), which 
   below it the "Publication record" table (drafts, published and replaced versions, with exports).
 - The apparatus profile's "More" menu links managers to the template that unit uses.
 - Editor `/admin/checklist-templates/{type}`: compartments as collapsible, reorderable sections;
-  items as reorderable rows (name, quantity, brand, model, description, note, location select).
+  items as reorderable rows (name, quantity, brand, model, description, internal note, location select).
   Header actions: Save draft (Ctrl/Cmd+S), Preview & publish (diff + per-unit impact + required summary +
   confirmation), Discard draft, Export JSON, Import JSON (into the draft, validated), Revert to
   repository file. History: every published version with publisher, date, summary, diff against
