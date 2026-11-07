@@ -305,7 +305,8 @@ class AppServiceProvider extends ServiceProvider
                 'evaluation_submission',
                 'New Evaluation Submitted',
                 "An evaluation for {$productName} has been submitted.",
-                '/admin/evaluation-submissions/'.$submission->id,
+                // EvaluationSubmissionResource lives under the workgroup cluster.
+                '/admin/workgroup/evaluation-submissions/'.$submission->id,
                 $submission->id,
                 event: $revision,
             );
