@@ -19,12 +19,14 @@ use App\Services\Inventory\InventoryCorrectionReason;
 use App\Services\Inventory\InventoryCorrectionService;
 use App\Services\Inventory\InventoryOperationException;
 use App\Services\Inventory\InventoryOverlay;
+use App\Services\Inventory\InventoryOverlayHealth;
 use App\Support\Fleet\InventoryCorrectionAccess;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Filament\Notifications\Actions\Action as NotificationAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -70,6 +72,8 @@ class ViewInventoryCorrection extends ViewRecord
             : null;
         $suggestedPlan = $this->safePlan(InventoryCorrectionReason::suggestedOperation($correction), InventoryChangePlanner::SCOPE_UNIT);
         $sourceUnit = collect($suggestedPlan['units'] ?? [])->firstWhere('is_source', true);
+        $changes = ApparatusInventoryChange::query()->where('apparatus_inventory_correction_id', $correction->getKey())
+            ->with('apparatus:id,designation,name')->orderBy('id')->get();
 
         return [
             'correction' => $correction,
@@ -79,10 +83,15 @@ class ViewInventoryCorrection extends ViewRecord
             'diffRows' => InventoryCorrectionDiff::rows($correction),
             'suggestedAfter' => $sourceUnit['after'] ?? null,
             'suggestedVerdict' => $sourceUnit['verdict_label'] ?? null,
+            // The request cannot be approved as reported (already done, item gone): point at "Close, no change needed".
+            'blockedAsReported' => $correction->isOpen() && $sourceUnit !== null && $sourceUnit['verdict'] !== InventoryChangePlanner::ELIGIBLE
+                ? (string) $sourceUnit['verdict_label'] : null,
             'compartmentNames' => $this->compartmentOptions(),
             'events' => $correction->events()->with('actor:id,name,display_name')->get(),
-            'changes' => ApparatusInventoryChange::query()->where('apparatus_inventory_correction_id', $correction->getKey())
-                ->with('apparatus:id,designation,name')->orderBy('id')->get(),
+            'changes' => $changes,
+            'changeStatusLabels' => ApparatusInventoryChange::statusLabels(),
+            'conflicts' => app(InventoryOverlayHealth::class)->conflictsFor($changes),
+            'canReview' => $this->isReviewer(),
             'inspectionUrl' => $correction->apparatus_inspection_id !== null
                 ? InspectionResource::getUrl('view', ['record' => $correction->apparatus_inspection_id])
                 : null,
@@ -149,6 +158,24 @@ class ViewInventoryCorrection extends ViewRecord
                 ->action(fn (array $data) => $this->run(fn (User $user) => app(InventoryCorrectionService::class)->reject(
                     (int) $this->correction()->getKey(), $user, $data['reason'] ?? null, $data['internal_note'] ?? null, (int) $data['lock_version'], $data['key'] ?? null,
                 ), 'Request rejected. The checklist was not changed and the member was told.')),
+            Action::make('closeNoChange')
+                ->label('Close, no change needed')
+                ->icon('heroicon-o-check-badge')
+                ->color('gray')
+                ->visible(fn (): bool => $this->correction()->isOpen() && $this->isReviewer())
+                ->modalHeading('Close without changing the checklist')
+                ->modalDescription('Use this when nothing needs to change: the checklist already matches, another request already did it, or the item is no longer relevant. The member is told it was closed, not rejected.')
+                ->modalSubmitActionLabel('Close request')
+                ->fillForm(fn (): array => ['lock_version' => $this->correction()->lock_version, 'key' => (string) Str::uuid(), 'message' => $this->closingSuggestion()])
+                ->form([
+                    Forms\Components\Hidden::make('lock_version'),
+                    Forms\Components\Hidden::make('key'),
+                    Forms\Components\Textarea::make('message')->label('Message to the member (optional)')->rows(3)->maxLength(InventoryCorrectionService::MAX_MESSAGE),
+                    Forms\Components\Textarea::make('internal_note')->label('Internal note (Logistics only, optional)')->rows(2)->maxLength(InventoryCorrectionService::MAX_MESSAGE),
+                ])
+                ->action(fn (array $data) => $this->run(fn (User $user) => app(InventoryCorrectionService::class)->closeNoChange(
+                    (int) $this->correction()->getKey(), $user, $data['message'] ?? null, $data['internal_note'] ?? null, (int) $data['lock_version'], $data['key'] ?? null,
+                ), 'Request closed. The checklist was not changed and the member was told.')),
             Action::make('reverse')
                 ->label('Reverse change')
                 ->icon('heroicon-o-arrow-uturn-left')
@@ -167,6 +194,26 @@ class ViewInventoryCorrection extends ViewRecord
                     (int) $this->correction()->getKey(), $user, (string) $data['reason'], (int) $data['lock_version'], $data['key'] ?? null,
                 ), 'Change reversed')),
         ];
+    }
+
+    /** Opened from the "Inventory changes made" list for one change that no longer applies. */
+    public function retireChangeAction(): Action
+    {
+        return Action::make('retireChange')
+            ->label('Retire this change')
+            ->color('warning')
+            ->visible(fn (): bool => $this->isReviewer())
+            ->modalHeading('Retire a change that no longer applies')
+            ->modalDescription('The checklist already ignores this change, so retiring it changes nothing on the truck. It only stops the change being listed as in effect. Other apparatus this correction changed are not affected.')
+            ->modalSubmitActionLabel('Retire change')
+            ->fillForm(fn (): array => ['key' => (string) Str::uuid()])
+            ->form([
+                Forms\Components\Hidden::make('key'),
+                Forms\Components\Textarea::make('note')->label('Internal note (optional)')->rows(2)->maxLength(InventoryCorrectionService::MAX_MESSAGE),
+            ])
+            ->action(fn (array $data, array $arguments) => $this->run(fn (User $user) => app(InventoryCorrectionService::class)->retireChange(
+                $this->ownChangeId($arguments['change'] ?? null), $user, $data['note'] ?? null, $data['key'] ?? null,
+            ), 'Change retired. The checklist was not changed.'));
     }
 
     private function approveAction(): Action
@@ -292,6 +339,28 @@ class ViewInventoryCorrection extends ViewRecord
                     $data['scope'] === InventoryChangePlanner::SCOPE_CHECKLISTS ? array_values((array) ($data['checklist_types'] ?? [])) : [],
                 ), 'Approved. The next checklist for the selected apparatus includes this change.');
             });
+    }
+
+    /** A change id from the page, accepted only when it belongs to this correction. */
+    private function ownChangeId(mixed $id): int
+    {
+        $changeId = is_numeric($id) ? (int) $id : 0;
+        abort_unless($changeId > 0 && ApparatusInventoryChange::query()->whereKey($changeId)
+            ->where('apparatus_inventory_correction_id', $this->correction()->getKey())->exists(), 404);
+
+        return $changeId;
+    }
+
+    /** Pre-filled member message when the request cannot be applied as reported, so closing takes one click. */
+    private function closingSuggestion(): ?string
+    {
+        $source = collect($this->safePlan(InventoryCorrectionReason::suggestedOperation($this->correction()), InventoryChangePlanner::SCOPE_UNIT)['units'] ?? [])->firstWhere('is_source', true);
+
+        return match ($source['verdict'] ?? null) {
+            'no_change' => 'The checklist already shows this, so no change was needed. Thank you for reporting it.',
+            'item_not_found' => 'This item is no longer on the checklist for this apparatus, so no change was needed.',
+            default => null,
+        };
     }
 
     /** @return array<string, mixed> */
@@ -546,7 +615,17 @@ class ViewInventoryCorrection extends ViewRecord
 
             return;
         } catch (InventoryCorrectionConflict $conflict) {
-            Notification::make()->warning()->title('Nothing was changed')->body($conflict->getMessage())->persistent()->send();
+            $notice = Notification::make()->warning()->title('Nothing was changed')->body($conflict->getMessage())->persistent();
+            if ($conflict->relatedCorrectionId !== null && $conflict->relatedCorrectionId !== (int) $this->correction()->getKey()) {
+                // A blocked reversal names the request to reverse first; take the reviewer straight there.
+                $notice->actions([
+                    NotificationAction::make('open')
+                        ->label('Open IC-'.str_pad((string) $conflict->relatedCorrectionId, 6, '0', STR_PAD_LEFT))
+                        ->url(InventoryCorrectionResource::getUrl('view', ['record' => $conflict->relatedCorrectionId]))
+                        ->button(),
+                ]);
+            }
+            $notice->send();
             $this->refreshRecord();
 
             return;

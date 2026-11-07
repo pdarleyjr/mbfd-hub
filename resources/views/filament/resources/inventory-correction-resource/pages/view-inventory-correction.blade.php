@@ -11,6 +11,7 @@
         'applied' => 'success',
         default => 'neutral',
     };
+    $conflicts ??= [];
     $value = fn ($v) => filled($v) ? $v : 'Not set';
     $fieldLabels = ['compartment' => 'Compartment', 'name' => 'Name', 'expectedQuantity' => 'Expected quantity', 'manufacturer' => 'Manufacturer', 'model' => 'Model', 'description' => 'Description'];
     $proposalLabels = ['to_compartment_id' => 'Moved to', 'to_location_text' => 'Where it is now (member\'s words)', 'name' => 'Name', 'manufacturer' => 'Manufacturer', 'model' => 'Model', 'description' => 'Description', 'quantity' => 'Quantity'];
@@ -28,6 +29,9 @@
         'joined' => 'Another member reported the same change',
         'merged_into' => 'Combined into another request',
         'merged_from' => 'Duplicate request combined into this one',
+        'closed' => 'Closed, no change needed',
+        'withdrawn' => 'Withdrawn by the member',
+        'change_retired' => 'Change retired (no longer applied)',
     ];
     $alsoReported = $correction->participants()->where('source', 'joined')->with('user:id,name,display_name')->get();
 @endphp
@@ -62,6 +66,17 @@
                 </dd></div>
             </dl>
             <p class="hub-insp-note">An inventory correction is separate from the inspection's findings: it never marks equipment missing or damaged, never holds the inspection and never changes the unit's status.</p>
+            @if($blockedAsReported)
+                <div class="hub-inv-conflict" role="status" data-blocked-as-reported>
+                    <p><strong>Cannot be approved as reported:</strong> {{ $blockedAsReported }}.</p>
+                    <p>If nothing needs to change, use <strong>Close, no change needed</strong> (the member is told it was not a rejection). Otherwise adjust the change in <strong>Review and approve</strong>.</p>
+                    @if($canReview)
+                        <div class="hub-inv-conflict__actions">
+                            <button type="button" class="hub-insp-btn" wire:click="mountAction('closeNoChange')">Close, no change needed</button>
+                        </div>
+                    @endif
+                </div>
+            @endif
         </section>
 
         @if($diffRows !== [])
@@ -156,8 +171,19 @@
                                             · {{ $fieldLabels[$key] ?? ($key === 'compartment_id' ? 'Compartment' : $key) }}: {{ $key === 'compartment_id' ? ($compartmentNames[$new] ?? $new) : $value($new) }}
                                         @endforeach
                                     </p>
+                                    @if(isset($conflicts[$change->getKey()]))
+                                        <div class="hub-inv-conflict" role="status" data-change-conflict="{{ $conflicts[$change->getKey()] }}">
+                                            <p><strong>Not applied to the checklist:</strong> {{ \App\Services\Inventory\InventoryOverlayHealth::reasonLabel($conflicts[$change->getKey()]) }}. Members on {{ $change->apparatus?->designation ?: $change->apparatus?->name }} do not see this change.</p>
+                                            <p>Retire it if it is no longer needed (nothing on the checklist changes), or ask the member to report the current situation again.</p>
+                                            @if($canReview)
+                                                <div class="hub-inv-conflict__actions">
+                                                    <button type="button" class="hub-insp-btn" wire:click="mountAction('retireChange', @js(['change' => $change->getKey()]))">Retire change #{{ $change->getKey() }}</button>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endif
                                 </div>
-                                <span class="hub-insp-badge hub-insp-badge--{{ $change->status === 'active' ? 'success' : 'neutral' }}">{{ ['active' => 'In effect', 'superseded' => 'Replaced by a later change', 'reversed' => 'Reversed'][$change->status] ?? $change->status }}</span>
+                                <span class="hub-insp-badge hub-insp-badge--{{ isset($conflicts[$change->getKey()]) ? 'warning' : ($change->status === 'active' ? 'success' : 'neutral') }}">{{ isset($conflicts[$change->getKey()]) ? 'Not applying' : ($changeStatusLabels[$change->status] ?? $change->status) }}</span>
                             </li>
                         @endforeach
                     </ul>
@@ -196,6 +222,9 @@
                                 @if(filled($event->details['photo_path'] ?? null))
                                     <a class="hub-insp-link" href="{{ route('inventory-corrections.photo', ['correction' => $correction, 'event' => $event->getKey()]) }}" target="_blank" rel="noopener">View this member's photo</a>
                                 @endif
+                            @endif
+                            @if($event->event_type === 'change_retired')
+                                <p class="hub-insp-item__sub">Change #{{ $event->details['change_id'] ?? '?' }} on {{ $event->details['apparatus'] ?? 'the apparatus' }}: {{ \App\Services\Inventory\InventoryOverlayHealth::reasonLabel((string) ($event->details['reason'] ?? '')) }}.</p>
                             @endif
                             @if($event->event_type === 'applied' && is_array($event->details['results'] ?? null))
                                 <ul class="hub-insp-linklist">

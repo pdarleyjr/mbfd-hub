@@ -302,3 +302,17 @@
 [data-inspection-workspace] .fi-header .fi-btn,
 .mbfd-command-actions :is(button, a) { min-height: 2.75rem; }
 .hub-insp-table-wrap:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+/* Inventory corrections: impact preview in the approval modal, member withdrawal, overlay conflicts. */
+.hub-inv-impact { display: grid; gap: .5rem; font-size: .875rem; color: rgb(var(--hub-ink)); }
+.hub-inv-impact p { margin: 0; }
+.hub-inv-impact__blocked { padding: .75rem 1rem; border: 1px solid rgb(var(--hub-danger)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-well)); color: rgb(var(--hub-ink)); }
+.hub-inv-impact__blocked strong { color: rgb(var(--hub-danger)); }
+.hub-inv-impact__excluded { display: grid; gap: .25rem; margin: 0; padding-left: 1.25rem; list-style: disc; color: rgb(var(--hub-ink-secondary)); }
+.hub-insp-withdraw { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgb(var(--hub-border)); }
+.hub-insp-withdraw summary { display: inline-flex; align-items: center; min-height: 2.75rem; color: rgb(var(--hub-action-primary)); font-size: .875rem; font-weight: 650; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.hub-insp-withdraw summary:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.hub-insp-withdraw p { margin: .25rem 0 0; color: rgb(var(--hub-ink-secondary)); font-size: .875rem; }
+.hub-insp-reply .hub-insp-btn { color: rgb(var(--hub-ink)); background: rgb(var(--hub-surface)); border-color: rgb(var(--hub-border)); }
+.hub-inv-conflict { display: grid; gap: .25rem; margin-top: .375rem; padding: .625rem .75rem; border: 1px solid rgb(var(--hub-warning-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-warning-bg)); font-size: .875rem; color: rgb(var(--hub-ink)); }
+.hub-inv-conflict strong { color: rgb(var(--hub-warning-strong)); }
+.hub-inv-conflict__actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .25rem; }

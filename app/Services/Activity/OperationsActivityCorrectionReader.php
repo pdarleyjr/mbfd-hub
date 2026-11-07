@@ -29,6 +29,9 @@ final class OperationsActivityCorrectionReader
         ApparatusInventoryCorrectionEvent::APPLIED => 'Approved and applied',
         ApparatusInventoryCorrectionEvent::REJECTED => 'Rejected',
         ApparatusInventoryCorrectionEvent::REVERSED => 'Reversed',
+        ApparatusInventoryCorrectionEvent::CLOSED => 'Closed, no change needed',
+        ApparatusInventoryCorrectionEvent::WITHDRAWN => 'Withdrawn by the member',
+        ApparatusInventoryCorrectionEvent::CHANGE_RETIRED => 'Change retired',
     ];
 
     private const MESSAGES = [

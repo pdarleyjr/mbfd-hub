@@ -19,6 +19,8 @@
         'reversed' => 'Change reversed',
         'joined' => 'Same change reported',
         'merged_into' => 'Combined with another request',
+        'closed' => 'Closed, no change needed',
+        'withdrawn' => 'Withdrawn',
     ];
     $mine = $detail['reported_by_viewer'] ?? true;
     $entryTitle = fn (array $entry): string => match (true) {
@@ -47,6 +49,12 @@
                 <p class="hub-insp-callout" role="status" data-rejected>Logistics rejected this request. The equipment list was not changed.{{ blank($detail['decision_reason']) ? ' They did not add a message.' : '' }} You can report it again from a Daily Checkout if something is still wrong.</p>
             @elseif($detail['status'] === 'merged' && $detail['combined_into'])
                 <p class="hub-insp-callout" role="status" data-combined>Another member already reported this change, so this request was combined with <a href="{{ \App\Filament\Employee\Pages\MyInventoryCorrectionView::getUrl(['correction' => $detail['combined_into']['id']], panel: 'employee') }}">{{ $detail['combined_into']['reference'] }}</a>. You will be told the decision there.</p>
+            @elseif($detail['status'] === 'closed')
+                <p class="hub-insp-callout" role="status" data-closed>Logistics closed this request without changing the equipment list because no change was needed (for example, it was already corrected). This is not a rejection. You can report it again from a Daily Checkout if something is still wrong.</p>
+            @elseif($detail['status'] === 'withdrawn')
+                <p class="hub-insp-callout" role="status" data-withdrawn>You withdrew this request. Logistics will not review it and the equipment list was not changed. You can report it again from a Daily Checkout if needed.</p>
+            @elseif($detail['status'] === 'reversed')
+                <p class="hub-insp-callout" role="status" data-reversed>Logistics approved this correction earlier and has since reversed it, so the Daily Checkout checklist is back to how it was. Their reason is below. You can report it again from a Daily Checkout if something is still wrong.</p>
             @endif
             @if(($detail['members'] ?? 1) > 1 && $detail['status'] !== 'merged')
                 <p class="hub-insp-note" data-members="{{ $detail['members'] }}">{{ $detail['members'] }} members reported this change. Logistics decides it once for everyone.</p>
@@ -100,6 +108,26 @@
                 @enderror
                 <button type="submit" wire:loading.attr="disabled" wire:target="sendReply">Send reply</button>
             </form>
+            @endif
+            @if(! ($detail['can_reply'] ?? true) && $detail['status'] !== 'merged')
+                <p class="hub-insp-note" data-closed-thread>This request is closed, so replies are off. If something on the truck is still wrong, report it again from the item in a Daily Checkout.</p>
+            @endif
+            @if($detail['can_withdraw'] ?? false)
+                <details class="hub-insp-withdraw" data-withdraw>
+                    <summary>Withdraw this request</summary>
+                    <p>Use this if you reported it by mistake or it is no longer needed. Logistics will not review it and the checklist stays as it is.</p>
+                    <form class="hub-insp-reply" wire:submit="withdraw">
+                        <label for="mic-withdraw-note">Reason (optional, shared with Logistics)</label>
+                        <textarea id="mic-withdraw-note" wire:model="withdrawNote" rows="2" maxlength="2000"
+                            @error('withdrawNote') aria-invalid="true" aria-describedby="mic-withdraw-error" @enderror></textarea>
+                        @error('withdrawNote')
+                            <p id="mic-withdraw-error" role="alert">{{ $message }}</p>
+                        @enderror
+                        <button type="submit" class="hub-insp-btn" wire:loading.attr="disabled" wire:target="withdraw">Withdraw request</button>
+                    </form>
+                </details>
+            @elseif(filled($detail['withdraw_refusal'] ?? null) && ($detail['reported_by_viewer'] ?? false))
+                <p class="hub-insp-note" data-withdraw-refusal>{{ $detail['withdraw_refusal'] }}</p>
             @endif
         </section>
     </div>

@@ -18,7 +18,8 @@ final class InventoryCorrectionConflict extends RuntimeException
 
     public const DEPENDENT_CHANGE = 'dependent_change';
 
-    public function __construct(public readonly string $reason, string $message)
+    /** @param int|null $relatedCorrectionId the correction to open to resolve this (for example the later change to reverse first) */
+    public function __construct(public readonly string $reason, string $message, public readonly ?int $relatedCorrectionId = null)
     {
         parent::__construct($message);
     }

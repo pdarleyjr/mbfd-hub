@@ -12,7 +12,7 @@
         <section id="inventory-corrections" class="hub-insp hub-insp-section hub-insp-anchor" aria-labelledby="my-inventory-corrections-title">
             <div class="hub-insp-section__head">
                 <h2 class="hub-insp-section__title" id="my-inventory-corrections-title">Inventory corrections you reported</h2>
-                <p class="hub-insp-note">Checklist entries you told Logistics were wrong.</p>
+                <p class="hub-insp-note">Checklist entries you told Logistics were wrong, including ones another member reported first that you were added to.@if(count($inventoryCorrections) >= 20) Showing the 20 most recent.@endif</p>
             </div>
             <div class="hub-insp-card">
                 <ul class="hub-insp-linklist">

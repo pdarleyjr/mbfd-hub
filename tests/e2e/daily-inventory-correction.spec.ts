@@ -252,7 +252,7 @@ test('offline reports are saved on the device and replayed exactly once with the
   await item.getByLabel('Correct quantity').fill('2');
   await item.getByRole('button', { name: 'Send to Logistics' }).click();
 
-  const saved = page.getByRole('status').filter({ hasText: 'Saved on this device. It will be sent when you\'re back online.' });
+  const saved = page.getByRole('status').filter({ hasText: 'Saved on this device because Logistics could not be reached.' });
   await expect(saved).toBeVisible();
   await expect(page.getByText('Sent to Logistics for review')).toHaveCount(0);
   await expect(item.getByText('Correction pending review')).toBeVisible();
@@ -296,6 +296,28 @@ test('a report saved on the device keeps its marker after the page is reloaded',
   await expect(row(page, 'Flashlight').getByText('Correction pending review')).toBeVisible();
   await expect(row(page, 'Portable Radio').getByText('Correction pending review')).toHaveCount(0);
   await expect(page.getByText('1 unlisted item reported here, pending review.')).toBeVisible();
+});
+
+test('a saved report the server refuses on replay is shown on its item and can be discarded', async ({ page }) => {
+  const api = await mockApi(page);
+  api.respondWith = { status: 409, message: 'This apparatus\'s checklist changed since you opened it.' };
+  await openInspection(page);
+  await seedQueuedCorrection(page, {
+    client_submission_id: '11111111-2222-4333-8444-555555555555', checklist_version: api.fixture.version, reason: 'no_longer_carried', compartment_id: 'cab', item_id: 'cab-flashlight',
+  });
+
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect.poll(async () => (await queuedCorrections(page)).map(row => row.status)).toEqual(['requires_attention']);
+  const flashlight = row(page, 'Flashlight');
+  await expect(flashlight.getByText('Report not sent')).toBeVisible();
+  await expect(flashlight.getByText(/checklist changed since you opened it/)).toBeVisible();
+  await expect(flashlight.getByText('Correction pending review')).toHaveCount(0);
+
+  await flashlight.getByRole('button', { name: 'Discard saved report…' }).click();
+  await flashlight.getByRole('button', { name: 'Discard permanently' }).click();
+  await expect.poll(async () => (await queuedCorrections(page)).length).toBe(0);
+  await expect(flashlight.getByText('Report not sent')).toHaveCount(0);
+  expect(api.corrections).toHaveLength(1);
 });
 
 test('a refused report says it was not sent, is not a rejection, and keeps everything that was typed', async ({ page }) => {

@@ -27,7 +27,7 @@
                                 @foreach ($row['diff'] as $change)
                                     <p class="hub-insp-item__text" data-diff>
                                         <span class="hub-insp-item__sub">{{ $change['label'] }}:</span>
-                                        <s>{{ $change['before'] }}</s> → <strong>{{ $change['after'] }}</strong>
+                                        <span class="sr-only">was </span><s>{{ $change['before'] }}</s> <span aria-hidden="true">→</span><span class="sr-only">, requested </span> <strong>{{ $change['after'] }}</strong>
                                     </p>
                                 @endforeach
                                 @if (filled($row['note']))

@@ -6,7 +6,8 @@ import { previousIssueHeadline, previousIssueStatusLine, resolveFindingTargets, 
 import { ArrowRight, Check, ChevronDown, ClipboardList, Package, TriangleAlert, X } from 'lucide-react';
 import ApparatusBlueprint from './ApparatusBlueprint';
 import InventoryCorrectionForm from './InventoryCorrectionForm';
-import { correctionLink, emptyCorrectionForm, markerForItem, questionFor, unlistedMarkers, type CorrectionForm, type InventoryCorrectionContext } from '../utils/inventoryCorrections';
+import { correctionLink, emptyCorrectionForm, markerForItem, questionFor, unlistedMarkers, unsentFor, type CorrectionForm, type InventoryCorrectionContext } from '../utils/inventoryCorrections';
+import UnsentCorrectionNotice from './UnsentCorrectionNotice';
 import { photoProblem } from '../utils/photoFile';
 import { discardQueuedPhoto, queuePhoto } from '../utils/photoUploadQueue';
 import QueuedPhotoPreview from './QueuedPhotoPreview';
@@ -293,7 +294,9 @@ export default function CompartmentStep({ checklistType, usesVehicleId = true, c
             {correctionMarker && <div className="equipment-markers" data-correction-marker={correctionMarker}>
               {correctionMarker === 'question'
                 ? <><span className="hub-tag hub-tag--warning">Logistics asked a question</span><a className="ic-link" href={correctionLink(questionFor(inventory!.markers, current.id, item.id))}>Open the question</a></>
-                : <span className="hub-tag hub-tag--info">Correction pending review</span>}
+                : correctionMarker === 'unsent'
+                  ? <UnsentCorrectionNotice marker={unsentFor(inventory!.markers, current.id, item.id)!} context={inventory!} />
+                  : <span className="hub-tag hub-tag--info">Correction pending review</span>}
             </div>}
             {known.length > 0 && <div className="equipment-known" data-previous-issues={item.id}>
               {known.map(finding => {
@@ -356,6 +359,8 @@ export default function CompartmentStep({ checklistType, usesVehicleId = true, c
           {unlistedPending.question ? 'Logistics asked a question about an unlisted item reported here. ' : `${unlistedPending.pending} unlisted ${unlistedPending.pending === 1 ? 'item' : 'items'} reported here, pending review. `}
           {unlistedPending.question && <a className="ic-link" href={correctionLink(questionFor(inventory.markers, current.id, null))}>Open the question</a>}
         </p>}
+        {inventory.markers.filter(marker => marker.compartmentId === current.id && marker.itemId === null && marker.kind === 'unsent')
+          .map(marker => <UnsentCorrectionNotice key={marker.queueId} marker={marker} context={inventory} />)}
       </div>}
       <footer className="inspection-compartment-footer"><span>Area {navigationIds.indexOf(current.id) + 1} of {navigationIds.length}</span></footer>
     </section>

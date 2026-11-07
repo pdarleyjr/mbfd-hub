@@ -23,7 +23,9 @@ use App\Notifications\Inspections\InspectionEventNotification;
 use App\Notifications\Inspections\InspectionNotificationCategory;
 use App\Notifications\Inspections\InspectionNotificationKind as Kind;
 use App\Services\Captain5\Captain5Notifier;
+use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Inventory\InventoryCorrectionReason;
+use App\Services\Inventory\InventoryOverlay;
 use App\Services\Notifications\NotificationRecipientEvaluator;
 use App\Services\Notifications\SupportAlertLevelFilter;
 use App\Support\Fleet\DefectActionStatus;
@@ -436,10 +438,15 @@ final class InspectionNotificationDispatcher
             $excerpt = $this->excerpt((string) $event->body);
             [$title, $body] = match ($event->event_type) {
                 ApparatusInventoryCorrectionEvent::CLARIFICATION_REQUESTED => ["{$unit}: question about your inventory correction", "Logistics asked about {$subject}: {$excerpt}"],
-                ApparatusInventoryCorrectionEvent::APPLIED => ["{$unit}: equipment change approved", "Logistics approved your correction for {$subject}. The Daily Checkout checklist now reflects it."],
+                // Say what was approved when Logistics changed the proposal, and pass on Logistics' note.
+                ApparatusInventoryCorrectionEvent::APPLIED => ["{$unit}: equipment change approved", "Logistics approved your correction for {$subject}"
+                    .(($correction->decision['modified'] ?? false) === true ? ' with changes. What was approved: '.$this->approvedChange($correction).'.' : '. The Daily Checkout checklist now reflects it.')
+                    .(filled($correction->decision_reason) ? ' '.$this->excerpt((string) $correction->decision_reason) : '')],
                 // The message is optional: a bare rejection still says what happened.
                 ApparatusInventoryCorrectionEvent::REJECTED => ["{$unit}: equipment change rejected", "Logistics rejected your correction for {$subject}.".($excerpt !== '' ? " {$excerpt}" : ' The checklist was not changed.')],
                 ApparatusInventoryCorrectionEvent::REVERSED => ["{$unit}: inventory correction reversed", "Logistics reversed the change made for {$subject}: {$excerpt}"],
+                // Not a refusal: nothing needed changing (already done, or no longer applies).
+                ApparatusInventoryCorrectionEvent::CLOSED => ["{$unit}: inventory correction closed", "Logistics closed your correction for {$subject}: no checklist change was needed.".($excerpt !== '' ? " {$excerpt}" : '')],
                 default => ["{$unit}: message about your inventory correction", "Logistics wrote about {$subject}: {$excerpt}"],
             };
             $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
@@ -487,6 +494,25 @@ final class InspectionNotificationDispatcher
                 ->map(static fn ($id): int => (int) $id)
                 ->all();
             $participating = $reviewers->filter(static fn (User $user): bool => in_array((int) $user->getKey(), $involved, true))->values();
+            if ($event->event_type === ApparatusInventoryCorrectionEvent::WITHDRAWN) {
+                // Only reviewers already working on it need to know; the queue simply drops it for everyone else.
+                if ($participating->isEmpty()) {
+                    return;
+                }
+                $this->queue(
+                    'correction:'.$correction->getKey().':reply:'.$event->getKey(),
+                    Kind::INVENTORY_CORRECTION_REPLY,
+                    $participating,
+                    fn (User $recipient): array => [
+                        'title' => "{$unit}: inventory correction withdrawn",
+                        'body' => "{$name} withdrew the correction for ".$this->correctionSubject($correction).'.'.(filled($event->body) ? ' '.$this->excerpt((string) $event->body) : ''),
+                        'url' => $this->correctionAdminUrl((int) $correction->getKey()),
+                    ],
+                    $author,
+                );
+
+                return;
+            }
 
             $this->queue(
                 'correction:'.$correction->getKey().':reply:'.$event->getKey(),
@@ -579,13 +605,32 @@ final class InspectionNotificationDispatcher
             if (! is_scalar($value) || ! isset($labels[$key])) {
                 continue;
             }
-            $shown = $key === 'compartment_id' && ($correction->proposal['to_compartment_id'] ?? null) === $value && isset($snapshot['to_compartment'])
-                ? (string) $snapshot['to_compartment']
-                : (string) $value;
+            $shown = $key === 'compartment_id' ? $this->compartmentNameFor($correction, (string) $value) : (string) $value;
             $parts[] = $labels[$key].': '.$this->excerpt($shown);
         }
 
         return $parts === [] ? 'the change shown on the request' : implode(', ', $parts);
+    }
+
+    /** A compartment's name as members know it; never the internal id when any name is known. */
+    private function compartmentNameFor(ApparatusInventoryCorrection $correction, string $compartmentId): string
+    {
+        $snapshot = (array) $correction->target_snapshot;
+        if (($correction->proposal['to_compartment_id'] ?? null) === $compartmentId && isset($snapshot['to_compartment'])) {
+            return (string) $snapshot['to_compartment'];
+        }
+        if ($compartmentId === $correction->compartment_key && isset($snapshot['compartment'])) {
+            return (string) $snapshot['compartment'];
+        }
+        $apparatus = Apparatus::query()->find($correction->apparatus_id);
+        $resolution = $apparatus instanceof Apparatus ? rescue(static fn (): array => app(DailyCheckoutChecklistResolver::class)->resolve($apparatus), [], report: false) : [];
+        foreach ($resolution['checklist']['compartments'] ?? [] as $compartment) {
+            if ((string) ($compartment['id'] ?? '') === $compartmentId) {
+                return InventoryOverlay::compartmentName($compartment);
+            }
+        }
+
+        return $compartmentId;
     }
 
     /** "Garage Door Clicker (Front Cab)" or "an unlisted item in Rear Cab". */

@@ -1336,7 +1336,7 @@ export default function InspectionWizard() {
           onSubmit={handleCompartmentsSubmit}
           onBack={() => setCurrentStep('officer')}
           backLabel={memberStepLabel}
-          inventory={checklist.schema_version === 2 ? undefined : { apparatusId: apparatus.id, checklistVersion: checklist.checklist_version, draftId, markers: inventoryMarkers.markers, onRecorded: inventoryMarkers.record }}
+          inventory={checklist.schema_version === 2 ? undefined : { apparatusId: apparatus.id, checklistVersion: checklist.checklist_version, draftId, markers: inventoryMarkers.markers, onRecorded: inventoryMarkers.record, onDiscardUnsent: inventoryMarkers.discardUnsent }}
         />
       )}
 
