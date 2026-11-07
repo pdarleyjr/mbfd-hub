@@ -111,7 +111,8 @@ final class OperationsActivityPersonnelReader
             automated: false,
             message: in_array($event, ['employee_responded', 'note_added'], true) || $visible !== '',
             ownerTag: null,
-            url: PersonnelRequestResource::getUrl('view', ['record' => $request->getKey()], panel: 'admin'),
+            // The resource's route key is public_id; the numeric id gives a 404.
+            url: PersonnelRequestResource::getUrl('view', ['record' => $request], panel: 'admin'),
         );
     }
 
