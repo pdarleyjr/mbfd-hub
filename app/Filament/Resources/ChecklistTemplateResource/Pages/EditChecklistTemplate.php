@@ -236,7 +236,10 @@ class EditChecklistTemplate extends Page
                                     ->maxLength(500)
                                     ->columnSpan(['md' => 4]),
                                 Forms\Components\TextInput::make('note')
-                                    ->label('Note shown to members')
+                                    ->label('Internal note')
+                                    // The Daily Checkout app shows brand, model and description; this note is kept with
+                                    // the template (source remarks such as "paper lists 2 sets") and is not shown to members.
+                                    ->helperText('For Logistics only; not shown on Daily Checkout. Use Description for text members should see.')
                                     ->maxLength(500)
                                     ->columnSpanFull(),
                             ]),

@@ -64,7 +64,7 @@ final class ChecklistTemplateEditor
         'manufacturer' => 'Brand / manufacturer',
         'model' => 'Model',
         'description' => 'Description',
-        'note' => 'Note',
+        'note' => 'Internal note',
         'compartment' => 'Location',
     ];
 
