@@ -1,0 +1,36 @@
+/*
+ * Fleet > Checklist templates (docs/checklist-template-editor.md section 7): the template cards on the
+ * index, the editor's callout, and the publish preview. Builds on hub-inspection-views.css; colours come
+ * from the --hub-* tokens in mbfd-theme.css. No sideways scrolling: long JSON and names wrap.
+ */
+
+.hub-tpl-callout { padding: 1rem 1.25rem; border: 1px solid rgb(var(--hub-info-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-info-bg)); color: rgb(var(--hub-ink)); }
+.hub-tpl-callout h2 { margin: 0 0 .375rem; color: rgb(var(--hub-info)); font-size: .9375rem; font-weight: 650; }
+.hub-tpl-callout ul { margin: 0; padding-left: 1.25rem; list-style: disc; font-size: .875rem; line-height: 1.6; }
+
+.hub-tpl-warning { margin: 1rem 0 0; padding: .625rem .875rem; border: 1px solid rgb(var(--hub-warning-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-warning-bg)); color: rgb(var(--hub-warning-strong)); font-size: .875rem; font-weight: 600; }
+.hub-tpl-inline { color: rgb(var(--hub-ink-secondary)); font-size: .75rem; font-weight: 400; }
+.hub-tpl-muted { color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
+
+.hub-tpl-subtitle { margin: 1rem 0 .5rem; color: rgb(var(--hub-header)); font-size: .9375rem; font-weight: 650; }
+.hub-tpl-list { display: grid; gap: .375rem; margin: 0; padding: 0; list-style: none; font-size: .875rem; }
+.hub-tpl-list li { overflow-wrap: anywhere; }
+.hub-tpl-card .hub-tpl-list { padding-left: 1.25rem; list-style: disc; }
+.hub-insp-card--danger .hub-tpl-list, .hub-insp-card--warning .hub-tpl-list { padding-left: 1.25rem; list-style: disc; }
+
+.hub-tpl-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+@container (min-width: 40rem) {
+    .hub-tpl-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.hub-tpl-json { max-height: 60vh; margin: 0; padding: 1rem; overflow-y: auto; border: 1px solid rgb(var(--hub-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-ink)); font-size: .75rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hub-tpl-json:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+
+/* Index: one card per template. */
+.hub-tpl-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+@container (min-width: 56rem) {
+    .hub-tpl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.hub-tpl-card { display: flex; flex-direction: column; gap: .75rem; }
+.hub-tpl-card .hub-insp-facts { margin-top: 0; }
+.hub-tpl-card__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-top: auto; }

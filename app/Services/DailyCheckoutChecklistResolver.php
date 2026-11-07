@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Models\Apparatus;
+use App\Services\ChecklistTemplates\ChecklistTemplateRepository;
 use App\Services\Inventory\InventoryOverlay;
 use Carbon\CarbonImmutable;
 use JsonException;
@@ -69,27 +70,100 @@ final class DailyCheckoutChecklistResolver
             return $this->unusable($mapping, '', $mapping['error']);
         }
 
-        $path = "{$this->checklistDirectory}/{$checklistType}_checklist.json";
-
-        if (! is_file($path) || ! is_readable($path)) {
-            return $this->unusable($mapping, $path, is_file($path) ? 'unreadable' : 'missing');
+        // The published editor version of the type when there is one, else the repository file read
+        // exactly as before (docs/checklist-template-editor.md section 3). Resolved lazily: this
+        // resolver may outlive the request-scoped repository.
+        $baseline = app(ChecklistTemplateRepository::class)->baseline(
+            $checklistType,
+            $this->checklistDirectory,
+            $apparatus->getConnectionName(),
+        );
+        if ($baseline['error'] !== null || $baseline['checklist'] === null) {
+            return $this->unusable($mapping, $baseline['path'], $baseline['error'] ?? 'invalid_json');
         }
 
-        $contents = file_get_contents($path);
-        if ($contents === false) {
-            return $this->unusable($mapping, $path, 'unreadable');
+        return $this->resolveLoaded($apparatus, $mapping, $baseline['path'], $baseline['checklist']);
+    }
+
+    /**
+     * resolve() with a supplied baseline in place of the type's file or published version: the same
+     * schema check, inventory overlay and versions. The checklist template editor uses it to show
+     * what every apparatus would be issued if a draft were published.
+     *
+     * @param  array<string, mixed>  $template
+     * @return array{
+     *     checklist_type: string,
+     *     configured_template: string,
+     *     resolution_source: 'configured_template'|'family'|'family_override'|'pending',
+     *     family: string|null,
+     *     identity: string|null,
+     *     ambiguity: string|null,
+     *     path: string,
+     *     fallback_used: false,
+     *     item_count: int,
+     *     checklist_version: string|null,
+     *     checklist_base_version: string|null,
+     *     inventory_change_ids: list<int>,
+     *     overlay_conflicts: list<array{change_id: int, reason: string}>,
+     *     checklist: array<string, mixed>|null,
+     *     usable: bool,
+     *     error: string|null
+     * }
+     */
+    public function resolveWithTemplate(Apparatus $apparatus, array $template): array
+    {
+        $mapping = $this->mappingFor($apparatus);
+        if ($mapping['error'] !== null) {
+            return $this->unusable($mapping, '', $mapping['error']);
         }
 
-        try {
-            $checklist = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return $this->unusable($mapping, $path, 'invalid_json');
-        }
+        return $this->resolveLoaded($apparatus, $mapping, $this->templatePath($mapping['checklist_type']), $template);
+    }
 
-        if (! is_array($checklist)) {
-            return $this->unusable($mapping, $path, 'invalid_json');
-        }
+    /** The directory holding the repository template files this resolver reads. */
+    public function templateDirectory(): string
+    {
+        return $this->checklistDirectory;
+    }
 
+    /** The repository file path of a checklist type (the `path` resolve() reports). */
+    public function templatePath(string $checklistType): string
+    {
+        return "{$this->checklistDirectory}/{$checklistType}_checklist.json";
+    }
+
+    /**
+     * @param array{
+     *     checklist_type: string,
+     *     configured_template: string,
+     *     resolution_source: 'configured_template'|'family'|'family_override'|'pending',
+     *     family: string|null,
+     *     identity: string|null,
+     *     ambiguity: string|null,
+     *     error: string|null
+     * } $mapping
+     * @param  array<string, mixed>  $checklist
+     * @return array{
+     *     checklist_type: string,
+     *     configured_template: string,
+     *     resolution_source: 'configured_template'|'family'|'family_override'|'pending',
+     *     family: string|null,
+     *     identity: string|null,
+     *     ambiguity: string|null,
+     *     path: string,
+     *     fallback_used: false,
+     *     item_count: int,
+     *     checklist_version: string|null,
+     *     checklist_base_version: string|null,
+     *     inventory_change_ids: list<int>,
+     *     overlay_conflicts: list<array{change_id: int, reason: string}>,
+     *     checklist: array<string, mixed>|null,
+     *     usable: bool,
+     *     error: string|null
+     * }
+     */
+    private function resolveLoaded(Apparatus $apparatus, array $mapping, string $path, array $checklist): array
+    {
         if (! $this->hasUnambiguousSubmissionSchema($checklist)) {
             return $this->unusable($mapping, $path, 'invalid_schema');
         }

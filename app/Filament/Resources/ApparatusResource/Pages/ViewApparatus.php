@@ -6,8 +6,14 @@ use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\ApparatusResource\ApparatusWorkflowActions;
 use App\Filament\Resources\ApparatusResource\Widgets\FrontlineCoverageBanner;
 use App\Filament\Resources\ApparatusResource\Widgets\VehicleChangesBanner;
+use App\Filament\Resources\ChecklistTemplateResource;
+use App\Models\Apparatus;
+use App\Services\ChecklistTemplates\ChecklistTemplateEditor;
+use App\Services\DailyCheckoutChecklistResolver;
+use App\Support\Fleet\ChecklistTemplateAccess;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
+use Throwable;
 
 class ViewApparatus extends ViewRecord
 {
@@ -57,10 +63,34 @@ class ViewApparatus extends ViewRecord
                 ApparatusWorkflowActions::scheduleChangeout(Actions\Action::make('scheduleChangeout')),
                 ApparatusWorkflowActions::addOperationalAlert(Actions\Action::make('addOperationalAlert')),
                 ApparatusWorkflowActions::dailyCheckout(Actions\Action::make('daily_checkout')),
+                Actions\Action::make('checklistTemplate')
+                    ->label('Edit checklist template')
+                    ->icon('heroicon-o-clipboard-document-list')
+                    ->color('gray')
+                    ->visible(fn (): bool => $this->checklistTemplateType() !== null)
+                    ->url(fn (): ?string => ($type = $this->checklistTemplateType()) !== null
+                        ? ChecklistTemplateResource::getUrl('editor', ['type' => $type])
+                        : null),
                 ApparatusWorkflowActions::masterRecord(Actions\Action::make('vehicle_record')),
                 ApparatusWorkflowActions::linkVehicleRecord(Actions\Action::make('linkVehicleRecord')),
             ])->label('More')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             Actions\EditAction::make()->color('gray'),
         ];
+    }
+
+    /** The Daily Checkout checklist this unit resolves to, when the signed-in user may edit that template. */
+    private function checklistTemplateType(): ?string
+    {
+        $record = $this->getRecord();
+        if (! $record instanceof Apparatus || ! ChecklistTemplateAccess::canManage(auth()->user())) {
+            return null;
+        }
+        try {
+            $type = app(DailyCheckoutChecklistResolver::class)->checklistTypeFor($record);
+
+            return in_array($type, app(ChecklistTemplateEditor::class)->types(), true) ? $type : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 }
