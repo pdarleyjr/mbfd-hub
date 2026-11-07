@@ -12,6 +12,7 @@ use App\Models\ApparatusInventoryChange;
 use App\Models\ApparatusInventoryCorrection;
 use App\Models\ApparatusInventoryCorrectionEvent as Event;
 use App\Models\User;
+use App\Services\ChecklistTemplates\ChecklistTemplateEditor;
 use App\Services\Inventory\InventoryCorrectionConflict;
 use App\Services\Inventory\InventoryOverlayHealth;
 use App\Support\Dashboards\IssueSourceRegistry;
@@ -204,6 +205,39 @@ final class InventoryCorrectionResolutionTest extends TestCase
         $this->service()->reverse($correction->id, $this->logistics, 'Back to the template.', $correction->fresh()->lock_version);
         $this->assertSame(ApparatusInventoryChange::STATUS_RETIRED, $ghost->fresh()->status);
         $this->assertSame(ApparatusInventoryChange::STATUS_REVERSED, $applied->fresh()->status);
+    }
+
+    public function test_a_published_template_that_drops_an_approved_item_leaves_a_change_logistics_can_retire(): void
+    {
+        $correction = $this->passports('wrong_quantity', ['quantity' => 4]);
+        $this->approve($correction, $this->logistics, ['op' => 'modify', 'fields' => ['expectedQuantity' => 4]]);
+        $change = $correction->changes()->where('apparatus_id', $this->units['E1']->id)->sole();
+
+        // Logistics removes Passports from the engine checklist in the template editor and publishes it.
+        $editor = app(ChecklistTemplateEditor::class);
+        $draft = $editor->startDraft('engine', $this->logistics);
+        $form = $editor->toForm($draft->checklist);
+        foreach ($form['compartments'] as $index => $compartment) {
+            $form['compartments'][$index]['items'] = array_values(array_filter($compartment['items'], static fn (array $item): bool => $item['name'] !== 'Passports'));
+        }
+        $draft = $editor->saveDraft($draft, $form, $this->logistics, $draft->lock_version)->fresh();
+        $preview = $editor->preview($draft);
+        $editor->publish($draft, $this->logistics, 'Passports moved to the station office', $preview['fingerprint'], $draft->lock_version);
+
+        // The approved change no longer applies: it is listed for Logistics instead of silently "in effect".
+        Cache::flush();
+        $before = $this->resolved('E1');
+        $this->assertSame([['change_id' => $change->id, 'reason' => 'item_not_found']], $before['overlay_conflicts']);
+        $this->assertContains($change->id, array_column(app(InventoryOverlayHealth::class)->fleetConflicts(), 'change_id'));
+        $this->asAdmin();
+        $this->get(InventoryCorrectionResource::getUrl('view', ['record' => $correction]))->assertOk()->assertSee('Not applied to the checklist');
+
+        // Retiring ends it without touching the published checklist.
+        $this->service()->retireChange($change->id, $this->logistics, 'Removed by the template publish.');
+        $this->assertSame(ApparatusInventoryChange::STATUS_RETIRED, $change->fresh()->status);
+        $after = $this->resolved('E1');
+        $this->assertSame($before['checklist_version'], $after['checklist_version']);
+        $this->assertSame([], $after['overlay_conflicts']);
     }
 
     public function test_a_blocked_reversal_names_the_request_to_reverse_first(): void
